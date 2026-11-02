@@ -1,5 +1,12 @@
 # ArtSoul Canon Bible
 
+Decision authority clarification (2026-11-02): [Current decisions and document evolution](CHANGELOG_2026-11-02_DECISION_AUTHORITY.md).
+This Bible records the current baseline and prior decisions; it is not an
+immutable veto on improvement. Current founder instructions supersede outdated
+entries. Use verified implementation evidence and current engineering practice,
+then reconcile the documents. A proposal does not change deployed behavior or
+silently authorize new economics, spending, custody or mainnet activation.
+
 Development amendment (2026-09-20): [Collection Launch](CHANGELOG_2026-09-20_COLLECTION_LAUNCH.md)
 authorizes a separate chain-aware collection path for local/testnet development.
 It qualifies §§1, 4, 8, 9, 12 and 17 for that path only; the existing Base 1/1

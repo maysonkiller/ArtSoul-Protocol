@@ -2,6 +2,12 @@
 
 This file is the compact overview of the ArtSoul public canon. The full version is `ARTSOUL_CANON_BIBLE_FULL.md`.
 
+The [November 2 decision-authority clarification](CHANGELOG_2026-11-02_DECISION_AUTHORITY.md)
+establishes that current founder instructions supersede obsolete documentation.
+The canon is a maintained baseline, not a veto on authorized improvements.
+Verify deployed behavior separately, use evidence-led current practices and
+reconcile changed decisions without inventing economics or acceptance results.
+
 The [October 26 extensibility direction](CHANGELOG_2026-10-26_CONTRACT_EXTENSIBILITY.md)
 permits future contract/payment research alongside Phase B; it does not enable
 new product networks or alter existing economics or deployment authority.
