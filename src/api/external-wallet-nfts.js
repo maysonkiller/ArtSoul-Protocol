@@ -100,10 +100,12 @@ function uint(value) {
   return number < 2n ** 256n ? number.toString() : null;
 }
 function imageUrl(image) {
-  // Only provider-cached Base images. Never forward metadata URLs or remote-fetch transformations.
+  // Only provider-cached images from the Base inventory response. Never forward original URLs or transformations.
   const value = image?.cachedUrl;
   if (typeof value !== 'string' || value.length > 512 || !['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'].includes(image.contentType)) return null;
-  return /^https:\/\/nft-cdn\.alchemy\.com\/base-mainnet\/[A-Za-z0-9_-]{1,256}$/.test(value) ? value : null;
+  const legacy = /^https:\/\/nft-cdn\.alchemy\.com\/base-mainnet\/[A-Za-z0-9_-]{1,256}$/;
+  const current = /^https:\/\/nft2-cdn\.alchemy\.com\/[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9_-]{1,128}$/;
+  return legacy.test(value) || current.test(value) ? value : null;
 }
 function normalizeItem(value) {
   const contractAddress = typeof value?.contract?.address === 'string' ? normalizeWallet(value.contract.address) : '';

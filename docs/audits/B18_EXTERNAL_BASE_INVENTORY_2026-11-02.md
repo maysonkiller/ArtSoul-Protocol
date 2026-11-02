@@ -38,16 +38,18 @@ A transfer, floor price or asking price is not a substitute for a sale receipt.
 Local request budgets are process-scoped. They are containment, not an
 account-wide billing ceiling. Separate Alchemy apps/keys do not create extra
 account quota. Activation requires verification of the existing provider
-account's free/no-spend controls and available quota. No paid plan, billing
-change, credential creation or live inventory activation is part of this slice.
+account's free/no-spend controls and available quota. The initial implementation
+was released disabled in PR461; the provider follow-up below records subsequent
+configuration without upgrading to a paid provider plan.
 
 ## Verification
 
-- 13 offline API checks pass: authentication, dispatcher routing, owner binding,
+- 14 offline API checks pass: authentication, dispatcher routing, owner binding,
   dedicated credential isolation, exact IDs/quantities, hostile metadata,
   cursor tampering/expiry, cache and concurrency, bounded response handling,
   provider failures, throttling and credential rotation races.
-- Together with the related Saved API suite, 25 checks pass.
+- The previous implementation and related Saved API suite passed 25 checks.
+  The additional check covers current CDN paths and hostile alternatives.
 - Production build passes, including all 11 HTML route and Tailwind checks.
 - 35 isolated browser checks pass at 320, 390, 768 and 1366 pixels in both
   palettes: disabled/no-auto-fetch state, explicit pagination, metadata text
@@ -64,10 +66,27 @@ chain endpoint and the existing public Base endpoint succeeded on November 2;
 the reported limit failure was not reproduced. This does not establish spare
 monthly quota or fix a provider account restriction.
 
-The Alchemy sign-in flow currently requires the owner to finish phone
-verification before the account dashboard can be inspected. No new credential
-has been created or installed. Separate provider apps can improve attribution
-and isolation, but are not a remedy for an exhausted account quota.
+The owner completed phone verification. The signed-in project account opened
+new-team onboarding, rather than the old RPC account. Its dashboard confirms
+Free ($0/month), 30 million CU/month and no payment method. The automatically
+created app was dedicated to Base NFT inventory; only Base Mainnet is enabled.
+Its credential is kept in a protected, ignored local file pending server-secret
+installation. Existing protocol RPC credentials have not changed. Separate apps
+do not provide additional account quota; old RPC account usage is still unverified.
+
+One real inventory request returned HTTP 200: 12 items, 463,568 response bytes,
+ERC-721 and ERC-1155 quantities, and continuation. A second read reused the cache.
+The response exposed a provider compatibility issue: cached previews now use
+`nft2-cdn.alchemy.com` with two opaque path segments. The adapter now accepts that
+exact HTTPS shape as well as the legacy CDN. Queries, fragments, extra segments,
+lookalike hosts, arbitrary originals and active SVG remain rejected. Replaying
+the captured response offline produces 11 raster previews and one SVG fallback,
+without another provider request. The new CDN test and production build pass.
+
+Alchemy's usage-limit control prompted a paid-plan upgrade. It was closed without
+an upgrade, card entry or spending authorization. The verified Free plan remains
+the cost boundary; process-local request limits are not represented as a shared
+quota or a guarantee of availability after free quota exhaustion.
 
 ## Interpretation and release boundary
 
@@ -79,7 +98,9 @@ The existing wallet sign-in is reused to bind the inventory to its owner;
 anonymous profile browsing does not trigger third-party inventory requests.
 These are explicit UX/data-boundary decisions, not new protocol mechanics.
 
-Local implementation and checks are complete. Hosted CI and release are
-recorded after completion. The activation gate remains open until provider
-quota controls and a bounded live request are verified. Phase B is not closed
-by this optional inventory feature.
+PR461 is merged and its dormant production release was verified. Provider-plan
+inspection and the bounded live request are now complete. The CDN compatibility
+patch, production-secret installation and explicit feature activation must still
+be verified in the release record. Native iPhone acceptance is not inferred from
+desktop fixtures or the provider probe. Phase B is not closed by this optional
+inventory feature.
