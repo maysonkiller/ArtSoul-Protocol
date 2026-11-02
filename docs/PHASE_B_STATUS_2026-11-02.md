@@ -24,6 +24,15 @@ showing whole artwork, removes hover shaking, makes desktop cards smaller and
 adds visible contextual guidance. See [the video follow-up audit](audits/B18_VIDEO_HELP_HERO_2026-11-02.md)
 for scope, verification and interpretation of the revised desktop density.
 
+The owner's next preview review superseded that banner arrangement: artwork
+fills the banner with attribution over a darkened lower edge, and the shared
+desktop card row is more compact. Menu load/retry feedback and viewport-aware
+placement preserve the existing actions. See [the overlay follow-up](audits/B18_HOME_OVERLAY_2026-11-02.md).
+Local verification is complete; production release is not yet established.
+PR443's production build was blocked by the Vercel deployment rate limit, with
+the site still serving PR442 at the time of this follow-up. No paid upgrade or
+limit bypass is authorized.
+
 ## Remaining acceptance and operational work
 
 | Gate | What remains | Boundary |
