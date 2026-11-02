@@ -361,3 +361,10 @@ shared desktop card density, and adds action-menu load/retry feedback plus
 viewport-aware placement. All action gates remain unchanged. Local build,
 focused tests and 694 shared-card browser assertions passed; release and
 remaining acceptance are recorded in [the overlay audit](audits/B18_HOME_OVERLAY_2026-11-02.md).
+
+November 2 B18 theme/account follow-up: remove the reproduced theme-switch
+geometry jump, use a straight theme split, group connector identity with the
+account, and show six Home selections without viewport-based hiding. The built
+interface passes 575 assertions over 13 viewport sizes in both palettes. See
+[the theme/account audit](audits/B18_THEME_ACCOUNT_2026-11-02.md) for release,
+synthetic-wallet limitations and remaining acceptance.

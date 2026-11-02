@@ -113,7 +113,7 @@ test('an actual Rabby provider shows its local mark, without issuing a provider 
     const provider = { isRabby: true, request: () => { throw new Error('No new provider request is allowed'); } };
     const harness = networkHarness({ provider });
     const { html } = await readMenu(harness);
-    assert.match(html, /class="avatar-wallet-provider"><img[^>]+src="\/brand\/rabby\.png"[^>]*><span>Rabby<\/span>/);
+    assert.match(html, /class="avatar-wallet-provider" title="Connected wallet: Rabby" role="img" aria-label="Connected wallet: Rabby"><img[^>]+src="\/brand\/rabby\.png"/);
 });
 
 test('a compatibility flag or unrelated injected provider cannot label the active wallet as Rabby', async () => {
@@ -128,7 +128,7 @@ test('live WalletConnect peer names are shown, while untrusted remote wallet ima
         session: { peer: { metadata: { name: 'Coinbase Wallet', icons: ['https://foreign.test/icon.svg'] } } }
     } });
     const { html } = await readMenu(harness);
-    assert.match(html, /class="avatar-wallet-provider"><span>Coinbase Wallet<\/span>/);
+    assert.match(html, /aria-label="Connected wallet: Coinbase Wallet"><span>Coinbase Wallet<\/span>/);
     assert.doesNotMatch(html, /foreign\.test|brand\/rabby\.png/);
 });
 
@@ -137,7 +137,119 @@ test('a live Rabby WalletConnect peer receives the Rabby mark', async () => {
         session: { peer: { metadata: { name: 'Rabby Wallet' } } }
     } });
     const { html } = await readMenu(harness);
-    assert.match(html, /src="\/brand\/rabby\.png"[^>]*><span>Rabby Wallet<\/span>/);
+    assert.match(html, /aria-label="Connected wallet: Rabby Wallet"><img[^>]+src="\/brand\/rabby\.png"/);
+});
+
+test('connector mark belongs to the account identity and leaves the network row independent', async () => {
+    const harness = networkHarness({ provider: { isRabby: true } });
+    const { network, html } = await readMenu(harness);
+    harness.dropdown.updateStableMenu(html, 'connected-rabby', network.walletProvider);
+    const button = harness.button();
+    const providerSlot = button.querySelector('[data-avatar-wallet-provider]');
+    assert.equal(providerSlot.parentNode, button, 'the connector mark remains available when mobile hides account text');
+    assert.equal(providerSlot.hidden, false);
+    assert.match(providerSlot.innerHTML, /aria-label="Connected wallet: Rabby"/);
+    assert.match(providerSlot.innerHTML, /src="\/brand\/rabby\.png"/);
+    const accountWallet = harness.menu().querySelector('.avatar-menu-wallet');
+    assert.ok(accountWallet.querySelector('[data-wallet-provider]'));
+    assert.equal(accountWallet.querySelector('.avatar-menu-address').dataset.walletAddress, WALLET);
+    assert.equal(harness.menu().querySelector('.avatar-wallet-section').querySelector('[data-wallet-provider]'), null);
+    assert.equal(harness.menu().querySelector('[data-network-mark]').querySelector('.avatar-identity-mark').getAttribute('src'), '/brand/base.svg');
+    assert.doesNotMatch(harness.menu().querySelector('[data-network-balance]').innerHTML, /<img/);
+
+    harness.context.window.web3Modal.getWalletProvider = async () => ({
+        session: { peer: { metadata: { name: 'Another Wallet' } } }
+    });
+    await harness.dropdown.updateNetworkDisplay();
+    assert.equal(harness.button(), button, 'provider refresh must not rebuild the account button');
+    assert.equal(providerSlot.hidden, true, 'unknown connector does not borrow the previous logo');
+    assert.equal(providerSlot.innerHTML, '');
+    assert.match(harness.menu().querySelector('[data-wallet-provider]').innerHTML, />Another Wallet<\/span>/);
+
+    harness.dropdown.renderConnectButton();
+    assert.equal(providerSlot.hidden, true);
+    assert.equal(providerSlot.innerHTML, '');
+    assert.doesNotMatch(harness.menuHtml(), /Another Wallet|avatar-menu-wallet/);
+});
+
+test('live account rendering clears the previous connector logo when the wallet changes or disconnects', async () => {
+    const harness = networkHarness({ provider: { isRabby: true } });
+    await harness.dropdown.sync(WALLET, { confirmed: true });
+    await harness.flush();
+    const providerSlot = harness.button().querySelector('[data-avatar-wallet-provider]');
+    assert.equal(providerSlot.hidden, false);
+    assert.match(providerSlot.innerHTML, /brand\/rabby\.png/);
+
+    harness.context.window.currentWalletAddress = OTHER_WALLET;
+    harness.context.window.web3Modal.getWalletProvider = async () => ({
+        session: { peer: { metadata: { name: 'Other connector' } } }
+    });
+    await harness.dropdown.sync(OTHER_WALLET, { confirmed: true });
+    await harness.flush();
+    assert.equal(providerSlot.hidden, true);
+    assert.equal(providerSlot.innerHTML, '');
+    assert.match(harness.menuHtml(), /Other connector/);
+    assert.doesNotMatch(harness.menuHtml(), /Rabby/);
+
+    harness.context.window.currentWalletAddress = null;
+    await harness.dropdown.sync(null);
+    await harness.flush();
+    assert.equal(providerSlot.hidden, true);
+    assert.doesNotMatch(harness.menuHtml(), /Other connector|Rabby/);
+});
+
+for (const [name, provider, hasMark] of [
+    ['Rabby', { isRabby: true }, true],
+    ['Other connector', { session: { peer: { metadata: { name: 'Other connector' } } } }, false]
+]) {
+    test(`same-wallet refresh retains ${name} while the live network read is pending`, async () => {
+        const harness = networkHarness({ provider });
+        await harness.dropdown.sync(WALLET, { confirmed: true });
+        await harness.flush();
+        const button = harness.button();
+        const providerSlot = button.querySelector('[data-avatar-wallet-provider]');
+        const before = providerSlot.innerHTML;
+        const pending = [];
+        harness.dropdown.getCurrentNetworkInfo = () => new Promise((resolve, reject) => pending.push({ resolve, reject }));
+
+        for (const refresh of [() => harness.dropdown.render({ walletAddress: WALLET }), () => harness.dropdown.renderWalletInfo(WALLET)]) {
+            await refresh();
+            assert.equal(harness.button(), button);
+            assert.equal(providerSlot.innerHTML, before);
+            assert.equal(providerSlot.hidden, !hasMark);
+            assert.match(harness.menuHtml(), new RegExp(`Connected wallet: ${name}`));
+        }
+        assert.equal(pending.length, 2, 'each refresh keeps its existing single network read');
+        pending.forEach(read => read.reject(new Error('Temporary network failure')));
+        await harness.flush();
+        assert.equal(providerSlot.innerHTML, before, 'a failed refresh does not erase a known connector');
+        assert.match(harness.menuHtml(), new RegExp(`Connected wallet: ${name}`));
+        assert.equal([...harness.storage.values()].some(value => value.includes(name)), false, 'provider metadata is never persisted');
+    });
+}
+
+test('stale live reads cannot revive the connector after disconnect and reconnect to the same address', async () => {
+    const harness = networkHarness({ provider: { isRabby: true } });
+    await harness.dropdown.sync(WALLET, { confirmed: true });
+    await harness.flush();
+    const providerSlot = harness.button().querySelector('[data-avatar-wallet-provider]');
+    const network = await harness.dropdown.getCurrentNetworkInfo({ includeBalance: false });
+    const pending = [];
+    harness.dropdown.getCurrentNetworkInfo = () => new Promise(resolve => pending.push(resolve));
+    const renderKey = harness.dropdown.pendingRenderKey;
+    const oldRefresh = harness.dropdown.updateNetworkDisplay();
+    const oldRender = harness.dropdown.applyLiveNetworkSection({ walletAddress: WALLET, currentPath: '/gallery', isOwnProfile: false, renderKey });
+
+    harness.dropdown.beginIdentityTransition(null);
+    assert.equal(providerSlot.hidden, true, 'disconnect clears the mark synchronously');
+    assert.equal(harness.menu().querySelector('[data-wallet-provider]').innerHTML, '');
+    harness.dropdown.beginIdentityTransition(WALLET);
+    assert.equal(harness.dropdown.pendingRenderKey, renderKey, 'same-address reconnect can reuse the same render key');
+    pending.forEach(resolve => resolve(network));
+    await Promise.all([oldRefresh, oldRender]);
+    assert.equal(providerSlot.innerHTML, '');
+    assert.equal(harness.menu().querySelector('[data-wallet-provider]').innerHTML, '');
+    assert.equal(harness.dropdown.getRememberedWalletProvider(WALLET), null);
 });
 
 test('wallet and network text cannot inject markup or arbitrary mark URLs', async () => {

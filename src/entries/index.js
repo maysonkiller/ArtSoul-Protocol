@@ -664,7 +664,7 @@ let morphActive = false;
         }
 
         // Load artworks on page load
-        const HOMEPAGE_MAX_CARDS = 8; // Up to two rows, with a responsive visible limit per breakpoint.
+        const HOMEPAGE_MAX_CARDS = 6; // A complete showcase; Explore contains the full feed.
         let homeArtworksRequest = 0;
         async function loadHomeArtworks() {
             const request = ++homeArtworksRequest;

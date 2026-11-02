@@ -4910,7 +4910,7 @@ body.future .site-header {
         display: none !important;
     }
 
-    #navButtons .avatar-button img {
+    #navButtons .avatar-button > img {
         width: 34px !important;
         height: 34px !important;
         flex-basis: 34px !important;
@@ -5683,8 +5683,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     #homeSection .home-protocol-cta h2,
     #homeSection .home-spotlight > h2 { font-size: 1.5rem; line-height: 1.25; }
     #homeSection .home-spotlight { margin-bottom: 1.5rem; }
-    #homeSection .home-spotlight > h2,
-    .classic #homeSection .home-spotlight-heading h2 { margin-bottom: 0.75rem; }
+    #homeSection .home-spotlight > h2 { margin-bottom: 0.75rem; }
 
     .gallery-page-main { padding-top: 0.75rem !important; }
     .gallery-filter-panel { padding: 1rem; margin-bottom: 1rem; }
@@ -6077,8 +6076,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         margin-top: 0 !important;
     }
 
-    #homeSection .home-spotlight > h2,
-    .classic #homeSection .home-spotlight-heading h2 {
+    #homeSection .home-spotlight > h2 {
         margin-bottom: 1rem !important;
         font-size: 1.35rem !important;
         line-height: 1.2;
@@ -7250,12 +7248,14 @@ body:is(.classic, .future) #homeSection .home-hero-actions > a {
     font-size: 15px !important;
     line-height: 1.5;
     gap: 4px;
+    border: 1px solid transparent;
     border-radius: 12px;
     clip-path: none;
     transform: none;
     box-shadow: none;
     animation: none !important;
     text-shadow: none !important;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, filter 160ms ease;
 }
 body:is(.classic, .future) #homeSection .home-hero-actions > a::before,
 body:is(.classic, .future) #homeSection .home-hero-actions > a::after { display: none; }
@@ -7263,6 +7263,7 @@ body:is(.classic, .future) #homeSection .home-hero-actions > .btn-main {
     background: var(--c-accent);
     color: var(--c-bg);
     -webkit-text-fill-color: currentColor;
+    font-weight: 600;
 }
 body:is(.classic, .future) #homeSection .home-hero-actions > .btn-secondary { border-color: transparent; background: transparent; color: var(--c-text); font-weight: 400; }
 body:is(.classic, .future) #homeSection .home-hero-actions > a:hover { transform: none; box-shadow: none; filter: brightness(1.08); }
@@ -8545,10 +8546,10 @@ body:is(.classic, .future) .site-theme-toggle-glyph {
     overflow: hidden;
     border: 1.5px solid var(--c-accent);
     border-radius: 50%;
-    transform: rotate(-35deg);
+    transform: none;
 }
-body:is(.classic, .future) .site-theme-toggle-classic { background: var(--c-text); }
-body:is(.classic, .future) .site-theme-toggle-future { background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2)); }
+body:is(.classic, .future) .site-theme-toggle-classic { background: var(--c-surface); }
+body:is(.classic, .future) .site-theme-toggle-future { background: var(--c-accent); }
 body.classic .site-theme-toggle[data-current-theme="classic"] { border-color: var(--c-accent); }
 body.future .site-theme-toggle[data-current-theme="future"] { border-color: var(--c-accent-2); }
 body:is(.classic, .future) .site-theme-toggle:focus-visible {
@@ -9422,6 +9423,7 @@ body:is(.classic, .future) #homeSection .home-spotlight-heading {
 body:is(.classic, .future) #homeSection .home-spotlight-heading h2 {
     font-size: 22px;
     line-height: 1.3;
+    margin-bottom: 5px !important;
 }
 body:is(.classic, .future) #homeSection .home-showcase-shell {
     min-height: 0 !important;
@@ -9594,19 +9596,18 @@ body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, 
     body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta { flex-direction: column; }
 }
 
-/* One density scale and a strict two-row home window at each breakpoint.
-   Unlike forcing 8 cards into 2 mobile columns, this does not create a
-   five-row feed on a tablet or phone. Explore and Profile remain unpaginated. */
+/* Six home selections form complete rows at every width. Gallery and Profile
+   retain their own density; no home selection disappears on smaller screens. */
 body:is(.classic, .future) .gallery-page-main.site-page-container {
     max-width: 1720px !important;
 }
 @media (min-width: 1200px) {
-    #artworkGallery[aria-busy="true"] { --home-loading-columns: 5; --home-loading-gap: 14px; }
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 6; --home-loading-gap: 14px; }
     body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
         grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
         gap: 14px !important;
     }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+9) { display: none !important; }
+    body:is(.classic, .future) #homeSection #artworkGallery { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
 }
 @media (min-width: 1440px) {
     #artworkGallery[aria-busy="true"] { --home-loading-columns: 6; }
@@ -9615,12 +9616,12 @@ body:is(.classic, .future) .gallery-page-main.site-page-container {
     }
 }
 @media (min-width: 900px) and (max-width: 1199px) {
-    #artworkGallery[aria-busy="true"] { --home-loading-columns: 4; --home-loading-gap: 14px; }
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 3; --home-loading-gap: 14px; }
     body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
         grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
         gap: 14px !important;
     }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+9) { display: none !important; }
+    body:is(.classic, .future) #homeSection #artworkGallery { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 }
 @media (min-width: 769px) and (max-width: 899px) {
     #artworkGallery[aria-busy="true"] { --home-loading-columns: 3; --home-loading-gap: 14px; }
@@ -9628,7 +9629,6 @@ body:is(.classic, .future) .gallery-page-main.site-page-container {
         grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
         gap: 14px !important;
     }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+7) { display: none !important; }
 }
 @media (min-width: 360px) and (max-width: 768px) {
     #artworkGallery[aria-busy="true"] { --home-loading-columns: 2; --home-loading-gap: 12px; }
@@ -9636,7 +9636,6 @@ body:is(.classic, .future) .gallery-page-main.site-page-container {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 12px !important;
     }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+5) { display: none !important; }
 }
 @media (max-width: 359px) {
     #artworkGallery[aria-busy="true"] { --home-loading-columns: 1; --home-loading-gap: 12px; }
@@ -9644,7 +9643,6 @@ body:is(.classic, .future) .gallery-page-main.site-page-container {
         grid-template-columns: minmax(0, 1fr) !important;
         gap: 12px !important;
     }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+3) { display: none !important; }
     body:is(.classic, .future) #homeSection .home-hero {
         gap: 12px !important;
         padding-bottom: 16px !important;
@@ -9718,10 +9716,42 @@ body:is(.classic, .future) .site-header .network-switcher-copy [data-network-bal
     line-height: 1.3;
 }
 body:is(.classic, .future) .site-header .avatar-wallet-provider {
+    display: inline-flex;
+    align-items: center;
     gap: 4px !important;
-    padding: 1px 5px 3px !important;
+    padding: 0 !important;
     font-size: 11px !important;
 }
+body:is(.classic, .future) .site-header .avatar-menu-wallet {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+body:is(.classic, .future) .site-header .avatar-menu-wallet > [data-wallet-provider]:empty { display: none; }
+body:is(.classic, .future) .site-header .avatar-menu-wallet > .avatar-menu-address {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-button-provider {
+    position: absolute;
+    left: 28px;
+    bottom: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--c-surface);
+    box-shadow: 0 0 0 2px var(--c-surface);
+    pointer-events: none;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-button:has(.avatar-button-provider) { position: relative; }
+body:is(.classic, .future) .site-header #navButtons .avatar-button-provider[hidden] { display: none; }
+body:is(.classic, .future) .site-header #navButtons .avatar-button-provider .avatar-identity-mark { width: 14px; height: 14px; flex-basis: 14px; }
 body:is(.classic, .future) .site-header .avatar-dropdown-navigation {
     padding: 0 !important;
 }
