@@ -1,0 +1,2011 @@
+{
+  "schemaVersion": 1,
+  "scope": "Current constructor-based source; not deployed state or upgrade compatibility",
+  "sourceNormalization": "CRLF to LF; no other source transformations",
+  "compiler": "0.8.24+commit.e11b9ed9",
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "evmVersion": "paris"
+  },
+  "sources": {
+    "@openzeppelin/contracts/access/Ownable.sol": {
+      "sha256": "38578bd71c0a909840e67202db527cc6b4e6b437e0f39f0c909da32c1e30cb81"
+    },
+    "@openzeppelin/contracts/access/Ownable2Step.sol": {
+      "sha256": "90f1f1cdd07ce4b90e987065e82899fdaa6ef967d1996915143c6e39818e160c"
+    },
+    "@openzeppelin/contracts/interfaces/IERC165.sol": {
+      "sha256": "49abfb8fa26e3f1715fe05948a96e3762b805bd4a77d103eb40ba96b1acfa144"
+    },
+    "@openzeppelin/contracts/interfaces/IERC2981.sol": {
+      "sha256": "5bbbb6dfc9b0d248cc19f10e7a14fc7706138fbf3b63cea6655fd7968e1666e0"
+    },
+    "@openzeppelin/contracts/interfaces/IERC4906.sol": {
+      "sha256": "0d997da24e513496c7f59de45c12fa0aa53ecfa65d3ae0d98cb9e2dcf45d9317"
+    },
+    "@openzeppelin/contracts/interfaces/IERC721.sol": {
+      "sha256": "f33ff9bb851371eab816597d29e77dea7947c392de6bce6bea29df3439546b16"
+    },
+    "@openzeppelin/contracts/interfaces/draft-IERC6093.sol": {
+      "sha256": "4aea87243e6de38804bf8737bf86f750443d3b5e63dd0fd0b7ad92f77cdbd3e3"
+    },
+    "@openzeppelin/contracts/token/ERC721/ERC721.sol": {
+      "sha256": "94f07f843e2f541a5a000a6375a41345412c6d6da9316c547f39e0fe1f2447f7"
+    },
+    "@openzeppelin/contracts/token/ERC721/IERC721.sol": {
+      "sha256": "8239cba58986af2deb65af8092d5abcd4ffe60a38dee00cb2e8c6465f945c2d0"
+    },
+    "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol": {
+      "sha256": "ad84633afd30a71a888403875e2ca7db9e97499d258ccdd98f48dd7cea8229f5"
+    },
+    "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol": {
+      "sha256": "ad44e65d5ab8aa7e8a03e6263fc0064217dbd3e879de31e363d8cf39287df08b"
+    },
+    "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol": {
+      "sha256": "63d104c065c281e8d8e1fabe0eda19ff83d4660ce1378f9dad2471226d2bf34f"
+    },
+    "@openzeppelin/contracts/token/common/ERC2981.sol": {
+      "sha256": "ec48a7d7d4b73599e3c010357ff350b95689629a8aca5190f8ffc0dd5152b11f"
+    },
+    "@openzeppelin/contracts/utils/Context.sol": {
+      "sha256": "9c1cc43aa4a2bde5c7dea0d4830cd42c54813ff883e55c8d8f12e6189bf7f10a"
+    },
+    "@openzeppelin/contracts/utils/Pausable.sol": {
+      "sha256": "6543160582b3c0319a180f31660faf6ba0a8444acbdb03357c09790a96256835"
+    },
+    "@openzeppelin/contracts/utils/ReentrancyGuard.sol": {
+      "sha256": "8d0bac508a25133c9ff80206f65164cef959ec084645d1e7b06050c2971ae0fc"
+    },
+    "@openzeppelin/contracts/utils/Strings.sol": {
+      "sha256": "0519199dbc635f98ce2e4537986604ee618bca665c65e9a1738702dfacf72010"
+    },
+    "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol": {
+      "sha256": "0c9a003ecff0f1fde559be648d43360000493d35666bf9221ff83f3bf3ddbccb"
+    },
+    "@openzeppelin/contracts/utils/introspection/ERC165.sol": {
+      "sha256": "99348354365cbdeb90157e2903334b861a00d69faab7720ae542d911d5c70d87"
+    },
+    "@openzeppelin/contracts/utils/introspection/IERC165.sol": {
+      "sha256": "07ae1ac964ab74dedada999e2dfc642031a6495469cffc0bf715daa4f1e4f904"
+    },
+    "@openzeppelin/contracts/utils/math/Math.sol": {
+      "sha256": "a6ee779fc42e6bf01b5e6a963065706e882b016affbedfd8be19a71ea48e6e15"
+    },
+    "@openzeppelin/contracts/utils/math/SignedMath.sol": {
+      "sha256": "768c28e3a33c3312e57ae8a1caaec2893bc89ac6e386621de018f85e9a2d6e99"
+    },
+    "contracts/ArtSoulCore.sol": {
+      "sha256": "8176ebf098465d0e4312c40b45b0032e73b979e9dbe1fcac272723296021feca"
+    },
+    "contracts/ArtSoulDonations.sol": {
+      "sha256": "51d45f1dc71fb64794c378786410688b24a84027165b74434658a1a7ce9416e9"
+    },
+    "contracts/ArtSoulNFT.sol": {
+      "sha256": "d34f894c8bfb3b73694832b846624d79a32b13a72a37ca9f715da0fd0b7ecd6c"
+    },
+    "contracts/ArtSoulProjectNFT.sol": {
+      "sha256": "609a9ff0c75736c379cae3fff23167f1d46e0f0567737e4e89399bd1a0839cc9"
+    },
+    "contracts/interfaces/IArtSoulArtworkRegistry.sol": {
+      "sha256": "d5598291cd694b3a9e2ed0886439d7ba31629c9927426556ed3a0302a3ac94c1"
+    },
+    "contracts/interfaces/IArtSoulNFT.sol": {
+      "sha256": "4902d80a144dda757fadb42d9de7f0348b8cb6319f43f2aae93a86e1aeb96881"
+    },
+    "contracts/interfaces/IArtSoulProjectNFT.sol": {
+      "sha256": "09d919d6924d7e556378d021ee4b2ad7e67ac269c499ced56af5d962aee9a1bb"
+    },
+    "contracts/launch/CollectionForge.sol": {
+      "sha256": "6f6cd123a1f4b009df8d4aac26662eaa4a9bc2278a66ff1788f281eafe69c827"
+    },
+    "contracts/launch/CollectionLaunch.sol": {
+      "sha256": "11aa1f9609edab420d33669ee42090f0e6c74862589d32ba49ced864953dedab"
+    },
+    "contracts/test/DonationAdversary.sol": {
+      "sha256": "aac7826b4c0db40ea449f2aef65bfb5c1e681639d73a4d18f908d3efeca513bf"
+    },
+    "contracts/test/LaunchAdversary.sol": {
+      "sha256": "26f98b0cc80bdc5ae86f9047b4862846f579240a2de7ab327eb1400d21781596"
+    },
+    "contracts/test/ReentrantWithdrawer.sol": {
+      "sha256": "c02810602f3b238381370a4197aa7262ec9ccd6aa8e223e79d9c2d0f01cdbbbd"
+    }
+  },
+  "compilerInputSha256": "4a85181d73f4f8b8ab89e11ec1df1718ff3f797ecc130f5814083361beb775ff",
+  "contracts": {
+    "contracts/ArtSoulCore.sol:ArtSoulCore": {
+      "storage": [
+        {
+          "astId": 8,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "_owner",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 156,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "_pendingOwner",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_address"
+        },
+        {
+          "astId": 2005,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "_paused",
+          "offset": 20,
+          "slot": "1",
+          "type": "t_bool"
+        },
+        {
+          "astId": 2124,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "_status",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 4284,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "treasury",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_address"
+        },
+        {
+          "astId": 4292,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "artworkCounter",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 4294,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "auctionCounter",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 4296,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "successfulSettlements",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 4301,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "artworks",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_mapping(t_uint256,t_struct(Artwork)4201_storage)"
+        },
+        {
+          "astId": 4306,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "auctions",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_mapping(t_uint256,t_struct(Auction)4227_storage)"
+        },
+        {
+          "astId": 4310,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "tokenToArtwork",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 4315,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "resaleListings",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_mapping(t_uint256,t_struct(ResaleListing)4234_storage)"
+        },
+        {
+          "astId": 4319,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "pendingWithdrawals",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 4323,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "projectEligibilityHash",
+          "offset": 0,
+          "slot": "12",
+          "type": "t_mapping(t_address,t_bytes32)"
+        },
+        {
+          "astId": 4327,
+          "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "label": "projectNFTMinted",
+          "offset": 0,
+          "slot": "13",
+          "type": "t_mapping(t_address,t_bool)"
+        }
+      ],
+      "types": {
+        "t_address": {
+          "encoding": "inplace",
+          "label": "address",
+          "numberOfBytes": "20"
+        },
+        "t_bool": {
+          "encoding": "inplace",
+          "label": "bool",
+          "numberOfBytes": "1"
+        },
+        "t_bytes32": {
+          "encoding": "inplace",
+          "label": "bytes32",
+          "numberOfBytes": "32"
+        },
+        "t_enum(AuctionStatus)4188": {
+          "encoding": "inplace",
+          "label": "enum ArtSoulCore.AuctionStatus",
+          "numberOfBytes": "1"
+        },
+        "t_mapping(t_address,t_bool)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => bool)",
+          "numberOfBytes": "32",
+          "value": "t_bool"
+        },
+        "t_mapping(t_address,t_bytes32)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => bytes32)",
+          "numberOfBytes": "32",
+          "value": "t_bytes32"
+        },
+        "t_mapping(t_address,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_mapping(t_uint256,t_struct(Artwork)4201_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct ArtSoulCore.Artwork)",
+          "numberOfBytes": "32",
+          "value": "t_struct(Artwork)4201_storage"
+        },
+        "t_mapping(t_uint256,t_struct(Auction)4227_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct ArtSoulCore.Auction)",
+          "numberOfBytes": "32",
+          "value": "t_struct(Auction)4227_storage"
+        },
+        "t_mapping(t_uint256,t_struct(ResaleListing)4234_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct ArtSoulCore.ResaleListing)",
+          "numberOfBytes": "32",
+          "value": "t_struct(ResaleListing)4234_storage"
+        },
+        "t_mapping(t_uint256,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_string_storage": {
+          "encoding": "bytes",
+          "label": "string",
+          "numberOfBytes": "32"
+        },
+        "t_struct(Artwork)4201_storage": {
+          "encoding": "inplace",
+          "label": "struct ArtSoulCore.Artwork",
+          "members": [
+            {
+              "astId": 4190,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "creator",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_address"
+            },
+            {
+              "astId": 4192,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "metadataURI",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_string_storage"
+            },
+            {
+              "astId": 4194,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "minted",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_bool"
+            },
+            {
+              "astId": 4196,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "canonicalFloor",
+              "offset": 0,
+              "slot": "3",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4198,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "tokenId",
+              "offset": 0,
+              "slot": "4",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4200,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "activeAuctionId",
+              "offset": 0,
+              "slot": "5",
+              "type": "t_uint256"
+            }
+          ],
+          "numberOfBytes": "192"
+        },
+        "t_struct(Auction)4227_storage": {
+          "encoding": "inplace",
+          "label": "struct ArtSoulCore.Auction",
+          "members": [
+            {
+              "astId": 4203,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "artworkId",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4205,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "creator",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_address"
+            },
+            {
+              "astId": 4207,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "startPrice",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4209,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "duration",
+              "offset": 0,
+              "slot": "3",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4211,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "originalEndTime",
+              "offset": 0,
+              "slot": "4",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4213,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "endTime",
+              "offset": 0,
+              "slot": "5",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4215,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "totalExtension",
+              "offset": 0,
+              "slot": "6",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4217,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "highestBid",
+              "offset": 0,
+              "slot": "7",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4219,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "highestBidder",
+              "offset": 0,
+              "slot": "8",
+              "type": "t_address"
+            },
+            {
+              "astId": 4221,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "depositLocked",
+              "offset": 0,
+              "slot": "9",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4223,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "settlementDeadline",
+              "offset": 0,
+              "slot": "10",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4226,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "status",
+              "offset": 0,
+              "slot": "11",
+              "type": "t_enum(AuctionStatus)4188"
+            }
+          ],
+          "numberOfBytes": "384"
+        },
+        "t_struct(ResaleListing)4234_storage": {
+          "encoding": "inplace",
+          "label": "struct ArtSoulCore.ResaleListing",
+          "members": [
+            {
+              "astId": 4229,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "seller",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_address"
+            },
+            {
+              "astId": 4231,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "price",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4233,
+              "contract": "contracts/ArtSoulCore.sol:ArtSoulCore",
+              "label": "active",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_bool"
+            }
+          ],
+          "numberOfBytes": "96"
+        },
+        "t_uint256": {
+          "encoding": "inplace",
+          "label": "uint256",
+          "numberOfBytes": "32"
+        }
+      },
+      "immutables": [
+        {
+          "name": "nftContract",
+          "declaredIn": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "type": "contract IArtSoulNFT",
+          "astId": 4287,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 2133
+            },
+            {
+              "length": 32,
+              "start": 3506
+            },
+            {
+              "length": 32,
+              "start": 4646
+            },
+            {
+              "length": 32,
+              "start": 4824
+            },
+            {
+              "length": 32,
+              "start": 4976
+            },
+            {
+              "length": 32,
+              "start": 6905
+            },
+            {
+              "length": 32,
+              "start": 7411
+            }
+          ]
+        },
+        {
+          "name": "projectNFT",
+          "declaredIn": "contracts/ArtSoulCore.sol:ArtSoulCore",
+          "type": "contract IArtSoulProjectNFT",
+          "astId": 4290,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 1698
+            },
+            {
+              "length": 32,
+              "start": 4058
+            }
+          ]
+        }
+      ]
+    },
+    "contracts/ArtSoulNFT.sol:ArtSoulNFT": {
+      "storage": [
+        {
+          "astId": 455,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_name",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 457,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_symbol",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 461,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_owners",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 465,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_balances",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 469,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_tokenApprovals",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 475,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_operatorApprovals",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_mapping(t_address,t_mapping(t_address,t_bool))"
+        },
+        {
+          "astId": 1594,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_tokenURIs",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_mapping(t_uint256,t_string_storage)"
+        },
+        {
+          "astId": 1740,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_defaultRoyaltyInfo",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_struct(RoyaltyInfo)1737_storage"
+        },
+        {
+          "astId": 1745,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_tokenRoyaltyInfo",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_mapping(t_uint256,t_struct(RoyaltyInfo)1737_storage)"
+        },
+        {
+          "astId": 8,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_owner",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_address"
+        },
+        {
+          "astId": 156,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "_pendingOwner",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_address"
+        },
+        {
+          "astId": 6477,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "totalSupply",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6479,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "core",
+          "offset": 0,
+          "slot": "12",
+          "type": "t_address"
+        },
+        {
+          "astId": 6483,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "artworkToToken",
+          "offset": 0,
+          "slot": "13",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 6487,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "tokenToArtwork",
+          "offset": 0,
+          "slot": "14",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 6491,
+          "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+          "label": "tokenCreator",
+          "offset": 0,
+          "slot": "15",
+          "type": "t_mapping(t_uint256,t_address)"
+        }
+      ],
+      "types": {
+        "t_address": {
+          "encoding": "inplace",
+          "label": "address",
+          "numberOfBytes": "20"
+        },
+        "t_bool": {
+          "encoding": "inplace",
+          "label": "bool",
+          "numberOfBytes": "1"
+        },
+        "t_mapping(t_address,t_bool)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => bool)",
+          "numberOfBytes": "32",
+          "value": "t_bool"
+        },
+        "t_mapping(t_address,t_mapping(t_address,t_bool))": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => mapping(address => bool))",
+          "numberOfBytes": "32",
+          "value": "t_mapping(t_address,t_bool)"
+        },
+        "t_mapping(t_address,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_mapping(t_uint256,t_address)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => address)",
+          "numberOfBytes": "32",
+          "value": "t_address"
+        },
+        "t_mapping(t_uint256,t_string_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => string)",
+          "numberOfBytes": "32",
+          "value": "t_string_storage"
+        },
+        "t_mapping(t_uint256,t_struct(RoyaltyInfo)1737_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct ERC2981.RoyaltyInfo)",
+          "numberOfBytes": "32",
+          "value": "t_struct(RoyaltyInfo)1737_storage"
+        },
+        "t_mapping(t_uint256,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_string_storage": {
+          "encoding": "bytes",
+          "label": "string",
+          "numberOfBytes": "32"
+        },
+        "t_struct(RoyaltyInfo)1737_storage": {
+          "encoding": "inplace",
+          "label": "struct ERC2981.RoyaltyInfo",
+          "members": [
+            {
+              "astId": 1734,
+              "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+              "label": "receiver",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_address"
+            },
+            {
+              "astId": 1736,
+              "contract": "contracts/ArtSoulNFT.sol:ArtSoulNFT",
+              "label": "royaltyFraction",
+              "offset": 20,
+              "slot": "0",
+              "type": "t_uint96"
+            }
+          ],
+          "numberOfBytes": "32"
+        },
+        "t_uint256": {
+          "encoding": "inplace",
+          "label": "uint256",
+          "numberOfBytes": "32"
+        },
+        "t_uint96": {
+          "encoding": "inplace",
+          "label": "uint96",
+          "numberOfBytes": "12"
+        }
+      },
+      "immutables": []
+    },
+    "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT": {
+      "storage": [
+        {
+          "astId": 455,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "_name",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 457,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "_symbol",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 461,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "_owners",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 465,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "_balances",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 469,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "_tokenApprovals",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 475,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "_operatorApprovals",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_mapping(t_address,t_mapping(t_address,t_bool))"
+        },
+        {
+          "astId": 8,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "_owner",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_address"
+        },
+        {
+          "astId": 156,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "_pendingOwner",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_address"
+        },
+        {
+          "astId": 6740,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "currentDistributed",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 6742,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "core",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_address"
+        },
+        {
+          "astId": 6744,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "baseURI",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 6746,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "contractMetadataURI",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 6750,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "hasMintedGenesis",
+          "offset": 0,
+          "slot": "12",
+          "type": "t_mapping(t_address,t_bool)"
+        },
+        {
+          "astId": 6754,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "userGenesisToken",
+          "offset": 0,
+          "slot": "13",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 6758,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "tokenEligibilityHash",
+          "offset": 0,
+          "slot": "14",
+          "type": "t_mapping(t_uint256,t_bytes32)"
+        },
+        {
+          "astId": 6763,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "ownershipHistory",
+          "offset": 0,
+          "slot": "15",
+          "type": "t_mapping(t_uint256,t_array(t_address)dyn_storage)"
+        },
+        {
+          "astId": 6768,
+          "contract": "contracts/ArtSoulProjectNFT.sol:ArtSoulProjectNFT",
+          "label": "ownershipTimestamps",
+          "offset": 0,
+          "slot": "16",
+          "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)"
+        }
+      ],
+      "types": {
+        "t_address": {
+          "encoding": "inplace",
+          "label": "address",
+          "numberOfBytes": "20"
+        },
+        "t_array(t_address)dyn_storage": {
+          "base": "t_address",
+          "encoding": "dynamic_array",
+          "label": "address[]",
+          "numberOfBytes": "32"
+        },
+        "t_array(t_uint256)dyn_storage": {
+          "base": "t_uint256",
+          "encoding": "dynamic_array",
+          "label": "uint256[]",
+          "numberOfBytes": "32"
+        },
+        "t_bool": {
+          "encoding": "inplace",
+          "label": "bool",
+          "numberOfBytes": "1"
+        },
+        "t_bytes32": {
+          "encoding": "inplace",
+          "label": "bytes32",
+          "numberOfBytes": "32"
+        },
+        "t_mapping(t_address,t_bool)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => bool)",
+          "numberOfBytes": "32",
+          "value": "t_bool"
+        },
+        "t_mapping(t_address,t_mapping(t_address,t_bool))": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => mapping(address => bool))",
+          "numberOfBytes": "32",
+          "value": "t_mapping(t_address,t_bool)"
+        },
+        "t_mapping(t_address,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_mapping(t_uint256,t_address)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => address)",
+          "numberOfBytes": "32",
+          "value": "t_address"
+        },
+        "t_mapping(t_uint256,t_array(t_address)dyn_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => address[])",
+          "numberOfBytes": "32",
+          "value": "t_array(t_address)dyn_storage"
+        },
+        "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => uint256[])",
+          "numberOfBytes": "32",
+          "value": "t_array(t_uint256)dyn_storage"
+        },
+        "t_mapping(t_uint256,t_bytes32)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => bytes32)",
+          "numberOfBytes": "32",
+          "value": "t_bytes32"
+        },
+        "t_string_storage": {
+          "encoding": "bytes",
+          "label": "string",
+          "numberOfBytes": "32"
+        },
+        "t_uint256": {
+          "encoding": "inplace",
+          "label": "uint256",
+          "numberOfBytes": "32"
+        }
+      },
+      "immutables": []
+    },
+    "contracts/ArtSoulDonations.sol:ArtSoulDonations": {
+      "storage": [
+        {
+          "astId": 8,
+          "contract": "contracts/ArtSoulDonations.sol:ArtSoulDonations",
+          "label": "_owner",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 156,
+          "contract": "contracts/ArtSoulDonations.sol:ArtSoulDonations",
+          "label": "_pendingOwner",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_address"
+        },
+        {
+          "astId": 2005,
+          "contract": "contracts/ArtSoulDonations.sol:ArtSoulDonations",
+          "label": "_paused",
+          "offset": 20,
+          "slot": "1",
+          "type": "t_bool"
+        },
+        {
+          "astId": 2124,
+          "contract": "contracts/ArtSoulDonations.sol:ArtSoulDonations",
+          "label": "_status",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        }
+      ],
+      "types": {
+        "t_address": {
+          "encoding": "inplace",
+          "label": "address",
+          "numberOfBytes": "20"
+        },
+        "t_bool": {
+          "encoding": "inplace",
+          "label": "bool",
+          "numberOfBytes": "1"
+        },
+        "t_uint256": {
+          "encoding": "inplace",
+          "label": "uint256",
+          "numberOfBytes": "32"
+        }
+      },
+      "immutables": [
+        {
+          "name": "core",
+          "declaredIn": "contracts/ArtSoulDonations.sol:ArtSoulDonations",
+          "type": "contract IArtSoulArtworkRegistry",
+          "astId": 6061,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 447
+            },
+            {
+              "length": 32,
+              "start": 712
+            }
+          ]
+        }
+      ]
+    },
+    "contracts/launch/CollectionLaunch.sol:CollectionLaunch": {
+      "storage": [
+        {
+          "astId": 455,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_name",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 457,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_symbol",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 461,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_owners",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 465,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_balances",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 469,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_tokenApprovals",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 475,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_operatorApprovals",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_mapping(t_address,t_mapping(t_address,t_bool))"
+        },
+        {
+          "astId": 1740,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_defaultRoyaltyInfo",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_struct(RoyaltyInfo)1737_storage"
+        },
+        {
+          "astId": 1745,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_tokenRoyaltyInfo",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_mapping(t_uint256,t_struct(RoyaltyInfo)1737_storage)"
+        },
+        {
+          "astId": 8,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_owner",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_address"
+        },
+        {
+          "astId": 156,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_pendingOwner",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_address"
+        },
+        {
+          "astId": 2005,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_paused",
+          "offset": 20,
+          "slot": "9",
+          "type": "t_bool"
+        },
+        {
+          "astId": 2124,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_status",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 7735,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_metadataPrefix",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 7737,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "totalMinted",
+          "offset": 0,
+          "slot": "12",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 7739,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "totalBurned",
+          "offset": 0,
+          "slot": "13",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 7741,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "allocatedSupply",
+          "offset": 0,
+          "slot": "14",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 7743,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "configurationLocked",
+          "offset": 0,
+          "slot": "15",
+          "type": "t_bool"
+        },
+        {
+          "astId": 7745,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "forge",
+          "offset": 1,
+          "slot": "15",
+          "type": "t_address"
+        },
+        {
+          "astId": 7749,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_phases",
+          "offset": 0,
+          "slot": "16",
+          "type": "t_array(t_struct(PhaseConfig)7694_storage)dyn_storage"
+        },
+        {
+          "astId": 7754,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_states",
+          "offset": 0,
+          "slot": "17",
+          "type": "t_mapping(t_uint256,t_struct(PhaseState)7707_storage)"
+        },
+        {
+          "astId": 7760,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "phaseMints",
+          "offset": 0,
+          "slot": "18",
+          "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))"
+        },
+        {
+          "astId": 7767,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "bids",
+          "offset": 0,
+          "slot": "19",
+          "type": "t_mapping(t_uint256,t_mapping(t_address,t_struct(Bid)7718_storage))"
+        },
+        {
+          "astId": 7772,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "_heaps",
+          "offset": 0,
+          "slot": "20",
+          "type": "t_mapping(t_uint256,t_array(t_address)dyn_storage)"
+        },
+        {
+          "astId": 7776,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "credits",
+          "offset": 0,
+          "slot": "21",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 7780,
+          "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "label": "firstCollector",
+          "offset": 0,
+          "slot": "22",
+          "type": "t_mapping(t_uint256,t_address)"
+        }
+      ],
+      "types": {
+        "t_address": {
+          "encoding": "inplace",
+          "label": "address",
+          "numberOfBytes": "20"
+        },
+        "t_array(t_address)dyn_storage": {
+          "base": "t_address",
+          "encoding": "dynamic_array",
+          "label": "address[]",
+          "numberOfBytes": "32"
+        },
+        "t_array(t_struct(PhaseConfig)7694_storage)dyn_storage": {
+          "base": "t_struct(PhaseConfig)7694_storage",
+          "encoding": "dynamic_array",
+          "label": "struct CollectionLaunch.PhaseConfig[]",
+          "numberOfBytes": "32"
+        },
+        "t_bool": {
+          "encoding": "inplace",
+          "label": "bool",
+          "numberOfBytes": "1"
+        },
+        "t_bytes32": {
+          "encoding": "inplace",
+          "label": "bytes32",
+          "numberOfBytes": "32"
+        },
+        "t_enum(Kind)7668": {
+          "encoding": "inplace",
+          "label": "enum CollectionLaunch.Kind",
+          "numberOfBytes": "1"
+        },
+        "t_mapping(t_address,t_bool)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => bool)",
+          "numberOfBytes": "32",
+          "value": "t_bool"
+        },
+        "t_mapping(t_address,t_mapping(t_address,t_bool))": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => mapping(address => bool))",
+          "numberOfBytes": "32",
+          "value": "t_mapping(t_address,t_bool)"
+        },
+        "t_mapping(t_address,t_struct(Bid)7718_storage)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => struct CollectionLaunch.Bid)",
+          "numberOfBytes": "32",
+          "value": "t_struct(Bid)7718_storage"
+        },
+        "t_mapping(t_address,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_mapping(t_uint256,t_address)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => address)",
+          "numberOfBytes": "32",
+          "value": "t_address"
+        },
+        "t_mapping(t_uint256,t_array(t_address)dyn_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => address[])",
+          "numberOfBytes": "32",
+          "value": "t_array(t_address)dyn_storage"
+        },
+        "t_mapping(t_uint256,t_mapping(t_address,t_struct(Bid)7718_storage))": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => mapping(address => struct CollectionLaunch.Bid))",
+          "numberOfBytes": "32",
+          "value": "t_mapping(t_address,t_struct(Bid)7718_storage)"
+        },
+        "t_mapping(t_uint256,t_mapping(t_address,t_uint256))": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => mapping(address => uint256))",
+          "numberOfBytes": "32",
+          "value": "t_mapping(t_address,t_uint256)"
+        },
+        "t_mapping(t_uint256,t_struct(PhaseState)7707_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct CollectionLaunch.PhaseState)",
+          "numberOfBytes": "32",
+          "value": "t_struct(PhaseState)7707_storage"
+        },
+        "t_mapping(t_uint256,t_struct(RoyaltyInfo)1737_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct ERC2981.RoyaltyInfo)",
+          "numberOfBytes": "32",
+          "value": "t_struct(RoyaltyInfo)1737_storage"
+        },
+        "t_string_storage": {
+          "encoding": "bytes",
+          "label": "string",
+          "numberOfBytes": "32"
+        },
+        "t_struct(Bid)7718_storage": {
+          "encoding": "inplace",
+          "label": "struct CollectionLaunch.Bid",
+          "members": [
+            {
+              "astId": 7709,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "amount",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 7711,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "sequence",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 7713,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "winner",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_bool"
+            },
+            {
+              "astId": 7715,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "claimed",
+              "offset": 1,
+              "slot": "2",
+              "type": "t_bool"
+            },
+            {
+              "astId": 7717,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "refundCredited",
+              "offset": 2,
+              "slot": "2",
+              "type": "t_bool"
+            }
+          ],
+          "numberOfBytes": "96"
+        },
+        "t_struct(PhaseConfig)7694_storage": {
+          "encoding": "inplace",
+          "label": "struct CollectionLaunch.PhaseConfig",
+          "members": [
+            {
+              "astId": 7671,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "kind",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_enum(Kind)7668"
+            },
+            {
+              "astId": 7673,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "start",
+              "offset": 1,
+              "slot": "0",
+              "type": "t_uint64"
+            },
+            {
+              "astId": 7675,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "end",
+              "offset": 9,
+              "slot": "0",
+              "type": "t_uint64"
+            },
+            {
+              "astId": 7677,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "allocation",
+              "offset": 17,
+              "slot": "0",
+              "type": "t_uint32"
+            },
+            {
+              "astId": 7679,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "walletLimit",
+              "offset": 21,
+              "slot": "0",
+              "type": "t_uint32"
+            },
+            {
+              "astId": 7681,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "price",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 7683,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "merkleRoot",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_bytes32"
+            },
+            {
+              "astId": 7685,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "enabled",
+              "offset": 0,
+              "slot": "3",
+              "type": "t_bool"
+            },
+            {
+              "astId": 7687,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "rollover",
+              "offset": 1,
+              "slot": "3",
+              "type": "t_bool"
+            },
+            {
+              "astId": 7689,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "priceSource",
+              "offset": 2,
+              "slot": "3",
+              "type": "t_uint8"
+            },
+            {
+              "astId": 7691,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "fallbackEnabled",
+              "offset": 3,
+              "slot": "3",
+              "type": "t_bool"
+            },
+            {
+              "astId": 7693,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "fallbackPrice",
+              "offset": 0,
+              "slot": "4",
+              "type": "t_uint256"
+            }
+          ],
+          "numberOfBytes": "160"
+        },
+        "t_struct(PhaseState)7707_storage": {
+          "encoding": "inplace",
+          "label": "struct CollectionLaunch.PhaseState",
+          "members": [
+            {
+              "astId": 7696,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "capacity",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_uint32"
+            },
+            {
+              "astId": 7698,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "consumed",
+              "offset": 4,
+              "slot": "0",
+              "type": "t_uint32"
+            },
+            {
+              "astId": 7700,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "bids",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 7702,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "clearingPrice",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 7704,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "closed",
+              "offset": 0,
+              "slot": "3",
+              "type": "t_bool"
+            },
+            {
+              "astId": 7706,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "subscribed",
+              "offset": 1,
+              "slot": "3",
+              "type": "t_bool"
+            }
+          ],
+          "numberOfBytes": "128"
+        },
+        "t_struct(RoyaltyInfo)1737_storage": {
+          "encoding": "inplace",
+          "label": "struct ERC2981.RoyaltyInfo",
+          "members": [
+            {
+              "astId": 1734,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "receiver",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_address"
+            },
+            {
+              "astId": 1736,
+              "contract": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+              "label": "royaltyFraction",
+              "offset": 20,
+              "slot": "0",
+              "type": "t_uint96"
+            }
+          ],
+          "numberOfBytes": "32"
+        },
+        "t_uint256": {
+          "encoding": "inplace",
+          "label": "uint256",
+          "numberOfBytes": "32"
+        },
+        "t_uint32": {
+          "encoding": "inplace",
+          "label": "uint32",
+          "numberOfBytes": "4"
+        },
+        "t_uint64": {
+          "encoding": "inplace",
+          "label": "uint64",
+          "numberOfBytes": "8"
+        },
+        "t_uint8": {
+          "encoding": "inplace",
+          "label": "uint8",
+          "numberOfBytes": "1"
+        },
+        "t_uint96": {
+          "encoding": "inplace",
+          "label": "uint96",
+          "numberOfBytes": "12"
+        }
+      },
+      "immutables": [
+        {
+          "name": "maxSupply",
+          "declaredIn": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "type": "uint32",
+          "astId": 7729,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 2261
+            },
+            {
+              "length": 32,
+              "start": 7128
+            },
+            {
+              "length": 32,
+              "start": 12659
+            }
+          ]
+        },
+        {
+          "name": "creator",
+          "declaredIn": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "type": "address",
+          "astId": 7731,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 870
+            },
+            {
+              "length": 32,
+              "start": 12586
+            }
+          ]
+        },
+        {
+          "name": "protocolReceiver",
+          "declaredIn": "contracts/launch/CollectionLaunch.sol:CollectionLaunch",
+          "type": "address",
+          "astId": 7733,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 1099
+            },
+            {
+              "length": 32,
+              "start": 12493
+            }
+          ]
+        }
+      ]
+    },
+    "contracts/launch/CollectionForge.sol:CollectionForge": {
+      "storage": [
+        {
+          "astId": 455,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_name",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 457,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_symbol",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 461,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_owners",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 465,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_balances",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 469,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_tokenApprovals",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 475,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_operatorApprovals",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_mapping(t_address,t_mapping(t_address,t_bool))"
+        },
+        {
+          "astId": 1740,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_defaultRoyaltyInfo",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_struct(RoyaltyInfo)1737_storage"
+        },
+        {
+          "astId": 1745,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_tokenRoyaltyInfo",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_mapping(t_uint256,t_struct(RoyaltyInfo)1737_storage)"
+        },
+        {
+          "astId": 8,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_owner",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_address"
+        },
+        {
+          "astId": 156,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_pendingOwner",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_address"
+        },
+        {
+          "astId": 2005,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_paused",
+          "offset": 20,
+          "slot": "9",
+          "type": "t_bool"
+        },
+        {
+          "astId": 2124,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_status",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 7313,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "totalMinted",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 7315,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "_metadataPrefix",
+          "offset": 0,
+          "slot": "12",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 7319,
+          "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "label": "forgedBy",
+          "offset": 0,
+          "slot": "13",
+          "type": "t_mapping(t_uint256,t_address)"
+        }
+      ],
+      "types": {
+        "t_address": {
+          "encoding": "inplace",
+          "label": "address",
+          "numberOfBytes": "20"
+        },
+        "t_bool": {
+          "encoding": "inplace",
+          "label": "bool",
+          "numberOfBytes": "1"
+        },
+        "t_mapping(t_address,t_bool)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => bool)",
+          "numberOfBytes": "32",
+          "value": "t_bool"
+        },
+        "t_mapping(t_address,t_mapping(t_address,t_bool))": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => mapping(address => bool))",
+          "numberOfBytes": "32",
+          "value": "t_mapping(t_address,t_bool)"
+        },
+        "t_mapping(t_address,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_mapping(t_uint256,t_address)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => address)",
+          "numberOfBytes": "32",
+          "value": "t_address"
+        },
+        "t_mapping(t_uint256,t_struct(RoyaltyInfo)1737_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct ERC2981.RoyaltyInfo)",
+          "numberOfBytes": "32",
+          "value": "t_struct(RoyaltyInfo)1737_storage"
+        },
+        "t_string_storage": {
+          "encoding": "bytes",
+          "label": "string",
+          "numberOfBytes": "32"
+        },
+        "t_struct(RoyaltyInfo)1737_storage": {
+          "encoding": "inplace",
+          "label": "struct ERC2981.RoyaltyInfo",
+          "members": [
+            {
+              "astId": 1734,
+              "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+              "label": "receiver",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_address"
+            },
+            {
+              "astId": 1736,
+              "contract": "contracts/launch/CollectionForge.sol:CollectionForge",
+              "label": "royaltyFraction",
+              "offset": 20,
+              "slot": "0",
+              "type": "t_uint96"
+            }
+          ],
+          "numberOfBytes": "32"
+        },
+        "t_uint256": {
+          "encoding": "inplace",
+          "label": "uint256",
+          "numberOfBytes": "32"
+        },
+        "t_uint96": {
+          "encoding": "inplace",
+          "label": "uint96",
+          "numberOfBytes": "12"
+        }
+      },
+      "immutables": [
+        {
+          "name": "ingredient",
+          "declaredIn": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "type": "contract IForgeIngredient",
+          "astId": 7305,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 765
+            },
+            {
+              "length": 32,
+              "start": 2088
+            },
+            {
+              "length": 32,
+              "start": 2235
+            },
+            {
+              "length": 32,
+              "start": 2383
+            },
+            {
+              "length": 32,
+              "start": 2808
+            },
+            {
+              "length": 32,
+              "start": 3085
+            }
+          ]
+        },
+        {
+          "name": "ingredientCount",
+          "declaredIn": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "type": "uint256",
+          "astId": 7307,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 858
+            },
+            {
+              "length": 32,
+              "start": 2543
+            }
+          ]
+        },
+        {
+          "name": "maxSupply",
+          "declaredIn": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "type": "uint256",
+          "astId": 7309,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 996
+            },
+            {
+              "length": 32,
+              "start": 2627
+            }
+          ]
+        },
+        {
+          "name": "recipeId",
+          "declaredIn": "contracts/launch/CollectionForge.sol:CollectionForge",
+          "type": "bytes32",
+          "astId": 7311,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 694
+            },
+            {
+              "length": 32,
+              "start": 3322
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

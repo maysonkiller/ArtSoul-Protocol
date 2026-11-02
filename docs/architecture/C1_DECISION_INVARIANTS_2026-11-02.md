@@ -57,6 +57,9 @@ for separate deployments, document how provenance resolves both versions.
 **UNDECIDED.** Actual boundaries; mint-authority rotation/removal and drain policy;
 ultimate upgrade powers; governance/delay/emergency policy; migration consent.
 This ownership map is not a Solidity storage-slot layout or proxy safety proof.
+The [current-source storage baseline](../audits/C1_STORAGE_BASELINE_2026-11-02.md)
+now records six existing layouts and immutable bindings with reproducible compiler
+evidence. It does not select the replacement topology or establish compatibility.
 Once topology is chosen, export inherited and declared layouts and specify every
 permitted state transition; do not infer compatibility from matching field names.
 

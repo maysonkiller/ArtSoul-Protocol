@@ -153,6 +153,11 @@ See [the characterization](audits/C1_PAUSE_AUTHORITY_CHARACTERIZATION_2026-11-02
 these are confirmed prototype hazards to resolve in the replacement design, not
 newly approved behavior or repairs to existing deployed contracts.
 
+The [C1 source-storage baseline](audits/C1_STORAGE_BASELINE_2026-11-02.md) also
+captures six current contract layouts and their immutable bindings. Repeated
+compiler output agrees and six refusal cases pass. This provides comparison
+evidence, not replacement layouts, deployed-state migration or proxy approval.
+
 Actual Snapshot A remains at the end of the final public testnet, announced in
 advance and independently stored/verified before any destructive reset. Export
 tooling readiness is separate from capturing that final snapshot. Mainnet,
