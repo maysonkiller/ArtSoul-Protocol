@@ -43,6 +43,7 @@ const ERROR_SIGNATURES = {
   ProjectNFTAlreadyMinted: "ProjectNFTAlreadyMinted()",
   ResaleUnavailable: "ResaleUnavailable()",
   SettlementStillActive: "SettlementStillActive()",
+  SettlementExpired: "SettlementExpired()",
   TransferFailed: "TransferFailed()",
   UnauthorizedCore: "UnauthorizedCore()",
 };
@@ -846,6 +847,157 @@ describe("ArtSoul V4.1 protocol", function () {
         core.mintProjectNFT(recipients[100], overflowHash),
         "GenesisSoldOut"
       );
+    });
+  });
+
+  // Current prototype hazards for C1 D1/D2 review, not replacement-contract requirements.
+  describe("C1 current pause and authority characterization", function () {
+    before(async function () {
+      expect(await network.provider.send("eth_chainId")).to.equal("0x7a69");
+    });
+
+    async function settlementState(ctx) {
+      const { core, nft, artist, bidder, treasury } = ctx;
+      const supply = await nft.totalSupply();
+      return {
+        auction: Array.from(await core.auctions(1)),
+        artwork: Array.from(await core.artworks(1)),
+        balance: await ethBalance(await core.getAddress()),
+        credits: await Promise.all([artist, bidder, treasury].map(async signer =>
+          core.pendingWithdrawals(await signer.getAddress()))),
+        settlements: await core.successfulSettlements(),
+        coreTokenArtwork: await core.tokenToArtwork(1),
+        supply,
+        nftArtworkToken: await nft.artworkToToken(1),
+        nftTokenArtwork: await nft.tokenToArtwork(1),
+        tokenCreator: await nft.tokenCreator(1),
+        tokenOwner: supply ? await nft.ownerOf(1) : null,
+        tokenURI: supply ? await nft.tokenURI(1) : null,
+      };
+    }
+
+    async function expectAtomicSettlementRevert(ctx, errorName) {
+      const before = await settlementState(ctx);
+      const deposit = (await ctx.core.auctions(1)).depositLocked;
+      const block = BigInt(await network.provider.send("eth_blockNumber"));
+      await expectRevert(ctx.core.connect(ctx.bidder).settleAuction(1, {
+        value: ONE_ETH - deposit,
+        gasLimit: 1_000_000,
+      }), errorName);
+      // Prove execution was attempted, not merely rejected by gas estimation.
+      expect(BigInt(await network.provider.send("eth_blockNumber"))).to.equal(block + 1n);
+      expect(await settlementState(ctx)).to.deep.equal(before);
+    }
+
+    async function replacementCore(ctx) {
+      return deployContract("ArtSoulCore", ctx.owner, [
+        await ctx.nft.getAddress(),
+        await ctx.projectNFT.getAddress(),
+        await ctx.treasury.getAddress(),
+      ]);
+    }
+
+    it("currently lets a pause consume the winner's funded settlement window", async function () {
+      const ctx = await deployProtocol();
+      const { core, nft, artist, bidder, treasury, outsider } = ctx;
+      const { deposit } = await createBidAndEndAuction(ctx);
+      const deadline = (await core.auctions(1)).settlementDeadline;
+
+      await mine(core.pause());
+      await expectAtomicSettlementRevert(ctx, "EnforcedPause");
+      await mineAt(deadline + 1n);
+      const paused = await settlementState(ctx);
+      await expectRevert(core.connect(outsider).claimSettlementDefault(1, {
+        gasLimit: 1_000_000,
+      }), "EnforcedPause");
+      expect(await settlementState(ctx)).to.deep.equal(paused);
+      await mine(core.unpause());
+      expect((await core.auctions(1)).settlementDeadline).to.equal(deadline);
+      await expectAtomicSettlementRevert(ctx, "SettlementExpired");
+
+      await mine(core.connect(outsider).claimSettlementDefault(1));
+      const auction = await core.auctions(1);
+      const artwork = await core.artworks(1);
+      expect(auction.status).to.equal(4n);
+      expect(auction.settlementDeadline).to.equal(deadline);
+      expect(auction.depositLocked).to.equal(0n);
+      expect(artwork.minted).to.equal(false);
+      expect(artwork.canonicalFloor).to.equal(0n);
+      expect(artwork.tokenId).to.equal(0n);
+      expect(artwork.activeAuctionId).to.equal(0n);
+      expect(await nft.totalSupply()).to.equal(0n);
+      expect(await nft.artworkToToken(1)).to.equal(0n);
+      expect(await core.successfulSettlements()).to.equal(0n);
+      expect(await core.pendingWithdrawals(await bidder.getAddress())).to.equal(0n);
+      expect(await core.pendingWithdrawals(await artist.getAddress())).to.equal(deposit * 80n / 100n);
+      expect(await core.pendingWithdrawals(await treasury.getAddress())).to.equal(deposit * 20n / 100n);
+      expect(await ethBalance(await core.getAddress())).to.equal(deposit);
+    });
+
+    it("currently blocks an old settlement until its mint authority is restored", async function () {
+      const ctx = await deployProtocol();
+      const { core, nft, owner, artist, bidder, treasury } = ctx;
+      const { deposit } = await createBidAndEndAuction(ctx);
+      const replacement = await replacementCore(ctx);
+
+      await mine(nft.connect(owner).setCore(await replacement.getAddress()));
+      await expectAtomicSettlementRevert(ctx, "UnauthorizedCore");
+      await mine(nft.connect(owner).setCore(await core.getAddress()));
+      expect(await latestTimestamp() < (await core.auctions(1)).settlementDeadline).to.equal(true);
+      const receipt = await mine(core.connect(bidder).settleAuction(1, {
+        value: ONE_ETH - deposit,
+        gasLimit: 1_000_000,
+      }));
+      await expectEvent(receipt, core, "SettlementCompleted");
+      expect((await core.auctions(1)).status).to.equal(3n);
+      expect((await core.auctions(1)).depositLocked).to.equal(0n);
+      expect((await core.artworks(1)).canonicalFloor).to.equal(ONE_ETH);
+      expect(await core.successfulSettlements()).to.equal(1n);
+      expect(await core.pendingWithdrawals(await artist.getAddress())).to.equal(ONE_ETH * 9750n / BPS);
+      expect(await core.pendingWithdrawals(await treasury.getAddress())).to.equal(ONE_ETH * 250n / BPS);
+      expect(await nft.totalSupply()).to.equal(1n);
+      expect(await nft.ownerOf(1)).to.equal(await bidder.getAddress());
+      expect(await nft.tokenCreator(1)).to.equal(await artist.getAddress());
+      expect(await ethBalance(await core.getAddress())).to.equal(ONE_ETH);
+    });
+
+    it("currently collides when two Core versions reuse an artwork ID in one NFT", async function () {
+      const ctx = await deployProtocol();
+      const { core, nft, owner, artist, bidder, bidder2, buyer } = ctx;
+      const replacement = await replacementCore(ctx);
+      const next = { ...ctx, core: replacement, artist: bidder2, bidder: buyer };
+      const deposit = await core.requiredDepositForBid(ONE_ETH);
+
+      // Fund both before advancing time so the old settlement remains timely.
+      for (const [current, metadata] of [[ctx, "ipfs://old-core"], [next, "ipfs://new-core"]]) {
+        await registerArtwork(current.core, current.artist, metadata);
+        await createAuction(current.core, current.artist);
+        await mine(current.core.connect(current.bidder).placeBid(1, ONE_ETH, { value: deposit }));
+      }
+      const end = (await replacement.auctions(1)).endTime;
+      await mineAt(end + 1n);
+      await mine(core.endAuction(1));
+      await mine(replacement.endAuction(1));
+      await mine(nft.connect(owner).setCore(await replacement.getAddress()));
+      await mine(replacement.connect(buyer).settleAuction(1, { value: ONE_ETH - deposit }));
+      const settledReplacement = await settlementState(next);
+      expect(settledReplacement.supply).to.equal(1n);
+      expect(settledReplacement.tokenCreator).to.equal(await bidder2.getAddress());
+      expect(settledReplacement.tokenOwner).to.equal(await buyer.getAddress());
+      expect(settledReplacement.tokenURI).to.equal("ipfs://new-core");
+
+      await mine(nft.connect(owner).setCore(await core.getAddress()));
+      expect(await latestTimestamp() < (await core.auctions(1)).settlementDeadline).to.equal(true);
+      await expectAtomicSettlementRevert(ctx, "ArtworkAlreadyMinted");
+      expect(await settlementState(next)).to.deep.equal(settledReplacement);
+      const oldArtwork = await core.artworks(1);
+      expect(oldArtwork.creator).to.equal(await artist.getAddress());
+      expect(oldArtwork.metadataURI).to.equal("ipfs://old-core");
+      expect(oldArtwork.minted).to.equal(false);
+      expect(oldArtwork.canonicalFloor).to.equal(0n);
+      expect((await core.auctions(1)).highestBidder).to.equal(await bidder.getAddress());
+      expect((await core.auctions(1)).depositLocked).to.equal(deposit);
+      expect(await ethBalance(await core.getAddress())).to.equal(deposit);
     });
   });
 

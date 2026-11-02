@@ -64,8 +64,13 @@ permitted state transition; do not infer compatibility from matching field names
 old funded auction during authority rotation; malicious/removed module mint;
 duplicate successful-path delivery; creator/First Collector preservation;
 old credit withdrawal after deploying a new engine. Reuse
-[current authorization checks](../../test/ArtSoulV41.test.cjs#L853), but those
+[current authorization checks](../../test/ArtSoulV41.test.cjs#L1005), but those
 do not prove safe rotation or mixed-version operation.
+
+November 2 characterization now reproduces both old-settlement authority denial
+and cross-Core local-ID collision, with an authority-restoration positive control
+and atomic rollback checks. See [the executed evidence](../audits/C1_PAUSE_AUTHORITY_CHARACTERIZATION_2026-11-02.md).
+This confirms current hazards; it does not choose a replacement topology.
 
 ## 3. D2 — Pause, deadlines and reachable exit paths
 
@@ -114,10 +119,15 @@ No clock compensation, grace period or delay value is proposed as approved polic
 **Acceptance cases:** `endTime - 1`, equality and `+1`; delayed end transaction;
 `deadline - 1`, equality and `+1`; pause before/after funding and across expiry;
 withdrawal during pause; no-bid repeated finalization; unaffected parallel auctions.
-[Core pause test:874](../../test/ArtSoulV41.test.cjs#L874) covers registration denial
+[Core pause test](../../test/ArtSoulV41.test.cjs#L1026) covers registration denial
 and invalid transitions, not the funded pause-expiry case.
 [Launch pause test:162](../../test/CollectionLaunch.test.cjs#L162) already verifies
 its distinct settlement/claim/withdrawal policy; retain it without generalizing it.
+
+The new [funded pause characterization](../../test/ArtSoulV41.test.cjs#L900)
+reproduces payment denial during pause, the unchanged deadline, subsequent payment
+expiry and default after unpause. No payment or mint-side state survives a failed
+transaction. This is current-source evidence, not approval of that deadline policy.
 
 ## 4. D3 — Exact liabilities, rounding and failed-recipient recovery
 
@@ -378,5 +388,8 @@ it does not amend Bible §§2–4, 14 or activate future cross-chain capabilitie
 The annex is ready for policy comparison, not C1 sign-off. Populate decisions and
 their canon impacts explicitly; no unanswered cell becomes a constructor default.
 No Solidity, schema, signing, deployment or live protocol operation was changed.
-Local document references and integer vectors were checked; no contract tests ran.
-This is source-level evidence, not a renewed live-bytecode or external security audit.
+The initial document review checked references and integer vectors without running
+contracts. The subsequent [D1/D2 characterization](../audits/C1_PAUSE_AUTHORITY_CHARACTERIZATION_2026-11-02.md)
+adds three local executed cases; the complete current contract suite passes 52
+tests. This is not replacement acceptance, a renewed live-bytecode verification
+or an external security audit.
