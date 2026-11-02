@@ -19,7 +19,7 @@ covers application/data boundaries; it is not replacement-contract acceptance.
 - **RECOMMENDATION** is a reviewable design preference, not an adopted rule.
 - **UNDECIDED** requires an explicit decision before replacement Solidity.
 
-The four records below connect a decision to protected state, money, authority,
+The five records below connect a decision to protected state, money, authority,
 events and falsifiable acceptance cases. They do not select signer addresses,
 thresholds, delays, proxy topology, new fees, currencies or collection parameters.
 All examples are native-ETH arithmetic in wei, not new product price parameters.
@@ -231,10 +231,152 @@ replacement, cancel/relist, approval races, two competing buyers, cross-engine r
 and indexer rebuild from events. Extend [resale tests:643–791](../../test/ArtSoulV41.test.cjs#L643)
 after the interface/policy decision, rather than rewriting prototype behavior now.
 
-## 6. Decision and verification limits
+## 6. D5 — Automatic execution, optional gas reserves and payment funding
+
+Direction: the founder's November 2 request is to minimize manual lifecycle steps,
+evaluate prepaid execution with unused-reserve refunds, and preserve future
+cross-network payment compatibility. This section records a design recommendation,
+not approval of a reserve amount, fee, funding mandate or new execution authority.
+Source rechecked at `d794aecfe836aa9db776fad0468a2c1bfc7e9bfc`.
+
+**FACT.** A timer does not send an EVM transaction. An external transaction invokes
+contract execution ([Ethereum documentation](https://ethereum.org/developers/docs/smart-contracts/)).
+Current [endAuction:328](../../contracts/ArtSoulCore.sol#L328) needs that transaction;
+its no-bid branch clears the active slot without minting. Current
+[settleAuction:356](../../contracts/ArtSoulCore.sol#L356) requires the winner as
+caller and the exact remaining payment. A relayer cannot simply call it for the
+winner. Current [deposit:606](../../contracts/ArtSoulCore.sol#L606) is generally
+partial security, not a fully funded purchase: a 1 ETH bid locks 0.1 ETH and leaves
+0.9 ETH payable. A gas reserve would not pay that missing purchase amount.
+
+**REQUIREMENT.** Bible §2 already requires future no-bid finalization without a
+separate user-facing End step; §§3.1/4 preserve full losing-deposit obligations
+and mint/floor only after successful settlement. Automation cannot select a winner,
+change price, extend a deadline, mint on expiry alone or penalize a losing bidder.
+Partner Collection attempts/cooldowns still apply; automatic eligibility is not
+permission to start a new auction or spend funds without the creator's consent.
+
+**RECOMMENDATION — remove unnecessary transactions before precharging for them.**
+
+| Situation | Target user experience | Necessary execution and boundary |
+| --- | --- | --- |
+| Expired with no bids | Work returns to Discovery as unminted; no separate End button | Derive effective expiry from canonical end time and bids. Atomically finalize/revalidate the previous auction in the next authorized creation; a permissionless executor can also finalize. Record the closure once, before a new auction event |
+| Expired with a winner | Show winner payment status and remaining amount | Executor can trigger deterministic finalization. D2 must decide the settlement-window anchor; do not shorten the payment opportunity because a worker was late |
+| Winner enables automatic payment | Settle and mint once when eligible and sufficiently funded | Separate, explicit payment authorization and a reliable source of the remaining price; gas sponsorship alone is insufficient |
+| Winner has not enabled/funded automatic payment | Show the normal payment action and reminders | Retain the agreed settlement path; no silent wallet debit. Actual missed settlement follows approved default rules, not a worker's guess |
+| Settlement deadline passed without successful payment | Work remains unminted; show default and re-auction eligibility under the applicable rules | Deterministic default execution accounts for the defaulted winner's deposit once. Gas reserve and extra purchase prefunding are separate obligations; D2 must resolve pauses before automating this path |
+| Refund or unused reserve becomes payable | Show paid refund or available credit, with a receipt | Bounded transfer attempt/batch, then individually withdrawable credit on failure; no recipient can block everyone else |
+
+Derived expiry is a view, not a fabricated `AuctionEnded` event. UI, contract
+eligibility checks and indexer projections must agree on the actual extended
+deadline and terminal state. A stale UI timer is never sufficient authorization.
+No-bid lazy cleanup removes a standalone transaction, not all computation cost.
+The next action must estimate its combined cost honestly.
+An already minted NFT remains an NFT when its resale listing expires or is
+cancelled; returning to unminted Discovery describes an unsuccessful primary
+auction, not a burn or reversal of successful settlement.
+
+### Execution service and funding choices
+
+Use the same permissionless, contract-validated transition for a user or an
+executor; the worker has no custody/admin ability to choose outcomes. An existing
+server may host a bounded worker, but an independent trigger/manual fallback must
+remain possible if that worker stops. There is no guarantee of execution at an
+exact wall-clock second. Compare infrastructure reuse after reviewing signer
+isolation, operating budget, confirmation/reorg handling and retry limits; no
+new server, provider or spending is authorized by this design.
+
+Recommend enabling deterministic finalization/refunds before optional automatic
+winner payment. Compare separately funded payment escrow with a narrowly scoped
+smart-account authorization. Escrow improves funding certainty but locks more
+capital; authorization can fail if funds disappear or permission is revoked.
+A signature is not an irrevocable funding guarantee. Native ETH in an ordinary
+wallet cannot be pulled by an ERC-20 allowance. Do not require unlimited approvals,
+collect private keys, replace the existing deposit with full escrow by implication,
+or give a general session key unrestricted spending power.
+
+[ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) supports account operations and
+paymaster gas funding; it does not itself provide auction scheduling or purchase
+funds. Account/paymaster compatibility and failure accounting need review for any
+selected implementation. It is an option, not a dependency added to this project.
+
+### Optional reserve model and cost disclosure
+
+A prepaid execution reserve, if selected, is a separate refundable liability, not
+an extra sale commission, bid deposit or treasury balance. Bind it to payer/refund
+owner, chain/engine, auction/action, terms version, nonce, expiry and approved cost
+cap. Each action and the entire authorization need bounded spending; no recharge,
+currency substitution or cap increase without fresh owner authorization.
+
+For each asset and custody boundary, extend D3 to `C + D + F + R <= B`:
+`C` = all credited obligations (including earned executor reimbursement if unpaid),
+`D` = locked bid deposits, `F` = separate unconsumed purchase prefunding excluding
+`D`, `R` = execution reserves not yet charged or credited, `B` = available balance.
+Moving a reserve into refund/executor credit removes it from `R` exactly once.
+For one reserve: `funded = charged + paidBack + refundCredit + remainingReserve`.
+`charged` includes authorized executor reimbursement already paid or still owed
+as executor credit in `C`; it does not mean only cash already transferred.
+These are model sums, not permission for an unbounded on-chain accounting loop.
+
+Do not reimburse caller-supplied gas figures or assume `gasleft * gasprice` measures
+the full cost. [Base fees](https://docs.base.org/specifications/transactions/network-fees)
+include L2 execution and L1 publication costs that vary. The capped reimbursement
+rule, evidence source and any provider charge must be specified and tested before
+implementation. Proposed default: failed, duplicate and no-op executor attempts
+must not consume the user's reserve; the executor bears those attempts unless an
+explicitly approved, disclosed alternative is adopted. An executed reverting
+transaction still costs its sender gas; the reserve cannot promise to undo that.
+
+On settlement/manual completion or other terminal outcome, release the unused
+reserve exactly once to its designated owner. Refund the unused part, not gas
+already spent. A separate transfer has its own execution cost; combine it with
+completion where safe and retain credit fallback. Do not promise an unconditional
+free transfer back to any wallet or source chain. Define cancellation, refund
+availability and reserve exhaustion before accepting reserves; expiry or a failed
+worker must not lock unused funds indefinitely. Extra purchase funding `F` needs
+its own release/default treatment; it must not silently enter the deposit penalty.
+
+Proposed review UI separates **purchase price / bid deposit / optional execution
+reserve / gas for the current transaction**. Show what each future action may
+spend, who pays, the maximum additional cost, reserve refund destination and
+whether automatic payment is actually funded. After completion show final receipt,
+actual authorized charge, unused amount paid or available, and a next action;
+remove the consumed confirmation. Never present an estimate as a fixed future fee.
+
+### Future cross-network funding and acceptance
+
+Keep asset ownership and canonical settlement on the destination chain; treat
+source-chain payment as a separately authorized transport/conversion operation.
+Reuse [Rework Plan §4](../canon/CONTRACT_REWORK_PLAN.md#4-pay-from-another-chain-keep-the-nft-on-its-home-chain)
+for route and intent boundaries. Source payment alone cannot create a bid, NFT or
+floor. Arrival after a deadline, duplicate delivery, slippage, wrong asset or a
+paused destination needs attributable recovery; transport failure is not an
+automatic refund on the source chain. Preserve signer, beneficiary and refund
+owner across the router instead of assigning ownership to `msg.sender` blindly.
+No extra product network or direct stablecoin auction denomination is activated.
+
+**Acceptance cases to add after decisions:** no-bid expiry/re-auction with the
+worker absent; soft-close extension racing execution; duplicate/manual/worker
+completion races; malicious or inflated reimbursement; reserve exhaustion and
+gas spikes; failed/refused refund and credit retry; winning prefund shortfall or
+revoked permission; pause spanning expiry (D2); forged/late/duplicate cross-chain
+delivery; native/contract wallets; conserved obligations across every terminal
+state. Do not let a failing refund or optional automation hook block an otherwise
+valid settlement. No failing external optional service may become the sole exit.
+
+**UNDECIDED before Solidity:** settlement anchor and pause policy (D2), executor
+funding/source of operating gas, reserve opt-in/payer/caps/reimbursement and refund
+rules, optional prefunding/authorization/revocation terms, treatment of extra
+prefunding on default, supported payment routes/assets and recovery payer. The
+direction is accepted for design; none of these blank values is a new fee/default.
+Interpretation: propose fewer mandatory transactions first, with optional scoped
+payment automation afterward. This qualifies the idea of precharging every stage;
+it does not amend Bible §§2–4, 14 or activate future cross-chain capabilities.
+
+## 7. Decision and verification limits
 
 The annex is ready for policy comparison, not C1 sign-off. Populate decisions and
 their canon impacts explicitly; no unanswered cell becomes a constructor default.
-No Solidity, schema, signing, deployment or remote operation was performed.
-Integer vectors were checked locally with JavaScript BigInt; no contract tests ran.
+No Solidity, schema, signing, deployment or live protocol operation was changed.
+Local document references and integer vectors were checked; no contract tests ran.
 This is source-level evidence, not a renewed live-bytecode or external security audit.

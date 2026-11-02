@@ -109,9 +109,10 @@ future design work, not an enabled product capability. No new chain support or
 economics are introduced by the redesign.
 
 The [C1 decision/invariant annex](architecture/C1_DECISION_INVARIANTS_2026-11-02.md)
-now records four concrete next-phase reviews: deployment identity and mint
+now records five concrete next-phase reviews: deployment identity and mint
 authority, funded-auction pause/deadline behavior, exact liability/rounding
-accounting and resale authorization lifetime. Source facts and unapproved policy
+accounting, resale authorization lifetime and automatic execution with separately
+accounted optional gas reserves/payment funding. Source facts and unapproved policy
 are separated; no Solidity or existing deployment was changed. Architecture
 sign-off, replacement storage layout and independent security review remain open.
 

@@ -246,6 +246,10 @@ Prototype tests do not prove these future guarantees.
 The [November 2 decision/invariant annex](../architecture/C1_DECISION_INVARIANTS_2026-11-02.md)
 adds a source-linked deployment/mint-authority map, current pause/deadline matrix,
 liability equations and integer vectors, and listing transition/event requirements.
+Its D5 follow-up evaluates deterministic automation, optional execution reserves,
+unused-reserve recovery and separately authorized purchase funding. No-bid lazy
+finalization does not require mandatory gas prepayment; full automatic settlement
+and cross-network funding still need their own authorization/accounting decisions.
 It distinguishes present prototype facts, approved requirements, recommendations
 and undecided policy. It is not architecture sign-off or replacement Solidity.
 
