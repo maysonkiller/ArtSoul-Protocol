@@ -218,6 +218,19 @@ test('public NFT consumers use one verified history across cards, filters, saved
     assert.equal(res.body.events.find(event => event.type === 'settlement_completed').final_price, '2');
     assert.equal(res.body.complete, true);
   });
+  await t.test('verified sale history retains sub-micro-ETH precision without pricing transfers', async () => {
+    history.lifecycle.find(event => event.event_name === 'SettlementCompleted').event_data.finalPrice = '1';
+    history.lifecycle.find(event => event.event_name === 'ResaleCompleted').event_data.price = '123456789012';
+    const res = await historyRequest();
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.events.find(event => event.type === 'settlement_completed').final_price, '0.000000000000000001');
+    assert.equal(res.body.events.find(event => event.type === 'resale_completed').price, '0.000000123456789012');
+    for (const movement of res.body.events.filter(event => event.type === 'nft_transferred')) {
+      assert.equal(Object.hasOwn(movement, 'price'), false);
+      assert.equal(Object.hasOwn(movement, 'final_price'), false);
+    }
+  });
+
   await t.test('unverified association prevents token-only timeline reads', async () => {
     Object.assign(owners[0], { token_id: null, verified: false, current_owner_address: null, first_collector_address: null, latest_transfer: null });
     history = { transfers: [], complete: false, lifecycle: [], lifecycle_available: false, lifecycle_complete: false };

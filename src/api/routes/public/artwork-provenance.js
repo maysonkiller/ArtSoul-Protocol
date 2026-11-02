@@ -26,18 +26,17 @@ function toNumber(value) {
 }
 
 function weiToEth(value) {
+  if (typeof value !== 'string' && typeof value !== 'bigint' &&
+      !(typeof value === 'number' && Number.isSafeInteger(value))) return null;
   const text = normalizeText(value);
-  if (!text || text === '0') return '0';
+  if (!/^\d{1,78}$/.test(text)) return null;
 
-  try {
-    const wei = BigInt(text);
-    const base = 10n ** 18n;
-    const whole = wei / base;
-    const fraction = (wei % base).toString().padStart(18, '0').replace(/0+$/, '');
-    return fraction ? `${whole}.${fraction.slice(0, 6)}` : whole.toString();
-  } catch {
-    return '0';
-  }
+  const wei = BigInt(text);
+  if (wei >= 2n ** 256n) return null;
+  const base = 10n ** 18n;
+  const whole = wei / base;
+  const fraction = (wei % base).toString().padStart(18, '0').replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 
 function projectionOrder(left = {}, right = {}) {
@@ -226,7 +225,7 @@ export default async function handler(req, res) {
     }
     const tokenId = protocolId(artwork.token_id);
     const auctionsPromise = readRows(
-      'v41_auctions?select=chain_id,auction_id::text,artwork_id::text,creator,start_price,duration,block_number,transaction_hash,log_index,indexed_at' +
+      'v41_auctions?select=chain_id,auction_id::text,artwork_id::text,creator,start_price::text,duration,block_number,transaction_hash,log_index,indexed_at' +
       `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
       `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
     );
@@ -234,7 +233,7 @@ export default async function handler(req, res) {
       const auctionIds = auctions.map(row => protocolId(row.auction_id)).filter(Boolean);
       return auctionIds.length > 0
         ? readRows(
-            'v41_auction_endings?select=chain_id,auction_id::text,winner,winning_bid,settlement_deadline,block_number,transaction_hash,log_index,indexed_at' +
+            'v41_auction_endings?select=chain_id,auction_id::text,winner,winning_bid::text,settlement_deadline,block_number,transaction_hash,log_index,indexed_at' +
             `&chain_id=${chainFilter}&auction_id=in.(${auctionIds.join(',')})` +
             `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
           )
@@ -243,20 +242,20 @@ export default async function handler(req, res) {
     const [auctions, settlements, resaleHistory, listingRows, endings, listingEvents] = await Promise.all([
       auctionsPromise,
       readRows(
-        'v41_settlements?select=chain_id,auction_id::text,artwork_id::text,winner,final_price,token_id::text,settlement_status,block_number,transaction_hash,log_index,indexed_at' +
+        'v41_settlements?select=chain_id,auction_id::text,artwork_id::text,winner,final_price::text,token_id::text,settlement_status,block_number,transaction_hash,log_index,indexed_at' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
         `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
       ),
       tokenId
         ? readRows(
-            'v41_resale_history?select=chain_id,token_id::text,seller,buyer,price,block_number,transaction_hash,log_index,indexed_at' +
+            'v41_resale_history?select=chain_id,token_id::text,seller,buyer,price::text,block_number,transaction_hash,log_index,indexed_at' +
             `&chain_id=${chainFilter}&token_id=eq.${tokenId}` +
             `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
           )
         : [],
       tokenId
         ? readRows(
-            'v41_resale_listings?select=chain_id,token_id::text,seller,price,active,block_number,transaction_hash,log_index,indexed_at' +
+            'v41_resale_listings?select=chain_id,token_id::text,seller,price::text,active,block_number,transaction_hash,log_index,indexed_at' +
             `&chain_id=${chainFilter}&token_id=eq.${tokenId}&active=eq.true&limit=1`
           )
         : [],

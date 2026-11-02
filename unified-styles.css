@@ -555,6 +555,7 @@ body.future .artwork-page-compact-action {
 
 .artwork-page-detail-list {
     display: grid;
+    align-items: center;
     grid-template-columns: minmax(90px, max-content) minmax(0, 1fr);
     gap: 9px 18px;
     margin: 18px 0 0;
