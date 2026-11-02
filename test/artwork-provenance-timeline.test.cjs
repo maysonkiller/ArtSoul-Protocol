@@ -198,6 +198,54 @@ test('provenance endpoint returns a chain-scoped chronological lifecycle and can
   });
 });
 
+test('successful primary and resale history preserve exact wei precision in ETH amounts', async () => {
+  const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
+  for (const [wei, eth] of [
+    ['1', '0.000000000000000001'],
+    ['123456789012', '0.000000123456789012'],
+    ['1000000000000000001', '1.000000000000000001'],
+    ['1000001000000000000', '1.000001'],
+    ['0', '0']
+  ]) {
+    const fixtures = structuredClone(visibleFixtures);
+    fixtures.v41_settlements[0].final_price = wei;
+    fixtures.v41_resale_history[0].price = wei;
+    await withSupabaseFixtures(fixtures, async requests => {
+      const res = apiResponse();
+      await handler({ method: 'GET', query: { chain_id: '84532', artwork_id: '77' }, headers: {} }, res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.body.events.find(event => event.type === 'settlement_completed').final_price, eth);
+      assert.equal(res.body.events.find(event => event.type === 'resale_completed').price, eth);
+      for (const [table, column] of [
+        ['v41_auctions', 'start_price'], ['v41_auction_endings', 'winning_bid'],
+        ['v41_settlements', 'final_price'], ['v41_resale_history', 'price'], ['v41_resale_listings', 'price']
+      ]) {
+        const query = new URLSearchParams(requests.find(request => request.table === table).search);
+        assert.ok(query.get('select').split(',').includes(`${column}::text`), `${table} preserves NUMERIC over JSON transport`);
+      }
+    });
+  }
+});
+
+test('missing or invalid historical sale amounts remain unknown instead of becoming zero', async () => {
+  const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
+  for (const invalid of [undefined, null, '', 'invalid', '-1', '1.5', '1e18', '0x1',
+    true, {}, [1], Number.MAX_SAFE_INTEGER + 1, (2n ** 256n).toString()]) {
+    const fixtures = structuredClone(visibleFixtures);
+    fixtures.v41_settlements[0].final_price = invalid;
+    fixtures.v41_resale_history[0].price = invalid;
+    await withSupabaseFixtures(fixtures, async () => {
+      const res = apiResponse();
+      await handler({ method: 'GET', query: { chain_id: '84532', artwork_id: '77' }, headers: {} }, res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.body.events.find(event => event.type === 'settlement_completed').final_price, null);
+      assert.equal(res.body.events.find(event => event.type === 'resale_completed').price, null);
+      assert.equal(res.body.events.find(event => event.type === 'resale_listed').price, '4');
+      assert.equal(res.body.roles.current_owner_address, CURRENT_OWNER);
+    });
+  }
+});
+
 test('repricing and cancellation preserve each original listing price, date and transaction', async () => {
   const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
   const secondHash = `0x${'cd'.repeat(32)}`;

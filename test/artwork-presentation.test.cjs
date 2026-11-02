@@ -56,6 +56,7 @@ function render(overrides = {}) {
         creatorProfile: null, auctionWinnerProfile: null, currentOwnerProfile: null,
         resolvedProfileAddresses: new Set([CREATOR, COLLECTOR, BUYER]), bidderProfiles: {},
         resolvedMedia: { type: 'image' }, describeArtworkNetwork: () => 'Base Sepolia', tokenExplorerUrl: '',
+        nftTokenId: '7', nftContractAddress: '', recordedNftSale: null, transactionExplorerUrl: () => '',
         aiGuidance: null, formatAIPrice: String, isV41CompositeId: true,
         provenanceState: { status: 'ready', events: [], complete: true },
         ...overrides
@@ -135,4 +136,35 @@ test('the layout reuses each keyed panel and keeps a single support/media/action
     const community = declaration('communityPanel');
     assert.equal((community.match(/<ContextHelp topic="reactions"/g) || []).length, 1);
     assert.equal((community.match(/<ContextHelp topic="trust"/g) || []).length, 1);
+});
+
+test('NFT details distinguish unavailable sale history from an absent sale and unminted artwork', () => {
+    for (const [state, copy] of [
+        [{ status: 'loading', events: [], complete: true }, 'Loading history…'],
+        [{ status: 'idle', events: [], complete: false }, 'History unavailable'],
+        [{ status: 'unavailable', events: [], complete: false }, 'History unavailable'],
+        [{ status: 'ready', events: [], complete: false }, 'History incomplete'],
+        [{ status: 'ready', events: [], complete: true }, 'Not recorded']
+    ]) {
+        const html = render({ provenanceState: state }).detailsPanel;
+        assert.ok(html.includes(copy));
+        assert.doesNotMatch(html, /0 ETH|You paid|Sale receipt/);
+    }
+    assert.doesNotMatch(render({ mintedArtwork: false }).detailsPanel, /NFT contract|Token ID|Last ArtSoul sale/);
+});
+
+test('NFT details display exact test currency, contract and sale receipt without implying personal acquisition', () => {
+    const receipt = `https://sepolia.basescan.org/tx/0x${'ab'.repeat(32)}`;
+    const html = render({
+        artwork: { chainId: 84532, token_id: '7' },
+        nftContractAddress: CREATOR,
+        tokenExplorerUrl: `https://sepolia.basescan.org/token/${CREATOR}?a=7`,
+        recordedNftSale: { amount: '0.000000000000000001', venue: 'ArtSoul primary auction', event: {} },
+        transactionExplorerUrl: () => receipt
+    }).detailsPanel;
+    assert.match(html, /0\.000000000000000001 test ETH/);
+    assert.match(html, /ArtSoul primary auction/);
+    assert.ok(html.includes(`href="${receipt}"`));
+    assert.match(html, /Wallet transfers do not record a purchase price/);
+    assert.doesNotMatch(html, /You paid|Your purchase/);
 });

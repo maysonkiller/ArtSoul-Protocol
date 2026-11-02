@@ -7,6 +7,7 @@ import { inspectAuctionCreation } from '../features/auction/auction-creation.js'
 import { ArtistSupport } from '../features/artwork/artist-support.jsx';
 import '../features/artwork/artwork-dialogs.css';
 import { artworkShareIntent } from '../features/artwork/artwork-sharing.js';
+import { readRecordedNftSale } from '../features/artwork/nft-sale-record.js';
 
 import { getOwnerResaleEligibility, validateResalePrice } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
@@ -1449,7 +1450,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 const chainId = Number(artworkData?.chain_id || artworkData?.chainId || 0);
                 const networkKey = chainId === 11155111 ? 'sepolia' : chainId === 84532 ? 'baseSepolia' : '';
                 const nftAddress = networkKey ? window.ARTSOUL_CONTRACTS?.[networkKey]?.nft : '';
-                if (!nftAddress) return '';
+                if (!/^0x[a-fA-F0-9]{40}$/.test(nftAddress || '') || /^0x0{40}$/i.test(nftAddress)) return '';
 
                 const explorer = networkKey === 'sepolia'
                     ? 'https://sepolia.etherscan.io'
@@ -2901,6 +2902,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 activeAuction: liveAuction
             });
             const tokenExplorerUrl = mintedArtwork ? getTokenExplorerUrl(artwork) : '';
+            const nftTokenId = artwork.token_id || artwork.tokenId;
+            const nftContractAddress = tokenExplorerUrl ? new URL(tokenExplorerUrl).pathname.split('/').pop() : '';
+            const recordedNftSale = mintedArtwork ? readRecordedNftSale(provenanceState, nftTokenId) : null;
             const statusForState = mintedArtwork
                 ? { key: 'sold', label: 'Sold' }
                 : settlementExpired
@@ -2924,17 +2928,39 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         {resolvedMedia.type && <><dt>Media</dt><dd className="artwork-detail-media-type">{resolvedMedia.type}</dd></>}
                         {describeArtworkNetwork(artwork) && <><dt>Network</dt><dd>{describeArtworkNetwork(artwork)}</dd></>}
                         {(artwork.artwork_id || artwork.blockchain_id) && <><dt>Artwork ID</dt><dd>{artwork.artwork_id || artwork.blockchain_id}</dd></>}
-                        {artwork.token_id && (
+                        {mintedArtwork && nftTokenId && (
                             <>
                                 <dt>Token ID</dt>
                                 <dd>
                                     {tokenExplorerUrl ? (
-                                        <a href={tokenExplorerUrl} target="_blank" rel="noopener noreferrer">{artwork.token_id}</a>
-                                    ) : artwork.token_id}
+                                        <a href={tokenExplorerUrl} target="_blank" rel="noopener noreferrer">{nftTokenId}</a>
+                                    ) : nftTokenId}
                                 </dd>
+                                <dt>NFT contract</dt>
+                                <dd>{nftContractAddress ? (
+                                    <a href={tokenExplorerUrl.split('?')[0]} target="_blank" rel="noopener noreferrer">{nftContractAddress}</a>
+                                ) : 'Not available'}</dd>
+                                <dt>Last ArtSoul sale</dt>
+                                <dd>{provenanceState.status === 'loading'
+                                    ? 'Loading history…'
+                                    : provenanceState.status === 'unavailable' || provenanceState.status === 'idle' ? 'History unavailable'
+                                    : !provenanceState.complete ? 'History incomplete'
+                                    : recordedNftSale?.amount !== null && recordedNftSale?.amount !== undefined
+                                        ? `${recordedNftSale.amount} ${[84532, 11155111].includes(Number(artwork.chain_id || artwork.chainId)) ? 'test ETH' : 'ETH'}`
+                                        : 'Not recorded'}</dd>
+                                {recordedNftSale && <>
+                                    <dt>Sale venue</dt><dd>{recordedNftSale.venue}</dd>
+                                    {transactionExplorerUrl(recordedNftSale.event) && <>
+                                        <dt>Sale receipt</dt>
+                                        <dd><a href={transactionExplorerUrl(recordedNftSale.event)} target="_blank" rel="noopener noreferrer">View transaction ↗</a></dd>
+                                    </>}
+                                </>}
                             </>
                         )}
                     </dl>
+                    {mintedArtwork && <p className="provenance-state-copy provenance-state-note">
+                        Recorded ArtSoul sales may differ from what the current owner paid. Wallet transfers do not record a purchase price.
+                    </p>}
                 </DetailsPanel>
             );
 

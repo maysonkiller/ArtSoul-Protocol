@@ -92,6 +92,10 @@ Goal: validate the product with real users without changing frozen economics.
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
+  The November 2 [NFT record display](../audits/B18_NFT_RECORD_DETAILS_2026-11-02.md)
+  adds exact indexed ArtSoul sale evidence and contract identity without inferring
+  a current owner's purchase price. External Base wallet inventory is separately
+  requested read-only work, not a new supported trading network or marketplace.
 - [x] **B4 — Snapshot tooling readiness.** PR #386 (`cc7db8dc`) verifies the current schema, offline archive verification, no-overwrite output and concurrent PostgreSQL read consistency; two live read-only rehearsals agree. Maintain and rehearse the versioned exporter and independent verifier. The October 28 founder amendment moves actual Snapshot A capture to C16, after the full final-contract testnet. No final cut-off or export is required to close the current beta.
 - [ ] **B5 — Base go-to-market loop.** Onboard the first artist cohort personally, run themed auction drops, build in public through the official project account, and use verified cached metrics when reporting progress.
 

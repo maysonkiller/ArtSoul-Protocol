@@ -47,6 +47,15 @@ Release evidence and limitations are recorded in
 
 ## Remaining acceptance and operational work
 
+The founder-requested NFT record slice adds contract/token identity and exact
+last indexed ArtSoul sale details to the existing expandable artwork panel.
+It reuses provenance without extra requests and distinguishes sale evidence
+from ownership, asking price and floor. See [NFT record details](audits/B18_NFT_RECORD_DETAILS_2026-11-02.md)
+for the local tests and release boundary. External Base wallet NFTs are a
+separate requested read-only inventory; they are not active ArtSoul listings.
+The owner selected Google Password Manager for backup-key custody. Actual
+independent encrypted-copy and key-recovery verification remain pending.
+
 The next bounded B18 fix improves Classic controls over dark/light media and
 opens contextual Guide links only after the target section is expanded.
 It also removes a Saved/playback overlap in the compact desktop Home row.
