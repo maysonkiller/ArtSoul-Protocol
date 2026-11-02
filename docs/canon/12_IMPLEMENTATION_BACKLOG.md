@@ -113,6 +113,12 @@ still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
   Includes the locally reproduced stale resale after ownership returns, versioned
   collections/utilities and payment-origin separation. Final architecture and
   storage-layout sign-off remain pending; no current contract/network change.
+
+  November 2: [decision/invariant annex](../architecture/C1_DECISION_INVARIANTS_2026-11-02.md)
+  specifies the deployment/mint-authority questions, current pause/exit matrix,
+  liability and rounding vectors, and listing invalidation acceptance cases.
+  These are review inputs, not approved emergency powers, rounding policy or
+  storage topology. C1 remains open before replacement Solidity.
 - [ ] **C2 — Core rework.** Implement the frozen economics, deterministic lazy/creator/keeper finalization, default handling, and the Bible §3.1 refund obligations with bounded batches and withdrawable-credit fallback. No unbounded bidder loop.
 - [ ] **C3 — ArtworkNFT rework.** Implement the canonical 5.5% royalty, marketplace whitelist, provenance, and migration-safe interfaces.
 - [ ] **C4 — ArtSoulGenesis.** Build the dedicated soulbound contract and audited grant path. The numeric grant cadence is tunable operational policy, not canon or an immutable roadmap value. Grants require published categories, durable grant records, an audit log, and multisig-authorized administration.
