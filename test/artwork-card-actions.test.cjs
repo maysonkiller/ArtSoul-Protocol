@@ -99,7 +99,7 @@ test('a report deeplink only opens the existing form after artwork and live conf
     }
 });
 
-test('shared menu preserves native modified links, focus and navigation boundaries through a delayed config read', async () => {
+function menuHarness() {
     const listeners = {};
     const document = { activeElement: null, querySelectorAll: () => menus.filter(menu => menu.open) };
     const menus = [];
@@ -120,15 +120,22 @@ test('shared menu preserves native modified links, focus and navigation boundari
         }
     }
     document.createElement = tag => { const element = new Element(tag); if (tag === 'details') menus.push(element); return element; };
-    let resolveConfig, reads = 0, starts = 0;
+    let reads = 0;
+    const pending = [];
     const local = { currentWalletAddress: creator, ArtSoulSecurity: { isValidStorageUrl: () => true },
-        ArtSoulPublicConfig: { load: () => { reads++; return new Promise(resolve => { resolveConfig = resolve; }); } },
+        ArtSoulPublicConfig: { load: () => { reads++; return new Promise((resolve, reject) => pending.push({ resolve, reject })); } },
         addEventListener: (name, callback) => { listeners[name] = callback; } };
     for (const file of ['src/ui/artwork-url.js', 'src/ui/components/artwork-card.js']) vm.runInNewContext(fs.readFileSync(file, 'utf8'), { window: local, document });
+    return { local, document, menus, listeners, pending, Element, get reads() { return reads; } };
+}
+
+test('shared menu preserves native modified links, focus and navigation boundaries through a delayed config read', async () => {
+    const h = menuHarness(), { local, document, menus, listeners, Element } = h;
+    let starts = 0;
     const fullTitle = 'A complete artwork title that does not fit in a compact card';
     const fullCreator = 'A complete creator name that also does not fit in a compact card';
     const card = local.ArtSoulArtworkCard.createCardElement({ ...artwork, source: 'v41_projection', transaction_hash: '0x' + 'b'.repeat(64), title: fullTitle, creator_name: fullCreator, start_price: '0.001', file_url: 'fixture.png' }, { onStartAuction: () => starts++ });
-    assert.equal(reads, 0, 'rendering cards must not start per-card requests');
+    assert.equal(h.reads, 0, 'rendering cards must not start per-card requests');
     assert.equal(card.tagName, 'div');
     assert.equal(card.children.at(-1).tagName, 'a');
     assert.equal(card.children.at(-1).href, '/artwork/34');
@@ -137,7 +144,7 @@ test('shared menu preserves native modified links, focus and navigation boundari
     const menu = menus[0], summary = menu.children[0], list = menu.children[1].children[0];
     assert.ok(card.children.includes(menu), 'the overlay belongs to the card, outside the metadata layout');
     assert.ok(!card.children.find(child => child.className === 'artsoul-card-body').contains(menu));
-    assert.equal(menu.children[1].children.length, 1, 'only requested actions, no details or management section');
+    assert.equal(menu.children[1].children[1].hidden, true, 'no feedback until the menu opens');
     menu.open = true;
     const loading = menu.dispatch('toggle');
     const creation = list.children.find(link => link.textContent === 'Creation transaction');
@@ -148,14 +155,14 @@ test('shared menu preserves native modified links, focus and navigation boundari
     assert.equal(starts, 0, 'menu never invokes auction management');
     menu.open = true;
     creation.focus();
-    resolveConfig(enabled); await loading;
+    h.pending.at(-1).resolve(enabled); await loading;
     assert.equal(document.activeElement.textContent, 'Creation transaction', 'late flags retain focused action');
     assert.deepEqual(list.children.map(link => link.textContent), ['Donate', 'Report', 'Creation transaction']);
     local.ArtSoulPublicConfigData = enabled;
     menu.open = true;
     const thirdLoading = menu.dispatch('toggle');
     list.children.find(link => link.textContent === 'Report').focus();
-    resolveConfig({}); await thirdLoading;
+    h.pending.at(-1).resolve({}); await thirdLoading;
     assert.equal(document.activeElement, summary, 'a removed action returns keyboard focus to the menu control');
     assert.equal((await menu.dispatch('click')).stopped, true);
     await menu.dispatch('keydown', { key: 'Escape' });
@@ -165,4 +172,96 @@ test('shared menu preserves native modified links, focus and navigation boundari
     const before = menus.length;
     const disabled = local.ArtSoulArtworkCard.createCardElement({ ...artwork, file_url: 'fixture.png' }, { href: false });
     assert.equal(menus.length, before); assert.equal(disabled.children.some(child => child.tagName === 'a'), false);
+});
+
+function indexedMenu(h) {
+    h.local.ArtSoulArtworkCard.createCardElement({ ...artwork, source: 'v41_projection',
+        transaction_hash: '0x' + 'b'.repeat(64), file_url: 'fixture.png' });
+    const menu = h.menus[0];
+    return { menu, list: menu.children[1].children[0], feedback: menu.children[1].children[1] };
+}
+
+test('pending config is explained without hiding indexed links, and disabled features stay quiet after success', async () => {
+    const h = menuHarness(), { menu, list, feedback } = indexedMenu(h);
+    menu.open = true;
+    const pending = menu.dispatch('toggle');
+    assert.equal(feedback.role, 'status');
+    assert.equal(feedback.hidden, false);
+    assert.equal(feedback.textContent, 'Loading actions…');
+    assert.deepEqual(list.children.map(link => link.textContent), ['Creation transaction']);
+    h.pending.at(-1).resolve(enabled); await pending;
+    assert.equal(feedback.hidden, true);
+    assert.equal(feedback.textContent, '');
+    assert.deepEqual(list.children.map(link => link.textContent), ['Donate', 'Report', 'Creation transaction']);
+
+    h.local.ArtSoulPublicConfigData = { reportingEnabled: false, donations: { enabled: false } };
+    const disabled = menu.dispatch('toggle');
+    assert.equal(feedback.hidden, true, 'cached config needs no loading flash');
+    h.pending.at(-1).resolve(h.local.ArtSoulPublicConfigData); await disabled;
+    assert.equal(feedback.hidden, true, 'intentional feature gates do not show an unavailable-feature notice');
+    assert.equal(feedback.textContent, '');
+    assert.deepEqual(list.children.map(link => link.textContent), ['Creation transaction']);
+});
+
+test('failed config keeps the creation link, explains retry and clears feedback after recovery', async () => {
+    const h = menuHarness(), { menu, list, feedback } = indexedMenu(h);
+    menu.open = true;
+    const failed = menu.dispatch('toggle');
+    h.pending.at(-1).reject(new Error('Network unavailable')); await failed;
+    assert.equal(feedback.hidden, false);
+    assert.match(feedback.textContent, /could not load.*Close and reopen to retry/);
+    assert.deepEqual(list.children.map(link => link.textContent), ['Creation transaction']);
+    menu.open = false; await menu.dispatch('toggle');
+    menu.open = true;
+    const retry = menu.dispatch('toggle');
+    assert.equal(h.reads, 2);
+    assert.equal(feedback.textContent, 'Loading actions…');
+    h.pending.at(-1).resolve(enabled); await retry;
+    assert.equal(feedback.hidden, true);
+    assert.deepEqual(list.children.map(link => link.textContent), ['Donate', 'Report', 'Creation transaction']);
+    delete h.local.ArtSoulPublicConfig;
+    await menu.dispatch('toggle');
+    assert.equal(feedback.hidden, false, 'an unavailable config loader must not leave loading feedback stuck');
+    assert.match(feedback.textContent, /could not load/);
+});
+
+test('a stale failed read cannot replace the latest menu result or update a detached menu', async () => {
+    const h = menuHarness(), { menu, list, feedback } = indexedMenu(h);
+    menu.open = true;
+    const old = menu.dispatch('toggle'), oldRead = h.pending.at(-1);
+    menu.open = false; await menu.dispatch('toggle');
+    menu.open = true;
+    const latest = menu.dispatch('toggle');
+    h.pending.at(-1).resolve(enabled); await latest;
+    oldRead.reject(new Error('Late failure')); await old;
+    assert.equal(feedback.hidden, true);
+    assert.equal(feedback.textContent, '');
+    assert.deepEqual(list.children.map(link => link.textContent), ['Donate', 'Report', 'Creation transaction']);
+    const detached = menu.dispatch('toggle');
+    const before = feedback.textContent;
+    menu.isConnected = false;
+    h.pending.at(-1).reject(new Error('Removed card')); await detached;
+    assert.equal(feedback.textContent, before);
+});
+
+test('menu stays inside the visible viewport after actions arrive and repositions on reopening', async () => {
+    const h = menuHarness(), { menu } = indexedMenu(h);
+    h.local.innerHeight = 900;
+    h.local.visualViewport = { offsetTop: 20, height: 780 };
+    let triggerTop = 700, panelHeight = 55;
+    menu.children[0].getBoundingClientRect = () => ({ top: triggerTop });
+    menu.children[1].getBoundingClientRect = () => ({ height: panelHeight, bottom: triggerTop + 50 + panelHeight });
+    menu.open = true;
+    const loading = menu.dispatch('toggle');
+    assert.equal(menu.dataset.placement, 'above', 'use the visible viewport, not the taller layout viewport');
+    panelHeight = 162;
+    h.pending.at(-1).resolve(enabled); await loading;
+    assert.equal(menu.dataset.placement, 'above', 'late Donate and Report entries remain visible');
+
+    menu.open = false; await menu.dispatch('toggle');
+    triggerTop = 120;
+    menu.open = true;
+    const reopened = menu.dispatch('toggle');
+    h.pending.at(-1).resolve(enabled); await reopened;
+    assert.equal(menu.dataset.placement, '', 'a later opening near the top uses the normal downward menu');
 });

@@ -354,3 +354,10 @@ CI and release remain pending. Wallet SDK startup cost is a separate bounded
 follow-up because mobile persisted sessions cannot be inferred from address
 hints. See [runtime/interface audit](audits/B18_RUNTIME_INTERFACE_AUDIT_2026-11-01.md).
 This does not close the remaining native-device, B02/B11/B12 or B35 gates.
+
+November 2 B18 preview follow-up: the latest owner request replaces the separate
+contained banner with full-area artwork and a lower caption overlay, tightens
+shared desktop card density, and adds action-menu load/retry feedback plus
+viewport-aware placement. All action gates remain unchanged. Local build,
+focused tests and 694 shared-card browser assertions passed; release and
+remaining acceptance are recorded in [the overlay audit](audits/B18_HOME_OVERLAY_2026-11-02.md).

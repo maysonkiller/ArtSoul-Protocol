@@ -3300,6 +3300,17 @@ body.future .resale-modal {
 }
 .artsoul-card-menu-list a:hover,
 .artsoul-card-menu-list a:focus-visible { background: var(--c-surface-muted); }
+.artsoul-card-menu-status {
+    margin: 0;
+    padding: 8px 12px;
+    color: var(--c-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+.artsoul-card-menu[data-placement="above"] .artsoul-card-menu-list {
+    top: auto;
+    bottom: calc(100% + 6px);
+}
 
 @media (max-width: 400px) {
     .artsoul-card-menu { top: 4px; left: 4px; right: 4px; }
@@ -8376,18 +8387,15 @@ body:is(.classic, .future) .home-showcase-stage {
 body:is(.classic, .future) .home-showcase-slide {
     position: absolute;
     inset: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-    grid-template-rows: minmax(0, 1fr);
-    gap: 16px;
-    padding: 10px 16px 58px;
+    display: block;
+    padding: 0;
     color: var(--c-text);
     text-decoration: none;
 }
 body:is(.classic, .future) .home-showcase-media {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     background: var(--c-surface-muted);
 }
 body:is(.classic, .future) .home-showcase-caption {
@@ -9035,16 +9043,16 @@ body:is(.classic, .future) .site-header .site-primary-nav a {
     }
 }
 
-/* Caption and controls have their own space inside the accepted shallow hero;
-   no scrim obscures the contained artwork. All colors use theme tokens. */
+/* Attribution overlays the lower edge of the full-width showcase. The scrim
+   protects text contrast without dimming the upper part of the artwork. */
 body:is(.classic, .future) .home-showcase-caption {
-    position: static;
-    justify-content: center;
+    position: absolute;
+    justify-content: flex-end;
     min-width: 0;
     z-index: 2;
     gap: 6px;
-    padding: 0;
-    background: transparent;
+    padding: 48px 20px 60px;
+    background: linear-gradient(to top, var(--c-bg) 0%, color-mix(in srgb, var(--c-bg) 85%, transparent) 45%, transparent 100%);
     pointer-events: none;
 }
 body:is(.classic, .future) .home-showcase-caption :is(.home-showcase-label, .home-showcase-title, .home-showcase-creator) {
@@ -9083,7 +9091,7 @@ body:is(.classic, .future) #homeShowcaseControls > button {
 @media (max-width: 640px) {
     body:is(.classic, .future) .home-showcase-caption {
         gap: 4px;
-        padding: 0;
+        padding: 40px 16px 58px;
     }
     body:is(.classic, .future) .home-showcase-caption .home-showcase-label { font-size: 11px; line-height: 1.2; }
     body:is(.classic, .future) .home-showcase-caption .home-showcase-creator {
@@ -9384,14 +9392,14 @@ body:is(.classic, .future) .site-header #navButtons :is([data-avatar-name], [dat
     text-shadow: none !important;
 }
 
-/* The showcase is no taller than the editorial introduction on wide screens.
-   On smaller screens its ratio compresses before the real gallery begins. */
+/* Keep the first artwork row close to a modestly taller showcase. */
 body:is(.classic, .future) #homeSection {
     padding-top: 16px !important;
 }
 body:is(.classic, .future) #homeSection .home-hero {
     gap: clamp(16px, 2.2vw, 30px) !important;
-    padding-block: 8px 20px !important;
+    padding-block: 8px 12px !important;
+    margin-bottom: 8px !important;
 }
 body:is(.classic, .future) #homeSection .home-hero h1 {
     font-size: clamp(32px, 3vw, 44px) !important;
@@ -9409,7 +9417,7 @@ body:is(.classic, .future) #homeSection .home-hero-actions {
 }
 body:is(.classic, .future) #homeSection .home-spotlight-heading {
     margin-top: 0;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
 }
 body:is(.classic, .future) #homeSection .home-spotlight-heading h2 {
     font-size: 22px;
@@ -9421,33 +9429,32 @@ body:is(.classic, .future) #homeSection .home-showcase-shell {
 }
 body:is(.classic, .future) #homeSection .home-showcase-caption {
     gap: 4px;
-    padding: 0;
 }
 body:is(.classic, .future) #homeSection .home-showcase-caption .home-showcase-title {
     font-size: clamp(17px, 1.5vw, 22px);
 }
 @media (min-width: 1050px) {
     body:is(.classic, .future) #homeSection .home-hero {
-        align-items: stretch !important;
+        align-items: center !important;
     }
     body:is(.classic, .future) #homeSection .home-showcase {
         display: flex;
-        align-self: stretch;
+        align-self: center;
         margin: 0;
         max-width: 100%;
     }
     body:is(.classic, .future) #homeSection .home-showcase-shell {
         aspect-ratio: auto !important;
         width: 100%;
-        height: 100% !important;
+        height: clamp(240px, 30vh, 280px) !important;
         max-height: 280px;
     }
 }
 @media (max-width: 1049px) {
     body:is(.classic, .future) #homeSection .home-showcase-shell {
-        aspect-ratio: 2.3 / 1 !important;
+        aspect-ratio: 2 / 1 !important;
         max-height: 250px;
-        min-height: 180px !important;
+        min-height: 210px !important;
     }
 }
 
@@ -9468,8 +9475,8 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media {
 }
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-body {
     position: static;
-    min-height: 120px;
-    padding: 16px;
+    min-height: 104px;
+    padding: 12px 14px;
     gap: 6px;
     flex: 1 0 auto;
 }
@@ -9498,7 +9505,7 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta {
     align-items: baseline;
     flex-wrap: wrap;
     margin-top: auto;
-    padding-top: 16px;
+    padding-top: 10px;
     gap: 4px 8px;
     font-size: 12px;
 }
@@ -9570,6 +9577,12 @@ body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, 
     body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-title { font-size: 15px; }
     body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price { font-size: 12px; }
 }
+@media (min-width: 769px) {
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media {
+        aspect-ratio: 3 / 2;
+        min-height: 124px;
+    }
+}
 @container (max-width: 175px) {
     body:is(.classic, .future) .artsoul-artwork-card .saved-button-overlay { top: 52px; left: auto; right: 4px; }
     body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-status, .artsoul-card-countdown) {
@@ -9595,7 +9608,7 @@ body:is(.classic, .future) .gallery-page-main.site-page-container {
     }
     body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+9) { display: none !important; }
 }
-@media (min-width: 1600px) {
+@media (min-width: 1440px) {
     #artworkGallery[aria-busy="true"] { --home-loading-columns: 6; }
     body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
         grid-template-columns: repeat(6, minmax(0, 1fr)) !important;

@@ -489,7 +489,11 @@
         const list = document.createElement('div');
         list.className = 'artsoul-card-menu-list';
         const actionList = document.createElement('div');
-        list.append(actionList);
+        const feedback = document.createElement('p');
+        feedback.className = 'artsoul-card-menu-status';
+        feedback.setAttribute('role', 'status');
+        feedback.hidden = true;
+        list.append(actionList, feedback);
         menu.append(toggle, list);
         ['click', 'pointerdown', 'mousedown', 'touchstart', 'keydown'].forEach(type =>
             menu.addEventListener(type, stopCardPropagation));
@@ -498,6 +502,18 @@
         });
         let request = 0;
         let renderedItems = '';
+        const positionList = () => {
+            menu.dataset.placement = '';
+            if (!list.getBoundingClientRect || !toggle.getBoundingClientRect) return;
+            const viewport = window.visualViewport;
+            const top = viewport?.offsetTop || 0;
+            const bottom = top + (viewport?.height || window.innerHeight);
+            const trigger = toggle.getBoundingClientRect();
+            const panel = list.getBoundingClientRect();
+            if (panel.bottom > bottom - 8 && trigger.top - panel.height - 6 >= top + 8) {
+                menu.dataset.placement = 'above';
+            }
+        };
         const render = config => {
             const items = cardActionItems(artwork, config);
             const signature = JSON.stringify(items);
@@ -525,10 +541,24 @@
             if (!menu.open) return;
             document.querySelectorAll('.artsoul-card-menu[open]').forEach(other => { if (other !== menu) other.open = false; });
             render(window.ArtSoulPublicConfigData || {});
+            feedback.textContent = 'Loading actions…';
+            feedback.hidden = Boolean(window.ArtSoulPublicConfigData);
+            positionList();
             try {
                 const config = await window.ArtSoulPublicConfig?.load?.();
-                if (menu.isConnected && menu.open && current === request && config) render(config);
-            } catch { /* Retain the indexed transaction link; feature gates fail closed. */ }
+                if (!menu.isConnected || !menu.open || current !== request) return;
+                if (!config) throw new Error('Action configuration unavailable');
+                render(config);
+                feedback.hidden = true;
+                feedback.textContent = '';
+                positionList();
+            } catch {
+                if (!menu.isConnected || !menu.open || current !== request) return;
+                // Keep existing links; a failed read never enables additional actions.
+                feedback.textContent = 'Actions could not load. Close and reopen to retry.';
+                feedback.hidden = false;
+                positionList();
+            }
         });
         return menu;
     }
