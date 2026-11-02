@@ -1,6 +1,6 @@
 # Roadmap Phases
 
-This roadmap expands the four-phase model in `ARTSOUL_CANON_BIBLE_FULL.md` §17. The Bible is the single source of protocol truth. This document schedules work; it does not create economics, contract mechanics, grant cadence, treasury triggers, legal decisions, or product scope.
+This roadmap tracks the four-phase model in `ARTSOUL_CANON_BIBLE_FULL.md` §17. Apply the [November 2 decision-authority clarification](CHANGELOG_2026-11-02_DECISION_AUTHORITY.md): current founder decisions supersede outdated scheduling and scope descriptions. Authorized independent preparation may run alongside unresolved gates, whose status stays explicit. A schedule does not itself approve financial parameters, custody or critical authority, or establish deployed behavior or release acceptance.
 
 ## Canonical Phase Mapping
 
@@ -13,7 +13,7 @@ The active canonical model is A–D:
 | C — Mainnet Preparation | Build and audit the final system | Contract rework, Genesis, Collections, pool, admin controls, auras, legal/domain/treasury readiness, fresh Base Sepolia rehearsal and final-testnet Snapshot A |
 | D — Staged Mainnet Launch | Migrate and activate safely | Snapshot verification, data reset, Base deployment, Core stability window, separate Genesis pilot, controlled growth |
 
-Earlier informal A–G plans are retired and are not parallel authority. Token or multichain phases from historical planning have no A–D destination and remain out of scope. Any old stabilization/testnet item belongs to A; beta/growth validation belongs to B; contract, security, Genesis, Collections, legal, and final visual work belongs to C; migration/deployment/activation belongs to D.
+Earlier informal A–G plans are historical, not parallel active roadmaps. Token mechanics remain unapproved. The founder-authorized future contract and cross-chain payment research belongs to C, may proceed alongside B, and does not activate new networks. Stabilization/testnet items belong to A; beta/growth validation to B; contract, security, Genesis, Collections, legal, and final visual work to C; migration/deployment/activation to D. Current founder priorities may revise this scheduling.
 
 ## Phase A — Stabilize Public Testnet (accepted October 24, 2026)
 

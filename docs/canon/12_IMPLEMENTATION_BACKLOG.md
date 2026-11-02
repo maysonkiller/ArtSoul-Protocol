@@ -1,6 +1,6 @@
 # Implementation Backlog
 
-This backlog expands the canonical A–D phase model in `ARTSOUL_CANON_BIBLE_FULL.md` §17. The Bible is the single source of protocol truth. A roadmap or backlog item may schedule work, but it may not create or amend economics, contract mechanics, roles, Genesis grant cadence, treasury triggers, or legal decisions.
+This backlog tracks the A–D phase model in `ARTSOUL_CANON_BIBLE_FULL.md` §17. Apply the [November 2 decision-authority clarification](CHANGELOG_2026-11-02_DECISION_AUTHORITY.md): current founder requests, risk and actual dependencies take priority over obsolete ordering. The Bible records design decisions; deployed contracts, receipts and verified configuration establish current behavior. A backlog entry alone does not approve new financial parameters, custody or critical authority, or establish release acceptance.
 
 Work proceeds one contained task at a time. One backlog item normally equals one focused PR. Contract changes require focused tests and explicit storage-layout review.
 
