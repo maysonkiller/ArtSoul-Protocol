@@ -111,7 +111,7 @@ export function MultiChainWalletAssets({ wallet }) {
       const allowed = network === 'all' ? five : [network];
       if (!valid()) return;
       if (data.wallet !== owner || data.view !== view || data.selectedNetwork !== network ||
-          !Array.isArray(data.items) || data.items.length > 12 ||
+          !Array.isArray(data.items) || data.items.length > (view === 'nfts' ? 12 : 100) ||
           data.items.some(item => !allowed.includes(item.network)) || !Array.isArray(data.partialNetworks))
         throw new Error('Unexpected portfolio data');
       setState({ status: 'ready', page: data, message: '' });
@@ -144,7 +144,7 @@ export function MultiChainWalletAssets({ wallet }) {
       <button className="btn-main" type="button" onClick={() => void load()} disabled={loading}>
         {loading ? 'Loading…' : page ? 'Reload' : 'Load assets'}</button>
       {page?.nextCursor && <button className="btn-secondary" type="button" onClick={() => void load(page.nextCursor)}
-        disabled={loading}>Next 12</button>}
+        disabled={loading}>Next page</button>}
     </div>
     <p className="wallet-assets-note">Only requested pages are loaded; more networks consume more free provider quota.
       Unsolicited NFTs and missing images are possible. No NFT is offered for sale here.</p>
