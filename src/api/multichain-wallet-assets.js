@@ -152,19 +152,23 @@ function tokenItem(item, wallet) {
   const meta = item?.tokenMetadata || {};
   const decimals = meta.decimals ?? (contract === null ? 18 : null);
   if (!chain || (item?.tokenAddress !== null && !contract) || balance === null ||
-      !Number.isInteger(decimals) || decimals < 0 || decimals > 36 ||
       (typeof item.address === 'string' && item.address.toLowerCase() !== wallet)) return null;
-  const value = BigInt(balance), divisor = 10n ** BigInt(decimals);
-  const major = (value / divisor).toString();
-  const minor = decimals ? (value % divisor).toString().padStart(decimals, '0').slice(0, 6).replace(/0+$/, '') : '';
-  const displayBalance = major + (minor ? '.' + minor : '');
+  const unitsKnown = Number.isInteger(decimals) && decimals >= 0 && decimals <= 36;
+  let displayBalance = null;
+  if (unitsKnown) {
+    const value = BigInt(balance), divisor = 10n ** BigInt(decimals);
+    const major = (value / divisor).toString();
+    const minor = decimals ? (value % divisor).toString().padStart(decimals, '0').slice(0, 6).replace(/0+$/, '') : '';
+    displayBalance = major + (minor ? '.' + minor : '');
+  }
   const nativeSymbol = { 137: 'POL', 56: 'BNB', 43114: 'AVAX' }[chain.chainId] || 'ETH';
   const symbol = safeText(meta.symbol, 24) || (contract === null ? nativeSymbol : 'Token');
   const name = safeText(meta.name) || symbol;
   const prices = Array.isArray(item.tokenPrices) ? item.tokenPrices : [];
   const usd = prices.find(p => p?.currency?.toLowerCase() === 'usd' && typeof p.value === 'string' && /^(?:0|[1-9]\d{0,12})(?:\.\d{1,12})?$/.test(p.value));
   return { id: chain.chainId + ':' + (contract || 'native'), network: item.network, chainId: chain.chainId,
-    networkName: chain.name, networkShort: chain.short, contractAddress: contract, symbol, name, balance: displayBalance,
+    networkName: chain.name, networkShort: chain.short, contractAddress: contract, symbol, name,
+    balance: displayBalance, balanceRaw: unitsKnown ? null : balance,
     priceUsd: usd ? usd.value : null,
     explorerUrl: contract ? chain.explorer + '/token/' + contract : chain.explorer };
 }
