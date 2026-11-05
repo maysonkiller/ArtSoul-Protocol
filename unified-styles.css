@@ -10018,3 +10018,36 @@ body:is(.classic,.future) .wallet-asset-quick-networks .wallet-chain-chip {
 }
 body:is(.classic,.future) .wallet-asset-quick-networks img,
 body:is(.classic,.future) .wallet-chain-chip img { object-fit: contain; }
+
+
+/* B36 owner-profile tab: compact horizontal navigation without clipped labels,
+   keyboard focus or overlap at iPhone/tablet widths. */
+@media (max-width: 620px) {
+  body:is(.classic,.future) .profile-collection-panel .profile-section-tabs {
+    display: flex !important; flex-wrap: nowrap !important;
+    gap: 3px !important; max-width: 100%;
+    overflow-x: auto !important; overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  body:is(.classic,.future) .profile-collection-panel .profile-section-tabs > .profile-content-tab {
+    flex: 0 0 auto !important; min-width: max-content !important;
+    padding-inline: 12px !important; min-height: 44px !important;
+    font-size: 12px !important; white-space: nowrap;
+    scroll-snap-align: start;
+  }
+}
+@media (min-width: 360px) and (max-width: 620px) {
+  /* Existing Base-only wallet NFT inventory shares B36's compact two-card
+     presentation, so the feature flag can remain off without a worse UI. */
+  body:is(.classic,.future) .profile-collection-panel .wallet-nfts-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    gap: 10px !important;
+  }
+  body:is(.classic,.future) .profile-collection-panel .wallet-nft-body {
+    padding: 10px !important; min-width: 0; font-size: 12px;
+  }
+  body:is(.classic,.future) .profile-collection-panel .wallet-nft-body h4 {
+    overflow-wrap: anywhere; font-size: 13px;
+  }
+}
