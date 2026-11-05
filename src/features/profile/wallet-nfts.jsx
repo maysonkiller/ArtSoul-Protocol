@@ -1,4 +1,5 @@
 import { React } from '../../entries/react-runtime.js';
+import { MultiChainWalletAssets } from './multichain-wallet-assets.jsx';
 
 const currentWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
 const empty = () => ({ status: 'idle', page: null, message: '' });
@@ -9,6 +10,7 @@ const contextEvents = ['artsoul:wallet-state-changed', 'artsoul:wallet-state-set
 export function WalletNfts({ wallet }) {
   const owner = String(wallet || '').toLowerCase();
   const [enabled, setEnabled] = React.useState(false);
+  const [multichainEnabled, setMultichainEnabled] = React.useState(false);
   const [state, setState] = React.useState(empty);
   const request = React.useRef(null);
   const generation = React.useRef(0);
@@ -16,7 +18,10 @@ export function WalletNfts({ wallet }) {
   React.useEffect(() => {
     let active = true;
     Promise.resolve(window.ArtSoulPublicConfig?.load?.()).then(config => {
-      if (active) setEnabled(config?.externalBaseNftsEnabled === true);
+      if (active) {
+        setEnabled(config?.externalBaseNftsEnabled === true);
+        setMultichainEnabled(config?.externalBaseNftsEnabled === true && config?.multichainWalletAssetsEnabled === true);
+      }
     }).catch(() => {});
     return () => { active = false; };
   }, []);
@@ -81,6 +86,7 @@ export function WalletNfts({ wallet }) {
     } catch { if (live.current && owner === currentWallet()) setState({ ...empty(), status: 'auth' }); }
   }
   if (!enabled || owner !== currentWallet()) return null;
+  if (multichainEnabled) return <MultiChainWalletAssets wallet={wallet} />;
   const page = state.page;
   return <section className="wallet-nfts" aria-label="Other NFTs in your Base wallet" aria-busy={state.status === 'loading'}>
     <h3>In your Base wallet</h3>

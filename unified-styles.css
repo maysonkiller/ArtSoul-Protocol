@@ -9803,3 +9803,251 @@ body:is(.classic, .future) .site-header .avatar-account-action .dropdown-item {
         padding: 4px !important;
     }
 }
+
+
+/* B36 — opt-in read-only multichain wallet gallery.
+   The old Base-only wallet inventory remains unchanged while B36 is off. */
+body:is(.classic,.future) .wallet-multichain {
+  max-width: 100%; overflow: visible;
+  --wallet-asset-gap: clamp(10px, 1.2vw, 18px);
+}
+body:is(.classic,.future) .wallet-multichain-heading {
+  display: flex; align-items: end; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+}
+body:is(.classic,.future) .wallet-multichain-heading h3 {
+  font-size: clamp(20px,2.1vw,28px);
+  color: var(--c-accent); margin: 2px 0 4px;
+}
+body:is(.classic,.future) .wallet-multichain-kicker {
+  color: var(--c-text-muted); font-size: 11px; font-weight: 650; letter-spacing: 0.12em;
+}
+body:is(.classic,.future) .wallet-assets-note,
+body:is(.classic,.future) .wallet-assets-disclaimer {
+  color: var(--c-text-muted); font-size: 12px; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+body:is(.classic,.future) .wallet-asset-tabs {
+  display: inline-flex; gap: 4px; padding: 4px;
+  border: 1px solid var(--c-border-soft); border-radius: 999px;
+  background: var(--c-surface-muted);
+}
+body:is(.classic,.future) .wallet-asset-tabs button {
+  min-height: 44px; min-width: 76px; border: 1px solid transparent;
+  border-radius: 999px; padding: 8px 14px;
+  background: transparent; color: var(--c-text); font-size: 13px;
+  cursor: pointer;
+}
+body:is(.classic,.future) .wallet-asset-tabs button[aria-pressed="true"] {
+  background: var(--c-surface); border-color: var(--c-accent); color: var(--c-accent);
+}
+body:is(.classic,.future) .wallet-asset-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px; padding: 12px; margin: 10px 0;
+  border-radius: 14px; border: 1px solid var(--c-border-soft);
+  background: var(--c-surface);
+}
+body:is(.classic,.future) .wallet-asset-toolbar label {
+  color: var(--c-text-muted); font-size: 12px; font-weight: 600;
+}
+body:is(.classic,.future) .wallet-asset-toolbar select {
+  flex: 1 1 170px; max-width: 300px; min-height: 44px;
+  border: 1px solid var(--c-border); border-radius: 10px;
+  padding: 6px 10px; font: inherit; font-size: 13px;
+  color: var(--c-text); background: var(--c-surface-muted);
+}
+body:is(.classic,.future) .wallet-asset-toolbar button {
+  min-height: 44px; padding: 9px 13px; font-size: 13px;
+}
+body:is(.classic,.future) .wallet-asset-grid {
+  display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,210px),1fr));
+  align-items: stretch; gap: var(--wallet-asset-gap); margin-top: 16px;
+}
+body:is(.classic,.future) .wallet-asset-card,
+body:is(.classic,.future) .wallet-token-card {
+  min-width: 0; width: 100%; overflow: hidden;
+  border: 1px solid var(--c-border-soft); border-radius: 16px;
+  background: var(--c-surface); color: var(--c-text);
+  box-sizing: border-box; box-shadow: none;
+}
+body:is(.classic,.future) .wallet-asset-card:hover,
+body:is(.classic,.future) .wallet-token-card:hover {
+  border-color: var(--c-border);
+}
+body:is(.classic,.future) .wallet-asset-art {
+  position: relative; width: 100%; aspect-ratio: 1;
+  display: grid; place-items: center; overflow: hidden;
+  background: var(--c-surface-muted);
+}
+body:is(.classic,.future) .wallet-asset-art img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; display: block; background: var(--c-surface-muted);
+}
+body:is(.classic,.future) .wallet-asset-placeholder {
+  display: grid; place-items: center; width: 80px; height: 80px;
+  border-radius: 50%; border: 1px solid var(--c-border-soft);
+  color: var(--c-text-muted); font-size: 17px; font-weight: 700; letter-spacing: .2em;
+}
+body:is(.classic,.future) .wallet-asset-overlay {
+  position: absolute; z-index: 2; left: 7px; top: 7px;
+  max-width: calc(100% - 14px);
+}
+body:is(.classic,.future) .wallet-chain-chip {
+  display: inline-flex; gap: 5px; align-items: center;
+  max-width: 100%; min-height: 26px; min-width: 0;
+  padding: 3px 7px; border: 1px solid var(--c-border-soft);
+  border-radius: 999px; background: color-mix(in srgb,var(--c-bg) 90%,transparent);
+  color: var(--c-text); font-size: 11px; font-weight: 650; line-height: 1.15;
+}
+body:is(.classic,.future) .wallet-chain-chip img {
+  position: static; inset: auto; width: 16px; height: 16px;
+  flex: 0 0 16px; object-fit: contain; background: transparent;
+}
+body:is(.classic,.future) .wallet-chain-glyph {
+  display: inline-grid; place-items: center; flex: 0 0 18px;
+  min-width: 18px; height: 18px; padding: 1px;
+  border-radius: 50%; background: var(--c-accent); color: var(--c-bg);
+  font-size: 9px; font-weight: 800;
+}
+body:is(.classic,.future) .wallet-chain-chip[data-chain="opt-mainnet"] .wallet-chain-glyph { background: var(--c-accent-3); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="matic-mainnet"] .wallet-chain-glyph { background: var(--c-accent-2); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="arb-mainnet"] .wallet-chain-glyph { background: var(--c-accent); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="bnb-mainnet"] .wallet-chain-glyph { background: var(--c-accent); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="avax-mainnet"] .wallet-chain-glyph { background: var(--c-accent-3); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="linea-mainnet"] .wallet-chain-glyph { background: var(--c-accent-2); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-asset-copy { padding: 12px; min-width: 0; }
+body:is(.classic,.future) .wallet-asset-copy h4 {
+  font-size: 15px; font-weight: 700; margin: 0 0 3px;
+  line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; overflow: hidden; min-height: 2.6em;
+}
+body:is(.classic,.future) .wallet-asset-collection {
+  color: var(--c-text-muted); font-size: 12px; line-height: 1.4;
+  white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+}
+body:is(.classic,.future) .wallet-asset-brief { font-size: 11px; color: var(--c-accent); padding: 2px 0; }
+body:is(.classic,.future) .wallet-asset-details {
+  margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--c-border-soft);
+}
+body:is(.classic,.future) .wallet-asset-details summary {
+  cursor: pointer; min-height: 44px; display: flex; align-items: center;
+  color: var(--c-accent); font-size: 12px; font-weight: 600;
+}
+body:is(.classic,.future) .wallet-asset-details dl {
+  display: grid; grid-template-columns: minmax(0,1fr); gap: 2px; font-size: 12px;
+}
+body:is(.classic,.future) .wallet-asset-details dt { color: var(--c-text-muted); margin-top: 6px; }
+body:is(.classic,.future) .wallet-asset-details dd,
+body:is(.classic,.future) .wallet-asset-details code {
+  min-width: 0; margin: 0; overflow-wrap: anywhere;
+  white-space: normal; font-size: 11px; color: var(--c-text);
+}
+body:is(.classic,.future) .wallet-asset-description {
+  margin: 0 0 8px; max-height: 160px; overflow: auto;
+  white-space: pre-wrap; font-size: 12px; line-height: 1.5;
+}
+body:is(.classic,.future) .wallet-asset-links {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+body:is(.classic,.future) .wallet-asset-details a {
+  display: inline-flex; align-items: center; min-height: 44px;
+  padding: 7px 10px; border-radius: 9px;
+  border: 1px solid var(--c-border-soft); background: var(--c-surface-muted);
+  color: var(--c-accent); font-size: 12px; text-decoration: none;
+}
+body:is(.classic,.future) .wallet-token-card { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+body:is(.classic,.future) .wallet-token-top { display: flex; align-items: center; min-width: 0; gap: 10px; }
+body:is(.classic,.future) .wallet-token-top div { min-width: 0; }
+body:is(.classic,.future) .wallet-token-top h4 { font-weight: 700; font-size: 15px; overflow-wrap: anywhere; }
+body:is(.classic,.future) .wallet-token-top p { font-size: 12px; color: var(--c-text-muted); }
+body:is(.classic,.future) .wallet-token-symbol {
+  display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px;
+  border-radius: 50%; border: 1px solid var(--c-border);
+  background: var(--c-surface-muted); color: var(--c-accent); font-size: 11px; font-weight: 750;
+}
+body:is(.classic,.future) .wallet-token-balance {
+  font-size: clamp(16px,2vw,21px); font-weight: 700; line-height: 1.4;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+body:is(.classic,.future) .wallet-token-balance span { font-size: 12px; color: var(--c-text-muted); }
+body:is(.classic,.future) .wallet-asset-warning,
+body:is(.classic,.future) .wallet-asset-error {
+  border: 1px solid var(--c-border-soft); border-radius: 10px;
+  padding: 12px; margin: 10px 0; line-height: 1.5; font-size: 12px; color: var(--c-text);
+}
+body:is(.classic,.future) .wallet-assets-empty {
+  margin: 14px 0; padding: 18px; border: 1px dashed var(--c-border-soft);
+  border-radius: 12px; color: var(--c-text-muted);
+}
+@media (min-width: 360px) and (max-width: 620px) {
+  body:is(.classic,.future) .wallet-asset-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px;
+  }
+  body:is(.classic,.future) .wallet-asset-copy { padding: 9px; }
+  body:is(.classic,.future) .wallet-asset-copy h4 { font-size: 13px; }
+  body:is(.classic,.future) .wallet-asset-toolbar select { max-width: none; flex: 1 1 100%; }
+  body:is(.classic,.future) .wallet-chain-chip { font-size: 10px; padding: 3px 5px; }
+}
+@media (max-width: 359px) {
+  body:is(.classic,.future) .wallet-asset-grid { grid-template-columns: minmax(0,1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body:is(.classic,.future) .wallet-asset-card,
+  body:is(.classic,.future) .wallet-token-card { transition: none !important; animation: none !important; }
+}
+
+/* B36: locally hosted branded chain icons and horizontally scrollable quick
+   network pills. Selection alone never sends a provider request. */
+body:is(.classic,.future) .wallet-asset-quick-networks {
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 7px;
+  width: 100%; min-width: 0; max-width: 100%;
+  overflow-x: auto; padding: 5px 2px 10px;
+  scroll-snap-type: x proximity;
+}
+body:is(.classic,.future) .wallet-asset-quick-networks button {
+  flex: 0 0 auto; min-height: 44px; border-radius: 999px;
+  padding: 4px 6px; border: 1px solid var(--c-border-soft);
+  background: var(--c-surface); color: var(--c-text);
+  scroll-snap-align: start; cursor: pointer;
+}
+body:is(.classic,.future) .wallet-asset-quick-networks button[aria-pressed="true"] {
+  border-color: var(--c-accent); box-shadow: inset 0 0 0 1px var(--c-border-soft);
+}
+body:is(.classic,.future) .wallet-asset-quick-networks .wallet-chain-chip {
+  border: 0; background: none; color: inherit;
+}
+body:is(.classic,.future) .wallet-asset-quick-networks img,
+body:is(.classic,.future) .wallet-chain-chip img { object-fit: contain; }
+
+
+/* B36 owner-profile tab: compact horizontal navigation without clipped labels,
+   keyboard focus or overlap at iPhone/tablet widths. */
+@media (max-width: 620px) {
+  body:is(.classic,.future) .profile-collection-panel .profile-section-tabs {
+    display: flex !important; flex-wrap: nowrap !important;
+    gap: 3px !important; max-width: 100%;
+    overflow-x: auto !important; overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  body:is(.classic,.future) .profile-collection-panel .profile-section-tabs > .profile-content-tab {
+    flex: 0 0 auto !important; min-width: max-content !important;
+    padding-inline: 12px !important; min-height: 44px !important;
+    font-size: 12px !important; white-space: nowrap;
+    scroll-snap-align: start;
+  }
+}
+@media (min-width: 360px) and (max-width: 620px) {
+  /* Existing Base-only wallet NFT inventory shares B36's compact two-card
+     presentation, so the feature flag can remain off without a worse UI. */
+  body:is(.classic,.future) .profile-collection-panel .wallet-nfts-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    gap: 10px !important;
+  }
+  body:is(.classic,.future) .profile-collection-panel .wallet-nft-body {
+    padding: 10px !important; min-width: 0; font-size: 12px;
+  }
+  body:is(.classic,.future) .profile-collection-panel .wallet-nft-body h4 {
+    overflow-wrap: anywhere; font-size: 13px;
+  }
+}

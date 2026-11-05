@@ -24,6 +24,7 @@ function readPublicConfig() {
     donations: readDonationConfig(),
     saved: readSavedConfig(),
     externalBaseNftsEnabled: process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED === 'true',
+    multichainWalletAssetsEnabled: process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED === 'true' && process.env.ARTSOUL_MULTICHAIN_ASSETS_ENABLED === 'true',
     profileLayout: readProfileLayoutConfig(),
     auctionNotifications: readAuctionNotificationConfig()
   };

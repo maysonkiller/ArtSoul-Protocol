@@ -41,6 +41,11 @@ const { useState, useEffect, useRef } = React;
             { id: 'sold', label: 'Activity', icon: '', description: 'Completed sales of works created by this artist.' },
         ];
 
+        const WALLET_NFT_TAB = {
+            id: 'wallet-nfts', label: 'Wallet NFTs', icon: '',
+            description: 'NFTs and tokens held in your connected wallet across supported networks.'
+        };
+
         function TransactionProcessingLabel() {
             return (
                 <span className="inline-flex items-center justify-center gap-2">
@@ -277,7 +282,7 @@ const { useState, useEffect, useRef } = React;
             }, []);
 
             useEffect(() => {
-                if (profile && selectedGallery !== 'saved') {
+                if (profile && selectedGallery !== 'saved' && selectedGallery !== 'wallet-nfts') {
                     loadMyArtworks();
                 }
             }, [selectedGallery]);
@@ -293,7 +298,7 @@ const { useState, useEffect, useRef } = React;
             useEffect(() => {
                 const showSaved = () => { if (savedEnabled && isOwnProfile && window.location.hash === '#saved') setSelectedGallery('saved'); };
                 showSaved();
-                if (!isOwnProfile && selectedGallery === 'saved') setSelectedGallery('created');
+                if (!isOwnProfile && ['saved', 'wallet-nfts'].includes(selectedGallery)) setSelectedGallery('created');
                 window.addEventListener('hashchange', showSaved);
                 return () => window.removeEventListener('hashchange', showSaved);
             }, [savedEnabled, isOwnProfile]);
@@ -1091,7 +1096,7 @@ const { useState, useEffect, useRef } = React;
             const FULL_GALLERY_LIMIT = 200;
 
             async function fetchProfileArtworks(activeProfile, galleryType = selectedGallery, dbOverride = null, { limit = FULL_GALLERY_LIMIT } = {}) {
-                if (galleryType === 'saved') return { items: [], corpus: [] };
+                if (galleryType === 'saved' || galleryType === 'wallet-nfts') return { items: [], corpus: [] };
                 if (!activeProfile?.wallet_address) return { items: [], corpus: [] };
 
                 const walletAddress = activeProfile.wallet_address;
@@ -1123,7 +1128,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function loadMyArtworks(profileOverride = null, { fresh = false } = {}) {
-                if (selectedGallery === 'saved') return;
+                if (selectedGallery === 'saved' || selectedGallery === 'wallet-nfts') return;
                 const requestId = ++artworksRequestRef.current;
                 setArtworksError(null);
                 const activeProfile = profileOverride || profile;
@@ -1932,7 +1937,7 @@ const { useState, useEffect, useRef } = React;
                         {/* Gallery Tabs */}
                         <nav className="profile-sections-nav" aria-label="Profile content">
                             <div className="profile-section-tabs flex flex-wrap gap-3">
-                                {[...GALLERY_TYPES, ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Saved', icon: '' }] : [])].map(gallery => (
+                                {[...GALLERY_TYPES, ...(isOwnProfile ? [WALLET_NFT_TAB] : []), ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Saved', icon: '' }] : [])].map(gallery => (
                                     <button
                                         key={gallery.id}
                                         type="button"
@@ -1947,7 +1952,7 @@ const { useState, useEffect, useRef } = React;
                                                 // loads; release it when that tab's result commits.
                                                 const panel = galleryPanelRef.current;
                                                 if (panel) panel.style.minHeight = `${Math.max(0, window.innerHeight - panel.getBoundingClientRect().top)}px`;
-                                                setArtworksLoading(true);
+                                                setArtworksLoading(gallery.id !== 'wallet-nfts' && gallery.id !== 'saved');
                                                 setSelectedGallery(gallery.id);
                                                 if (gallery.id === 'saved' || window.location.hash === '#saved') {
                                                     window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (gallery.id === 'saved' ? '#saved' : ''));
@@ -1963,7 +1968,8 @@ const { useState, useEffect, useRef } = React;
                         </nav>
 
                         {/* Gallery Content */}
-                        {selectedGallery === 'saved' ? (isOwnProfile && savedEnabled && <SavedList wallet={profile.wallet_address} />) : (
+                        {selectedGallery === 'saved' ? (isOwnProfile && savedEnabled && <SavedList wallet={profile.wallet_address} />) :
+                          selectedGallery === 'wallet-nfts' ? (isOwnProfile && <WalletNfts key={profile.wallet_address} wallet={profile.wallet_address} />) : (
                         <div ref={galleryPanelRef} className="profile-gallery-panel p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="profile-gallery-heading">
@@ -2041,7 +2047,6 @@ const { useState, useEffect, useRef } = React;
                         </div>
                         )}
                         </section>
-                        {isOwnProfile && selectedGallery === 'collected' && <WalletNfts key={profile.wallet_address} wallet={profile.wallet_address} />}
                     </main>
                 </div>
             );

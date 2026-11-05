@@ -42,3 +42,16 @@ test('Saved navigation preserves the history entry and clears its hash when anot
   click({ id: 'created' }, 'saved', () => {}, () => {}, { current: null }, window, request);
   assert.deepEqual(writes[1], [historyState, '', '/profile?address=owner']);
 });
+
+
+test('Wallet NFTs tab retires old artwork requests and does not request a gallery reload', () => {
+  const changes = [], request = { current: 8 }, panel = { style: {}, getBoundingClientRect: () => ({ top: 150 }) };
+  const win = { innerHeight: 800, location: { pathname: '/profile', search: '', hash: '' }, history: {state: null, replaceState() {}} };
+  click({ id: 'wallet-nfts' }, 'collected', v => changes.push(['loading',v]), v => changes.push(['tab',v]), {current: panel}, win, request);
+  assert.equal(request.current, 9);
+  assert.deepEqual(changes,[['loading',false],['tab','wallet-nfts']]);
+  assert.match(source, /selectedGallery !== 'saved' && selectedGallery !== 'wallet-nfts'/);
+  assert.match(source, /galleryType === 'saved' \|\| galleryType === 'wallet-nfts'/);
+  assert.match(source, /selectedGallery === 'wallet-nfts' \? \(isOwnProfile && <WalletNfts/);
+  assert.doesNotMatch(source, /selectedGallery === 'collected' && <WalletNfts/);
+});
