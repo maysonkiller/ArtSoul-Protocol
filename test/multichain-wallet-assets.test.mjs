@@ -175,3 +175,37 @@ test('eight network badges use local bundled vector marks instead of remote imag
   const css=readFileSync('unified-styles.css','utf8');
   assert.match(css,/\.wallet-asset-quick-networks[\s\S]*?overflow-x: auto/);
 });
+
+
+test('Robinhood and Soneium source identity and external marketplace browse links are correct', async t => {
+  setup(t); const read = await fresh(); let calls=0;
+  globalThis.fetch=async (_, options) => {
+    calls++; const body=JSON.parse(options.body);
+    assert.ok(['robinhood-mainnet','soneium-mainnet'].includes(body.addresses[0].networks[0]));
+    const n=body.addresses[0].networks[0];
+    return Response.json(nftResponse({data:{ownedNfts:[sampleNft({network:n})],totalCount:1}}));
+  };
+  const rh=await read(A,{view:'multichain-nfts',network:'robinhood-mainnet'});
+  assert.equal(rh.items[0].chainId,4663);assert.equal(rh.items[0].networkName,'Robinhood Chain');
+  assert.equal(rh.items[0].openseaUrl,null);assert.equal(rh.items[0].openseaBrowseUrl,'https://opensea.io/discover/chain/robinhood');
+  assert.match(rh.items[0].explorerUrl,/robinhoodchain\.blockscout\.com/);
+  const sn=await read(A,{view:'multichain-nfts',network:'soneium-mainnet'});
+  assert.equal(sn.items[0].chainId,1868);assert.equal(sn.items[0].networkName,'Soneium');
+  assert.equal(sn.items[0].openseaBrowseUrl,'https://opensea.io/discover/chain/soneium');
+  assert.match(sn.items[0].explorerUrl,/soneium\.blockscout\.com/);assert.equal(calls,2);
+});
+test('unverified individual portfolio network is not silently declared empty', async t => {
+  setup(t);const read=await fresh();
+  globalThis.fetch=async()=>Response.json({
+    data:{ownedNfts:[],totalCount:0},error:{partialErrors:[{network:'robinhood-mainnet',message:'unsupported by tier'}]}
+  });
+  const data=await read(A,{view:'multichain-nfts',network:'robinhood-mainnet'});
+  assert.deepEqual(data.partialNetworks,['robinhood-mainnet']);assert.equal(data.items.length,0);
+});
+test('profile shows Wallet NFTs only for its owner and directly before Saved',()=>{
+  const profile=readFileSync('src/entries/profile.jsx','utf8');
+  const markup=profile.slice(profile.indexOf('{/* Gallery Tabs */}'),profile.indexOf('{/* Gallery Content */}'));
+  assert.match(markup, /\.\.\.\(isOwnProfile \? \[WALLET_NFT_TAB\] : \[\]\)/);
+  assert.ok(markup.indexOf('WALLET_NFT_TAB') < markup.indexOf("'saved'"));
+  assert.match(profile,/selectedGallery === 'wallet-nfts' \? \(isOwnProfile && <WalletNfts/);
+});

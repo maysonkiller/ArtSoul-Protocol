@@ -1,6 +1,6 @@
 # B36 network icon attribution
 
-Six local branded SVG chain icons in `public/brand/wallet-networks/` are
+Thirteen local branded SVG chain icons in `public/brand/wallet-networks/` are
 from [0xa3k5/web3icons](https://github.com/0xa3k5/web3icons)
 (`@web3icons/core`, v4.0.58), author 0xa3k5 and contributors.
 The package declares the MIT license. Static assets only; no JS library or

@@ -5,9 +5,14 @@ const OPTIONS = [
   ['base-mainnet', 'Base', 'B'], ['eth-mainnet', 'Ethereum', 'Ξ'],
   ['arb-mainnet', 'Arbitrum', 'A'], ['opt-mainnet', 'Optimism', 'OP'],
   ['matic-mainnet', 'Polygon', 'P'], ['linea-mainnet', 'Linea', 'L'],
-  ['bnb-mainnet', 'BNB Chain', 'BNB'], ['avax-mainnet', 'Avalanche', 'AVAX']
+  ['bnb-mainnet', 'BNB Chain', 'BNB'], ['avax-mainnet', 'Avalanche', 'AVAX'],
+  ['robinhood-mainnet', 'Robinhood Chain', 'RH'], ['soneium-mainnet', 'Soneium', 'SONE'],
+  ['unichain-mainnet', 'Unichain', 'UNI'], ['worldchain-mainnet', 'World Chain', 'WORLD'],
+  ['monad-mainnet', 'Monad', 'MON'], ['abstract-mainnet', 'Abstract', 'ABS'],
+  ['zora-mainnet', 'Zora', 'ZORA']
 ];
 const five = OPTIONS.slice(0, 5).map(n => n[0]);
+const quickNetworkChoices = ['base-mainnet','eth-mainnet','arb-mainnet','soneium-mainnet','robinhood-mainnet'];
 const current = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
 const empty = () => ({ status: 'idle', page: null, message: '' });
 const events = ['artsoul:wallet-state-changed', 'artsoul:wallet-state-settled', 'artsoul:auth-state-changed', 'pagehide'];
@@ -20,7 +25,14 @@ const BRAND_ICONS = Object.freeze({
   'matic-mainnet': '/brand/wallet-networks/polygon.svg',
   'linea-mainnet': '/brand/wallet-networks/linea.svg',
   'bnb-mainnet': '/brand/wallet-networks/binance-smart-chain.svg',
-  'avax-mainnet': '/brand/wallet-networks/avalanche.svg'
+  'avax-mainnet': '/brand/wallet-networks/avalanche.svg',
+  'robinhood-mainnet': '/brand/wallet-networks/robinhood.svg',
+  'soneium-mainnet': '/brand/wallet-networks/soneium.svg',
+  'unichain-mainnet': '/brand/wallet-networks/unichain.svg',
+  'worldchain-mainnet': '/brand/wallet-networks/world.svg',
+  'monad-mainnet': '/brand/wallet-networks/monad.svg',
+  'abstract-mainnet': '/brand/wallet-networks/abstract.svg',
+  'zora-mainnet': '/brand/wallet-networks/zora.svg'
 });
 
 function NetworkBadge({ network }) {
@@ -53,6 +65,7 @@ function NftCard({ item }) {
         <div className="wallet-asset-links">
           {item.explorerUrl && <a href={item.explorerUrl} target="_blank" rel="noopener noreferrer">Explorer ↗</a>}
           {item.openseaUrl && <a href={item.openseaUrl} target="_blank" rel="noopener noreferrer">View on OpenSea ↗</a>}
+          {item.openseaBrowseUrl && <a href={item.openseaBrowseUrl} target="_blank" rel="noopener noreferrer">Browse network on OpenSea ↗</a>}
         </div>
         <p className="wallet-assets-disclaimer">External site only. ArtSoul has not verified a listing or sale price.</p>
       </details>
@@ -150,7 +163,7 @@ export function MultiChainWalletAssets({ wallet }) {
     <div className="wallet-asset-toolbar">
       <label htmlFor="wallet-asset-network">Network</label>
       <select id="wallet-asset-network" value={network} onChange={e => chooseNetwork(e.target.value)}>
-        <option value="all">All major networks (5)</option>
+        <option value="all">All core networks (5, lower quota)</option>
         {OPTIONS.map(item => <option key={item[0]} value={item[0]}>{item[1]}</option>)}
       </select>
       <button className="btn-main" type="button" onClick={() => void load()} disabled={loading}>
@@ -159,9 +172,9 @@ export function MultiChainWalletAssets({ wallet }) {
         disabled={loading}>Next page</button>}
     </div>
     <div className="wallet-asset-quick-networks" role="group" aria-label="Popular network filters">
-      {OPTIONS.slice(0, 5).map(option => <button key={option[0]} type="button"
-        aria-pressed={network === option[0]} onClick={() => chooseNetwork(option[0])}>
-        <NetworkBadge network={option[0]}/></button>)}
+      {quickNetworkChoices.map(slug => <button key={slug} type="button"
+        aria-pressed={network === slug} onClick={() => chooseNetwork(slug)}>
+        <NetworkBadge network={slug}/></button>)}
       <button type="button" aria-pressed={network === 'all'} onClick={() => chooseNetwork('all')}>All 5</button>
     </div>
     <p className="wallet-assets-note">Only requested pages are loaded; more networks consume more free provider quota.

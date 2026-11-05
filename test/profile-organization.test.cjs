@@ -36,8 +36,8 @@ test('profile navigation orders the public sections and keeps Saved private', as
       const view = await fixture(tabs, {isOwnProfile, savedEnabled, selectedGallery: 'sold', isClassic: true}, types);
       const buttons = elements(view, item => item.type === 'button');
       assert.deepEqual(buttons.map(button => React.Children.toArray(button.props.children).join('').trim()),
-        ['Artworks', 'Auctions', 'Collected', 'Activity', ...(isOwnProfile && savedEnabled ? ['Saved'] : [])]);
-      assert.deepEqual(buttons.map(button => button.key), ['created', 'auction', 'collected', 'sold', ...(isOwnProfile && savedEnabled ? ['saved'] : [])]);
+        ['Artworks', 'Auctions', 'Collected', 'Activity', ...(isOwnProfile ? ['Wallet NFTs'] : []), ...(isOwnProfile && savedEnabled ? ['Saved'] : [])]);
+      assert.deepEqual(buttons.map(button => button.key), ['created', 'auction', 'collected', 'sold', ...(isOwnProfile ? ['wallet-nfts'] : []), ...(isOwnProfile && savedEnabled ? ['saved'] : [])]);
       assert.deepEqual(buttons.filter(button => button.props['aria-pressed']).map(button => button.key), ['sold']);
       assert.doesNotMatch(render(view), /Profile Sections/);
       const navigation = elements(view, item => item.type === 'nav')[0];

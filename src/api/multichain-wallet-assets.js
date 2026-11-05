@@ -13,7 +13,14 @@ export const WALLET_ASSET_NETWORKS = Object.freeze({
   'matic-mainnet': { chainId: 137, name: 'Polygon', short: 'POL', explorer: 'https://polygonscan.com', market: 'polygon' },
   'linea-mainnet': { chainId: 59144, name: 'Linea', short: 'LINEA', explorer: 'https://lineascan.build', market: null },
   'bnb-mainnet': { chainId: 56, name: 'BNB Chain', short: 'BNB', explorer: 'https://bscscan.com', market: null },
-  'avax-mainnet': { chainId: 43114, name: 'Avalanche', short: 'AVAX', explorer: 'https://snowtrace.io', market: 'avalanche' }
+  'avax-mainnet': { chainId: 43114, name: 'Avalanche', short: 'AVAX', explorer: 'https://snowtrace.io', market: 'avalanche' },
+  'robinhood-mainnet': { chainId: 4663, name: 'Robinhood Chain', short: 'RH', explorer: 'https://robinhoodchain.blockscout.com', market: null, marketBrowse: 'https://opensea.io/discover/chain/robinhood' },
+  'soneium-mainnet': { chainId: 1868, name: 'Soneium', short: 'SONE', explorer: 'https://soneium.blockscout.com', market: null, marketBrowse: 'https://opensea.io/discover/chain/soneium' },
+  'unichain-mainnet': { chainId: 130, name: 'Unichain', short: 'UNI', explorer: 'https://uniscan.xyz', market: null },
+  'worldchain-mainnet': { chainId: 480, name: 'World Chain', short: 'WORLD', explorer: 'https://worldscan.org', market: null },
+  'monad-mainnet': { chainId: 143, name: 'Monad', short: 'MON', explorer: 'https://monadscan.com', market: null, marketBrowse: 'https://opensea.io/discover/chain/monad' },
+  'abstract-mainnet': { chainId: 2741, name: 'Abstract', short: 'ABS', explorer: 'https://abscan.org', market: null },
+  'zora-mainnet': { chainId: 7777777, name: 'Zora', short: 'ZORA', explorer: 'https://explorer.zora.energy', market: null }
 });
 // The "All" preset is limited to five documented Portfolio networks, not every
 // chain in the dashboard. Optional networks remain single-network selections.
@@ -143,7 +150,8 @@ function nftItem(item, wallet) {
     description: safeText(item.description, 600), imageUrl: cachedImage(item.image), traits,
     // External links open exact NFT pages for inspection only: not listings or sale confirmations.
     explorerUrl: chain.explorer + '/token/' + contract + '?a=' + tokenId,
-    openseaUrl: chain.market ? 'https://opensea.io/assets/' + chain.market + '/' + contract + '/' + tokenId : null };
+    openseaUrl: chain.market ? 'https://opensea.io/assets/' + chain.market + '/' + contract + '/' + tokenId : null,
+    openseaBrowseUrl: chain.marketBrowse || null };
 }
 function tokenItem(item, wallet) {
   const chain = WALLET_ASSET_NETWORKS[item?.network];
@@ -161,7 +169,7 @@ function tokenItem(item, wallet) {
     const minor = decimals ? (value % divisor).toString().padStart(decimals, '0').slice(0, 6).replace(/0+$/, '') : '';
     displayBalance = major + (minor ? '.' + minor : '');
   }
-  const nativeSymbol = { 137: 'POL', 56: 'BNB', 43114: 'AVAX' }[chain.chainId] || 'ETH';
+  const nativeSymbol = { 137: 'POL', 56: 'BNB', 43114: 'AVAX', 143: 'MON' }[chain.chainId] || 'ETH';
   const symbol = safeText(meta.symbol, 24) || (contract === null ? nativeSymbol : 'Token');
   const name = safeText(meta.name) || symbol;
   const prices = Array.isArray(item.tokenPrices) ? item.tokenPrices : [];
