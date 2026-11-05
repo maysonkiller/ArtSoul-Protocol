@@ -9909,12 +9909,12 @@ body:is(.classic,.future) .wallet-chain-glyph {
   border-radius: 50%; background: var(--c-accent); color: var(--c-bg);
   font-size: 9px; font-weight: 800;
 }
-body:is(.classic,.future) .wallet-chain-chip[data-chain="opt-mainnet"] .wallet-chain-glyph { background: #ff3944; color: white; }
-body:is(.classic,.future) .wallet-chain-chip[data-chain="matic-mainnet"] .wallet-chain-glyph { background: #8247e5; color: white; }
-body:is(.classic,.future) .wallet-chain-chip[data-chain="arb-mainnet"] .wallet-chain-glyph { background: #28a0f0; color: white; }
-body:is(.classic,.future) .wallet-chain-chip[data-chain="bnb-mainnet"] .wallet-chain-glyph { background: #f0b90b; color: #131313; }
-body:is(.classic,.future) .wallet-chain-chip[data-chain="avax-mainnet"] .wallet-chain-glyph { background: #e84142; color: white; }
-body:is(.classic,.future) .wallet-chain-chip[data-chain="linea-mainnet"] .wallet-chain-glyph { background: #d4fc47; color: #111; }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="opt-mainnet"] .wallet-chain-glyph { background: var(--c-accent-3); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="matic-mainnet"] .wallet-chain-glyph { background: var(--c-accent-2); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="arb-mainnet"] .wallet-chain-glyph { background: var(--c-accent); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="bnb-mainnet"] .wallet-chain-glyph { background: var(--c-accent); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="avax-mainnet"] .wallet-chain-glyph { background: var(--c-accent-3); color: var(--c-bg); }
+body:is(.classic,.future) .wallet-chain-chip[data-chain="linea-mainnet"] .wallet-chain-glyph { background: var(--c-accent-2); color: var(--c-bg); }
 body:is(.classic,.future) .wallet-asset-copy { padding: 12px; min-width: 0; }
 body:is(.classic,.future) .wallet-asset-copy h4 {
   font-size: 15px; font-weight: 700; margin: 0 0 3px;
