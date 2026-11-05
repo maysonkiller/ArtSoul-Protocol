@@ -73,9 +73,23 @@ async function safePortfolio(fetcher, apiKey, body, asset) {
   if (!res.ok) return { status: res.status, ok: false, count: null, partialNetworks: null };
   const bytes = Number(res.headers.get('content-length') || 0);
   if (bytes > 768 * 1024) throw new Error('Portfolio response exceeds 768 KiB; request already counted.');
-  const content = await res.text();
-  if (Buffer.byteLength(content) > 768 * 1024) throw new Error('Portfolio response exceeds 768 KiB; request already counted.');
-  const parsed = JSON.parse(content);
+  // A Content-Length header is optional and untrusted; enforce the cap while
+  // streaming as well. The completed request may still consume provider CUs.
+  if (!res.body) throw new Error('Portfolio response has no readable body.');
+  const reader = res.body.getReader();
+  const chunks = []; let size = 0;
+  try {
+    for (;;) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.byteLength;
+      if (size > 768 * 1024) throw new Error('Portfolio response exceeds 768 KiB; request already counted.');
+      chunks.push(part.value);
+    }
+  } finally {
+    void reader.cancel().catch(() => {});
+  }
+  const parsed = JSON.parse(Buffer.concat(chunks.map(x => Buffer.from(x)), size).toString('utf8'));
   const items = parsed?.data?.[asset === 'nfts' ? 'ownedNfts' : 'tokens'];
   const partial = parsed?.error?.partialErrors;
   return { status: res.status, ok: Array.isArray(items),
