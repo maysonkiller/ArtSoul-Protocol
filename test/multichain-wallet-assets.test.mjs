@@ -99,6 +99,9 @@ test('token balances use decimals without floating-point balance loss',async t =
   setup(t);const read=await fresh();
   globalThis.fetch=async (_,opts)=> {
     const body=JSON.parse(opts.body);assert.deepEqual(body.addresses[0].networks,['eth-mainnet']);
+    assert.equal('pageSize' in body, false, 'Tokens By Wallet does not support pageSize');
+    assert.equal(body.withMetadata, true);assert.equal(body.withPrices, true);
+    assert.equal(body.includeNativeTokens, true);assert.equal(body.includeErc20Tokens, true);
     return Response.json({data:{tokens:[{network:'eth-mainnet',address:A,tokenAddress:C,
       tokenBalance:'0x152d02c7e14af6800000',tokenMetadata:{symbol:'TEST',name:'Test token',decimals:18},
       tokenPrices:[{currency:'usd',value:'0.1234'}]}],pageKey:null}});
