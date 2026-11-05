@@ -56,11 +56,14 @@ function TokenCard({ item }) {
       <span className="wallet-token-symbol">{item.symbol.slice(0,3).toUpperCase()}</span>
       <div><h4>{item.name}</h4><p>{item.symbol}</p></div>
     </div>
-    <p className="wallet-token-balance">{item.balance} <span>{item.symbol}</span></p>
+    <p className="wallet-token-balance">{item.balance === null ? 'Units unavailable' : item.balance}
+      {item.balance !== null && <span> {item.symbol}</span>}</p>
     {item.priceUsd && <p className="wallet-assets-note">Reference price: {'$'}{item.priceUsd} per token</p>}
     <details className="wallet-asset-details"><summary>Token details</summary>
       <dl><dt>Network</dt><dd>{item.networkName}</dd><dt>Contract</dt>
-        <dd><code>{item.contractAddress || 'Native token'}</code></dd></dl>
+        <dd><code>{item.contractAddress || 'Native token'}</code></dd>
+        {item.balanceRaw !== null && <><dt>Exact raw balance (decimals not verified)</dt>
+          <dd><code>{item.balanceRaw}</code></dd></>}</dl>
       {item.explorerUrl && <a href={item.explorerUrl} target="_blank" rel="noopener noreferrer">Explorer ↗</a>}
     </details>
   </article>;
