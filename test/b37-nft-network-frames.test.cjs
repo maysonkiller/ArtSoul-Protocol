@@ -15,6 +15,7 @@ class FakeElement {
         this.children = [];
         this.attributes = {};
         this.className = '';
+        this.classList = { add: (...names) => { this.className = [...new Set([...this.className.split(/\s+/).filter(Boolean), ...names])].join(' '); } };
         this.dataset = {};
         this.style = {};
     }
