@@ -141,7 +141,7 @@ function tokenItem(item, wallet) {
   const contract = item?.tokenAddress === null ? null : normalizeWallet(item?.tokenAddress);
   const balance = uint(item?.tokenBalance);
   const meta = item?.tokenMetadata || {};
-  const decimals = meta.decimals;
+  const decimals = meta.decimals ?? (contract === null ? 18 : null);
   if (!chain || (item?.tokenAddress !== null && !contract) || balance === null ||
       !Number.isInteger(decimals) || decimals < 0 || decimals > 36 ||
       (typeof item.address === 'string' && item.address.toLowerCase() !== wallet)) return null;
@@ -149,7 +149,8 @@ function tokenItem(item, wallet) {
   const major = (value / divisor).toString();
   const minor = decimals ? (value % divisor).toString().padStart(decimals, '0').slice(0, 6).replace(/0+$/, '') : '';
   const displayBalance = major + (minor ? '.' + minor : '');
-  const symbol = safeText(meta.symbol, 24) || (contract === null ? 'Native' : 'Token');
+  const nativeSymbol = { 137: 'POL', 56: 'BNB', 43114: 'AVAX' }[chain.chainId] || 'ETH';
+  const symbol = safeText(meta.symbol, 24) || (contract === null ? nativeSymbol : 'Token');
   const name = safeText(meta.name) || symbol;
   const prices = Array.isArray(item.tokenPrices) ? item.tokenPrices : [];
   const usd = prices.find(p => p?.currency?.toLowerCase() === 'usd' && typeof p.value === 'string' && /^(?:0|[1-9]\d{0,12})(?:\.\d{1,12})?$/.test(p.value));
@@ -161,7 +162,7 @@ function tokenItem(item, wallet) {
 function normalized(raw, wallet, kind, nets, now) {
   const data = raw?.data;
   const list = data?.[kind === 'nfts' ? 'ownedNfts' : 'tokens'];
-  if (!Array.isArray(list) || list.length > PAGE_SIZE || !Number.isSafeInteger(data?.totalCount ?? list.length) ||
+  if (!Array.isArray(list) || list.length > (kind === 'nfts' ? PAGE_SIZE : 100) || !Number.isSafeInteger(data?.totalCount ?? list.length) ||
       (data.pageKey != null && (typeof data.pageKey !== 'string' || !/^[\x21-\x7e]{1,1024}$/.test(data.pageKey)))) throw unavailable();
   const partial = raw?.error?.partialErrors;
   if (partial !== undefined && (!Array.isArray(partial) || partial.length > 16)) throw unavailable();
@@ -196,8 +197,9 @@ async function fromAlchemy(wallet, kind, nets, page, s) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
-    const body = { addresses: [{ address: wallet, networks: nets }], pageSize: PAGE_SIZE,
-      ...(kind === 'nfts' ? { withMetadata: true, excludeFilters: ['SPAM'] } : {}),
+    const body = { addresses: [{ address: wallet, networks: nets }],
+      ...(kind === 'nfts' ? { pageSize: PAGE_SIZE, withMetadata: true, excludeFilters: ['SPAM'] } :
+        { withMetadata: true, withPrices: true, includeNativeTokens: true, includeErc20Tokens: true }),
       ...(page ? { pageKey: page } : {}) };
     const response = await fetch(url, { method: 'POST', redirect: 'error', signal: controller.signal,
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
