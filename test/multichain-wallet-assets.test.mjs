@@ -135,3 +135,16 @@ test('repeated explicit reads are deduplicated, bounded and never fall back to o
   globalThis.fetch=async()=>{throw new Error('new provider unavailable');};
   await assert.rejects(read(A,options),err('WALLET_ASSETS_UNAVAILABLE'));
 });
+
+
+test('cached reads also have a bounded Vercel invocation budget without extra provider work',async t=>{
+  setup(t);const read=await fresh();let calls=0;
+  globalThis.fetch=async()=>{calls++;return Response.json(nftResponse());};
+  for(let i=0;i<60;i++) {
+    const p=await read(A,{view:'multichain-nfts',network:'base-mainnet'});
+    assert.equal(p.items.length,1);
+  }
+  assert.equal(calls,1);
+  await assert.rejects(read(A,{view:'multichain-nfts',network:'base-mainnet'}),err('WALLET_ASSETS_RATE_LIMITED',429));
+  assert.equal(calls,1);
+});
