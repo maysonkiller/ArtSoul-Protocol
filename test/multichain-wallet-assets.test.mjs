@@ -148,3 +148,14 @@ test('cached reads also have a bounded Vercel invocation budget without extra pr
   await assert.rejects(read(A,{view:'multichain-nfts',network:'base-mainnet'}),err('WALLET_ASSETS_RATE_LIMITED',429));
   assert.equal(calls,1);
 });
+
+
+test('unknown ERC20 decimals preserve exact raw units without inventing a human balance',async t=>{
+  setup(t);const read=await fresh();
+  globalThis.fetch=async()=>Response.json({data:{tokens:[{network:'eth-mainnet',address:A,
+    tokenAddress:C,tokenBalance:'0xffffffffffffffffff',tokenMetadata:{symbol:'UNK',name:'Unknown unit',decimals:null}}],pageKey:null}});
+  const page=await read(A,{view:'multichain-tokens',network:'eth-mainnet'});
+  assert.equal(page.items.length,1);assert.equal(page.items[0].balance,null);
+  assert.equal(page.items[0].balanceRaw,BigInt('0xffffffffffffffffff').toString());
+  assert.equal(page.items[0].symbol,'UNK');
+});
