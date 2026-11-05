@@ -126,6 +126,73 @@
     // simply made before the bytes are sent rather than after.
     const CARD_THUMBNAIL_SIZE = 600;
 
+    // Display-only identity. Never infer the artwork chain from the connected wallet
+    // or use this badge to authorize a transaction.
+    const CARD_NETWORKS = Object.freeze({
+        'base-sepolia': { name: 'Base Sepolia', icon: '/brand/base.svg' },
+        'eth-sepolia': { name: 'Ethereum Sepolia', icon: '/brand/eth.png' },
+        'base-mainnet': { name: 'Base', icon: '/brand/base.svg' },
+        'eth-mainnet': { name: 'Ethereum', icon: '/brand/eth.png' },
+        'arb-mainnet': { name: 'Arbitrum', icon: '/brand/wallet-networks/arbitrum-one.svg' },
+        'opt-mainnet': { name: 'Optimism', icon: '/brand/wallet-networks/optimism.svg' },
+        'matic-mainnet': { name: 'Polygon', icon: '/brand/wallet-networks/polygon.svg' },
+        'linea-mainnet': { name: 'Linea', icon: '/brand/wallet-networks/linea.svg' },
+        'bnb-mainnet': { name: 'BNB Chain', icon: '/brand/wallet-networks/binance-smart-chain.svg' },
+        'avax-mainnet': { name: 'Avalanche', icon: '/brand/wallet-networks/avalanche.svg' },
+        'robinhood-mainnet': { name: 'Robinhood Chain', icon: '/brand/wallet-networks/robinhood.svg' },
+        'soneium-mainnet': { name: 'Soneium', icon: '/brand/wallet-networks/soneium.svg' },
+        'unichain-mainnet': { name: 'Unichain', icon: '/brand/wallet-networks/unichain.svg' },
+        'worldchain-mainnet': { name: 'World Chain', icon: '/brand/wallet-networks/world.svg' },
+        'monad-mainnet': { name: 'Monad', icon: '/brand/wallet-networks/monad.svg' },
+        'abstract-mainnet': { name: 'Abstract', icon: '/brand/wallet-networks/abstract.svg' },
+        'zora-mainnet': { name: 'Zora', icon: '/brand/wallet-networks/zora.svg' }
+    });
+    const CARD_CHAIN_SLUGS = Object.freeze({
+        1: 'eth-mainnet', 10: 'opt-mainnet', 56: 'bnb-mainnet',
+        137: 'matic-mainnet', 130: 'unichain-mainnet', 480: 'worldchain-mainnet',
+        8453: 'base-mainnet', 84532: 'base-sepolia', 11155111: 'eth-sepolia',
+        42161: 'arb-mainnet', 43114: 'avax-mainnet', 59144: 'linea-mainnet',
+        1868: 'soneium-mainnet', 2741: 'abstract-mainnet', 7777777: 'zora-mainnet'
+    });
+
+    function networkInfo(artwork = {}) {
+        const explicit = artwork.chain_id ?? artwork.chainId ?? artwork.network_chain_id;
+        const canonical = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\\d+):/i)?.[1];
+        // A supplied numeric chain overrides even a conflicting network name.
+        const hasChain = explicit !== null && explicit !== undefined && String(explicit).trim() !== '';
+        const chain = hasChain ? Number(explicit) : canonical ? Number(canonical) : null;
+        const aliases = { basesepolia: 'base-sepolia', sepolia: 'eth-sepolia', base: 'base-mainnet', ethereum: 'eth-mainnet' };
+        const raw = String(artwork.network || artwork.chain || artwork.chain_name || '').trim().toLowerCase();
+        const slug = chain !== null ? CARD_CHAIN_SLUGS[chain] : (aliases[raw] || raw);
+        const info = CARD_NETWORKS[slug];
+        return info ? { slug, ...info } : null;
+    }
+
+    function createNetworkMarker(artwork = {}) {
+        const info = networkInfo(artwork);
+        if (!info) return null;
+        const marker = document.createElement('span');
+        marker.className = 'artsoul-chain-marker';
+        marker.setAttribute('aria-label', 'Network: ' + info.name);
+        marker.title = info.name;
+        const icon = document.createElement('img');
+        icon.src = info.icon;
+        icon.alt = '';
+        icon.loading = 'lazy';
+        icon.decoding = 'async';
+        const label = document.createElement('span');
+        label.textContent = info.name;
+        marker.append(icon, label);
+        return marker;
+    }
+
+    function reactNetworkMarker(h, artwork = {}) {
+        const info = networkInfo(artwork);
+        return info ? h('span', { className: 'artsoul-chain-marker', 'aria-label': 'Network: ' + info.name, title: info.name },
+            h('img', { src: info.icon, alt: '', loading: 'lazy', decoding: 'async' }), h('span', null, info.name)) : null;
+    }
+
+
     function cardThumbnailUrl(url, type) {
         // Still images only. A GIF put through a still transform loses its
         // animation, and video and audio are not images at all. The shared
@@ -706,6 +773,8 @@
         const { type, url } = descriptor;
         const container = document.createElement('div');
         container.className = 'artsoul-card-media';
+        const chainMarker = createNetworkMarker(artwork);
+        if (chainMarker) container.appendChild(chainMarker);
 
         if (!descriptor.known) {
             container.appendChild(createMediaLoadingElement());
@@ -904,7 +973,7 @@
         const { type, url } = descriptor;
         if (!url || !hasSafeMedia(artwork)) return null;
         if (!descriptor.known) {
-            return h('div', { className: 'artsoul-card-media' }, reactMediaLoading(h));
+            return h('div', { className: 'artsoul-card-media' }, reactMediaLoading(h), reactNetworkMarker(h, artwork));
         }
         if (type === 'video') return h(ReactVideoPreview, { artwork, descriptor, onUnavailable });
         if (type === 'audio') return h(ReactAudioPreview, { artwork, url, onUnavailable });
@@ -918,7 +987,8 @@
                 decoding: 'async',
                 onError: onUnavailable || undefined
             }),
-            h('span', { className: 'artsoul-card-media-badge artsoul-card-media-badge-image' }, 'IMAGE')
+            h('span', { className: 'artsoul-card-media-badge artsoul-card-media-badge-image' }, 'IMAGE'),
+            reactNetworkMarker(h, artwork)
         );
     }
 
@@ -973,6 +1043,7 @@
                 onError: onUnavailable || undefined,
                 onVolumeChange: event => setMuted(event.currentTarget.muted) }),
             h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO'),
+            reactNetworkMarker(h, artwork),
             h('div', { className: 'artsoul-card-media-controls', draggable: false,
                 onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                 onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
@@ -1021,6 +1092,7 @@
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
                 h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
+                reactNetworkMarker(h, artwork),
                 h('img', { src: '/ARTSOULlogo.png', alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
                 h('div', { className: 'artsoul-card-media-controls', draggable: false,
                     onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
@@ -1153,6 +1225,7 @@
         creatorLabel,
         formatPrice,
         cardPriceMark,
+        networkInfo,
         cardPreviewInfo,
         cardSummary,
         statusInfo,
