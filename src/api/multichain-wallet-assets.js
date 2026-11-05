@@ -20,7 +20,7 @@ export const WALLET_ASSET_NETWORKS = Object.freeze({
 const MAIN_NETWORKS = ['base-mainnet', 'eth-mainnet', 'arb-mainnet', 'opt-mainnet', 'matic-mainnet'];
 const PAGE_SIZE = 12, CACHE_MS = 5 * 60_000, CURSOR_MS = 20 * 60_000;
 const MAX_BYTES = 768 * 1024, MAX_CACHE = 96, MAX_USERS = 128;
-const cached = new Map(), inflight = new Map(), perWallet = new Map();
+const cached = new Map(), inflight = new Map(), perWallet = new Map(), viewAttempts = new Map();
 const globalBudget = { minute: null, day: null };
 function problem(code, message, statusCode = 503, retryAfter) {
   return Object.assign(new Error(message), { code, statusCode, retryAfter });
@@ -51,6 +51,15 @@ function kindOf(value) {
 }
 function nowWindow(previous, now, duration) {
   return previous && previous.until > now ? previous : { count: 0, until: now + duration };
+}
+function boundViewRequests(wallet, now) {
+  for (const [id, state] of viewAttempts) if (state.until <= now) viewAttempts.delete(id);
+  const original = viewAttempts.get(wallet);
+  if (!original && viewAttempts.size >= MAX_USERS) throw limited();
+  const state = nowWindow(original, now, 60_000);
+  if (state.count >= 60) throw limited(Math.max(1, Math.ceil((state.until - now) / 1000)));
+  state.count++;
+  viewAttempts.set(wallet, state);
 }
 function charge(wallet, now) {
   for (const [id, record] of perWallet) if (record.until <= now) perWallet.delete(id);
@@ -213,6 +222,7 @@ export async function readMultichainWalletAssets(wallet, opts = {}) {
   if (!normalizeWallet(wallet) || normalizeWallet(wallet) !== wallet || /^0x0{40}$/.test(wallet)) throw unavailable();
   const kind = kindOf(opts.view), nets = selection(opts.network), s = settings(), now = Date.now();
   const page = cursorOf(opts.cursor, wallet, kind, opts.network, s, now);
+  boundViewRequests(wallet, now);
   const key = createHash('sha256').update([s.fingerprint, wallet, kind, opts.network, page].join(':')).digest('hex');
   for (const [k,v] of cached) if (v.until <= now) cached.delete(k);
   let entry = cached.get(key);
