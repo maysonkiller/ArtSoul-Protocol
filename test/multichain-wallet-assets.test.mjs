@@ -129,5 +129,6 @@ test('repeated explicit reads are deduplicated, bounded and never fall back to o
   release(Response.json(nftResponse({data:{ownedNfts:[sampleNft({network:'eth-mainnet'})],totalCount:1}})));
   const both=await Promise.all([first,second]);assert.equal(both[0].items[0].id,both[1].items[0].id);assert.equal(calls,1);
   process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ALCHEMY_API_KEY=KEY+'rotated';
+  globalThis.fetch=async()=>{throw new Error('new provider unavailable');};
   await assert.rejects(read(A,options),err('WALLET_ASSETS_UNAVAILABLE'));
 });
