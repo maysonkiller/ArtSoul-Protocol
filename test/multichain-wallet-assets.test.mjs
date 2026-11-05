@@ -159,3 +159,19 @@ test('unknown ERC20 decimals preserve exact raw units without inventing a human 
   assert.equal(page.items[0].balanceRaw,BigInt('0xffffffffffffffffff').toString());
   assert.equal(page.items[0].symbol,'UNK');
 });
+
+
+test('eight network badges use local bundled vector marks instead of remote images or text approximations', () => {
+  const jsx=readFileSync('src/features/profile/multichain-wallet-assets.jsx','utf8');
+  const marks=['arbitrum-one','optimism','polygon','linea','binance-smart-chain','avalanche'];
+  for(const name of marks) {
+    const path='public/brand/wallet-networks/'+name+'.svg';
+    const svg=readFileSync(path,'utf8');
+    assert.match(svg,/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+    assert.doesNotMatch(svg,/<script|<foreignObject|<iframe|onload=|javascript:/i);
+    assert.ok(jsx.includes('/brand/wallet-networks/'+name+'.svg'));
+  }
+  assert.match(jsx,/wallet-asset-quick-networks/);
+  const css=readFileSync('unified-styles.css','utf8');
+  assert.match(css,/\.wallet-asset-quick-networks[\s\S]*?overflow-x: auto/);
+});

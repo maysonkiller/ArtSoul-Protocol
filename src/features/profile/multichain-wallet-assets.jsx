@@ -12,13 +12,22 @@ const current = () => String(window.getCurrentWalletAddress?.() || window.curren
 const empty = () => ({ status: 'idle', page: null, message: '' });
 const events = ['artsoul:wallet-state-changed', 'artsoul:wallet-state-settled', 'artsoul:auth-state-changed', 'pagehide'];
 const networkName = slug => OPTIONS.find(row => row[0] === slug)?.[1] || 'Unknown network';
+const BRAND_ICONS = Object.freeze({
+  'base-mainnet': '/brand/base.svg',
+  'eth-mainnet': '/brand/eth.png',
+  'arb-mainnet': '/brand/wallet-networks/arbitrum-one.svg',
+  'opt-mainnet': '/brand/wallet-networks/optimism.svg',
+  'matic-mainnet': '/brand/wallet-networks/polygon.svg',
+  'linea-mainnet': '/brand/wallet-networks/linea.svg',
+  'bnb-mainnet': '/brand/wallet-networks/binance-smart-chain.svg',
+  'avax-mainnet': '/brand/wallet-networks/avalanche.svg'
+});
 
 function NetworkBadge({ network }) {
   const info = OPTIONS.find(row => row[0] === network);
   if (!info) return null;
   return <span className="wallet-chain-chip" data-chain={network}>
-    {network === 'base-mainnet' ? <img src="/brand/base.svg" alt="" /> :
-      network === 'eth-mainnet' ? <img src="/brand/eth.png" alt="" /> :
+    {BRAND_ICONS[network] ? <img src={BRAND_ICONS[network]} alt="" /> :
       <span className="wallet-chain-glyph" aria-hidden="true">{info[2]}</span>}
     <span>{info[1]}</span>
   </span>;
@@ -148,6 +157,12 @@ export function MultiChainWalletAssets({ wallet }) {
         {loading ? 'Loading…' : page ? 'Reload' : 'Load assets'}</button>
       {page?.nextCursor && <button className="btn-secondary" type="button" onClick={() => void load(page.nextCursor)}
         disabled={loading}>Next page</button>}
+    </div>
+    <div className="wallet-asset-quick-networks" role="group" aria-label="Popular network filters">
+      {OPTIONS.slice(0, 5).map(option => <button key={option[0]} type="button"
+        aria-pressed={network === option[0]} onClick={() => chooseNetwork(option[0])}>
+        <NetworkBadge network={option[0]}/></button>)}
+      <button type="button" aria-pressed={network === 'all'} onClick={() => chooseNetwork('all')}>All 5</button>
     </div>
     <p className="wallet-assets-note">Only requested pages are loaded; more networks consume more free provider quota.
       Unsolicited NFTs and missing images are possible. No NFT is offered for sale here.</p>
