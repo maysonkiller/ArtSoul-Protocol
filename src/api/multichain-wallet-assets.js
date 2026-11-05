@@ -10,9 +10,9 @@ export const WALLET_ASSET_NETWORKS = Object.freeze({
   'eth-mainnet': { chainId: 1, name: 'Ethereum', short: 'ETH', explorer: 'https://etherscan.io', market: 'ethereum' },
   'arb-mainnet': { chainId: 42161, name: 'Arbitrum', short: 'ARB', explorer: 'https://arbiscan.io', market: 'arbitrum' },
   'opt-mainnet': { chainId: 10, name: 'Optimism', short: 'OP', explorer: 'https://optimistic.etherscan.io', market: 'optimism' },
-  'matic-mainnet': { chainId: 137, name: 'Polygon', short: 'POL', explorer: 'https://polygonscan.com', market: 'matic' },
-  'linea-mainnet': { chainId: 59144, name: 'Linea', short: 'LINEA', explorer: 'https://lineascan.build', market: 'linea' },
-  'bnb-mainnet': { chainId: 56, name: 'BNB Chain', short: 'BNB', explorer: 'https://bscscan.com', market: 'bsc' },
+  'matic-mainnet': { chainId: 137, name: 'Polygon', short: 'POL', explorer: 'https://polygonscan.com', market: 'polygon' },
+  'linea-mainnet': { chainId: 59144, name: 'Linea', short: 'LINEA', explorer: 'https://lineascan.build', market: null },
+  'bnb-mainnet': { chainId: 56, name: 'BNB Chain', short: 'BNB', explorer: 'https://bscscan.com', market: null },
   'avax-mainnet': { chainId: 43114, name: 'Avalanche', short: 'AVAX', explorer: 'https://snowtrace.io', market: 'avalanche' }
 });
 // The "All" preset is limited to five documented Portfolio networks, not every
@@ -143,7 +143,7 @@ function nftItem(item, wallet) {
     description: safeText(item.description, 600), imageUrl: cachedImage(item.image), traits,
     // External links open exact NFT pages for inspection only: not listings or sale confirmations.
     explorerUrl: chain.explorer + '/token/' + contract + '?a=' + tokenId,
-    openseaUrl: 'https://opensea.io/assets/' + chain.market + '/' + contract + '/' + tokenId };
+    openseaUrl: chain.market ? 'https://opensea.io/assets/' + chain.market + '/' + contract + '/' + tokenId : null };
 }
 function tokenItem(item, wallet) {
   const chain = WALLET_ASSET_NETWORKS[item?.network];
