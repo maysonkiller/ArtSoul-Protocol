@@ -157,7 +157,7 @@
 
     function networkInfo(artwork = {}) {
         const explicit = artwork.chain_id ?? artwork.chainId ?? artwork.network_chain_id;
-        const canonical = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\\d+):/i)?.[1];
+        const canonical = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\d+):/i)?.[1];
         // A supplied numeric chain overrides even a conflicting network name.
         const hasChain = explicit !== null && explicit !== undefined && String(explicit).trim() !== '';
         const chain = hasChain ? Number(explicit) : canonical ? Number(canonical) : null;
