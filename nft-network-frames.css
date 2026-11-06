@@ -1,52 +1,27 @@
-/* B37 — Network identity on art previews and equal NFT frames.
-   Presentation only: no fetches, no new dependencies, no wallet/chain switches.
-   Both palettes inherit their existing --c-* variables. */
+/* B38: compact, icon-only network identity on all artwork media previews.
+   No extra provider calls. The wrapper retains its full aria-label/title. */
 body:is(.classic, .future) .artsoul-card-media .artsoul-chain-marker {
-    position: absolute;
-    left: 8px;
-    bottom: 37px;
-    z-index: 4;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    max-width: calc(100% - 16px);
-    min-height: 24px;
-    padding: 3px 7px;
-    border: 1px solid var(--c-border-soft);
-    border-radius: 999px;
-    background: var(--c-surface);
-    color: var(--c-text);
-    font-size: 10px;
-    font-weight: 650;
-    line-height: 1.2;
-    box-shadow: none;
+    position: absolute; z-index: 4; left: auto; right: 8px; bottom: 8px;
+    display: inline-flex; justify-content: center; align-items: center;
+    gap: 0; width: 30px; height: 30px; min-width: 30px; max-width: 30px;
+    min-height: 30px; padding: 5px;
+    border: 1px solid var(--c-border-soft); border-radius: 50%;
+    background: var(--c-surface); color: var(--c-text); box-shadow: none;
     pointer-events: none;
 }
 body:is(.classic, .future) .artsoul-card-media .artsoul-chain-marker > img {
-    display: block;
-    width: 16px;
-    height: 16px;
-    flex: 0 0 16px;
-    object-fit: contain;
-    border-radius: 50%;
+    display: block; width: 18px; height: 18px; flex: 0 0 18px;
+    max-width: 18px; max-height: 18px; object-fit: contain;
     background: transparent;
 }
-body:is(.classic, .future) .artsoul-card-media .artsoul-chain-marker > span {
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-}
+body:is(.classic, .future) .artsoul-card-media .artsoul-chain-marker > span { display: none; }
+/* Video/audio playback stays clickable, with its network icon above the controls. */
+body:is(.classic, .future) .artsoul-card-media:has(.artsoul-card-media-controls) .artsoul-chain-marker { bottom: 60px; }
 @container (max-width: 175px) {
     body:is(.classic, .future) .artsoul-artwork-card .artsoul-chain-marker {
-        padding: 3px;
-        min-width: 24px;
-        justify-content: center;
+        width: 26px; height: 26px; min-width: 26px; max-width: 26px; min-height: 26px; padding: 4px;
     }
-    body:is(.classic, .future) .artsoul-artwork-card .artsoul-chain-marker > span { display: none; }
-    body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-media-controls) .artsoul-chain-marker {
-        bottom: 86px;
-    }
+    body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-media-controls) .artsoul-chain-marker { bottom: 57px; }
 }
 
 /* Legacy Base wallet and new Alchemy Portfolio cards now share one frame. */
@@ -83,9 +58,11 @@ body:is(.classic, .future) .wallet-nft-image > img {
 body:is(.classic, .future) .wallet-nft-image .wallet-asset-overlay {
     position: absolute;
     z-index: 3;
-    top: 7px;
-    left: 7px;
-    max-width: calc(100% - 14px);
+    top: auto;
+    left: auto;
+    right: 8px;
+    bottom: 8px;
+    max-width: 30px;
     pointer-events: none;
 }
 body:is(.classic, .future) .wallet-nft-image .wallet-chain-chip > img {
@@ -127,4 +104,23 @@ body:is(.classic, .future) :is(.wallet-nft-body, .wallet-asset-copy) > details {
     body:is(.classic, .future) .wallet-nfts-grid {
         grid-template-columns: minmax(0, 1fr);
     }
+}
+
+/* Wallet NFT cards share the same bottom-right logo; filters still show labels. */
+body:is(.classic, .future) .wallet-asset-art > .wallet-asset-overlay {
+    left: auto; top: auto; right: 8px; bottom: 8px;
+    max-width: 30px; z-index: 3; pointer-events: none;
+}
+body:is(.classic, .future) :is(.wallet-nft-image, .wallet-asset-art) > .wallet-asset-overlay .wallet-chain-chip {
+    display: inline-flex; justify-content: center; align-items: center;
+    width: 30px; height: 30px; min-width: 30px; min-height: 30px;
+    max-width: 30px; padding: 5px; gap: 0; border-radius: 50%;
+    background: var(--c-surface); color: var(--c-text);
+    border: 1px solid var(--c-border-soft);
+}
+body:is(.classic, .future) :is(.wallet-nft-image, .wallet-asset-art) > .wallet-asset-overlay .wallet-chain-chip > span:not(.wallet-chain-glyph) { display: none; }
+body:is(.classic, .future) :is(.wallet-nft-image, .wallet-asset-art) > .wallet-asset-overlay .wallet-chain-chip > img {
+    position: static; inset: auto; display: block;
+    width: 18px; height: 18px; flex: 0 0 18px; max-width: 18px; max-height: 18px;
+    object-fit: contain; background: transparent;
 }
