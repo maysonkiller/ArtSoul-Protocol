@@ -113,6 +113,35 @@ test('blurring a field preserves the pressed analysis or retry button text node'
     }
 });
 
+test('B39: AI guidance action is visible but disabled until the upload is complete', () => {
+    const markup = read('upload.html');
+    const button = markup.match(/<button id="prePublishAction"[^>]*>/)?.[0] || '';
+    assert.match(button, /\bdisabled\b/);
+    assert.doesNotMatch(button, /display:\s*none/, 'first paint must not hide the next action');
+
+    const { context, element } = client();
+    context.updatePrePublishAction();
+    assert.equal(element('prePublishAction').style.display, 'inline-flex');
+    assert.equal(element('prePublishAction').disabled, true);
+    assert.match(element('prePublishAction').title, /file/i);
+
+    vm.runInContext("selectedFile = { name: 'original.png', type: 'image/png', size: 100 }; selectedAuctionDuration = 24;", context);
+    element('artTitle').value = 'An original work';
+    element('artDescription').value = 'This is an original work of art.';
+    element('artPrice').value = '0.001';
+    element('originalWorkConfirm').checked = true;
+    context.updatePrePublishAction();
+    assert.equal(element('prePublishAction').style.display, 'inline-flex');
+    assert.equal(element('prePublishAction').disabled, false);
+    assert.equal(element('prePublishAction').title, '');
+
+    // The separate bounded retry control handles later attempts; never offer two primary starts.
+    vm.runInContext('aiValuationAttemptCount = 1;', context);
+    context.updatePrePublishAction();
+    assert.equal(element('prePublishAction').style.display, 'none');
+    assert.equal(element('prePublishAction').disabled, true);
+});
+
 function server(authenticated = true) {
     const signed = [];
     const context = vm.createContext({ crypto, URL, console,

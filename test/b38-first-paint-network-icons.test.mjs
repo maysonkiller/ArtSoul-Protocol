@@ -29,6 +29,23 @@ test('the first paint is inline, theme-accurate, small and available before page
   assert.equal(inlineCriticalFirstPaint('<body></body>', unified), '<body></body>');
 });
 
+test('B39: desktop Guide label never disappears when critical and full CSS are combined', () => {
+  const css = criticalFirstPaintCss(unified);
+  const desktop = css.split('@media (max-width: 768px)')[0];
+  const mobile = css.slice(css.indexOf('@media (max-width: 768px)'));
+  assert.ok(desktop.includes(':where(.site-primary-nav .site-nav-guide-long) { display: inline; }'));
+  assert.ok(desktop.includes(':where(.site-primary-nav .site-nav-guide-short) { display: none; }'));
+  assert.ok(!desktop.includes(':where(.site-primary-nav .site-nav-guide-long) { display: none; }'),
+    'never hide the sole desktop visible label in the unconditional critical shell');
+  assert.ok(mobile.includes(':where(.site-primary-nav .site-nav-guide-long) { display: none; }'));
+  assert.ok(mobile.includes(':where(.site-primary-nav .site-nav-guide-short) { display: inline; }'));
+  assert.match(unified, /\.site-header \.site-nav-guide-short \{ display: none; \}/);
+  for (const page of ['index.html', 'gallery.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
+    const content = readFileSync(page, 'utf8');
+    assert.match(content, /href="\/docs-protocol"[^>]*aria-label="How it works"/);
+  }
+});
+
 test('critical colors always originate from canonical CSS, and missing themes fail closed', () => {
   const original = criticalFirstPaintCss(unified);
   const changed = unified.replace('--bg-classic: #010101;', '--bg-classic: #010102;');
