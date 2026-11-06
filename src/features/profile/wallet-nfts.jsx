@@ -108,6 +108,12 @@ export function WalletNfts({ wallet }) {
           <div className="wallet-nft-image">
             <span>Preview unavailable</span>
             {item.imageUrl && <img src={item.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={event => { event.currentTarget.hidden = true; }} />}
+            <span className="wallet-asset-overlay" aria-label="Network: Base">
+              <span className="wallet-chain-chip" data-chain="base-mainnet">
+                <img src="/brand/base.svg" alt="" loading="lazy" decoding="async" />
+                <span>Base</span>
+              </span>
+            </span>
           </div>
           <div className="wallet-nft-body">
             <h4>{item.name || `Token ${item.tokenId}`}</h4>
