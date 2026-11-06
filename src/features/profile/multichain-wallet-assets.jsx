@@ -38,7 +38,7 @@ const BRAND_ICONS = Object.freeze({
 function NetworkBadge({ network }) {
   const info = OPTIONS.find(row => row[0] === network);
   if (!info) return null;
-  return <span className="wallet-chain-chip" data-chain={network}>
+  return <span className="wallet-chain-chip" data-chain={network} title={info[1]} aria-label={"Network: " + info[1]}>
     {BRAND_ICONS[network] ? <img src={BRAND_ICONS[network]} alt="" /> :
       <span className="wallet-chain-glyph" aria-hidden="true">{info[2]}</span>}
     <span>{info[1]}</span>
