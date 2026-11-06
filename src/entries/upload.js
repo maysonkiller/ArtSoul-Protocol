@@ -559,8 +559,12 @@ let selectedFile = null;
             const currentKey = getAIValuationFormKey();
             const estimateCurrent = Boolean(latestAIValuation && latestAIValuationFormKey === currentKey);
             const canStart = !formError && !estimateCurrent && !aiValuationController && !authorizationInProgress && aiValuationAttemptCount === 0;
-            action.style.display = canStart ? 'inline-flex' : 'none';
+            // Keep the primary next step visible before any upload data exists.
+            // Only an actual valid form can enable wallet authorization or AI.
+            // After the first request, the separately bounded Retry action owns retries.
+            action.style.display = aiValuationAttemptCount === 0 && !estimateCurrent ? 'inline-flex' : 'none';
             action.disabled = !canStart;
+            action.title = !canStart ? (formError || 'Authorization or analysis is in progress.') : '';
             const label = window.getCurrentWalletAddress?.()
                 ? 'Authorize and analyze'
                 : 'Connect, authorize, and analyze';

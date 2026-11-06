@@ -677,7 +677,7 @@
                         <p id="aiValuationStatus" class="text-sm opacity-70 mt-1">Complete the form and confirm that this is your original work to request AI value guidance.</p>
                     </div>
                     <div class="ai-guidance-actions">
-                        <button id="prePublishAction" type="button" class="btn-secondary" onclick="beginPrePublishFlow()" style="display: none;">Authorize and analyze</button>
+                        <button id="prePublishAction" type="button" class="btn-secondary" onclick="beginPrePublishFlow()" disabled aria-describedby="aiValuationStatus" title="Complete the form to enable analysis">Authorize and analyze</button>
                         <button id="aiValuationRetry" type="button" class="btn-secondary" onclick="retryAIValuation()" style="display: none;">Retry</button>
                     </div>
                 </div>
