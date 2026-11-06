@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { inlineCriticalFirstPaint } from './scripts/critical-first-paint.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(root, 'dist');
@@ -101,6 +102,22 @@ export function prioritizePublicPageEntry(html, page) {
     return html.replace(entry, '').replace(legacy, `${entry}\n    ${legacy}`);
 }
 
+// First paint must not depend on a 380KB shared CSS response, particularly on
+// iOS tab restoration. This is a tiny build-time inline shell; no runtime fetch,
+// duplicate theme hex, inline JS or change to the full stylesheet.
+function inlineCriticalFirstPaintPlugin() {
+    return {
+        name: 'inline-critical-first-paint',
+        transformIndexHtml: {
+            order: 'pre',
+            async handler(html) {
+                const shared = await readFile(path.join(root, 'unified-styles.css'), 'utf8');
+                return inlineCriticalFirstPaint(html, shared);
+            }
+        }
+    };
+}
+
 function inlineSharedHeaderAvatar() {
     return {
         name: 'inline-shared-header-avatar',
@@ -181,7 +198,7 @@ function copyLegacyRuntimeAssets() {
 
 export default defineConfig({
     appType: 'mpa',
-    plugins: [react(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()],
+    plugins: [react(), inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()],
     build: {
         outDir,
         emptyOutDir: true,
