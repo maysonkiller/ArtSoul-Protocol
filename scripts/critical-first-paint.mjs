@@ -19,5 +19,12 @@ export function inlineCriticalFirstPaint(html, unifiedCss) {
   if (typeof html !== 'string' || !html.includes('<head>')) return html;
   if (html.includes('data-artsoul-critical-paint')) return html;
   const content = criticalFirstPaintCss(unifiedCss);
-  return html.replace('<head>', '<head>\n<style data-artsoul-critical-paint>\n' + content + '\n</style>');
+  const block = '\n<style data-artsoul-critical-paint>\n' + content + '\n</style>';
+  // Keep the UTF-8 charset declaration within the first 1024 bytes; a long
+  // prepaint block before charset may corrupt non-ASCII text on Safari.
+  const viewport = html.match(/<meta\s+name=["']viewport["'][^>]*>/i)?.[0];
+  if (viewport) return html.replace(viewport, viewport + block);
+  const charset = html.match(/<meta\s+charset=["']utf-8["'][^>]*>/i)?.[0];
+  if (charset) return html.replace(charset, charset + block);
+  return html.replace('<head>', '<head>' + block);
 }
