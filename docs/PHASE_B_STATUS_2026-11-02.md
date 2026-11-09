@@ -77,6 +77,15 @@ resulting gallery showed a live Keeef card. In-place modal closure was not
 observed. Preserve both defaults and the new auction; remaining assistant
 scenarios stay open, as detailed in the same audit.
 
+PR #479 released the new-auction native dialog correction after both operating
+system checks passed. Assistant withdrawal is now accepted on artwork 38:
+`0.0609875 ETH` returned to the owner's wallet, pending credit became zero and
+the assistant cleared its command without a reload. A separate Gallery-only
+adapter readiness defect was reproduced and corrected locally; its release
+and no-funds retest are tracked in
+[the readiness audit](audits/B11_GALLERY_WALLET_READINESS_2026-11-09.md).
+The completed withdrawal must not be replayed.
+
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.
 It reuses provenance without extra requests and distinguishes sale evidence

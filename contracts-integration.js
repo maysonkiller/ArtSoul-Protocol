@@ -287,7 +287,7 @@ class ArtSoulContracts {
         this.currentNetwork = null;
     }
 
-    async init(provider) {
+    async init(provider, { passiveWallet } = {}) {
         try {
             this.provider = new ethers.BrowserProvider(wrapProviderForWalletApprovals(provider));
             const network = await this.provider.getNetwork();
@@ -303,7 +303,16 @@ class ArtSoulContracts {
             }
 
             this.currentNetwork = networkKey;
-            this.signer = await this.provider.getSigner();
+            if (passiveWallet) {
+                // listAccounts only uses eth_accounts. Unlike getSigner it
+                // cannot open a connection prompt if the account disappeared.
+                const signers = await this.provider.listAccounts();
+                this.signer = signers.find(signer =>
+                    signer.address.toLowerCase() === passiveWallet.toLowerCase());
+                if (!this.signer) throw new Error('The selected wallet is no longer connected.');
+            } else {
+                this.signer = await this.provider.getSigner();
+            }
 
             const addresses = CONTRACTS[this.currentNetwork];
             this.validateConfiguredAddresses(addresses);
