@@ -13,6 +13,7 @@ Classic and Future are separate themes.
 - Future may use animation, glow, and neon effects.
 - Mobile and desktop differ in layout only; color semantics stay identical.
 - Any animation must be disabled under `prefers-reduced-motion: reduce` in both themes.
+- Token, network and wallet brand marks retain their original asset colors in both themes (founder clarification, 2026-11-09). A neutral backing may preserve contrast; do not tint their artwork with the interface palette. This does not change either theme's interface colors.
 
 ## Artwork Media
 
