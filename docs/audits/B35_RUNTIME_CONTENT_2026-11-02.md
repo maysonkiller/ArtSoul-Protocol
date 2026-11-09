@@ -1,5 +1,10 @@
 # B35 — Package content, isolated loading and startup context
 
+November 9 update: the reviewed Core runtime is now active on the existing host
+after independent recovery and a fresh migration rehearsal. See
+[the dated activation evidence](B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md).
+The inactive status below describes the November 2 inspection, not current deployment.
+
 Status: package bytes match the pinned candidate dependency closure; isolated
 imports and native/fallback checks pass. One executable-mode difference was
 explicitly reviewed. The newer worker remains inactive.

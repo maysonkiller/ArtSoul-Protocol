@@ -98,6 +98,11 @@ Goal: validate the product with real users without changing frozen economics.
 
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
+  The November 9 [independent recovery and Core cutover](../audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md)
+  verifies off-PC encrypted storage, owner key access from iPhone, fresh isolated
+  restoration, five atomic migrations and the newer worker on the existing host.
+  Representative IO/egress, optional NFT/cache activation and operator/cohort
+  coverage remain distinct gates; no additional paid infrastructure was enabled.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit

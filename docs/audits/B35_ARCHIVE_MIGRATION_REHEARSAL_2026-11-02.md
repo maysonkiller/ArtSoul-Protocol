@@ -1,5 +1,11 @@
 # B35 — Actual-archive migration rehearsal
 
+November 9 update: independent encrypted recovery, owner key custody and fresh
+archive restoration passed; the five migrations and Core-only worker are now
+active. See [the dated evidence](B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md).
+The open production gates below describe the November 2 rehearsal. NFT/cache
+activation and representative capacity remain separate acceptance work.
+
 Status: local archive restoration, ordered migrations and committed-schema
 archive restoration checks pass.
 Production migrations, worker activation and independent encrypted recovery
