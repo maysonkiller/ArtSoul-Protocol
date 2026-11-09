@@ -47,6 +47,12 @@ Release evidence and limitations are recorded in
 
 ## Remaining acceptance and operational work
 
+The November 9 [confirmed purchase correction](audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
+removes obsolete post-confirmation RPC/legacy-write calls that could report a
+successful settlement or resale as failed. Purchased listings use the existing
+receipt bridge to remove stale purchase actions while the indexer catches up.
+This is regression coverage, not a repeated real-wallet acceptance transaction.
+
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.
 It reuses provenance without extra requests and distinguishes sale evidence

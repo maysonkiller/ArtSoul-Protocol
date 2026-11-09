@@ -2533,17 +2533,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     const txHash = await window.ArtSoulContracts.completeSettlement(auctionActionId);
                     console.log('Settlement tx:', txHash);
 
-                    const blockchainArtwork = await window.ArtSoulContracts.getArtwork(artwork.blockchain_id);
-                    try {
-                        await window.ArtSoulDB.recordWinnerPurchase(
-                            artworkId,
-                            walletAddress,
-                            blockchainArtwork.tokenId
-                        );
-                    } catch (syncError) {
-                        console.warn('Legacy settlement sync skipped; indexer projection remains source of truth.', syncError.message);
-                    }
-
                     alert('Settlement complete! NFT minted to your wallet. The indexer will update public state.');
                     loadArtwork();
                 } catch (error) {
@@ -2747,17 +2736,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         { idType: 'artwork' }
                     );
                     console.log('Resale purchase tx:', txHash);
-
-                    const blockchainArtwork = await window.ArtSoulContracts.getArtwork(artwork.blockchain_id);
-                    try {
-                        await window.ArtSoulDB.recordDirectPurchase(
-                            artworkId,
-                            walletAddress,
-                            blockchainArtwork.tokenId
-                        );
-                    } catch (syncError) {
-                        console.warn('Legacy resale sync skipped; indexer projection remains source of truth.', syncError.message);
-                    }
 
                     alert('Purchase successful! NFT transferred to your wallet. The indexer will update public state.');
                     loadArtwork();

@@ -104,6 +104,9 @@ Goal: validate the product with real users without changing frozen economics.
   Representative IO/egress, optional NFT/cache activation and operator/cohort
   coverage remain distinct gates; no additional paid infrastructure was enabled.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
+  The November 9 [confirmed purchase fix](../audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
+  prevents optional read failures from misreporting confirmed settlement/resale
+  transactions and uses the receipt bridge to suppress stale purchase actions.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.
