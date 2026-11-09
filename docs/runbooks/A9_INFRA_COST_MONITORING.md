@@ -17,7 +17,7 @@ The checker reads the existing indexer `/health` response and exits non-zero whe
 - chain ID is Base Sepolia `84532`;
 - confirmation depth is `3` and has no synchronization error;
 - there are zero unresolved indexer errors;
-- block lag is below `20` and `isSynced` is true;
+- block lag is below the explicit deployment threshold and `isSynced` is true;
 - RPC errors in the last minute do not exceed `5`;
 - the response timestamp is no more than two minutes old.
 
@@ -25,13 +25,17 @@ Run on the Hetzner host from the deployed repository:
 
 ```bash
 cd /opt/artsoul
-npm run --silent monitor:indexer
+ARTSOUL_MONITOR_MAX_BLOCKS_BEHIND=50 npm run --silent monitor:indexer
 echo $?
 ```
 
 Successful output is one JSON line with `"ok":true` and exit code `0`. Failure output contains stable failure codes and exit code `1`. The output intentionally omits the configured endpoint URL so credentials cannot be copied into logs if an operator overrides it incorrectly.
 
-The indexer uses `INDEXER_HEALTH_MAX_BLOCKS_BEHIND=20`; normally keep that production default. The standalone checker also supports these explicit overrides for a non-production rehearsal:
+The November 9 Base Sepolia deployment explicitly uses
+`INDEXER_HEALTH_MAX_BLOCKS_BEHIND=50`. Pass the matching
+`ARTSOUL_MONITOR_MAX_BLOCKS_BEHIND=50` to the standalone checker. Both repository
+fallbacks remain 20; invoking the checker without the deployment override uses
+that older, stricter block-count boundary. Supported overrides are:
 
 ```text
 ARTSOUL_INDEXER_HEALTH_URL
@@ -43,7 +47,17 @@ ARTSOUL_MONITOR_MAX_RESPONSE_AGE_MS
 ARTSOUL_MONITOR_REQUEST_TIMEOUT_MS
 ```
 
-Production values remain Base Sepolia, depth `3`, lag below `20`, at most `5` RPC errors per minute, response age at most `120000` ms, and request timeout `10000` ms. Since Denim introduced 200 ms native blocks on October 21, a 15-second poll no longer fits that lag boundary. The Base host now explicitly sets `INDEXER_POLL_INTERVAL=2000`; retain that override when deploying because the older runner fallback is still 15000 ms. The indexer and standalone checker retain the same strict lag threshold. Do not weaken a threshold merely to make a sustained failing check green. See the [October 23 maintenance evidence](../audits/HOST_SECURITY_2026-10-23.md), including bounded measurements and the pending review of confirmation policy and RPC cost assumptions.
+Production values are Base Sepolia, depth `3`, lag strictly below `50`, at most
+`5` RPC errors per minute, response age at most `120000` ms and request timeout
+`10000` ms. After Denim's 200-ms canonical blocks, the explicit lag target is
+nominally ten seconds; the old 20-block target represented forty seconds before
+Denim and four seconds afterward. The November 9 observations showed bounded
+12–28-block lag, not an accumulating backlog. See the
+[dated decision and measurements](../audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md).
+This supersedes the October 23 operating threshold without changing transaction
+confirmation/finality policy. Retain `INDEXER_POLL_INTERVAL=2000` on the Base
+host: the older runner fallback is still 15000 ms. Do not repeatedly widen the
+boundary to hide increasing lag; investigate a sustained failure.
 
 The `/health` handler observes the current block. Do not poll this command more often than once every five minutes; excessive health polling becomes an RPC consumer itself.
 
@@ -59,6 +73,17 @@ old full-history SELECT must not increase. Keep chain/cursor/hash parity and
 the existing health invariants. Do not run a diagnostic that repeatedly
 downloads all block hashes.
 
+Collect recurring statement counters with `extensions.pg_stat_statements(false)`
+rather than its text-bearing view. Resolve a required query identity once,
+then compare `(dbid, userid, queryid, toplevel)` under the same statistics-reset
+marker; collect only bounded counters. Fetch normalized SQL text separately
+only when attribution requires it, and keep it out of public reports. A small
+outer `LIMIT` does not eliminate the cost of materializing all query texts.
+[PostgreSQL documents this lower-overhead interface](https://www.postgresql.org/docs/17/pgstatstatements.html#PGSTATSTATEMENTS-FUNCS).
+Diagnostics can themselves create temporary files; include their statements
+when attributing a short-window IO increase. Do not reset counters to erase
+the symptom or treat temporary bytes as network egress.
+
 Record the correct organization's **Shared Pooler**, Database and Storage
 egress separately; database/storage size is not transferred volume. During a
 quota incident, test a bounded real Data API and Storage read as well as the
@@ -69,7 +94,7 @@ Keep Spend Cap enabled unless the owner approves the financial change.
 
 Until native threshold alerts are available, the founder or named operator performs this review every Tuesday and Friday and after any indexer/RPC/database deployment:
 
-1. Run `npm run --silent monitor:indexer` on Hetzner.
+1. Run `ARTSOUL_MONITOR_MAX_BLOCKS_BEHIND=50 npm run --silent monitor:indexer` on Hetzner.
 2. Run `pm2 status` and confirm `artsoul-base-sepolia` is online while the retired Ethereum Sepolia process remains stopped.
 3. Run `pm2 logs artsoul-base-sepolia --lines 80 --nostream` and inspect new errors only.
 4. In Alchemy, record current billing-cycle Compute Units, forecast, hard limit, success rate, and top methods. Investigate a renewed sustained rise in `eth_blockNumber`, `eth_getLogs`, or `eth_getBlockByNumber`.

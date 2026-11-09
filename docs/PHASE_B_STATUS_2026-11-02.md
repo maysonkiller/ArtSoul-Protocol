@@ -86,8 +86,12 @@ browser matrix also covers a short landscape viewport. These three reported
 implementation fixes are released; the operational and actual-device gates
 below remain open.
 
-The owner selected Google Password Manager for backup-key custody. Actual
-independent encrypted-copy and key-recovery verification remain pending.
+On November 9 the owner confirmed backup-key custody in Google Password Manager
+and access from an iPhone. The encrypted archive on the existing indexer server
+was downloaded, decrypted and restored in isolation; all 159 Storage files and
+113 database tables passed verification. The five reviewed migrations and
+Core-only worker are now applied on that server. See
+[independent recovery and cutover evidence](audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md).
 
 The next bounded B18 fix improves Classic controls over dark/light media and
 opens contextual Guide links only after the target section is expanded.
@@ -99,9 +103,14 @@ for the 53 focused checks, 450 built-browser assertions and release boundary.
 | --- | --- | --- |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |
 | B11/B12 actual journeys | Current-page expired settlement/default/re-auction and the remaining signed assistant scenarios | Retain accepted receipts, voice acceptance and completed transactions. Never replay a completed operation merely to collect another test result. |
-| B30/B35 operations | Representative usage/egress and reviewed activation of the newer worker on the existing server | Whole outer Saved/search responses and combined polling/cache/auxiliary/periodic-reorg paths pass isolated tests. Real provider/cache transport and representative capacity remain unproven. The Hetzner worker is still the B30 version. No new server is required or purchased; ownership API/NFT-writer activation remains a separate gate. |
-| Recovery | An independently durable encrypted copy and restore evidence | All 159 objects were recovered and verified locally. Two copies on one computer do not meet independent durability. |
+| B30/B35 operations | Representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; the atomic migration batch, matching runtime bytes, bounded health observations, effective grants and four populated public APIs passed. Real Redis transport, NFT ownership/writer activation and representative capacity remain separate gates. No new server was purchased. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
+
+Independent backup, restoration and owner key custody are completed prerequisites,
+not remaining gates. The November 9 Core cutover retains the two-second poll and
+uses an explicit health lag below 50 post-Denim blocks (nominally ten seconds),
+with confirmation depth unchanged at three. The recorded seven samples were
+12–28 blocks behind, not zero lag. Long-term cost acceptance is still open.
 
 The owner has prohibited extra paid infrastructure/API usage. Do not remove the
 Supabase spend cap or enable paid conversational voice. Existing browser voice
