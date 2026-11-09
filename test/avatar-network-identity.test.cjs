@@ -33,10 +33,10 @@ test('confirmed Base Sepolia uses one network mark and a clearly labelled test E
     const harness = networkHarness();
     const { html } = await readMenu(harness);
     assert.match(html, /data-network-mark><img[^>]+src="\/brand\/base\.svg"/);
-    assert.doesNotMatch(html, /src="\/brand\/eth\.png"/);
+    assert.doesNotMatch(html.match(/data-network-balance>(.*?)<\/div>/)?.[1] || '', /<img/);
     assert.match(html, /class="network-balance-value">… test ETH<\/span>/);
-    assert.match(html, /network-current-row" role="status"/);
-    assert.doesNotMatch(html, /selectNetwork\(|avatar-wallet-provider|src="(?:https?:|data:)/);
+    assert.match(html, /aria-controls="avatarNetworkOptions"/);
+    assert.doesNotMatch(html, /avatar-wallet-provider|src="(?:https?:|data:)/);
     for (const mark of html.matchAll(/<img[^>]+>/g)) {
         assert.match(mark[0], /alt="" aria-hidden="true"/);
     }
@@ -48,7 +48,7 @@ test('unconfirmed Base Sepolia preserves its switch action and does not claim an
     assert.match(html, /src="\/brand\/base\.svg"/);
     assert.match(html, /Tap to switch/);
     assert.match(html, /onclick="window.AvatarDropdown.handleNetworkRowClick\(event\)"/);
-    assert.doesNotMatch(html, /brand\/eth\.png|selectNetwork\(/);
+    assert.match(html, /aria-pressed="false"[\s\S]*?selectNetwork\(84532, event\)/);
 });
 
 for (const [chainId, name, mark, currency] of [
@@ -56,19 +56,28 @@ for (const [chainId, name, mark, currency] of [
     [1, 'Ethereum Mainnet', 'eth.png', 'ETH'],
     [11155111, 'Ethereum Sepolia', 'eth.png', 'test ETH']
 ]) {
-    test(`${name} remains display-only with Base Sepolia as the sole switch target`, async () => {
+    test(`${name} offers wallet browsing networks while transactions stay on Base Sepolia`, async () => {
         const harness = networkHarness({ chainId, confirmed: false });
         const { html } = await readMenu(harness);
         assert.ok(html.includes(`data-network-name>${name}</span>`));
         assert.ok(html.includes(`src="/brand/${mark}"`));
-        assert.ok(html.includes(`0.0000 ${currency}</span>`));
+        assert.ok(html.includes(`… ${currency}</span>`));
         const balance = html.match(/data-network-balance>(.*?)<\/div>/)?.[1];
         assert.ok(balance);
         assert.equal(balance.includes('<img'), false, 'the currency is text beside one network mark');
-        assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), [84532]);
+        assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), [84532, 8453, 1]);
         assert.match(html, /aria-controls="avatarNetworkOptions"/);
     });
 }
+
+test('a failed native balance request remains unknown instead of claiming a zero balance', async () => {
+    const harness = networkHarness({ chainId: 1, provider: {
+        request: async () => { throw new Error('RPC unavailable'); }
+    } });
+    const network = await harness.dropdown.getCurrentNetworkInfo();
+    assert.equal(network.balance, '…');
+    assert.equal(network.chainId, 1);
+});
 
 for (const [chainId, label] of [[999, 'Unsupported'], [null, 'Connecting...']]) {
     test(`${label} does not fabricate a token or remote mark`, async () => {
@@ -77,8 +86,8 @@ for (const [chainId, label] of [[999, 'Unsupported'], [null, 'Connecting...']]) 
         assert.ok(html.includes(`data-network-name>${label}</span>`));
         assert.match(html, /data-network-mark><\/span>/);
         assert.match(html, /data-network-balance><\/div>/);
-        assert.doesNotMatch(html, /brand\/eth\.png|src=""|0\.0000 ETH/);
-        assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), [84532]);
+        assert.doesNotMatch(html, /src=""|0\.0000 ETH/);
+        assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), [84532, 8453, 1]);
     });
 }
 

@@ -7490,7 +7490,18 @@ body:is(.classic, .future) .profile-hero .profile-social-links .truncate {
     white-space: normal;
     overflow-wrap: anywhere;
 }
-body:is(.classic, .future) .profile-hero .profile-inline-edit-action { flex: 0 0 auto; margin: 0; }
+/* Reserve both action cells before the server confirms staff access. Right
+   alignment must not move Edit Profile or the social links when Admin arrives. */
+body:is(.classic, .future) .profile-hero .profile-inline-edit-action {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 16rem;
+    max-width: 100%;
+    flex: 0 0 auto;
+    margin: 0;
+    align-items: center;
+}
 @media (min-width: 769px) {
     body:is(.classic, .future) .profile-hero .profile-inline-edit-action { margin-inline-start: auto; }
 }
@@ -9511,9 +9522,8 @@ body:is(.classic, .future) .site-header #navButtons .avatar-info [data-avatar-ad
 }
 body:is(.classic, .future) .site-header #navButtons .avatar-info button:disabled { opacity: 1; cursor: default; }
 body:is(.classic, .future) .site-header #navButtons .avatar-info button[hidden] { display: none !important; }
-body:is(.classic, .future) .site-header #navButtons .avatar-info button:not(:disabled):is(:hover, :focus-visible),
-body:is(.classic, .future) .site-header #navButtons .avatar-button:is(:hover, :focus-visible, [aria-expanded="true"]) {
-    background: var(--c-surface-strong) !important;
+body:is(.classic, .future) .site-header #navButtons .avatar-info button:not(:disabled):focus-visible,
+body:is(.classic, .future) .site-header #navButtons .avatar-button:focus-visible {
     outline: 1px solid var(--c-accent);
     outline-offset: -1px;
 }
@@ -9539,6 +9549,21 @@ body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-menu {
     border-radius: 16px !important;
 }
 body:is(.classic, .future) .site-header #navButtons .avatar-wallet-section { margin: 0; padding: 0; border: 0; }
+body:is(.classic, .future) .site-header #navButtons .avatar-network-options { padding: 4px 0; }
+body:is(.classic, .future) .site-header #navButtons .avatar-network-guidance {
+    margin: 4px 0 8px;
+    color: var(--c-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-network-option {
+    padding: 8px 4px !important;
+    gap: 6px;
+    min-height: 44px;
+    font-size: 12px;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-network-option .network-option-name { white-space: normal; }
+body:is(.classic, .future) .site-header #navButtons .avatar-network-option:disabled { opacity: 1; cursor: default; }
 body:is(.classic, .future) .site-header #navButtons .network-current-row,
 body:is(.classic, .future) .site-header #navButtons .network-switcher-btn {
     padding: 8px 4px !important;

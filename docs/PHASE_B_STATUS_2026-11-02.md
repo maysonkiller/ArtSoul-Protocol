@@ -72,6 +72,14 @@ normal-domain route shells returned HTTP 200, and sixteen shared/build assets
 matched. Both author canonicals reported by Google are now distinct in the
 rendered page; HTTP-to-HTTPS remains an intentional redirect. Search recrawling
 is not yet verified. This bounded release does not close the gates below.
+The November 9 follow-up reserves stable Edit Profile/Admin cells, removes
+nested account hover frames, and offers the already-configured Base Sepolia,
+Base and Ethereum wallet networks. Every ArtSoul write still requires Base
+Sepolia. The newer founder request supersedes the previous account-menu-only
+network restriction and nested hover feedback. See
+[profile and network verification](audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
+for the local test/browser evidence and release boundary.
+
 The owner selected Google Password Manager for backup-key custody. Actual
 independent encrypted-copy and key-recovery verification remain pending.
 

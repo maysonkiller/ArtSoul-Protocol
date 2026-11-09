@@ -105,8 +105,8 @@ test('compact account menu keeps network and disconnect without duplicate naviga
     assert.ok(html.indexOf('avatar-wallet-section') < html.indexOf('avatar-account-action'));
     assert.doesNotMatch(html, /avatar-menu-identity|avatar-theme-section|href="\/profile"|href="\/admin"/);
     assert.doesNotMatch(html, /data-wallet-provider/, 'connector is on the plaque, not a repeated menu row');
-    assert.match(html, /network-current-row" role="status"/);
-    assert.doesNotMatch(html, /aria-controls="avatarNetworkOptions"/);
+    assert.match(html, /network-switcher-btn network-current-row/);
+    assert.match(html, /aria-controls="avatarNetworkOptions"/);
     assert.match(html, /window\.resetWalletConnection\(\)/);
     harness.dropdown.protocolAdminEligible = false;
     assert.doesNotMatch(harness.dropdown.renderMenuContent({ currentPath: '/gallery' }), /href="\/admin"/);
