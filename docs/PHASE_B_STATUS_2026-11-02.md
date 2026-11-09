@@ -1,4 +1,4 @@
-# Phase B status — November 2, 2026
+# Phase B status — updated November 9, 2026
 
 Phase A engineering readiness was accepted on October 24. Phase B engineering
 and interface work is active; there is no claim of a completed public beta or
@@ -66,6 +66,12 @@ integration preserves the incoming multichain feature gate and corrects profile
 canonicals reported by Search Console. See the [resume audit](audits/B18_RESUME_ACCOUNT_SEO_2026-11-09.md)
 for checks and the release boundary, and the inventory audit for
 provider limits, verification and release evidence.
+PR470 is merged and released as `651db8a3`; production deployment
+`dpl_GQGJJERyHNpSzyNjtiaC3qFeKTxM` is READY. Linux/Windows CI passed, eight
+normal-domain route shells returned HTTP 200, and sixteen shared/build assets
+matched. Both author canonicals reported by Google are now distinct in the
+rendered page; HTTP-to-HTTPS remains an intentional redirect. Search recrawling
+is not yet verified. This bounded release does not close the gates below.
 The owner selected Google Password Manager for backup-key custody. Actual
 independent encrypted-copy and key-recovery verification remain pending.
 
