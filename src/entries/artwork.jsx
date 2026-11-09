@@ -396,6 +396,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [newAuctionPrice, setNewAuctionPrice] = useState('');
             const [newAuctionDuration, setNewAuctionDuration] = useState(24);
             const [isNewAuctionModalOpen, setIsNewAuctionModalOpen] = useState(false);
+            const newAuctionDialogRef = useRef(null);
+            const newAuctionTriggerRef = useRef(null);
             const [auctionCreationError, setAuctionCreationError] = useState('');
             const [auctionCreationChecking, setAuctionCreationChecking] = useState(false);
             const auctionCreationCheckRef = useRef({ pending: false, context: null, autoOpened: false });
@@ -661,19 +663,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             useEffect(() => {
                 if (!isNewAuctionModalOpen) return undefined;
-                const previousOverflow = document.body.style.overflow;
-                document.body.style.overflow = 'hidden';
-                const closeOnEscape = event => {
-                    if (event.key === 'Escape' && !transactionActionsRef.current.has('create-auction')) {
-                        reauctionValuationControllerRef.current?.abort();
-                        setIsNewAuctionModalOpen(false);
-                    }
-                };
-                window.addEventListener('keydown', closeOnEscape);
-                return () => {
-                    window.removeEventListener('keydown', closeOnEscape);
-                    document.body.style.overflow = previousOverflow;
-                };
+                const dialog = newAuctionDialogRef.current;
+                dialog?.showModal();
+                return () => { if (dialog?.open) dialog.close(); };
             }, [isNewAuctionModalOpen]);
 
             useEffect(() => () => reauctionValuationControllerRef.current?.abort(), []);
@@ -2245,6 +2237,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 auctionCreationCheckRef.current.context = null;
                 setAuctionCreationError('');
                 setIsNewAuctionModalOpen(false);
+                window.requestAnimationFrame(() => newAuctionTriggerRef.current?.focus({ preventScroll: true }));
             }
 
             async function handleConfirmNewAuction() {
@@ -2278,6 +2271,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     );
                     console.log('New auction transaction:', txHash);
 
+                    // The shared success notice is outside the native top layer.
+                    newAuctionDialogRef.current?.close();
+                    setIsNewAuctionModalOpen(false);
+                    reauctionValuationControllerRef.current?.abort();
+                    reauctionValuationControllerRef.current = null;
+                    auctionCreationCheckRef.current.context = null;
                     await alert('New auction created successfully. Public auction data will update shortly.');
                     window.location.assign('/gallery#auctions');
                 } catch (error) {
@@ -3472,6 +3471,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                     type="button"
                                     className="btn-main w-full artwork-page-primary-action"
                                     onClick={openNewAuctionModal}
+                                    ref={newAuctionTriggerRef}
                                     disabled={auctionCreationChecking || isTransactionActionPending('create-auction')}
                                     aria-busy={auctionCreationChecking}
                                 >
@@ -3808,19 +3808,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             </dialog>
                     )}
                     {isNewAuctionModalOpen && (
-                        <div
-                            className="reauction-modal-backdrop"
-                            role="presentation"
-                            onMouseDown={event => {
-                                if (event.target === event.currentTarget) closeNewAuctionModal();
-                            }}
+                        <dialog
+                            ref={newAuctionDialogRef}
+                            className="reauction-modal"
+                            aria-modal="true"
+                            aria-labelledby="reauction-modal-title"
+                            onCancel={event => { event.preventDefault(); closeNewAuctionModal(); }}
                         >
-                            <section
-                                className="reauction-modal"
-                                role="dialog"
-                                aria-modal="true"
-                                aria-labelledby="reauction-modal-title"
-                            >
                                 <div className="reauction-modal-header">
                                     <div>
                                         <p className="reauction-modal-eyebrow">Primary auction</p>
@@ -3832,6 +3826,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         aria-label="Close new auction setup"
                                         onClick={closeNewAuctionModal}
                                         disabled={isTransactionActionPending('create-auction')}
+                                        autoFocus
                                     >
                                         ×
                                     </button>
@@ -3850,7 +3845,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                     value={newAuctionPrice}
                                     onChange={event => setNewAuctionPrice(event.target.value)}
                                     disabled={isTransactionActionPending('create-auction')}
-                                    autoFocus
                                 />
                                 <p id="new-auction-price-help">Use a decimal point or comma, with up to 18 decimal places. The price must be greater than zero.</p>
                                 <p id="new-auction-error" role="alert">{auctionCreationError}</p>
@@ -3917,8 +3911,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             : 'Confirm'}
                                     </button>
                                 </div>
-                            </section>
-                        </div>
+                        </dialog>
                     )}
                     {isResaleModalOpen && (() => {
                         const floorPrice = String(resaleFloorPrice || '0');

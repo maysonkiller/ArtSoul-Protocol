@@ -2775,18 +2775,6 @@ dialog.artwork-image-lightbox::backdrop { background: var(--c-bg); }
     }
 }
 
-.reauction-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 120;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    background: color-mix(in srgb, var(--c-bg) 84%, transparent);
-    overflow-y: auto;
-}
-
 .reauction-modal {
     width: min(100%, 560px);
     max-height: calc(100vh - 40px);
@@ -2905,11 +2893,6 @@ dialog.artwork-image-lightbox::backdrop { background: var(--c-bg); }
 }
 
 @media (max-width: 600px) {
-    .reauction-modal-backdrop {
-        align-items: flex-end;
-        padding: 12px;
-    }
-
     .reauction-modal {
         width: 100%;
         max-height: calc(100vh - 24px);
