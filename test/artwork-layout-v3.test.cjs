@@ -51,14 +51,14 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(source, /<h2>Artwork details<\/h2>/);
     assert.doesNotMatch(source, /artwork-page-insights/);
     assert.match(source, /<h2>Community<\/h2>/);
-    assert.match(source, /<h2>Gemini Analysis<\/h2>/);
+    assert.match(source, /<h2>AI insights<\/h2>/);
     assert.match(styles, /\.artwork-page-context \{[\s\S]*?gap: 8px;[\s\S]*?padding: 12px 14px 8px !important;[\s\S]*?background: transparent !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-context \{[\s\S]*?display: flex;[\s\S]*?flex-direction: column;[\s\S]*?justify-content: flex-start;[\s\S]*?gap: 8px;[\s\S]*?padding: 10px 14px 6px !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-context > \* \{[\s\S]*?flex: 0 0 auto;/);
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=85/);
+    assert.match(html, /unified-styles\.css\?v=87/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {

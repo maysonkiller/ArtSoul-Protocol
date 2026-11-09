@@ -71,7 +71,79 @@ and showed profile and transaction links. This is accepted withdrawal
 evidence, not evidence that the then-broken Gallery preparation worked.
 Private evidence: `docs/private/b11-assistant-withdraw-receipt-2026-11-09.json`
 and `output/b11-assistant-withdraw-confirmed-2026-11-09.png`.
-Do not repeat the completed withdrawal. Assistant start, bid, initial listing
-and purchase remain pending, alongside the existing real Phantom and latest
-native iPhone observations. Separate provider/cohort gates remain open; this
-record does not declare Phase B or the future public beta complete.
+Do not repeat the completed withdrawal.
+
+## Accepted assistant auction creation
+
+The owner signed assistant creation of artwork 14's auction at `0.001 ETH` for
+24 hours. Both public RPCs confirmed transaction
+`0x8234c4009a9cf0f40e47157f26ad3e23b9fd44b2f88b55d0d66c69853313634a`,
+status 1, block `56631239`, `2026-11-09T18:15:16Z`. The exact Core
+`AuctionCreated` event and state at that block identify active auction 75,
+artwork 14 and its existing creator, with a duration of 86,400 seconds and end
+time `2026-11-10T18:15:16Z`. The artwork remained unminted with floor zero.
+
+Without reload, the page showed the live auction at the approved price and
+duration. The assistant cleared its input, disabled Send and showed the
+next-action prompt plus artwork and transaction links. Evidence:
+`docs/private/b11-assistant-start14-receipt-2026-11-09.json`, its matching
+read-only `.mjs` verifier, and
+`output/b11-assistant-start14-confirmed-2026-11-09.png`.
+
+The documentation follow-up [PR #481](https://github.com/maysonkiller/ArtSoul-Protocol/pull/481)
+is deployed as `dpl_EsM4JvuRUY3dMgi4y5yg7Y3GTe6E`, READY at exact merge
+`b07e94fb0a01a64fddd025ed1d100569f7976c49`.
+[Merge CI 42672213379](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42672213379)
+passed Linux, Windows and static checks. The earlier
+[PR CI 42671887123](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42671887123)
+had an aggregate failure while its two recorded jobs passed; no Linux job or
+failed-job log explained that result. It is not recorded as a fully green PR run.
+
+## Accepted assistant initial resale listing
+
+The owner signed the assistant listing of artwork 38, token 7, for `0.001 ETH`.
+Both public RPCs confirmed transaction
+`0xa2a9478dd35f602846b6c5fefe6c472e0098f7fb7e3fec6d4e96529aee398e09`,
+status 1, block `56633575`, `2026-11-09T18:23:03Z`. The exact Core
+`ResaleListed` event and state at that block confirm the active listing at
+`0.001 ETH`; the existing canonical floor remained `0.001 ETH`. NFT contract
+`0xf061f70503c37Cf2196A28F4785E524D0Fb32538` still recorded the seller
+`0x6EC8C121043357aC231E36D403EdAbf90AE6989B` as token 7's owner.
+
+Without reload, the page showed the sale price and replaced List NFT with
+Change price / Remove from sale. The assistant cleared its input, disabled
+Send and showed the next-action prompt plus artwork and transaction links.
+Evidence: `docs/private/b11-assistant-list38-receipt-2026-11-09.json`, its
+matching read-only `.mjs` verifier, and
+`output/b11-assistant-list38-confirmed-2026-11-09.png`.
+
+Assistant bid remains pending and requires an eligible funded account different
+from the creator. Existing real Phantom and latest native iPhone
+observations, plus separate provider/cohort gates, remain open. Do not repeat
+the accepted auction creation or listing; this record does not declare Phase B
+or the future public beta complete.
+
+## Signed purchase and delayed resale projection
+
+The owner signed purchase of artwork 38/token 7 through the assistant for
+`0.001 ETH`. Two public RPCs agree on transaction
+`0xf029a10c9863601eeab56b43807ff455e52199378f54ad11db3c576329c45ec4`,
+status 1, block `56637436`, `2026-11-09T18:35:56Z`. Ownership moved from
+`0x6EC8C121043357aC231E36D403EdAbf90AE6989B` to
+`0x2d49162fcf065dae43c4a0dc2feb3d1cc9ff1824`; the listing became inactive and
+floor remained `0.001 ETH`. Evidence:
+`docs/private/b11-assistant-buy38-receipt-2026-11-09.json` and its read-only
+verifier. Do not replay the completed purchase.
+
+The assistant cleared its input and retired Buy without reload, but the owner
+label and five-event provenance remained stale in the observed page. This is
+a confirmed UI defect, not a failed purchase or accepted complete UI journey.
+Screenshot: `output/b11-assistant-buy38-initial-2026-11-09.png`.
+
+The correction refreshes only the affected artwork after a confirmed resale:
+one immediate read and at most six delayed reads across 60 seconds of scheduled
+delays. It waits for both the newer indexed resale block and matching provenance,
+pauses reads while hidden, and cancels on cleanup or a newer resale. It does not
+resubmit transactions or add permanent polling. Focused tests cover delayed
+history, visibility, cleanup, unrelated receipts, failed reads and exhaustion.
+New native-wallet acceptance is still distinct from local regression evidence.

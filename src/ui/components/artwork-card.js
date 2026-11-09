@@ -143,8 +143,6 @@
         'soneium-mainnet': { name: 'Soneium', icon: '/brand/wallet-networks/soneium.svg' },
         'unichain-mainnet': { name: 'Unichain', icon: '/brand/wallet-networks/unichain.svg' },
         'worldchain-mainnet': { name: 'World Chain', icon: '/brand/wallet-networks/world.svg' },
-        'monad-mainnet': { name: 'Monad', icon: '/brand/wallet-networks/monad.svg' },
-        'abstract-mainnet': { name: 'Abstract', icon: '/brand/wallet-networks/abstract.svg' },
         'zora-mainnet': { name: 'Zora', icon: '/brand/wallet-networks/zora.svg' }
     });
     const CARD_CHAIN_SLUGS = Object.freeze({
@@ -152,7 +150,7 @@
         137: 'matic-mainnet', 130: 'unichain-mainnet', 480: 'worldchain-mainnet',
         8453: 'base-mainnet', 84532: 'base-sepolia', 11155111: 'eth-sepolia',
         42161: 'arb-mainnet', 43114: 'avax-mainnet', 59144: 'linea-mainnet',
-        1868: 'soneium-mainnet', 2741: 'abstract-mainnet', 7777777: 'zora-mainnet'
+        1868: 'soneium-mainnet', 7777777: 'zora-mainnet'
     });
 
     function networkInfo(artwork = {}) {

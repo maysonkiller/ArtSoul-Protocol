@@ -32,8 +32,8 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(read(page), /wallet-runtime-loader\.js/, `${page} must load the standard wallet flow`);
     }
     assert.match(read('wallet-runtime-loader.js'), /appkit-init\.js\?v=54/, 'the loader must import the pinned appkit entry');
-    assert.match(appKit, /wallet-core-connect\.js\?v=18/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=18/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=20/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=20/);
     assert.match(walletTest, /appkit-init\.js\?v=54/);
 });
 
@@ -54,7 +54,7 @@ test('mobile external browsers use the standard flow: pinned provider + official
     assert.match(coreWallet, /WC_ETHEREUM_PROVIDER_VERSION = '2\.23\.10'/);
     assert.match(coreWallet, /esm\.sh\/@walletconnect\/ethereum-provider@\$\{WC_ETHEREUM_PROVIDER_VERSION\}/);
     assert.match(coreWallet, /const REQUIRED_CHAIN_IDS = \[BASE_SEPOLIA_CHAIN_ID\]/);
-    assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[8453, 1\]/);
+    assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[8453, 1,/);
     assert.match(coreWallet, /const REQUIRED_METHODS = \['personal_sign', 'eth_sendTransaction'\]/);
     assert.match(coreWallet, /CORE_STORAGE_PREFIX = 'artsoul-mobile-core-v4'/);
     assert.match(coreWallet, /customStoragePrefix: CORE_STORAGE_PREFIX/);

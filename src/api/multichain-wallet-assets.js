@@ -18,8 +18,6 @@ export const WALLET_ASSET_NETWORKS = Object.freeze({
   'soneium-mainnet': { chainId: 1868, name: 'Soneium', short: 'SONE', explorer: 'https://soneium.blockscout.com', market: null, marketBrowse: 'https://opensea.io/discover/chain/soneium' },
   'unichain-mainnet': { chainId: 130, name: 'Unichain', short: 'UNI', explorer: 'https://uniscan.xyz', market: null },
   'worldchain-mainnet': { chainId: 480, name: 'World Chain', short: 'WORLD', explorer: 'https://worldscan.org', market: null },
-  'monad-mainnet': { chainId: 143, name: 'Monad', short: 'MON', explorer: 'https://monadscan.com', market: null, marketBrowse: 'https://opensea.io/discover/chain/monad' },
-  'abstract-mainnet': { chainId: 2741, name: 'Abstract', short: 'ABS', explorer: 'https://abscan.org', market: null },
   'zora-mainnet': { chainId: 7777777, name: 'Zora', short: 'ZORA', explorer: 'https://explorer.zora.energy', market: null }
 });
 // The "All" preset is limited to five documented Portfolio networks, not every
@@ -169,7 +167,7 @@ function tokenItem(item, wallet) {
     const minor = decimals ? (value % divisor).toString().padStart(decimals, '0').slice(0, 6).replace(/0+$/, '') : '';
     displayBalance = major + (minor ? '.' + minor : '');
   }
-  const nativeSymbol = { 137: 'POL', 56: 'BNB', 43114: 'AVAX', 143: 'MON' }[chain.chainId] || 'ETH';
+  const nativeSymbol = { 137: 'POL', 56: 'BNB', 43114: 'AVAX' }[chain.chainId] || 'ETH';
   const symbol = safeText(meta.symbol, 24) || (contract === null ? nativeSymbol : 'Token');
   const name = safeText(meta.name) || symbol;
   const prices = Array.isArray(item.tokenPrices) ? item.tokenPrices : [];

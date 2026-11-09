@@ -8,7 +8,6 @@ const OPTIONS = [
   ['bnb-mainnet', 'BNB Chain', 'BNB'], ['avax-mainnet', 'Avalanche', 'AVAX'],
   ['robinhood-mainnet', 'Robinhood Chain', 'RH'], ['soneium-mainnet', 'Soneium', 'SONE'],
   ['unichain-mainnet', 'Unichain', 'UNI'], ['worldchain-mainnet', 'World Chain', 'WORLD'],
-  ['monad-mainnet', 'Monad', 'MON'], ['abstract-mainnet', 'Abstract', 'ABS'],
   ['zora-mainnet', 'Zora', 'ZORA']
 ];
 const five = OPTIONS.slice(0, 5).map(n => n[0]);
@@ -30,8 +29,6 @@ const BRAND_ICONS = Object.freeze({
   'soneium-mainnet': '/brand/wallet-networks/soneium.svg',
   'unichain-mainnet': '/brand/wallet-networks/unichain.svg',
   'worldchain-mainnet': '/brand/wallet-networks/world.svg',
-  'monad-mainnet': '/brand/wallet-networks/monad.svg',
-  'abstract-mainnet': '/brand/wallet-networks/abstract.svg',
   'zora-mainnet': '/brand/wallet-networks/zora.svg'
 });
 

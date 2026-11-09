@@ -5,7 +5,8 @@
 
 import { createAppKit } from '@reown/appkit'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { baseSepolia, base, mainnet } from '@reown/appkit/networks'
+import { baseSepolia, base, mainnet, arbitrum, optimism, polygon, bsc, avalanche,
+    linea, robinhood, soneium, unichain, worldchain, zora } from '@reown/appkit/networks'
 // Mobile external browsers connect through the standard WalletConnect flow:
 // the proven bare @walletconnect/ethereum-provider driving the official
 // WalletConnect modal. AppKit stays for desktop and injected browsers.
@@ -25,7 +26,7 @@ import {
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome,
     setCoreAuthLifecycleState
-} from './wallet-core-connect.js?v=18'
+} from './wallet-core-connect.js?v=20'
 
 // ============================================
 // CONFIGURATION
@@ -61,7 +62,8 @@ const BASE_SEPOLIA_RPC_URL = BASE_SEPOLIA_RPC_URLS[0];
 const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2';
 // These are wallet browsing networks, not ArtSoul deployment targets.
 // ArtSoul operations and every write remain Base Sepolia-only.
-const networks = [baseSepolia, base, mainnet];
+const networks = [baseSepolia, base, mainnet, arbitrum, optimism, polygon, bsc,
+    avalanche, linea, robinhood, soneium, unichain, worldchain, zora];
 const customRpcUrls = {
     [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URLS.map(url => ({ url }))
 };
@@ -76,7 +78,7 @@ const SUPPORTED_NETWORKS = {
         rpcUrls: BASE_SEPOLIA_RPC_URLS,
         blockExplorerUrls: ['https://sepolia.basescan.org']
     },
-    ...Object.fromEntries([base, mainnet].map(network => [network.id, {
+    ...Object.fromEntries(networks.filter(network => network.id !== BASE_SEPOLIA_CHAIN_ID).map(network => [network.id, {
         appKitNetwork: network,
         chainId: network.id,
         hexChainId: `0x${network.id.toString(16)}`,
@@ -3210,7 +3212,7 @@ window.openArtSoulNetworkSelector = async () => {
 window.switchArtSoulNetwork = async (chainId) => {
     const target = getSupportedNetworkTarget(chainId);
     if (!target) {
-        alert('Choose a supported wallet network: Base Sepolia, Base or Ethereum.');
+        alert('Choose a network from the wallet network list. ArtSoul transactions use Base Sepolia testnet.');
         return false;
     }
 

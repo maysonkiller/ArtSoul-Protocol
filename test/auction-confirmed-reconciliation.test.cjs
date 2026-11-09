@@ -623,17 +623,27 @@ test('confirmed resale stays visible with blocked browser storage', () => {
 
 test('open artwork applies repricing and cancellation before a slow refresh can finish', () => {
   const source = fs.readFileSync('src/entries/artwork.jsx','utf8');
-  const handler = source.match(/const refresh = \(\) => \{([\s\S]*?)\};\s*window\.addEventListener\('artsoul:auction-confirmed', refresh\)/);
-  assert.ok(handler,'the artwork receipt listener is present');
+  const marker = source.indexOf('let stopResaleRefresh = () => {};');
+  const start = source.lastIndexOf('useEffect(() => {', marker);
+  const end = source.indexOf('}, [artworkId]);', marker) + '}, [artworkId]);'.length;
+  assert.ok(start >= 0 && end > start, 'the artwork receipt listener is present');
   for (const active of [true,false]) {
     const {db} = client();
     let displayed = resaleRow({canonical_floor:'0.01'}), refreshes = 0;
     db.recordConfirmedResale(resaleReceipt({active,price:active?'0.11':'0'}));
-    vm.runInNewContext(handler[1], {
-      window: {ArtSoulDB:db},
-      setArtwork(update) { displayed = update(displayed); },
-      loadArtwork() { refreshes++; return new Promise(() => {}); }
+    const listeners = new Map();
+    vm.runInNewContext(source.slice(start, end), {
+      window: {ArtSoulDB:db, addEventListener: (name, listener) => listeners.set(name, listener)},
+      artworkId: '28', artworkSnapshotRef: {current:displayed},
+      useEffect: effect => effect(),
+      setArtwork(update) { displayed = typeof update === 'function' ? update(displayed) : update; },
+      loadArtwork() { refreshes++; return new Promise(() => {}); },
+      startResaleProjectionRefresh(updated) {
+        assert.equal(updated, displayed, 'the confirmed view is applied before scheduled refresh');
+        refreshes++; return () => {};
+      }
     });
+    listeners.get('artsoul:resale-confirmed')();
     assert.equal(refreshes,1);
     assert.equal(displayed.sale_price,active?'0.11':'0');
     assert.equal(displayed.status,active?'for_sale':'sold');

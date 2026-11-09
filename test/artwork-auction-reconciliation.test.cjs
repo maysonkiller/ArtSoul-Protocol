@@ -42,7 +42,7 @@ const functionNames = [
   'normalizeTimestampMs', 'firstPositiveTimestamp', 'firstDefined', 'parseEthToWei',
   'getAuctionHighestBidWei', 'projectedAuctionFromArtwork', 'mergeProjectedAuction',
   'bidIdentity', 'advanceBidCursor', 'applyLiveAuctionProjection', 'refreshLiveBidActivity',
-  'getAuctionActionId', 'isZeroAddress', 'isSameAddress', 'hasProtocolId', 'loadArtwork'
+  'getAuctionActionId', 'isZeroAddress', 'isSameAddress', 'hasProtocolId', 'loadArtwork', 'startResaleProjectionRefresh'
 ];
 
 function page({ getArtwork, getLiveAuctionActivity, getProfile, getArtworkProvenance, hydrateBidderProfiles } = {}) {
@@ -53,6 +53,7 @@ function page({ getArtwork, getLiveAuctionActivity, getProfile, getArtworkProven
     artworkId: 'v41:84532:28', isV41CompositeId: true, v41CompositeId: {chainId: 84532, artworkId: '28'},
     artwork: projection(), auction: null,
     artworkLoadSequenceRef: { current: 0 }, liveAuctionIdentityRef: { current: '' }, loadedArtworkIdRef: { current: null },
+    artworkSnapshotRef: { current: null }, provenanceSnapshotRef: { current: null },
     bidCursorRef: { current: null }, bidPollInFlightRef: { current: false },
     hydrateBidderProfiles: hydrateBidderProfiles || (async () => {}),
     loadModerationVisibility() {}, readAIValuation: value => value,
@@ -68,13 +69,15 @@ function page({ getArtwork, getLiveAuctionActivity, getProfile, getArtworkProven
       state[key] = typeof value === 'function' ? value(state[key]) : value;
       writes.push(key);
       if (key === 'artwork' || key === 'auction') context[key] = state[key];
+      if (key === 'artwork') context.artworkSnapshotRef.current = state[key];
+      if (key === 'provenanceState') context.provenanceSnapshotRef.current = state[key];
     };
   }
   vm.runInContext(functionNames.map(pageFunction).join('\n'), context, { filename: 'shipped-artwork-functions.js' });
   return { page: context, state, writes };
 }
 
-function receiptBridge(api, record) {
+function receiptBridge(api, record, resale = false) {
   const storage = new Map();
   const window = { localStorage: {
     getItem: key => storage.get(key) || null,
@@ -84,13 +87,17 @@ function receiptBridge(api, record) {
     window, document: {}, console: quiet, URL, URLSearchParams,
     CustomEvent: class { constructor(type, options = {}) { this.type = type; Object.assign(this, options); } }
   });
-  window.ArtSoulDB.recordConfirmedAuction({ chain_id: 84532, artwork_id: '28', auction_id: '63',
+  if (resale) window.ArtSoulDB.recordConfirmedResale({ chain_id: 84532, artwork_id: '28', token_id: '7',
+    seller: CREATOR, active: false, price: '0', transaction_hash: `0x${'12'.repeat(32)}`,
+    block_number: 100, transaction_index: 0, ...record });
+  else window.ArtSoulDB.recordConfirmedAuction({ chain_id: 84532, artwork_id: '28', auction_id: '63',
     transaction_hash: `0x${'12'.repeat(32)}`, block_number: 100, kind: 'defaulted', patch: {}, ...record });
   api.window.ArtSoulDB.applyConfirmedAuctionUpdate = window.ArtSoulDB.applyConfirmedAuctionUpdate;
+  return window.ArtSoulDB;
 }
 
 function refreshFromReceipt(api) {
-  const listener = source.match(/const refresh = \(\) => \{([\s\S]*?)\};\s*window\.addEventListener\('artsoul:auction-confirmed', refresh\)/);
+  const listener = source.match(/const refresh = \(\) => \{([\s\S]*?)\n {16}\};/);
   assert.ok(listener, 'the shared receipt listener exists');
   vm.runInContext(listener[1], api);
   // Commit the effect keyed to the updated artwork without waiting for the
@@ -100,6 +107,155 @@ function refreshFromReceipt(api) {
   api.useEffect = effect => effect();
   vm.runInContext(effect[0], api);
 }
+
+function mountReceiptRefresh(api) {
+  const timers = new Map(), listeners = new Map(), visibility = new Set();
+  let nextTimer = 0, cleanup;
+  api.setTimeout = (callback, delay) => { timers.set(++nextTimer, { callback, delay }); return nextTimer; };
+  api.clearTimeout = id => timers.delete(id);
+  api.window.addEventListener = (name, listener) => listeners.set(name, listener);
+  api.window.removeEventListener = name => listeners.delete(name);
+  api.document.visibilityState = 'visible';
+  api.document.addEventListener = (_, listener) => visibility.add(listener);
+  api.document.removeEventListener = (_, listener) => visibility.delete(listener);
+  api.useEffect = effect => { cleanup = effect(); };
+  const marker = source.indexOf('let stopResaleRefresh = () => {};');
+  const start = source.lastIndexOf('useEffect(() => {', marker);
+  const end = source.indexOf('}, [artworkId]);', marker) + '}, [artworkId]);'.length;
+  assert.ok(start >= 0 && end > start, 'mount the shipped receipt listener effect');
+  vm.runInContext(source.slice(start, end), api);
+  return {
+    timers, visibility, cleanup,
+    receipt: () => listeners.get('artsoul:resale-confirmed')(),
+    setVisible: visible => {
+      api.document.visibilityState = visible ? 'visible' : 'hidden';
+      [...visibility].forEach(listener => listener());
+    },
+    tick: async () => {
+      const [id, timer] = timers.entries().next().value || [];
+      assert.ok(timer, 'a bounded retry is scheduled');
+      timers.delete(id);
+      await timer.callback();
+      await new Promise(resolve => setImmediate(resolve));
+    }
+  };
+}
+
+async function resalePage(record = {}) {
+  const original = projection({ status: 'for_sale', minted: true, token_id: '7',
+    current_owner_address: CREATOR, auction_winner_address: CREATOR, canonical_floor: '0.001',
+    sale_price: '0.001', resale_seller: CREATOR, resale_updated_block: 20 });
+  const feed = { row: original, events: [{ type: 'resale_listed', block_number: 20 }], reads: 0, historyReads: 0 };
+  let bridge;
+  const fixture = page({
+    getArtwork: () => {
+      feed.reads++;
+      if (feed.error) throw feed.error;
+      if (feed.pending) return feed.pending;
+      return bridge ? bridge.applyConfirmedAuctionUpdate(feed.row) : feed.row;
+    },
+    getArtworkProvenance: () => { feed.historyReads++; return { events: [...feed.events], complete: true }; }
+  });
+  await fixture.page.loadArtwork();
+  bridge = receiptBridge(fixture.page, record, true);
+  return { ...fixture, feed, clock: mountReceiptRefresh(fixture.page) };
+}
+
+test('a resale receipt refreshes indexed ownership and separately delayed history without restoring Buy', async () => {
+  const { state, feed, clock } = await resalePage();
+  clock.receipt();
+  assert.equal(state.artwork.status, 'sold');
+  assert.equal(state.artwork.sale_price, '0');
+  assert.equal(state.artwork.current_owner_address, CREATOR, 'the receipt cannot infer ownership');
+  await clock.tick();
+  assert.equal(state.artwork.pending_resale_sync, true);
+  feed.row = { ...feed.row, status: 'sold', sale_price: '0', current_owner_address: BIDDER, resale_updated_block: 100 };
+  await clock.tick();
+  assert.equal(state.artwork.current_owner_address, BIDDER);
+  assert.equal(state.artwork.pending_resale_sync, undefined);
+  assert.equal(state.provenanceState.events.length, 1);
+  assert.equal(clock.timers.size, 1, 'history still needs to catch up after ownership does');
+  feed.events.push({ type: 'resale_completed', block_number: 100, transaction_hash: `0x${'12'.repeat(32)}` });
+  await clock.tick();
+  assert.equal(state.artwork.status, 'sold');
+  assert.equal(state.artwork.auction_winner_address, CREATOR);
+  assert.equal(state.artwork.canonical_floor, '0.001');
+  assert.equal(state.provenanceState.events.length, 2);
+  assert.equal(clock.timers.size, 0);
+  assert.equal(clock.visibility.size, 0);
+  assert.equal(feed.reads, 4);
+  assert.equal(feed.historyReads, 4);
+  clock.cleanup();
+});
+
+test('a temporary resale refresh failure preserves the receipt and recovers on a later indexed read', async () => {
+  const { state, feed, clock } = await resalePage();
+  feed.error = Object.assign(new Error('Offline'), { code: 'ARTWORK_READ_UNAVAILABLE' });
+  clock.receipt();
+  await clock.tick();
+  assert.equal(state.artwork.status, 'sold');
+  assert.equal(state.artwork.current_owner_address, CREATOR);
+  assert.match(state.refreshError, /could not be refreshed/);
+  feed.error = null;
+  feed.row = { ...feed.row, status: 'sold', sale_price: '0', current_owner_address: BIDDER, resale_updated_block: 100 };
+  feed.events.push({ type: 'resale_completed', block_number: 100 });
+  await clock.tick();
+  assert.equal(state.artwork.current_owner_address, BIDDER);
+  assert.equal(state.refreshError, '');
+  assert.equal(clock.timers.size, 0);
+  clock.cleanup();
+});
+
+test('resale reconciliation has a finite read budget even when the projection never catches up', async () => {
+  const { state, feed, clock } = await resalePage();
+  clock.receipt();
+  for (let attempt = 0; attempt < 7; attempt++) await clock.tick();
+  assert.equal(feed.reads, 8, 'one initial page read and seven bounded receipt reads');
+  assert.equal(feed.historyReads, 8);
+  assert.equal(clock.timers.size, 0);
+  assert.equal(clock.visibility.size, 0);
+  assert.equal(state.artwork.current_owner_address, CREATOR);
+  assert.equal(state.artwork.status, 'sold');
+  clock.cleanup();
+});
+
+test('resale refresh pauses while hidden and cleanup prevents late reads from changing the page', async () => {
+  const { state, writes, feed, clock } = await resalePage();
+  clock.setVisible(false);
+  clock.receipt();
+  assert.equal(clock.timers.size, 0);
+  assert.equal(feed.reads, 1);
+  clock.setVisible(true);
+  await clock.tick();
+  clock.setVisible(false);
+  await clock.tick();
+  assert.equal(feed.reads, 2, 'a scheduled timer cannot fetch after the page becomes hidden');
+  clock.setVisible(true);
+  const delayed = deferred();
+  feed.pending = delayed.promise;
+  const read = clock.tick();
+  const writesBeforeCleanup = writes.length;
+  clock.cleanup();
+  delayed.resolve({ ...feed.row, status: 'sold', current_owner_address: BIDDER, resale_updated_block: 100 });
+  await read;
+  assert.equal(writes.length, writesBeforeCleanup, 'unmounted or changed artwork rejects the late response');
+  assert.equal(state.artwork.current_owner_address, CREATOR);
+  assert.equal(clock.timers.size, 0);
+  assert.equal(clock.visibility.size, 0);
+});
+
+test('unrelated or already-indexed resale receipts do not start a reconciliation loop', async () => {
+  for (const record of [{ artwork_id: '29' }, { token_id: '8' }, { chain_id: 11155111 },
+    { seller: BIDDER }, { block_number: 20 }]) {
+    const { state, clock } = await resalePage(record);
+    clock.receipt();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(clock.timers.size, 0);
+    assert.equal(state.artwork.status, 'for_sale');
+    assert.equal(state.artwork.current_owner_address, CREATOR);
+    clock.cleanup();
+  }
+});
 
 for (const { kind, originalStatus, expectedState, patch } of [
   { kind: 'defaulted', originalStatus: 'settlement_pending', expectedState: 'DEFAULTED', patch: {} },

@@ -140,8 +140,26 @@ Goal: validate the product with real users without changing frozen economics.
   is READY; the actual Gallery zero-funds command returned "There is nothing
   to withdraw." without a wallet prompt or transaction. Evidence is in the
   [readiness audit](../audits/B11_GALLERY_WALLET_READINESS_2026-11-09.md).
-  Assistant start, bid, initial listing and purchase remain pending; prior
-  repricing/removal and the completed withdrawal must not become replay gates.
+  Assistant creation of artwork 14's auction 75 is accepted: `0.001 ETH`,
+  24 hours, block `56631239` at `2026-11-09T18:15:16Z`, verified on both RPCs.
+  Without reload, the live auction appeared and the assistant cleared its
+  input, disabled Send and showed the next-action prompt plus artwork/tx links.
+  The same audit records PR #481's READY exact-merge deployment and green merge
+  CI, preserving the separate earlier PR-run aggregate failure limitation.
+  Assistant initial listing of artwork 38/token 7 is also accepted at
+  `0.001 ETH`, block `56633575` at `2026-11-09T18:23:03Z`, verified on both RPCs.
+  Without reload, the sale price and Change price / Remove from sale actions
+  appeared, and the assistant cleared its input and showed completion links.
+  Assistant purchase of artwork 38/token 7 succeeded at block `56637436` for
+  `0.001 ETH`; Buy retired and the command cleared without reload, but ownership
+  and provenance remained stale. The same audit records the bounded receipt
+  reconciliation correction and the still-open complete UI acceptance.
+  Assistant bid remains pending using an eligible funded account other than
+  the creator. Completed purchase, repricing/removal, withdrawal, auction
+  creation and initial listing must not become replay gates.
+  The [network picker follow-up](../audits/B18_NETWORK_PICKER_2026-11-09.md)
+  aligns logo/label spacing, adds searchable configured EVM browsing networks,
+  retains the Base Sepolia write boundary and renames the public AI panel.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.
