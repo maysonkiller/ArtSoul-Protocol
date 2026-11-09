@@ -1,5 +1,34 @@
 # B35 — Combined polling and cache acceptance, November 2, 2026
 
+## November 9 follow-up: actual Redis in the combined scenario
+
+The same combined scenario now runs with both its original Map transport and
+Redis 7.4.12, using two independent Redis connections. PostgreSQL is 18.4.
+The purger receives a real ACL `NOPERM` on its first two `DEL` commands; the
+reader remains usable. After deletion is permitted, the next poll acknowledges
+the durable token without repeating publication, chain reads or the digest.
+The delayed refill executes the actual Lua generation check: results `[0, 1]`
+reject the old generation and store the fresh one. Exactly three cache fetches
+occur; event, processing and lifecycle-outbox records are not duplicated.
+
+The final selected run passes three tests (parent and both variants), with no
+failures or skips. Per-phase SQL counts match the original scenario:
+47, 1, 9, 2, 2, 2 and 38. The disposable Redis instance listens on loopback only;
+its container was removed and PostgreSQL stopped. Linux CI requires the real
+Redis variant when this integration suite is enabled. No production code,
+flags, database schema or worker settings changed, and no dependency was added.
+
+Evidence: `docs/private/b35-combined-real-redis-2026-11-09-final.log` and
+`docs/private/reorg-atomicity-1794240349115-768-85dac56a/evidence.json`.
+This closes the local combined PostgreSQL/Redis transport gap. Synthetic chain
+responses, stubbed auxiliary refreshes and bounded fixture volume remain its
+limits; hosted-cache activation and representative capacity are not established.
+The separate auxiliary/reorg suite remains applicable. Independent encrypted
+recovery and Core activation were completed separately on November 9; see
+[the recovery and cutover record](B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md).
+
+The sections below preserve the original November 2 evidence and limitations.
+
 Status: one bounded offline acceptance slice passes. No production-source,
 schema, deployment, feature-flag or worker configuration change accompanies it.
 The test extends `test/indexer-reorg-atomicity.test.cjs` and reuses its disposable

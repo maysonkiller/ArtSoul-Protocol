@@ -1154,6 +1154,53 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     });
     return {cache,data,calls};
   }
+  async function recoveryRedis(sub) {
+    const available=spawnSync('docker',['version','--format','{{.Server.Os}}'],{
+      encoding:'utf8',stdio:['ignore','pipe','pipe'],windowsHide:true,timeout:10000
+    });
+    if(available.status!==0||available.stdout.trim()!=='linux'){
+      assert.ok(!process.env.CI||process.platform!=='linux','Linux CI must run combined recovery with real Redis');
+      sub.skip('Disposable Redis requires a Linux Docker server; no Redis connection attempted');
+      return null;
+    }
+    const docker=(...args)=>execFileSync('docker',args,{
+      encoding:'utf8',stdio:['ignore','pipe','pipe'],windowsHide:true,timeout:30000
+    }).trim();
+    const container=`artsoul-combined-cache-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+    const clients=[],details={image:'redis:7.4-alpine',loopbackOnly:true,containerRemoved:false};
+    let creationAttempted=false;
+    sub.after(()=>{
+      for(const client of clients)client.disconnect();
+      if(creationAttempted){
+        try{docker('rm','-f',container);}
+        catch(error){if(!/No such container/i.test(String(error.stderr)))throw error;}
+        details.containerRemoved=true;
+      }
+    });
+    creationAttempted=true;
+    docker('run','-d','--name',container,'-p','127.0.0.1::6379',
+      details.image,'redis-server','--save','','--appendonly','no');
+    const endpoint=docker('port',container,'6379/tcp');
+    assert.match(endpoint,/^127\.0\.0\.1:\d+$/);
+    for(let attempt=0;;attempt++){
+      try{assert.equal(docker('exec',container,'redis-cli','PING'),'PONG');break;}
+      catch(error){if(attempt>=30)throw error;await new Promise(resolve=>setTimeout(resolve,100));}
+    }
+    const Redis=require('ioredis');
+    const connect=async options=>{
+      const client=new Redis({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),
+        lazyConnect:true,enableOfflineQueue:false,retryStrategy:null,maxRetriesPerRequest:1,
+        connectTimeout:2000,commandTimeout:3000,...options});
+      clients.push(client);client.on('error',()=>{});
+      await client.connect();assert.equal(await client.ping(),'PONG');return client;
+    };
+    const reader=await connect();
+    details.version=(await reader.info('server')).match(/^redis_version:(.+)$/m)[1].trim();
+    await reader.acl('SETUSER','fixture-purger','reset','on','nopass','~artsoul:*','+@all','-del');
+    const purger=await connect({username:'fixture-purger',password:''});
+    assert.notEqual(await reader.call('CLIENT','ID'),await purger.call('CLIENT','ID'));
+    return {reader,purger,details,allowDeletion:()=>reader.acl('SETUSER','fixture-purger','+del')};
+  }
   await t.test('a new worker drains the committed cache obligation after actual process exit',async()=>{
     await apply(target,'BidPlaced',112,{auctionId:1,bidder:WINNER,bidAmount:2500,depositAmount:10000});
     const {cache,calls}=await recoveryCache(),cacheKey=cache.keys.auction(CHAIN+':artwork:1');
@@ -2146,9 +2193,14 @@ const {pathToFileURL}=require('node:url');
     assert.deepEqual(recovered.outbox,committed.outbox);
     assert.deepEqual(recovered.chain.contract_events,committed.chain.contract_events);
   });
-  await t.test('coordinated poll/cache acceptance preserves one publication through purge retries and delayed refill',async sub=>{
+  for(const realRedis of [false,true])await t.test(
+    `coordinated poll/cache acceptance preserves one publication through purge retries and delayed refill${realRedis?' with real Redis':''}`,async sub=>{
+    const redisFixture=realRedis?await recoveryRedis(sub):null;
+    if(realRedis&&!redisFixture)return;
     const f=await coordinatedFixture(sub,coordinatedEvents());f.addTransfer();
     const {cache,data}=await recoveryCache();
+    const purger=realRedis?new cache.constructor():cache;
+    const hasCached=async key=>realRedis?Boolean(await redisFixture.reader.exists(key)):data.has(key);
     const phases=[],bytes=value=>Buffer.byteLength(JSON.stringify(value,(_,item)=>typeof item==='bigint'?item.toString():item));
     let phase=null,now=Date.now(),head=132,failDeletion=true,refills=0;
     const startedAt=now,entered=deferred(),release=deferred();
@@ -2197,14 +2249,27 @@ const {pathToFileURL}=require('node:url');
     sub.mock.method(runner,'_publishCoordinatedRange',async(...args)=>{
       if(phase)phase.publications++;return originalPublish(...args);
     });
-    const redis=await cache.getRedis(),transport={};
-    for(const name of ['get','set','scan','del','eval'])transport[name]=async(...args)=>{
+    const transport=redis=>Object.fromEntries(['get','set','scan','del','eval'].map(name=>[name,async(...args)=>{
       if(phase)phase.cacheCommands[name]=(phase.cacheCommands[name]||0)+1;
-      if(name==='del'&&failDeletion)throw new Error('fixture cache deletion unavailable');
-      return redis[name](...args);
-    };
-    sub.mock.method(cache,'getRedis',async()=>transport);
-    target.fixtureCachePurgeHook=options=>cache.purge(options);
+      if(!realRedis&&name==='del'&&failDeletion)throw new Error('fixture cache deletion unavailable');
+      try{
+        const result=await redis[name](...args);
+        if(phase&&name==='eval')phase.cacheEvalResults.push(result);
+        return result;
+      }catch(error){
+        if(phase&&realRedis)phase.cacheErrors.push({command:name,code:error.message.split(' ')[0]});
+        throw error;
+      }
+    }]));
+    if(realRedis){
+      const readTransport=transport(redisFixture.reader),purgeTransport=transport(redisFixture.purger);
+      sub.mock.method(cache,'getRedis',async()=>readTransport);
+      sub.mock.method(purger,'getRedis',async()=>purgeTransport);
+    }else{
+      const mapTransport=transport(await cache.getRedis());
+      sub.mock.method(cache,'getRedis',async()=>mapTransport);
+    }
+    target.fixtureCachePurgeHook=options=>purger.purge(options);
     const key=cache.keys.auction(`${CHAIN}:combined-poll`),oldKey=cache.keys.stats('combined-poll-old');
     await cache.set(oldKey,{indexedThrough:115},3600);
     const fetchSnapshot=async()=>{
@@ -2218,7 +2283,8 @@ const {pathToFileURL}=require('node:url');
     const measure=async(name,elapsed,operation=()=>runner._runConfirmationPoll())=>{
       now=startedAt+elapsed;
       phase={name,elapsedMs:elapsed,headReads:0,publications:0,sqlCalls:0,sqlRowsJsonBytes:0,digestCalls:0,
-        nftRpc:{},nftRpcJsonBytes:0,coreListenerReads:{},coreListenerJsonBytes:0,cacheCommands:{}};
+        nftRpc:{},nftRpcJsonBytes:0,coreListenerReads:{},coreListenerJsonBytes:0,cacheCommands:{},
+        cacheEvalResults:[],cacheErrors:[]};
       const recorded=phase;phases.push(recorded);
       try{await operation();}finally{phase=null;}
       return recorded;
@@ -2227,6 +2293,7 @@ const {pathToFileURL}=require('node:url');
     assert.equal(initial.publications,1);assert.equal(initial.digestCalls,1);
     assert.equal(initial.nftRpc.eth_getLogs,1);assert.equal(initial.coreListenerReads.queryAllHistoricalEvents,1);
     assert.equal(initial.cacheCommands.scan,1);assert.equal(initial.cacheCommands.del,1);
+    if(realRedis)assert.deepEqual(initial.cacheErrors,[{command:'del',code:'NOPERM'}]);
     assert.equal((await target.getIndexerState()).last_indexed_block,117);
     assert.equal((await coverageRows(CHAIN))[0].covered_through,'117');
     assert.ok(await recoveryToken());assert.deepEqual(await f.boundary(),[]);
@@ -2236,21 +2303,26 @@ const {pathToFileURL}=require('node:url');
     const retry=await measure('purge-retry-fails',2000);
     assert.equal(retry.publications,0);assert.equal(retry.headReads,0);assert.deepEqual(retry.nftRpc,{});
     assert.equal(retry.digestCalls,0);assert.equal(retry.cacheCommands.del,1);
+    if(realRedis)assert.deepEqual(retry.cacheErrors,[{command:'del',code:'NOPERM'}]);
     assert.equal(await recoveryToken(),token);assert.deepEqual(await f.boundary(),[]);
     assert.deepEqual(await writerSnapshot(),committed);
     failDeletion=false;
+    if(realRedis)await redisFixture.allowDeletion();
     const recovered=await measure('purge-recovers',4000);
     assert.equal(recovered.publications,0);assert.equal(recovered.headReads,0);assert.deepEqual(recovered.nftRpc,{});
     assert.equal(recovered.digestCalls,0);assert.equal(recovered.cacheCommands.scan,1);
     assert.equal(await recoveryToken(),null);assert.equal((await f.boundary())[0].indexed_through,'117');
-    assert.equal(data.has(oldKey),false);
-    await measure('delayed-refill-and-cache-hit',4000,async()=>{
+    assert.deepEqual(recovered.cacheErrors,[]);assert.equal(await hasCached(oldKey),false);
+    const refill=await measure('delayed-refill-and-cache-hit',4000,async()=>{
       release.resolve();assert.deepEqual(await pending,{indexedThrough:117});assert.equal(refills,2);
-      assert.equal(data.has(key),false,'a delayed old publication cannot refill the cache');
+      assert.equal(await hasCached(key),false,'a delayed old publication cannot refill the cache');
       assert.deepEqual(await cache.remember(key,3600,fetchSnapshot),{indexedThrough:117});
       assert.equal(refills,3);
       assert.deepEqual(await cache.remember(key,3600,()=>assert.fail('expected the current cached publication')),{indexedThrough:117});
     });
+    assert.deepEqual(refill.cacheEvalResults,[0,1],'the old generation is rejected and the current generation is stored');
+    assert.deepEqual(refill.cacheErrors,[]);
+    if(realRedis)assert.deepEqual(JSON.parse(await redisFixture.reader.get(key)),{indexedThrough:117});
     const afterRecovery=await writerSnapshot();
     assert.deepEqual(afterRecovery.outbox,committed.outbox);
     for(const table of tables.filter(name=>name!=='indexer_state'))
@@ -2276,8 +2348,9 @@ const {pathToFileURL}=require('node:url');
     assert.deepEqual(final.chain.event_processing_registry,committed.chain.event_processing_registry);
     assert.deepEqual(final.chain.v41_artworks,committed.chain.v41_artworks);
     assert.deepEqual(final.chain.v41_auctions,committed.chain.v41_auctions);
-    evidence.results.push({scenario:'coordinated_poll_cache',phases,cacheFetches:refills,
-      limitations:'Synthetic chain/cache transport; SQL row JSON bytes exclude protocol overhead. Auxiliary resale/search refreshes are stubbed. Not production latency, billed egress or Redis atomicity evidence.'});
+    evidence.results.push({scenario:realRedis?'coordinated_poll_real_redis':'coordinated_poll_cache',
+      phases,cacheFetches:refills,...(realRedis?{redis:redisFixture.details}:{}),
+      limitations:`Synthetic chain${realRedis?'':'/cache'} transport; SQL row JSON bytes exclude protocol overhead. Auxiliary resale/search refreshes are stubbed. Not production latency, billed egress${realRedis?' or hosted Redis acceptance':' or Redis atomicity evidence'}.`});
   });
   await t.test('coordinated auxiliary refresh and due reorg reject stale metadata through cache recovery',async sub=>{
     const {reconcileResaleState,readResaleStateAtBlock}=await import('../src/indexer/resale-state-reconciliation.js');

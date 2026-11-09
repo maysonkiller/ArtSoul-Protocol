@@ -58,3 +58,20 @@ both purchases, without bypassing the production wallet guard.
 The existing local receipt bridge expires after two minutes. If receipt decoding
 is unavailable, indexed refresh remains the fallback. Neither condition changes
 the confirmed receipt result or authorizes a repeated transaction.
+
+## Released verification
+
+[PR #475](https://github.com/maysonkiller/ArtSoul-Protocol/pull/475) merged as
+`084bb003bf4bf805c883cc05c87e66cd434dffeb`. The reviewed head was
+`0aa8190dc0763b2fe8bf21d64ff475b503ef943a`.
+[CI run 42647218859](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42647218859)
+passed Linux (4,179 pass, 2 skip), Windows (3,480 pass, 35 skip), 55 contract
+tests per platform, static checks and both production builds. Skips are retained
+as skips rather than converted to acceptance.
+
+Production deployment `dpl_HgRGf1p5Efo87vkpmPPDzZzQUg5y` became READY and received
+the normal-domain aliases. Five production routes returned HTTP 200; adapter
+version 18 and the built artwork entry matched the locally verified content
+hashes. The private preview/production probe receipts retain those comparisons.
+This closes release verification for this correction, not the independent
+native-device or remaining signed-journey gates above.

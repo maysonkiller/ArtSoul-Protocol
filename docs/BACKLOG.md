@@ -189,6 +189,30 @@ change; evidence is in the stabilization checkpoint.
 
 ## Phase B - Public Beta
 
+**November 9 B30/B35 update:** this dated status supersedes the then-open
+attribution, recovery and Core-worker activation statements in the historical
+B-30/B-35 rows and follow-ups below. Both items remain `in progress`.
+
+B30: a five-minute trace captured six files from Supabase's managed
+`postgres_exporter`, totaling 20,277,852 bytes and exactly matching the window's
+database-counter increase. Each of the two exact logged SELECTs reproduced
+413 temporary blocks read/written with transaction-local `work_mem=3500kB`,
+and zero with `16MB`. The diagnostic logging override was removed; no global
+memory or paid change was made. Attribution is complete for this window;
+a provider-owned, collector-only correction and its verification remain pending.
+This does not attribute every historical temporary byte or establish billed
+egress/capacity. See [the trace and reproduction](audits/B30_EXPORTER_TEMP_FILES_2026-11-09.md).
+
+B35: [independent recovery and Core-only cutover](audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md)
+are complete on the existing host. The [combined polling follow-up](audits/B35_COMBINED_POLL_CACHE_ACCEPTANCE_2026-11-02.md#november-9-follow-up-actual-redis-in-the-combined-scenario)
+now passes with PostgreSQL 18.4 and actual Redis 7.4.12: three selected tests,
+zero failures/skips. Real deletion denial preserves the committed range;
+a later poll acknowledges the recovery token without replay, and the Lua
+generation check rejects a delayed stale refill. This closes the local combined
+transport gap. The NFT writer and ownership API flags remain off; hosted-cache
+activation and representative IO/egress/capacity remain open. No new service,
+dependency, production flag or paid capacity was enabled by this test.
+
 | ID | Item | Why/source | Status | Phase | Notes |
 | --- | --- | --- | --- | --- | --- |
 | B-01 | Recruit and support a controlled tester cohort | Canon [B1](canon/12_IMPLEMENTATION_BACKLOG.md); [`17_ROADMAP_PHASES.md`](canon/17_ROADMAP_PHASES.md) | planned | B | Track artists and collectors through GitHub Issues rather than private chat-only notes. **Tracking shape decided 2026-09-14** in [`B4_BETA_DEFECT_TRIAGE.md`](runbooks/B4_BETA_DEFECT_TRIAGE.md) §Cohort tracking: track the journeys, not the people. A public issue naming who is testing, on what device, with which wallet, is a durable public record of a private individual and no beta needs one; an issue per journey carries everything triage uses, and identity stays in the invitation channel. Asserted by test - no intake form may collect a name, email or handle. Recruitment itself stays founder-owned, along with creating the four suggested labels. |
