@@ -115,6 +115,9 @@ Goal: validate the product with real users without changing frozen economics.
   The November 9 [confirmed purchase fix](../audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
   prevents optional read failures from misreporting confirmed settlement/resale
   transactions and uses the receipt bridge to suppress stale purchase actions.
+  Its follow-up synchronizes confirmed end/default auction state without waiting
+  for API refresh, preserving indexed ownership/floor and receipt scope. Delayed
+  refresh and late-poll regressions pass; actual signed journeys remain separate.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.
