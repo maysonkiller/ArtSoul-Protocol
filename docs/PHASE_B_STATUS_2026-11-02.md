@@ -60,6 +60,12 @@ API refresh stalls or fails. The 81-test focused suite includes late polling
 and unrelated receipt controls; release evidence belongs to the same audit.
 This does not substitute for the remaining real-wallet journeys below.
 
+The owner then completed expired settlement for artwork 25 on-chain, exposing
+an unsigned relayed-transaction lookup from the wallet that stranded ethers
+before receipt reconciliation. The [relay confirmation correction](audits/B11_RELAYED_WALLET_CONFIRMATION_2026-11-09.md)
+recovers the exact approved call from canonical Base Sepolia data. That receipt
+is preserved; release and subsequent live UI acceptance remain distinct.
+
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.
 It reuses provenance without extra requests and distinguishes sale evidence

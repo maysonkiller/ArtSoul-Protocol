@@ -118,6 +118,11 @@ Goal: validate the product with real users without changing frozen economics.
   Its follow-up synchronizes confirmed end/default auction state without waiting
   for API refresh, preserving indexed ownership/floor and receipt scope. Delayed
   refresh and late-poll regressions pass; actual signed journeys remain separate.
+  Owner acceptance then confirmed artwork 25 default on-chain but found an
+  unsigned wallet relay response blocking the send promise. The
+  [relay confirmation follow-up](../audits/B11_RELAYED_WALLET_CONFIRMATION_2026-11-09.md)
+  validates the original call before recovering its canonical transaction;
+  no successful transaction is replayed to repair UI state.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.
