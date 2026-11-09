@@ -58,7 +58,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=83/);
+    assert.match(html, /unified-styles\.css\?v=84/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -89,7 +89,7 @@ test('header keeps a top-right avatar button during wallet initialization', () =
     assert.match(html, /data-avatar-render-key="initializing"/);
     assert.match(html, /class="avatar-button"/);
     assert.match(html, /src="\/default-avatar\.png"/);
-    assert.match(html, /data-avatar-name>ArtSoul Guest<\/div>/);
+    assert.match(html, /data-avatar-name[^>]*>ArtSoul Guest<\/button>/);
     // Logo and right-aligned controls share a stable two-column header.
     assert.match(styles, /\.site-header-row \{[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\);/);
     assert.match(styles, /\.site-header-actions \{[\s\S]*?justify-content: flex-end;/);

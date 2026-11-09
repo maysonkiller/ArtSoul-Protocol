@@ -3232,22 +3232,61 @@ body.future .resale-modal {
 .artwork-page-header:has(.saved-button-detail:not([hidden])) h1 { min-width: 0; flex: 1; }
 .saved-list { padding: 24px; border: 1px solid var(--c-border-soft); border-radius: 12px; color: var(--c-text); background: var(--c-surface); }
 .saved-list h3 { font-weight: 700; font-size: 20px; }
-.wallet-nfts { margin-top: 1.5rem; padding-block: 1.25rem; border-top: 1px solid var(--c-border-soft); color: var(--c-text); }
+.wallet-nfts { padding-block: 1.25rem; color: var(--c-text); }
 .wallet-nfts h3 { font-size: 1.25rem; font-weight: 700; }
 .wallet-nfts > p { margin-block: 0.6rem; }
 .wallet-nfts-note { color: var(--c-text-muted); font-size: 0.875rem; }
 .wallet-nfts-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-block: 1rem; }
-.wallet-nfts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 1rem; align-items: start; }
+.wallet-nfts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 1rem; align-items: stretch; touch-action: pan-y pinch-zoom; }
 .wallet-nft-card { min-width: 0; overflow: hidden; border: 1px solid var(--c-border-soft); border-radius: 1rem; background: var(--c-surface); }
 .wallet-nft-image { position: relative; aspect-ratio: 1; display: grid; place-items: center; background: var(--c-bg); }
 .wallet-nft-image img { position: absolute; width: 100%; height: 100%; object-fit: contain; }
 .wallet-nft-body { padding: 1rem; overflow-wrap: anywhere; }
 .wallet-nft-body h4 { font-weight: 700; }
 .wallet-nft-body > p { margin-block: 0.35rem; font-size: 0.875rem; }
-.wallet-nft-body summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--c-accent); }
-.wallet-nft-body dl { font-size: 0.875rem; }
-.wallet-nft-body dt { color: var(--c-text-muted); margin-top: 0.5rem; }
-.wallet-nft-body a { display: inline-flex; align-items: center; min-height: 44px; color: var(--c-accent); }
+.wallet-nfts-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.5rem; }
+.wallet-nfts-heading p { color: var(--c-text-muted); font-size: 0.875rem; margin-top: 0.25rem; }
+.wallet-nfts-network { border: 1px solid var(--c-border-soft); border-radius: 2rem; padding: 0.4rem 0.75rem; font-size: 0.8125rem; }
+.wallet-nfts-actions > button { min-height: 44px; padding: 0.5rem 0.875rem; }
+.wallet-nfts-actions > span { min-width: 5rem; text-align: center; font-size: 0.875rem; }
+.wallet-nfts-first { margin-left: auto; }
+.wallet-nft-card { display: flex; flex-direction: column; }
+.wallet-nft-body { display: flex; flex: 1; flex-direction: column; gap: 0.4rem; }
+.wallet-nft-body h4, .wallet-nft-body > .wallet-nft-collection { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.4; min-height: 2.8em; }
+.wallet-nft-body > p { margin: 0; }
+.wallet-nft-body > button { width: 100%; min-height: 44px; margin-top: auto; padding: 0.5rem 0.75rem; }
+.wallet-nft-dialog { width: min(800px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); margin: auto; padding: 1.25rem; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--c-border); border-radius: 1.25rem; background: var(--c-surface); color: var(--c-text); }
+.wallet-nft-dialog::backdrop { background: var(--c-modal-backdrop); }
+html:has(.wallet-nft-dialog[open]) { overflow: hidden; scrollbar-gutter: stable; }
+.wallet-nft-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.wallet-nft-dialog-heading > div { min-width: 0; }
+.wallet-nft-dialog-heading h2 { font-size: 1.25rem; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }
+.wallet-nft-dialog-heading > button { min-height: 44px; flex: 0 0 auto; padding: 0.5rem 0.75rem; }
+.wallet-nft-detail-layout { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr); align-items: start; gap: 1.25rem; }
+.wallet-nft-detail-layout > .wallet-nft-image { border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--c-border-soft); }
+.wallet-nft-detail-info { min-width: 0; overflow-wrap: anywhere; }
+.wallet-nft-detail-info h3 { font-size: 0.875rem; font-weight: 700; margin-block: 1rem 0.5rem; }
+.wallet-nft-value-panel { padding: 0.875rem; margin-block: 0.75rem 1rem; background: var(--c-surface-strong); border: 1px solid var(--c-border-soft); border-radius: 0.75rem; }
+.wallet-nft-value-panel dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.4rem 0.75rem; font-size: 0.875rem; }
+.wallet-nft-value-panel dt, .wallet-nft-identifiers dt, .wallet-nft-traits dt { color: var(--c-text-muted); }
+.wallet-nft-value-panel > .wallet-nfts-note { font-size: 0.75rem; line-height: 1.5; margin-top: 0.6rem; }
+.wallet-nft-quote { display: flex; flex-direction: column; gap: 0.3rem; padding-top: 0.75rem; margin-top: 0.75rem; border-top: 1px solid var(--c-border-soft); }
+.wallet-nft-quote > span, .wallet-nft-quote > small { font-size: 0.75rem; color: var(--c-text-muted); }
+.wallet-nft-quote strong { font-size: 1.125rem; }
+.wallet-nft-identifiers { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.5rem 1rem; font-size: 0.8125rem; }
+.wallet-nft-traits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; font-size: 0.8125rem; }
+.wallet-nft-traits > div { padding: 0.5rem; border: 1px solid var(--c-border-soft); border-radius: 0.5rem; }
+.wallet-nft-detail-info > a { display: inline-flex; align-items: center; min-height: 44px; color: var(--c-accent); margin-top: 0.75rem; }
+@media (max-width: 540px) {
+    .wallet-nfts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.625rem; }
+    .wallet-nft-body { padding: 0.625rem; font-size: 0.875rem; }
+    .wallet-nft-body > p, .wallet-nft-body > button { font-size: 0.75rem; }
+    .wallet-nft-dialog { padding: 1rem; }
+    .wallet-nft-detail-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .wallet-nft-detail-layout > .wallet-nft-image { width: min(100%, 200px); justify-self: center; }
+    .wallet-nfts-actions { gap: 0.5rem; }
+    .wallet-nfts-actions > button { font-size: 0.8125rem; }
+}
 .saved-explanation { margin: 8px 0 20px; color: var(--c-text-muted); }
 .saved-unavailable { padding: 16px; border: 1px solid var(--c-border-soft); border-radius: 8px; }
 .saved-feedback { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; width: max-content; max-width: calc(100vw - 32px); padding: 12px 16px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface); color: var(--c-text); }
@@ -7514,6 +7553,11 @@ body:is(.classic, .future) .profile-section-tabs > .profile-content-tab {
 }
 body:is(.classic, .future) .profile-section-tabs > .profile-content-tab[aria-pressed="true"] { border-bottom-color: var(--c-accent); }
 body:is(.classic, .future) .profile-content-tab:focus-visible { outline-offset: -2px; }
+body:is(.classic, .future) .profile-section-tabs[data-wallet-nfts="true"] > .profile-content-tab {
+    flex: 0 0 auto;
+    min-width: max-content;
+    padding-inline: 0.625rem !important;
+}
 body:is(.classic, .future) .profile-gallery-panel,
 body:is(.classic, .future) .profile-collection-panel > .saved-list { padding: 1.25rem 0 !important; }
 body:is(.classic, .future) .profile-gallery-panel > .flex:first-child { margin-bottom: 1rem !important; }
@@ -9384,36 +9428,156 @@ body:is(.classic, .future) .site-header .site-header-actions .artsoul-voice-butt
    Presentation only: live wallet/network authorization and card lifecycle
    status continue to come from the original JavaScript resolvers. */
 
-/* Restore the pre-circle account capsule. Icon-only header tools remain 44px
-   circles with their existing hover states; this is a separate control. */
+/* Account option A: identity actions and the menu are sibling buttons.
+   The popup follows the plaque width; mobile keeps identity inside the popup. */
+body:is(.classic, .future) .site-header #navButtons .avatar-plaque {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    align-items: center;
+    width: 184px;
+    flex-shrink: 0;
+    padding: 2px 4px 2px 10px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 16px;
+    background: var(--c-surface);
+    box-sizing: border-box;
+}
+body:is(.classic, .future) .site-header .site-header-actions #navButtons .avatar-button {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    border: 0 !important;
+    background: transparent !important;
+    display: grid !important;
+    justify-items: center;
+    align-content: center;
+    padding: 2px !important;
+    gap: 1px !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-button [data-avatar-image] {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-button .dropdown-arrow {
+    display: block !important;
+    width: 8px !important;
+    flex: 0 0 8px !important;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-info {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch !important;
+    text-align: left !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 48px !important;
+    flex: none !important;
+    gap: 0 !important;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-info button {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 24px;
+    height: 24px;
+    padding: 2px 17px 2px 3px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--c-text);
+    font: inherit;
+    font-size: 12px !important;
+    line-height: 20px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: none;
+    transform: none;
+    clip-path: none;
+}
+body:is(.classic, .future) .site-header #navButtons [data-avatar-name] { font-weight: 700; }
+body:is(.classic, .future) .site-header #navButtons .avatar-info [data-avatar-address] {
+    font-family: ui-monospace, monospace;
+    font-size: 11px !important;
+    border-top: 1px solid var(--c-border-soft);
+    color: var(--c-muted);
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-info button:disabled { opacity: 1; cursor: default; }
+body:is(.classic, .future) .site-header #navButtons .avatar-info button[hidden] { display: none !important; }
+body:is(.classic, .future) .site-header #navButtons .avatar-info button:not(:disabled):is(:hover, :focus-visible),
+body:is(.classic, .future) .site-header #navButtons .avatar-button:is(:hover, :focus-visible, [aria-expanded="true"]) {
+    background: var(--c-surface-strong) !important;
+    outline: 1px solid var(--c-accent);
+    outline-offset: -1px;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-info button:not(:disabled)::after {
+    content: '';
+    position: absolute;
+    right: 4px;
+    top: 8px;
+    width: 7px;
+    height: 8px;
+    border: 1px solid currentColor;
+    border-radius: 1px;
+    box-shadow: -2px -2px 0 -1px var(--c-surface), -2px -2px 0 0 currentColor;
+    opacity: .55;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-info button:is(:hover, :focus-visible)::after { opacity: 1; }
+body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-menu {
+    width: 184px !important;
+    min-width: 184px !important;
+    max-width: calc(100vw - 24px) !important;
+    padding: 8px !important;
+    right: 0 !important;
+    border-radius: 16px !important;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-wallet-section { margin: 0; padding: 0; border: 0; }
+body:is(.classic, .future) .site-header #navButtons .network-current-row,
+body:is(.classic, .future) .site-header #navButtons .network-switcher-btn {
+    padding: 8px 4px !important;
+    min-height: 48px;
+    gap: 8px;
+    text-align: left;
+}
+body:is(.classic, .future) .site-header #navButtons .network-name { font-size: 12px; line-height: 1.5; }
+body:is(.classic, .future) .site-header #navButtons .network-balance { font-size: 11px; line-height: 1.5; }
+body:is(.classic, .future) .site-header #navButtons .avatar-account-action { margin: 4px 0 0; padding-top: 4px; }
+body:is(.classic, .future) .site-header #navButtons .avatar-account-action button {
+    min-height: 36px; padding: 7px 8px; font-size: 12px; text-align: center;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-copy-status:not([hidden]) {
+    position: absolute; right: 0; top: calc(100% + 5px); z-index: 3;
+    padding: 6px 10px; border: 1px solid var(--c-border-soft); border-radius: 8px;
+    background: var(--c-surface); color: var(--c-text); font-size: 12px; white-space: nowrap;
+}
 @media (min-width: 769px) {
-    body:is(.classic, .future) .site-header .site-header-actions #navButtons .avatar-button {
-        width: 180px !important;
-        min-width: 180px !important;
-        max-width: 180px !important;
-        border-radius: 13px !important;
-        border: 1px solid var(--c-border-soft) !important;
-        background: var(--c-surface) !important;
-        box-shadow: none !important;
-        justify-content: flex-start !important;
-        gap: 6px !important;
-        padding: 5px 9px 5px 6px !important;
-        text-align: left !important;
+    body:is(.classic, .future) .site-header .site-header-actions #navButtons,
+    body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-container {
+        width: 184px !important; min-width: 184px !important; max-width: 184px !important; flex: 0 0 184px !important;
     }
-    body:is(.classic, .future) .site-header .site-header-actions #navButtons .avatar-button:is(:hover, :focus-visible, [aria-expanded="true"]) {
-        border-color: var(--c-accent) !important;
-        background: var(--c-surface-strong) !important;
-        box-shadow: 0 0 0 1px var(--c-glow) !important;
+}
+@media (max-width: 768px) {
+    body:is(.classic, .future) .site-header #navButtons .avatar-plaque {
+        display: block; width: 44px; padding: 0; border-radius: 50%;
     }
-    body:is(.classic, .future) .site-header #navButtons .avatar-info {
-        text-align: left !important;
-        align-items: flex-start !important;
-        min-width: 0 !important;
-        flex: 1 1 0 !important;
+    body:is(.classic, .future) .site-header #navButtons .avatar-button { border-radius: 50% !important; }
+    body:is(.classic, .future) .site-header #navButtons .avatar-button .dropdown-arrow { display: none !important; }
+    body:is(.classic, .future) .site-header #navButtons .avatar-info { display: none !important; }
+    body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-container:has(.avatar-button[aria-expanded="true"]) .avatar-info {
+        display: flex !important; position: absolute; top: calc(100% + 18px); right: 8px;
+        width: 168px !important; height: 64px !important; z-index: 10003;
     }
-    body:is(.classic, .future) .site-header #navButtons .avatar-button .dropdown-arrow {
-        flex: 0 0 10px !important;
-    }
+    body:is(.classic, .future) .site-header #navButtons .avatar-info button { min-height: 32px; height: 32px; line-height: 28px; }
+    body:is(.classic, .future) .site-header #navButtons .avatar-info button::after { top: 12px !important; }
+    body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-menu { padding-top: 78px !important; }
+    body:is(.classic, .future) .site-header #navButtons .avatar-copy-status:not([hidden]) { top: calc(100% + 80px); }
 }
 body:is(.classic, .future) .site-header #navButtons :is([data-avatar-name], [data-avatar-address]) {
     animation: none !important;

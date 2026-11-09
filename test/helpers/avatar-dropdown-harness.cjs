@@ -67,6 +67,7 @@ function parseFragment(html, parent, harness) {
       if (name === 'class') element.className = value;
       else if (name === 'id') element.id = value;
       else if (name === 'hidden') element.hidden = true;
+      else if (name === 'disabled') element.disabled = true;
       else if (name.startsWith('data-')) {
         const key = name.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase());
         element.dataset[key] = value;
@@ -159,8 +160,10 @@ class FakeElement {
 
   get src() { return this._src; }
 
-  appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
-  prepend(child) { child.parentNode = this; this.children.unshift(child); return child; }
+  appendChild(child) { child.parentNode?.removeChild(child); child.parentNode = this; this.children.push(child); return child; }
+  prepend(child) { child.parentNode?.removeChild(child); child.parentNode = this; this.children.unshift(child); return child; }
+  removeChild(child) { this.children = this.children.filter(node => node !== child); child.parentNode = null; return child; }
+  replaceChild(next, previous) { const index = this.children.indexOf(previous); next.parentNode?.removeChild(next); this.children[index] = next; next.parentNode = this; previous.parentNode = null; return previous; }
 
   setAttribute(name, value) {
     this.attributes[name] = String(value);

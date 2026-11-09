@@ -18,7 +18,6 @@
     </script>
     <title>Profile - ArtSoul</title>
     <meta name="description" content="View and manage an ArtSoul creator or collector profile after wallet connection.">
-    <link rel="canonical" href="https://artsoulprotocol.com/profile">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="ArtSoul">
     <meta property="og:title" content="ArtSoul — Artist & Collector Profiles">
@@ -29,6 +28,20 @@
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:alt" content="ArtSoul wordmark beside a cyan and violet glass sculpture on a dark background.">
     <meta property="og:url" content="https://artsoulprotocol.com/profile">
+    <script data-profile-canonical>
+        // Each public author has a distinct page. Set one canonical before
+        // hydration, without consulting the visitor's wallet or private data.
+        (function () {
+            var address = new URLSearchParams(window.location.search).get('address') || '';
+            var url = 'https://artsoulprotocol.com/profile';
+            if (/^0x[a-f0-9]{40}$/i.test(address)) url += '?address=' + address.toLowerCase();
+            var canonical = document.createElement('link');
+            canonical.rel = 'canonical';
+            canonical.href = url;
+            document.head.appendChild(canonical);
+            document.querySelector('meta[property="og:url"]').content = url;
+        })();
+    </script>
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="ArtSoul — Artist & Collector Profiles">
     <meta name="twitter:description" content="Explore an artist or collector profile, their artworks, auctions, and collected pieces on ArtSoul.">
@@ -37,9 +50,9 @@
     <link rel="icon" type="image/jpeg" href="/favicon.jpg?v=3">
     <link rel="shortcut icon" type="image/jpeg" href="/favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
-    <script src="/header-prepaint.js?v=10"></script>
+    <script src="/header-prepaint.js?v=11"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
-    <link rel="stylesheet" href="/unified-styles.css?v=83">
+    <link rel="stylesheet" href="/unified-styles.css?v=84">
     <link rel="stylesheet" href="/button-effects.css?v=6">
     <link rel="stylesheet" href="/mobile-responsive.css?v=5">
     <link rel="stylesheet" href="/performance-optimizations.css?v=2">
@@ -104,7 +117,7 @@
         }
     </style>
     <script src="/data-prefetch.js?v=6" async></script>
-    <script src="/avatar-dropdown.js?v=65" defer></script>
+    <script src="/avatar-dropdown.js?v=66" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <!-- Agent tools (WebMCP). Registers nothing in a browser without the API. -->
@@ -254,11 +267,14 @@
                     </button>
                     <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
                         <div class="avatar-dropdown-container">
-                            <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
-                                <img data-avatar-image src="/default-avatar.png" alt="ArtSoul" loading="eager" decoding="sync">
-                                <div class="avatar-info"><div data-avatar-name>ArtSoul Guest</div><div data-avatar-address hidden aria-hidden="true"></div><div data-avatar-resolving aria-hidden="true">Connecting…</div></div>
-                                <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg>
-                            </button>
+                            <div class="avatar-plaque" role="group" aria-label="ArtSoul account">
+                                <div class="avatar-info"><button type="button" data-avatar-name disabled data-allow-rapid onclick="window.AvatarDropdown?.copyHeaderIdentity(event)">ArtSoul Guest</button><button type="button" data-avatar-address hidden disabled aria-hidden="true" data-allow-rapid onclick="window.AvatarDropdown?.copyHeaderIdentity(event)"></button><div data-avatar-resolving aria-hidden="true">Connecting…</div></div>
+                                <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
+                                    <img data-avatar-image src="/default-avatar.png" alt="ArtSoul" loading="eager" decoding="sync">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg>
+                                </button>
+                            </div>
+                            <span data-avatar-copy-status class="avatar-copy-status" role="status" aria-live="polite" hidden></span>
                         </div>
                     </div>
                 </div>

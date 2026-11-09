@@ -225,12 +225,22 @@
                 navButtons.appendChild(dropdown);
             }
 
+            let plaque = dropdown.querySelector('.avatar-plaque');
+            if (!plaque) {
+                plaque = document.createElement('div');
+                plaque.className = 'avatar-plaque';
+                plaque.setAttribute('role', 'group');
+                plaque.setAttribute('aria-label', 'ArtSoul account');
+                dropdown.prepend(plaque);
+            }
+
             let button = dropdown.querySelector('.avatar-button');
             if (!button) {
                 button = document.createElement('button');
                 button.className = 'avatar-button';
-                dropdown.prepend(button);
+                plaque.appendChild(button);
             }
+            if (button.parentNode !== plaque) plaque.appendChild(button);
 
             button.type = 'button';
             button.dataset.allowRapid = '';
@@ -242,15 +252,43 @@
             if (!button.querySelector('[data-avatar-image]')) {
                 button.innerHTML = `
                     <img data-avatar-image src="/default-avatar.png" alt="ArtSoul" />
-                    <div class="avatar-info">
-                        <div data-avatar-name>ArtSoul Guest</div>
-                        <div data-avatar-address hidden aria-hidden="true"></div>
-                        <div data-avatar-resolving aria-hidden="true"></div>
-                    </div>
                     <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true">
                         <path d="M4 6l4 4 4-4"></path>
                     </svg>
                 `;
+            }
+
+            let info = dropdown.querySelector('.avatar-info');
+            if (!info) {
+                info = document.createElement('div');
+                info.className = 'avatar-info';
+                info.innerHTML = '<button type="button" data-avatar-name disabled>ArtSoul Guest</button><button type="button" data-avatar-address hidden disabled aria-hidden="true"></button><div data-avatar-resolving aria-hidden="true"></div>';
+            }
+            if (info.parentNode !== plaque) plaque.prepend(info);
+            for (const attribute of ['data-avatar-name', 'data-avatar-address']) {
+                let control = info.querySelector(`[${attribute}]`);
+                // Preserve the prepainted text when upgrading an older shell.
+                if (control && control.tagName.toLowerCase() !== 'button') {
+                    const replacement = document.createElement('button');
+                    replacement.setAttribute(attribute, '');
+                    replacement.textContent = control.textContent;
+                    replacement.hidden = control.hidden;
+                    replacement.disabled = true;
+                    info.replaceChild(replacement, control);
+                    control = replacement;
+                }
+                control.type = 'button';
+                control.dataset.allowRapid = '';
+                control.setAttribute('onclick', 'window.AvatarDropdown.copyHeaderIdentity(event)');
+            }
+            if (!dropdown.querySelector('[data-avatar-copy-status]')) {
+                const status = document.createElement('span');
+                status.className = 'avatar-copy-status';
+                status.setAttribute('data-avatar-copy-status', '');
+                status.setAttribute('role', 'status');
+                status.setAttribute('aria-live', 'polite');
+                status.hidden = true;
+                dropdown.appendChild(status);
             }
 
             // Static page shells already contain the account text. Add the
@@ -272,7 +310,7 @@
                 dropdown.appendChild(menu);
             }
 
-            return { navButtons, dropdown, button, menu };
+            return { navButtons, dropdown, plaque, button, menu };
         }
 
         /**
@@ -316,6 +354,7 @@
             // still advances, which is how a restored cached presentation is
             // promoted to a provider-confirmed one with zero repaint.
             if (button.dataset.avatarContentKey === contentKey) {
+                this.syncHeaderCopyControls(structure, { name: nextName, address: nextAddress, previewWallet });
                 if (uiState) this.commitVisibleState(uiState, { persist: persistUiState });
                 return structure;
             }
@@ -399,12 +438,12 @@
          * Write the whole snapshot to the DOM in one synchronous, guarded pass.
          * Returns false when a newer snapshot has already superseded this one.
          */
-        commitIdentitySnapshot({ button }, snapshot, token, failed) {
+        commitIdentitySnapshot(structure, snapshot, token, failed) {
             if (token !== this.identityCommitToken) return false;
-
+            const { button, dropdown } = structure;
             const image = button.querySelector('[data-avatar-image]');
-            const nameNode = button.querySelector('[data-avatar-name]');
-            const addressNode = button.querySelector('[data-avatar-address]');
+            const nameNode = dropdown.querySelector('[data-avatar-name]');
+            const addressNode = dropdown.querySelector('[data-avatar-address]');
             // A permanently broken avatar resolves to the canonical image, but it
             // is still committed TOGETHER with the connected name and address as
             // one final state. It never stays pending.
@@ -425,6 +464,7 @@
                 addressNode.textContent = snapshot.address;
                 addressNode.setAttribute('aria-hidden', snapshot.address ? 'false' : 'true');
             }
+            this.syncHeaderCopyControls(structure, snapshot);
             button.dataset.avatarContentKey = failed
                 ? `${snapshot.contentKey}|image-error`
                 : snapshot.contentKey;
@@ -439,7 +479,8 @@
          * Keep a complete, coherent state on screen while the snapshot's avatar
          * is being fetched and decoded. Never a half identity.
          */
-        holdIdentityWhilePending({ button }, snapshot) {
+        holdIdentityWhilePending(structure, snapshot) {
+            const { button, dropdown } = structure;
             const image = button.querySelector('[data-avatar-image]');
             const previousKey = button.dataset.avatarContentKey || '';
             const previousIsCoherent = previousKey
@@ -452,8 +493,8 @@
             // Otherwise there is no safe previous identity: a fresh document, or
             // a different wallet. Show the complete resolving state rather than
             // any part of the new one.
-            const nameNode = button.querySelector('[data-avatar-name]');
-            const addressNode = button.querySelector('[data-avatar-address]');
+            const nameNode = dropdown.querySelector('[data-avatar-name]');
+            const addressNode = dropdown.querySelector('[data-avatar-address]');
             if (image) {
                 if (image.getAttribute('src') !== NEUTRAL_AVATAR_PAINT) image.src = NEUTRAL_AVATAR_PAINT;
                 image.alt = 'ArtSoul';
@@ -465,6 +506,7 @@
                 addressNode.textContent = snapshot.address;
                 addressNode.setAttribute('aria-hidden', snapshot.address ? 'false' : 'true');
             }
+            this.syncHeaderCopyControls(structure, {});
             button.dataset.avatarContentKey = `${snapshot.contentKey}|pending`;
             this.commitVisibleState('resolving', { persist: false });
         }
@@ -556,6 +598,12 @@
             };
             document.addEventListener('click', this.closeHandler);
             document.addEventListener('touchstart', this.closeHandler, { passive: true });
+            document.addEventListener('keydown', event => {
+                if (event.key !== 'Escape' || !this.isOpen) return;
+                event.preventDefault();
+                this.close();
+                this.getNavContainer()?.querySelector('.avatar-button')?.focus();
+            });
         }
 
         getNavigationLabels() {
@@ -1457,11 +1505,15 @@
             const container = this.getNavContainer();
             const buttonSlot = container?.querySelector('[data-avatar-wallet-provider]');
             if (!buttonSlot) return;
-            // Unknown connector names remain readable in the dropdown. Do not
-            // squeeze arbitrary peer metadata into the compact account button.
+            // Only a verified local mark is drawn. Other connector names stay
+            // available as a plain-text tooltip, never borrowed branding.
             const html = this.renderIdentityMark(walletProvider?.mark) ? this.renderWalletProvider(walletProvider) : '';
             if (buttonSlot.innerHTML !== html) buttonSlot.innerHTML = html;
             buttonSlot.hidden = !html;
+            const button = container.querySelector('.avatar-button');
+            const label = walletProvider?.name ? `ArtSoul account menu; connected wallet: ${walletProvider.name}` : 'ArtSoul account menu';
+            button?.setAttribute('aria-label', label);
+            button?.setAttribute('title', label);
         }
 
         getMenuIdentity(walletAddress, restoring = false) {
@@ -1471,27 +1523,43 @@
             const profileBound = this.identityWallet === wallet && this.resolvedIdentityWallet === wallet
                 && (!profileWallet || profileWallet === wallet);
             const cached = restoring || (this.identityWallet === wallet && this.resolvedIdentityWallet !== wallet)
-                ? this.getCachedHeaderIdentity(wallet)
-                : null;
-            const name = profileBound
-                ? this.getProfileDisplayName(this.profile, wallet)
+                ? this.getCachedHeaderIdentity(wallet) : null;
+            const name = profileBound ? this.getProfileDisplayName(this.profile, wallet)
                 : cached?.name || this.getProfileDisplayName(null, wallet);
             return { name, wallet };
         }
 
-        renderMenuIdentity(walletAddress, restoring, walletProvider) {
-            const identity = this.getMenuIdentity(walletAddress, restoring);
-            const shortAddress = identity.wallet ? this.shortWalletAddress(identity.wallet) : '';
-            // A pending balance read must not erase the connector already
-            // confirmed for this wallet in this document. Never persist brands.
-            if (walletProvider === undefined) walletProvider = this.getRememberedWalletProvider(identity.wallet);
-            return `<div class="avatar-menu-identity"><span class="avatar-menu-name">${escapeMenuText(identity.name)}</span>${identity.wallet ? `
-                <div class="avatar-menu-wallet">
-                <span data-wallet-provider>${this.renderWalletProvider(walletProvider)}</span>
-                <button type="button" class="avatar-menu-address" data-wallet-address="${escapeMenuText(identity.wallet)}" onclick="window.AvatarDropdown.copyMenuAddress(event)" aria-label="Copy wallet address ${escapeMenuText(identity.wallet)}" title="Tap address to copy">
-                    <span class="avatar-menu-address-value">${escapeMenuText(shortAddress)}</span>
-                    <span class="avatar-menu-copy-status" aria-live="polite"></span>
-                </button></div>` : ''}</div>`;
+        syncHeaderCopyControls({ dropdown }, snapshot) {
+            const wallet = String(snapshot.previewWallet || '').toLowerCase();
+            const currentWallet = String(window.currentWalletAddress || '').toLowerCase();
+            const validWallet = WALLET_ADDRESS_PATTERN.test(wallet) && wallet === currentWallet;
+            const name = typeof snapshot.name === 'string' ? snapshot.name.trim() : '';
+            const nameIsAddress = name === this.shortWalletAddress(wallet);
+            const revision = `${this.identityGeneration}:${this.identityCommitToken}`;
+            let changed = false;
+            for (const attribute of ['data-avatar-name', 'data-avatar-address']) {
+                const control = dropdown.querySelector(`[${attribute}]`);
+                const isAddress = attribute === 'data-avatar-address' || nameIsAddress;
+                const value = validWallet ? (isAddress ? wallet : name) : '';
+                const enabled = value && (isAddress || value.length <= 256) && !control.hidden;
+                if (control.dataset.copyValue !== value || control.dataset.walletAddress !== wallet || control.dataset.copyRevision !== revision) {
+                    control.dataset.copyValue = value;
+                    control.dataset.walletAddress = wallet;
+                    control.dataset.copyRevision = revision;
+                    control.dataset.copyState = '';
+                    control.disabled = !enabled;
+                    changed = true;
+                } else if (!enabled) control.disabled = true;
+                control.dataset.copyKind = isAddress ? 'address' : 'name';
+                const label = enabled ? `Copy ${isAddress ? 'wallet address' : 'display name'}: ${value}` : (name || 'ArtSoul account');
+                control.setAttribute('aria-label', label);
+                control.setAttribute('title', enabled ? label : 'Account identity');
+            }
+            if (changed) {
+                const status = dropdown.querySelector('[data-avatar-copy-status]');
+                status.textContent = '';
+                status.hidden = true;
+            }
         }
 
         // iOS embedded browsers do not consistently expose navigator.clipboard.
@@ -1504,7 +1572,7 @@
             const previousFocus = document.activeElement;
             field.value = address;
             // Readonly textarea selection is unreliable in iOS WebKit.
-            // This ephemeral input contains only the validated wallet address.
+            // This ephemeral input contains only validated account display text.
             field.readOnly = false;
             field.setAttribute('aria-hidden', 'true');
             field.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;font-size:16px;z-index:-1';
@@ -1523,43 +1591,53 @@
             }
         }
 
-        async copyMenuAddress(event) {
+        async copyHeaderIdentity(event) {
             event?.preventDefault?.();
             event?.stopPropagation?.();
             const button = event?.currentTarget;
-            const address = button?.dataset.walletAddress || '';
-            if (!WALLET_ADDRESS_PATTERN.test(address) || button.disabled) return false;
-            const status = button.querySelector('.avatar-menu-copy-status');
-            const isCurrent = () => button.isConnected !== false && button.dataset.walletAddress === address;
+            const wallet = button?.dataset.walletAddress || '';
+            const value = button?.dataset.copyValue || '';
+            const kind = button?.dataset.copyKind;
+            const generation = this.identityGeneration;
+            const commitToken = this.identityCommitToken;
+            const currentWallet = () => String(window.currentWalletAddress || '').toLowerCase();
+            if (!WALLET_ADDRESS_PATTERN.test(wallet) || wallet !== currentWallet() || button.disabled
+                || !value || value.length > 256 || !['name', 'address'].includes(kind)
+                || (kind === 'address' && value !== wallet)) return false;
+            const status = this.getNavContainer()?.querySelector('[data-avatar-copy-status]');
+            const isCurrent = () => button.isConnected !== false && button.dataset.walletAddress === wallet
+                && button.dataset.copyValue === value && generation === this.identityGeneration
+                && commitToken === this.identityCommitToken && currentWallet() === wallet;
             const feedback = (state, message) => {
                 if (!isCurrent()) return;
                 button.dataset.copyState = state;
-                if (status) status.textContent = message;
+                if (status) { status.textContent = message; status.hidden = false; }
             };
             button.disabled = true;
+            if (status) { status.textContent = ''; status.hidden = true; }
             let copied = false;
             try {
                 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-                if (isIOS) copied = this.copyMenuAddressLegacy(address);
+                if (isIOS) copied = this.copyMenuAddressLegacy(value);
                 if (!copied && typeof navigator.clipboard?.writeText === 'function') {
                     try {
-                        await navigator.clipboard.writeText(address);
+                        await navigator.clipboard.writeText(value);
                         copied = true;
                     } catch {
                         // A denied embedded-browser Clipboard API is not final;
                         // try the built-in selection route before reporting failure.
                     }
                 }
-                if (!copied && !isIOS) copied = this.copyMenuAddressLegacy(address);
+                if (!copied && !isIOS && isCurrent()) copied = this.copyMenuAddressLegacy(value);
                 feedback(copied ? 'copied' : 'unavailable',
-                    copied ? 'Copied' : 'Could not copy');
+                    copied ? (kind === 'name' ? 'Name copied' : 'Address copied') : 'Could not copy');
                 if (!copied && typeof window.prompt === 'function' && isCurrent()) {
                     // Explicit, selectable fallback rather than a fake success.
-                    window.prompt('Copy wallet address:', address);
+                    window.prompt(kind === 'name' ? 'Copy display name:' : 'Copy wallet address:', value);
                 }
                 return copied;
             } finally {
-                button.disabled = false;
+                if (isCurrent()) button.disabled = false;
             }
         }
 
@@ -1696,19 +1774,8 @@
             }
 
             return `
-                ${this.renderMenuIdentity(walletAddress || (isConnected ? this.identityWallet || window.currentWalletAddress : ''), restoring, networkInfo?.walletProvider)}
-                <div class="avatar-dropdown-navigation${document.querySelector('.site-primary-nav') ? ' avatar-account-links' : ''}">
-                    ${this.renderDropdownNavItems({ currentPath, isOwnProfile })}
-                    ${this.renderProtocolAdminSlot(currentPath)}
-                </div>
+                ${this.renderProtocolAdminSlot(currentPath)}
                 ${networkSection}
-                <div class="avatar-theme-section">
-                    <div class="avatar-theme-label" id="avatarThemeLabel">Appearance</div>
-                    <div class="theme-toggle avatar-theme-switch" role="group" aria-labelledby="avatarThemeLabel">
-                        <button type="button" onclick="window.setTheme('classic')" id="classicBtnDropdown" class="theme-btn">Classic</button>
-                        <button type="button" onclick="window.setTheme('future')" id="futureBtnDropdown" class="theme-btn">Future</button>
-                    </div>
-                </div>
                 <div class="avatar-account-action">
                     ${accountAction}
                 </div>

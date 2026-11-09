@@ -29,11 +29,11 @@ test('Profile Admin confirmation uses existing server-owned decision and fail-cl
     assert.doesNotMatch(segment, /localStorage|adminWallets|hardcodedAddresses|role === 'admin'/);
 });
 
-test('tap-to-copy wallet popover is concise and retains the full source address', () => {
-    assert.match(menu, /this\.shortWalletAddress\(identity\.wallet\)/);
-    assert.match(menu, /data-wallet-address="\$\{escapeMenuText\(identity\.wallet\)\}"/);
-    assert.match(menu, /aria-label="Copy wallet address /);
+test('tap-to-copy account controls retain full wallet payload with stale-account guards', () => {
+    assert.match(menu, /control.dataset.copyValue = value/);
+    assert.match(menu, /control.dataset.walletAddress = wallet/);
+    assert.match(menu, /wallet !== currentWallet\(\)/);
+    assert.match(menu, /generation === this.identityGeneration/);
+    assert.match(menu, /commitToken === this.identityCommitToken/);
     assert.doesNotMatch(menu, />Copy address<|>Admin panel</);
-    assert.match(css, /\.avatar-menu-copy-status \{[\s\S]*?position: absolute !important/);
-    assert.match(css, /width: min\(252px, calc\(100vw - 24px\)\)/);
 });

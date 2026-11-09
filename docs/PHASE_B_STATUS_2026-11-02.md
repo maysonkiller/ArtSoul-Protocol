@@ -53,12 +53,19 @@ It reuses provenance without extra requests and distinguishes sale evidence
 from ownership, asking price and floor. See [NFT record details](audits/B18_NFT_RECORD_DETAILS_2026-11-02.md)
 for the local tests and release boundary. External Base wallet NFTs are a
 separate requested read-only inventory; they are not active ArtSoul listings.
-Its [default-off implementation](audits/B18_EXTERNAL_BASE_INVENTORY_2026-11-02.md)
-uses explicit pagination and a dedicated server credential. Local API/browser
-checks pass. The owner completed Alchemy verification: the new project team is
-on Free with no payment method, and one bounded live inventory request succeeded.
-The current CDN compatibility patch and server-only activation are tracked in
-the inventory audit; the existing RPC account quota remains unverified.
+Its [bounded inventory implementation](audits/B18_EXTERNAL_BASE_INVENTORY_2026-11-02.md)
+uses private pagination and a dedicated server credential. PR464 fixed the route;
+signed production acceptance loaded two 12-item pages without changing the wallet
+network or requesting a transaction. The project Alchemy team is Free with no
+payment method; the old RPC account quota remains unverified. The next UX slice
+places Wallet NFTs before Saved, adds uniform cards and a contained details dialog,
+and shows a cached public ETH/USD reference separately from unknown purchase
+prices. The founder selected account-plaque A, with the same-width dropdown
+and separate name/address hover and copy feedback from B. The November 9
+integration preserves the incoming multichain feature gate and corrects profile
+canonicals reported by Search Console. See the [resume audit](audits/B18_RESUME_ACCOUNT_SEO_2026-11-09.md)
+for checks and the release boundary, and the inventory audit for
+provider limits, verification and release evidence.
 The owner selected Google Password Manager for backup-key custody. Actual
 independent encrypted-copy and key-recovery verification remain pending.
 

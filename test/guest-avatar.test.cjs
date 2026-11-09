@@ -108,15 +108,13 @@ test('account menu uses the compact desktop and mobile width contracts', () => {
   assert.match(unifiedStyles, /\.profile-social-links \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });
 
-test('mobile account button keeps the connected name and address visible', () => {
-  const mobileInfoStart = unifiedStyles.indexOf('.site-header #navButtons .avatar-info {', unifiedStyles.indexOf('grid-template-columns: 40px minmax(0, 1fr);'));
-  const mobileInfo = unifiedStyles.slice(mobileInfoStart, unifiedStyles.indexOf('}', mobileInfoStart) + 1);
-  assert.ok(mobileInfoStart >= 0, 'the final shared mobile identity rule must exist');
-  assert.match(unifiedStyles, /@media \(max-width: 768px\)[\s\S]*?grid-template-columns: 40px minmax\(0, 1fr\);/);
-  assert.match(mobileInfo, /display: flex !important;/);
-  assert.match(mobileInfo, /width: 103px !important;/);
-  assert.doesNotMatch(mobileInfo, /display: none !important;/);
-  assert.doesNotMatch(unifiedStyles, /\.site-header #navButtons \.avatar-info \{[^}]*display: none/);
+test('mobile menu exposes identity controls when opened without duplicating them', () => {
+  assert.match(unifiedStyles, /avatar-dropdown-container:has\(\.avatar-button\[aria-expanded="true"\]\) \.avatar-info/);
+  for (const page of sharedHeaderPages) {
+    const html = fs.readFileSync(page, 'utf8');
+    assert.equal((html.match(/data-avatar-name/g) || []).length, 1);
+    assert.equal((html.match(/data-avatar-address/g) || []).length, 1);
+  }
 });
 
 test('account menu has one stylesheet source and a full-width compact network row', () => {
@@ -132,9 +130,9 @@ test('account menu has one stylesheet source and a full-width compact network ro
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=83/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=10"><\/script>/, `${page} must load the first-frame bridge`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=65" defer><\/script>/, `${page} must load the deferred account menu`);
+    assert.match(html, /unified-styles\.css\?v=84/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=11"><\/script>/, `${page} must load the first-frame bridge`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=66" defer><\/script>/, `${page} must load the deferred account menu`);
     assert.match(
       html,
       /<\/header>\s*<script>window\.ArtSoulHeaderPrepaint\?\.hydrate\(document\.getElementById\('navButtons'\)\);<\/script>/,
@@ -150,8 +148,8 @@ test('the account button commits identity as one atomic snapshot', () => {
   assert.doesNotMatch(avatarDropdown, /avatar-image-loading/);
   assert.doesNotMatch(unifiedStyles, /avatar-image-loading/);
   assert.doesNotMatch(avatarDropdown, /commitAvatarImage/);
-  assert.match(avatarDropdown, /commitIdentitySnapshot\(\{ button \}, snapshot, token, failed\) \{/);
-  assert.match(avatarDropdown, /holdIdentityWhilePending\(\{ button \}, snapshot\) \{/);
+  assert.match(avatarDropdown, /commitIdentitySnapshot\(structure, snapshot, token, failed\) \{/);
+  assert.match(avatarDropdown, /holdIdentityWhilePending\(structure, snapshot\) \{/);
   assert.match(avatarDropdown, /decodeThenCommitIdentity\(structure, snapshot, token, options = \{\}\) \{/);
   // A restored local preview is what paints; the snapshot still records the
   // original avatar URL as its source, so a later render recognises it.

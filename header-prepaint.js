@@ -82,8 +82,8 @@
         if (!container) return false;
         const button = container.querySelector('.avatar-button');
         const image = button?.querySelector('[data-avatar-image]');
-        const name = button?.querySelector('[data-avatar-name]');
-        const address = button?.querySelector('[data-avatar-address]');
+        const name = container.querySelector('[data-avatar-name]');
+        const address = container.querySelector('[data-avatar-address]');
         if (!button || !image || !name || !address) return false;
         const shellSource = image.getAttribute('src') || '';
         if (image.dataset.avatarSource === NEUTRAL_AVATAR_URL && PREVIEW_PATTERN.test(shellSource)) {

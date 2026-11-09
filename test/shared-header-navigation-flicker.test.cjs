@@ -127,7 +127,7 @@ function assertNeverFlickers(history, label) {
     const where = `${label} frame ${index} ${state.key}`;
     // 1 — the button always exists and always reserves its geometry.
     assert.equal(state.hasButton, true, `${where}: the account button disappeared`);
-    assert.ok(state.childCount >= 3, `${where}: the account button was emptied`);
+    assert.ok(state.childCount >= 2, `${where}: the account button was emptied`);
     // 1 / 9 — the avatar slot is never blank.
     assert.ok(state.imgSrc, `${where}: the avatar slot had no image`);
     assert.equal(state.imgHiddenByClass, false, `${where}: the avatar image was hidden`);
@@ -572,13 +572,13 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=83">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=10"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=65" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=84">/, `${page} stylesheet pin`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=11"><\/script>/, `${page} prepaint pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=66" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=83');
-    const prepaint = html.indexOf('header-prepaint.js?v=10');
-    const component = html.indexOf('avatar-dropdown.js?v=65');
+    const stylesheet = html.indexOf('unified-styles.css?v=84');
+    const prepaint = html.indexOf('header-prepaint.js?v=11');
+    const component = html.indexOf('avatar-dropdown.js?v=66');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is
     // wallet-runtime-loader.js and appkit-init is imported from inside it. The
     // ordering this guard protects is unchanged: the header component still has
@@ -642,7 +642,7 @@ test('the resolving label sits after the name so theme first-child rules still t
   const css = fs.readFileSync(path.join(ROOT, 'unified-styles.css'), 'utf8');
   assert.match(css, /\.avatar-info > div:first-child/);
   for (const page of SHARED_HEADER_PAGES) {
-    const info = readPage(page).match(/<div class="avatar-info">([\s\S]*?)<\/div>\s*<svg/);
+    const info = readPage(page).match(/<div class="avatar-info">([\s\S]*?)<\/div>\s*<\/div>/);
     assert.ok(info, `${page} must ship the identity region`);
     assert.ok(
       info[1].indexOf('data-avatar-name') < info[1].indexOf('data-avatar-resolving'),
@@ -979,7 +979,7 @@ test('the component awaits decode before touching the visible image', () => {
   assert.match(component, /preloader\.decode\(\)\.then\(/);
   assert.match(component, /if \(typeof preloader\.decode !== 'function'\) \{\s*commitAndCapture\(\);/);
   // The commit itself is one guarded transaction, never a per-field write.
-  assert.match(component, /commitIdentitySnapshot\(\{ button \}, snapshot, token, failed\)/);
+  assert.match(component, /commitIdentitySnapshot\(structure, snapshot, token, failed\)/);
   assert.match(component, /this\.holdIdentityWhilePending\(structure, snapshot\);\s*this\.decodeThenCommitIdentity\(structure, snapshot, token\);/);
 });
 
