@@ -5,7 +5,7 @@ import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { EmailConnection } from '../features/profile/email-connection.jsx';
 import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
-import { WalletNfts } from '../features/profile/wallet-nfts.jsx';
+import { WalletNfts, useWalletNftsEnabled } from '../features/profile/wallet-nfts.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import '../../supabase-client.js';
@@ -37,7 +37,7 @@ const { useState, useEffect, useRef } = React;
         const GALLERY_TYPES = [
             { id: 'created', label: 'Artworks', icon: '', description: 'Works created by this artist, including works not yet minted.' },
             { id: 'auction', label: 'Auctions', icon: '', description: 'Auctions for works created by this artist.' },
-            { id: 'collected', label: 'Collected', icon: '', description: 'NFTs currently owned by this profile.' },
+            { id: 'collected', label: 'Collected', icon: '', description: 'ArtSoul NFTs currently owned by this profile.' },
             { id: 'sold', label: 'Activity', icon: '', description: 'Completed sales of works created by this artist.' },
         ];
 
@@ -132,6 +132,7 @@ const { useState, useEffect, useRef } = React;
 
         function ProfilePage({ initialSkeletonVisible = false }) {
             const savedEnabled = useSavedEnabled();
+            const walletNftsEnabled = useWalletNftsEnabled();
             const initialViewAddress = getViewAddress();
             const initialWalletHint = getStoredWalletHint();
             const hasInitialWalletHint = /^0x[a-f0-9]{40}$/i.test(initialWalletHint);
@@ -282,7 +283,7 @@ const { useState, useEffect, useRef } = React;
             }, []);
 
             useEffect(() => {
-                if (profile && selectedGallery !== 'saved' && selectedGallery !== 'wallet-nfts') {
+                if (profile && !['saved', 'wallet-nfts'].includes(selectedGallery)) {
                     loadMyArtworks();
                 }
             }, [selectedGallery]);
@@ -296,12 +297,16 @@ const { useState, useEffect, useRef } = React;
             }, [artworksLoading, selectedGallery]);
 
             useEffect(() => {
-                const showSaved = () => { if (savedEnabled && isOwnProfile && window.location.hash === '#saved') setSelectedGallery('saved'); };
+                const showSaved = () => {
+                    if (!isOwnProfile) return;
+                    if (savedEnabled && window.location.hash === '#saved') setSelectedGallery('saved');
+                    if (walletNftsEnabled && window.location.hash === '#wallet-nfts') setSelectedGallery('wallet-nfts');
+                };
                 showSaved();
                 if (!isOwnProfile && ['saved', 'wallet-nfts'].includes(selectedGallery)) setSelectedGallery('created');
                 window.addEventListener('hashchange', showSaved);
                 return () => window.removeEventListener('hashchange', showSaved);
-            }, [savedEnabled, isOwnProfile]);
+            }, [savedEnabled, walletNftsEnabled, isOwnProfile]);
 
             useEffect(() => {
                 if (galleryPanelRef.current) galleryPanelRef.current.style.minHeight = '';
@@ -1096,7 +1101,7 @@ const { useState, useEffect, useRef } = React;
             const FULL_GALLERY_LIMIT = 200;
 
             async function fetchProfileArtworks(activeProfile, galleryType = selectedGallery, dbOverride = null, { limit = FULL_GALLERY_LIMIT } = {}) {
-                if (galleryType === 'saved' || galleryType === 'wallet-nfts') return { items: [], corpus: [] };
+                if (['saved', 'wallet-nfts'].includes(galleryType)) return { items: [], corpus: [] };
                 if (!activeProfile?.wallet_address) return { items: [], corpus: [] };
 
                 const walletAddress = activeProfile.wallet_address;
@@ -1128,7 +1133,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function loadMyArtworks(profileOverride = null, { fresh = false } = {}) {
-                if (selectedGallery === 'saved' || selectedGallery === 'wallet-nfts') return;
+                if (['saved', 'wallet-nfts'].includes(selectedGallery)) return;
                 const requestId = ++artworksRequestRef.current;
                 setArtworksError(null);
                 const activeProfile = profileOverride || profile;
@@ -1936,8 +1941,8 @@ const { useState, useEffect, useRef } = React;
                         <section className="profile-collection-panel" aria-label="Profile artworks">
                         {/* Gallery Tabs */}
                         <nav className="profile-sections-nav" aria-label="Profile content">
-                            <div className="profile-section-tabs flex flex-wrap gap-3">
-                                {[...GALLERY_TYPES, ...(isOwnProfile ? [WALLET_NFT_TAB] : []), ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Saved', icon: '' }] : [])].map(gallery => (
+                            <div className="profile-section-tabs flex flex-wrap gap-3" data-wallet-nfts={walletNftsEnabled && isOwnProfile}>
+                                {[...GALLERY_TYPES, ...(walletNftsEnabled && isOwnProfile ? [WALLET_NFT_TAB] : []), ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Saved', icon: '' }] : [])].map(gallery => (
                                     <button
                                         key={gallery.id}
                                         type="button"
@@ -1952,10 +1957,11 @@ const { useState, useEffect, useRef } = React;
                                                 // loads; release it when that tab's result commits.
                                                 const panel = galleryPanelRef.current;
                                                 if (panel) panel.style.minHeight = `${Math.max(0, window.innerHeight - panel.getBoundingClientRect().top)}px`;
-                                                setArtworksLoading(gallery.id !== 'wallet-nfts' && gallery.id !== 'saved');
+                                                setArtworksLoading(!['saved', 'wallet-nfts'].includes(gallery.id));
                                                 setSelectedGallery(gallery.id);
-                                                if (gallery.id === 'saved' || window.location.hash === '#saved') {
-                                                    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (gallery.id === 'saved' ? '#saved' : ''));
+                                                if (['saved', 'wallet-nfts'].includes(gallery.id) || ['#saved', '#wallet-nfts'].includes(window.location.hash)) {
+                                                    const hash = gallery.id === 'saved' ? '#saved' : gallery.id === 'wallet-nfts' ? '#wallet-nfts' : '';
+                                                    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + hash);
                                                 }
                                             }
                                         }}
@@ -1968,8 +1974,7 @@ const { useState, useEffect, useRef } = React;
                         </nav>
 
                         {/* Gallery Content */}
-                        {selectedGallery === 'saved' ? (isOwnProfile && savedEnabled && <SavedList wallet={profile.wallet_address} />) :
-                          selectedGallery === 'wallet-nfts' ? (isOwnProfile && <WalletNfts key={profile.wallet_address} wallet={profile.wallet_address} />) : (
+                        {selectedGallery === 'wallet-nfts' ? (isOwnProfile && walletNftsEnabled && <WalletNfts key={profile.wallet_address} wallet={profile.wallet_address} />) : selectedGallery === 'saved' ? (isOwnProfile && savedEnabled && <SavedList wallet={profile.wallet_address} />) : (
                         <div ref={galleryPanelRef} className="profile-gallery-panel p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="profile-gallery-heading">

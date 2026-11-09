@@ -97,7 +97,8 @@ test('public metadata and runtime navigation use canonical extensionless URLs', 
 
   for (const [file, canonicalUrl] of canonicalPages) {
     const source = read(file);
-    assert.ok(source.includes(`<link rel="canonical" href="${canonicalUrl}">`), `${file} canonical URL`);
+    if (file === 'profile.html') assert.match(source, /data-profile-canonical/);
+    else assert.ok(source.includes(`<link rel="canonical" href="${canonicalUrl}">`), `${file} canonical URL`);
     assert.ok(source.includes(`content="${canonicalUrl}"`), `${file} Open Graph URL`);
   }
 
@@ -251,7 +252,7 @@ test('only the bounded header prepaint may block parsing before first paint', ()
       .filter(attrs => !/type="module"| defer| async/.test(attrs))
       .map(attrs => attrs.match(/src="([^"]+)"/)[1]);
 
-    assert.deepEqual(blocking, ['/header-prepaint.js?v=10'], `${page} may block only on the shared prepaint bridge`);
+    assert.deepEqual(blocking, ['/header-prepaint.js?v=11'], `${page} may block only on the shared prepaint bridge`);
   }
 
   assert.ok(

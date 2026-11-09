@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizeWallet } from './backend.js';
 import { collectionAssetKey } from '../config/collection-networks.js';
+import { readEthUsdQuote } from './eth-usd-quote.js';
 
 const PAGE_SIZE = 12;
 const CACHE_MS = 5 * 60_000;
@@ -182,6 +183,15 @@ async function fetchPage(wallet, page, settings) {
 
 // Process-local safeguards are not an account-wide billing cap. Activation requires
 // independent verification of existing provider spending controls; no retries or polling.
+export async function readExternalWalletEthQuote(wallet) {
+  if (!normalizeWallet(wallet) || normalizeWallet(wallet) !== wallet || /^0x0{40}$/.test(wallet)) throw unavailable();
+  const settings = config();
+  walletBudget(wallet, Date.now());
+  const quote = await readEthUsdQuote();
+  unchanged(settings);
+  return { quote };
+}
+
 export async function readExternalWalletNfts(wallet, cursor) {
   if (!normalizeWallet(wallet) || normalizeWallet(wallet) !== wallet || /^0x0{40}$/.test(wallet)) throw unavailable();
   const settings = config(), now = Date.now();

@@ -64,6 +64,7 @@ test('wallet NFT handler permits only the signed-in wallet, GET and bounded page
   assert.equal((await call({ method: 'POST' })).statusCode, 405);
   assert.equal((await call({ method: 'OPTIONS' })).statusCode, 204);
   for (const query of [{ owner: B }, { wallet: B }, { chainId: 1 }, { pageSize: 100 }, { refresh: true }, { url: 'https://other.test' },
+    { quote: 'BTC' }, { quote: ['eth-usd'] }, { quote: 'eth-usd', cursor: 'anything' },
     { route: 'other' }, { route: ['wallet-nfts', 'other'] }, { route: {} }, { route: ['wallet-nfts'], owner: B }]) {
     assert.equal((await call({ query })).body.error, 'INVALID_WALLET_NFT_QUERY');
   }
@@ -317,4 +318,100 @@ test('catch-all dispatcher preserves wallet NFT route metadata without widening 
   const rejected = response();
   await dispatch({ method: 'GET', url: destination.pathname, query: { ...routedQuery, owner: B }, headers: h }, rejected);
   assert.equal(rejected.statusCode, 400); assert.equal(rejected.body.error, 'INVALID_WALLET_NFT_QUERY'); assert.equal(calls, 2);
+});
+
+test('quote requests retain session binding and reject disabled or malformed requests before any network read', async t => {
+  setup(t); let calls = 0;
+  globalThis.fetch = async () => { calls++; return Response.json({ data: { amount: '2500', currency: 'USD' } }); };
+  const good = headers(), query = { quote: 'eth-usd' };
+  for (const h of [{}, { ...good, cookie: `${good.cookie}invalid` }, { ...good, 'x-artsoul-wallet': B }, { cookie: good.cookie }]) {
+    const result = await call({ h, query });
+    assert.equal(result.statusCode, 401); assert.equal(result.headers['Cache-Control'], 'private, no-store');
+    assert.equal(result.body.quote, undefined);
+  }
+  const realNow = Date.now;
+  Date.now = () => realNow() - 8 * 24 * 60 * 60_000;
+  const expired = headers(); Date.now = realNow;
+  assert.equal((await call({ h: expired, query })).statusCode, 401);
+  assert.equal((await call({ method: 'POST', query })).statusCode, 405);
+  for (const invalid of [{ quote: 'btc-usd' }, { quote: '' }, { quote: ['eth-usd'] }, { quote: {} }, { quote: null },
+    { ...query, cursor: '' }, { ...query, cursor: 'anything' }, { ...query, owner: B }, { ...query, wallet: B },
+    { ...query, url: 'https://other.test' }, { ...query, chainId: 1 }, { ...query, route: 'other' }]) {
+    const result = await call({ query: invalid });
+    assert.equal(result.statusCode, 400); assert.equal(result.body.error, 'INVALID_WALLET_NFT_QUERY');
+  }
+  for (const enabled of [undefined, '', 'false', 'TRUE', '1']) {
+    if (enabled === undefined) delete process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED;
+    else process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED = enabled;
+    const result = await call({ query });
+    assert.equal(result.statusCode, 503); assert.equal(result.body.error, 'WALLET_NFTS_DISABLED');
+  }
+  assert.equal(calls, 0, 'rejected quote requests never reach Coinbase or the NFT provider');
+});
+
+test('authenticated quote routing shares one Coinbase read without sending wallet data or invoking Alchemy', async t => {
+  setup(t); const now = 1_900_000_000_000; Date.now = () => now;
+  const owner = `0x${'6'.repeat(40)}`, other = `0x${'7'.repeat(40)}`, query = { quote: 'eth-usd' };
+  let calls = 0, finish;
+  globalThis.fetch = (input, options) => {
+    calls++;
+    assert.equal(String(input), 'https://api.coinbase.com/v2/prices/ETH-USD/spot');
+    assert.equal(options.method, 'GET'); assert.equal(options.redirect, 'error');
+    assert.deepEqual(options.headers, { Accept: 'application/json' });
+    assert.equal(options.body, undefined); assert.ok(options.signal);
+    return new Promise(resolve => { finish = resolve; });
+  };
+  const first = call({ h: headers(owner), query }), second = call({ h: headers(other), query });
+  assert.equal(calls, 1);
+  finish(Response.json({ data: { base: 'ETH', amount: '2500.12345678', currency: 'USD' } }));
+  const expected = { quote: { symbol: 'ETH', currency: 'USD', amount: '2500.12345678', source: 'Coinbase', fetchedAt: new Date(now).toISOString() } };
+  for (const result of await Promise.all([first, second])) {
+    assert.equal(result.statusCode, 200); assert.deepEqual(result.body, expected);
+    assert.equal(result.headers['Cache-Control'], 'private, no-store');
+  }
+  const deployment = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const rewrite = deployment.rewrites.find(rule => rule.source === '/api/wallet-nfts');
+  const destination = new URL(rewrite.destination, 'https://deployment.test');
+  const routed = Object.fromEntries(destination.searchParams);
+  for (const routeQuery of [query, { ...query, route: ['wallet-nfts'] }, { ...query, ...routed }]) {
+    const res = response();
+    await dispatch({ method: 'GET', url: routeQuery === query ? '/api/wallet-nfts' : destination.pathname, query: routeQuery, headers: headers(owner) }, res);
+    assert.equal(res.statusCode, 200); assert.deepEqual(res.body, expected);
+    assert.equal(res.headers['Cache-Control'], 'private, no-store'); assert.equal(res.headers['X-Content-Type-Options'], 'nosniff');
+  }
+  assert.equal(calls, 1, 'authenticated details share the process quote cache, not NFT inventory reads');
+  process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED = 'false';
+  assert.equal((await call({ h: headers(owner), query })).body.error, 'WALLET_NFTS_DISABLED');
+  process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED = 'true';
+  delete process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ALCHEMY_API_KEY;
+  assert.equal((await call({ h: headers(owner), query })).body.error, 'WALLET_NFTS_CONFIG_UNAVAILABLE');
+  assert.equal(calls, 1, 'cached quotes cannot bypass disabled or unconfigured inventory gates');
+});
+
+test('quote failures are nullable without provider leakage and an in-flight quote cannot outlive feature disablement', async t => {
+  setup(t); let now = 2_000_000_000_000; Date.now = () => now;
+  const owner = `0x${'8'.repeat(40)}`, query = { quote: 'eth-usd' }; let calls = 0;
+  globalThis.fetch = async input => {
+    calls++; assert.equal(String(input), 'https://api.coinbase.com/v2/prices/ETH-USD/spot');
+    return Response.json({ error: `private-provider ${KEY}` }, { status: 500 });
+  };
+  for (let i = 0; i < 2; i++) {
+    const result = await call({ h: headers(owner), query });
+    assert.equal(result.statusCode, 200); assert.deepEqual(result.body, { quote: null });
+    assert.equal(result.headers['Cache-Control'], 'private, no-store');
+    assert.doesNotMatch(JSON.stringify(result), /private-provider|synthetic-test-key/);
+  }
+  assert.equal(calls, 1, 'failure backoff does not retry or fall back to Alchemy');
+  now += 60_000; let finish;
+  globalThis.fetch = input => {
+    calls++; assert.equal(String(input), 'https://api.coinbase.com/v2/prices/ETH-USD/spot');
+    return new Promise(resolve => { finish = resolve; });
+  };
+  const pending = call({ h: headers(owner), query });
+  assert.equal(calls, 2);
+  process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED = 'false';
+  finish(Response.json({ data: { base: 'ETH', amount: '2501.5', currency: 'USD' } }));
+  const result = await pending;
+  assert.equal(result.statusCode, 503); assert.equal(result.body.error, 'WALLET_NFTS_DISABLED');
+  assert.equal(result.body.quote, undefined); assert.equal(calls, 2);
 });

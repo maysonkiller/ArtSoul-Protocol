@@ -1,5 +1,5 @@
 import { allowMethods, requireWallet, sendError } from '../backend.js';
-import { readExternalWalletNfts } from '../external-wallet-nfts.js';
+import { readExternalWalletNfts, readExternalWalletEthQuote } from '../external-wallet-nfts.js';
 import { readMultichainWalletAssets } from '../multichain-wallet-assets.js';
 
 export default async function handler(req, res) {
@@ -17,8 +17,8 @@ export default async function handler(req, res) {
       (Array.isArray(route) && route.length === 1 && route[0] === 'wallet-nfts');
     const view = req.query?.view;
     const multi = view === 'multichain-nfts' || view === 'multichain-tokens';
-    const allowedKeys = multi ? ['cursor', 'route', 'view', 'network'] : ['cursor', 'route'];
-    if (!validRoute || Object.keys(req.query || {}).some(key => !allowedKeys.includes(key)) ||
+    const allowedKeys = multi ? ['cursor', 'route', 'view', 'network'] : ['cursor', 'route', 'quote'];
+    if (!validRoute || (req.query?.quote !== undefined && (req.query.quote !== 'eth-usd' || req.query.cursor !== undefined || multi)) || Object.keys(req.query || {}).some(key => !allowedKeys.includes(key)) ||
         (multi && (typeof req.query?.network !== 'string' || req.query.network.length > 40))) {
       throw Object.assign(new Error('Choose a valid wallet asset query.'), { code: 'INVALID_WALLET_NFT_QUERY', statusCode: 400 });
     }
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       });
       return res.status(200).json(data);
     }
-    const data = await readExternalWalletNfts(wallet, req.query?.cursor);
+    const data = req.query?.quote === 'eth-usd' ? await readExternalWalletEthQuote(wallet) : await readExternalWalletNfts(wallet, req.query?.cursor);
     return res.status(200).json(data);
   } catch (error) {
     if (!['UNAUTHENTICATED', 'SESSION_WALLET_MISMATCH', 'INVALID_WALLET_NFT_QUERY', 'INVALID_WALLET_NFT_CURSOR',

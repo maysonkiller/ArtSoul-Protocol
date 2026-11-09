@@ -112,8 +112,8 @@ for (const chainId of [999, '__proto__', '84532<img>', 84532.1, true, [84532]]) 
 test('an actual Rabby provider shows its local mark, without issuing a provider request', async () => {
     const provider = { isRabby: true, request: () => { throw new Error('No new provider request is allowed'); } };
     const harness = networkHarness({ provider });
-    const { html } = await readMenu(harness);
-    assert.match(html, /class="avatar-wallet-provider" title="Connected wallet: Rabby" role="img" aria-label="Connected wallet: Rabby"><img[^>]+src="\/brand\/rabby\.png"/);
+    const { network } = await readMenu(harness);
+    assert.match(harness.dropdown.renderWalletProvider(network.walletProvider), /class="avatar-wallet-provider" title="Connected wallet: Rabby" role="img" aria-label="Connected wallet: Rabby"><img[^>]+src="\/brand\/rabby\.png"/);
 });
 
 test('a compatibility flag or unrelated injected provider cannot label the active wallet as Rabby', async () => {
@@ -127,7 +127,8 @@ test('live WalletConnect peer names are shown, while untrusted remote wallet ima
     const harness = networkHarness({ provider: {
         session: { peer: { metadata: { name: 'Coinbase Wallet', icons: ['https://foreign.test/icon.svg'] } } }
     } });
-    const { html } = await readMenu(harness);
+    const { network } = await readMenu(harness);
+    const html = harness.dropdown.renderWalletProvider(network.walletProvider);
     assert.match(html, /aria-label="Connected wallet: Coinbase Wallet"><span>Coinbase Wallet<\/span>/);
     assert.doesNotMatch(html, /foreign\.test|brand\/rabby\.png/);
 });
@@ -136,7 +137,8 @@ test('a live Rabby WalletConnect peer receives the Rabby mark', async () => {
     const harness = networkHarness({ provider: {
         session: { peer: { metadata: { name: 'Rabby Wallet' } } }
     } });
-    const { html } = await readMenu(harness);
+    const { network } = await readMenu(harness);
+    const html = harness.dropdown.renderWalletProvider(network.walletProvider);
     assert.match(html, /aria-label="Connected wallet: Rabby Wallet"><img[^>]+src="\/brand\/rabby\.png"/);
 });
 
@@ -150,9 +152,7 @@ test('connector mark belongs to the account identity and leaves the network row 
     assert.equal(providerSlot.hidden, false);
     assert.match(providerSlot.innerHTML, /aria-label="Connected wallet: Rabby"/);
     assert.match(providerSlot.innerHTML, /src="\/brand\/rabby\.png"/);
-    const accountWallet = harness.menu().querySelector('.avatar-menu-wallet');
-    assert.ok(accountWallet.querySelector('[data-wallet-provider]'));
-    assert.equal(accountWallet.querySelector('.avatar-menu-address').dataset.walletAddress, WALLET);
+    assert.equal(harness.menu().querySelector('.avatar-menu-wallet'), null);
     assert.equal(harness.menu().querySelector('.avatar-wallet-section').querySelector('[data-wallet-provider]'), null);
     assert.equal(harness.menu().querySelector('[data-network-mark]').querySelector('.avatar-identity-mark').getAttribute('src'), '/brand/base.svg');
     assert.doesNotMatch(harness.menu().querySelector('[data-network-balance]').innerHTML, /<img/);
@@ -164,7 +164,7 @@ test('connector mark belongs to the account identity and leaves the network row 
     assert.equal(harness.button(), button, 'provider refresh must not rebuild the account button');
     assert.equal(providerSlot.hidden, true, 'unknown connector does not borrow the previous logo');
     assert.equal(providerSlot.innerHTML, '');
-    assert.match(harness.menu().querySelector('[data-wallet-provider]').innerHTML, />Another Wallet<\/span>/);
+    assert.match(button.getAttribute('aria-label'), /Another Wallet/);
 
     harness.dropdown.renderConnectButton();
     assert.equal(providerSlot.hidden, true);
@@ -188,7 +188,7 @@ test('live account rendering clears the previous connector logo when the wallet 
     await harness.flush();
     assert.equal(providerSlot.hidden, true);
     assert.equal(providerSlot.innerHTML, '');
-    assert.match(harness.menuHtml(), /Other connector/);
+    assert.match(harness.button().getAttribute('aria-label'), /Other connector/);
     assert.doesNotMatch(harness.menuHtml(), /Rabby/);
 
     harness.context.window.currentWalletAddress = null;
@@ -217,13 +217,13 @@ for (const [name, provider, hasMark] of [
             assert.equal(harness.button(), button);
             assert.equal(providerSlot.innerHTML, before);
             assert.equal(providerSlot.hidden, !hasMark);
-            assert.match(harness.menuHtml(), new RegExp(`Connected wallet: ${name}`));
+            assert.match(button.getAttribute('aria-label'), new RegExp(`connected wallet: ${name}`));
         }
         assert.equal(pending.length, 2, 'each refresh keeps its existing single network read');
         pending.forEach(read => read.reject(new Error('Temporary network failure')));
         await harness.flush();
         assert.equal(providerSlot.innerHTML, before, 'a failed refresh does not erase a known connector');
-        assert.match(harness.menuHtml(), new RegExp(`Connected wallet: ${name}`));
+        assert.match(button.getAttribute('aria-label'), new RegExp(`connected wallet: ${name}`));
         assert.equal([...harness.storage.values()].some(value => value.includes(name)), false, 'provider metadata is never persisted');
     });
 }
@@ -242,13 +242,13 @@ test('stale live reads cannot revive the connector after disconnect and reconnec
 
     harness.dropdown.beginIdentityTransition(null);
     assert.equal(providerSlot.hidden, true, 'disconnect clears the mark synchronously');
-    assert.equal(harness.menu().querySelector('[data-wallet-provider]').innerHTML, '');
+    assert.equal(harness.menu().querySelector('[data-wallet-provider]'), null);
     harness.dropdown.beginIdentityTransition(WALLET);
     assert.equal(harness.dropdown.pendingRenderKey, renderKey, 'same-address reconnect can reuse the same render key');
     pending.forEach(resolve => resolve(network));
     await Promise.all([oldRefresh, oldRender]);
     assert.equal(providerSlot.innerHTML, '');
-    assert.equal(harness.menu().querySelector('[data-wallet-provider]').innerHTML, '');
+    assert.equal(harness.menu().querySelector('[data-wallet-provider]'), null);
     assert.equal(harness.dropdown.getRememberedWalletProvider(WALLET), null);
 });
 
@@ -262,7 +262,7 @@ test('wallet and network text cannot inject markup or arbitrary mark URLs', asyn
     network.mark = 'base" onerror="alert(1)';
     const html = menuHtml(harness, network);
     assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
-    assert.match(html, /&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt; &amp; &quot;Wallet&quot;/);
+    assert.match(harness.dropdown.renderWalletProvider(network.walletProvider), /&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt; &amp; &quot;Wallet&quot;/);
     assert.doesNotMatch(html, /<script|<img src=x|javascript:|src="base/);
     assert.equal(harness.dropdown.renderIdentityMark('__proto__'), '');
 });
@@ -283,7 +283,7 @@ test('live balance refresh retains currency text and removes an unavailable prov
     const balance = harness.menu().querySelector('[data-network-balance]');
     assert.doesNotMatch(balance.innerHTML, /<img/);
     assert.match(balance.innerHTML, /1\.0000 test ETH/);
-    assert.equal(harness.menu().querySelector('[data-wallet-provider]').innerHTML, '');
+    assert.equal(harness.menu().querySelector('[data-wallet-provider]'), null);
 });
 
 test('a late network refresh cannot apply the previous wallet provider or balance', async () => {
@@ -315,9 +315,9 @@ test('the mobile menu identity shows current resolved name, shortened address an
     } });
     await harness.dropdown.sync(WALLET, { confirmed: true });
     await harness.flush();
-    assert.match(harness.menuHtml(), /class="avatar-menu-name">Current Artist<\/span>/);
-    assert.ok(harness.menuHtml().includes(`class="avatar-menu-address-value">${WALLET.slice(0, 6)}...${WALLET.slice(-4)}</span>`));
-    assert.ok(harness.menuHtml().includes(`data-wallet-address="${WALLET}"`), 'copy action retains full wallet');
+    assert.equal(harness.avatarName(), 'Current Artist');
+    assert.equal(harness.dropdown.getStableStructure().dropdown.querySelector('[data-avatar-name]').dataset.walletAddress, WALLET);
+    assert.equal(harness.dropdown.getStableStructure().dropdown.querySelector('[data-avatar-address]').dataset.copyValue, WALLET);
 });
 
 test('a profile belonging to another wallet cannot name the menu identity', () => {
@@ -325,10 +325,10 @@ test('a profile belonging to another wallet cannot name the menu identity', () =
     harness.dropdown.identityWallet = WALLET;
     harness.dropdown.resolvedIdentityWallet = WALLET;
     harness.dropdown.profile = { wallet_address: OTHER_WALLET, username: 'Another Artist' };
-    const html = harness.dropdown.renderMenuIdentity(WALLET);
+    const html = JSON.stringify(harness.dropdown.getMenuIdentity(WALLET));
     assert.doesNotMatch(html, /Another Artist/);
-    assert.match(html, /class="avatar-menu-name">0xaaaa\.\.\.aaaa<\/span>/);
-    assert.ok(html.includes(`class="avatar-menu-address-value">${WALLET.slice(0, 6)}...${WALLET.slice(-4)}</span>`));
+    assert.match(html, /0xaaaa\.\.\.aaaa/);
+    assert.ok(html.includes(WALLET));
 });
 
 test('a mismatched profile response cannot redirect header identity, caching or balance reads', async () => {
@@ -350,7 +350,7 @@ test('a mismatched profile response cannot redirect header identity, caching or 
     assert.equal(harness.avatarSrc(), '/default-avatar.png');
     assert.equal(harness.imageLoads.includes(foreignAvatar), false);
     assert.doesNotMatch(harness.menuHtml(), /class="avatar-menu-name">Another Artist/);
-    assert.ok(harness.menuHtml().includes(`class="avatar-menu-address-value">${WALLET.slice(0, 6)}...${WALLET.slice(-4)}</span>`));
+    assert.equal(harness.dropdown.getStableStructure().dropdown.querySelector('[data-avatar-name]').dataset.walletAddress, WALLET);
     assert.equal(harness.dropdown.getCachedHeaderIdentity(WALLET), null);
     assert.equal(harness.dropdown.profileCache.has(WALLET), false);
     assert.equal(harness.dropdown.profile, null);
@@ -403,7 +403,7 @@ for (const [description, walletAddress] of [['case-insensitive', WALLET.toUpperC
         assert.equal(harness.avatarName(), 'Current Artist');
         assert.equal(harness.avatarAddress(), '0xaaaa...aaaa');
         assert.equal(harness.avatarSrc(), profile.avatar_url);
-        assert.ok(harness.menuHtml().includes(`class="avatar-menu-address-value">${WALLET.slice(0, 6)}...${WALLET.slice(-4)}</span>`));
+        assert.equal(harness.dropdown.getStableStructure().dropdown.querySelector('[data-avatar-name]').dataset.walletAddress, WALLET);
         assert.equal(harness.dropdown.profileCache.get(WALLET).username, 'Current Artist');
         assert.equal(harness.profileCalls.length, 1);
         assert.equal(harness.dropdown.automaticRecoveries, 0);
@@ -422,7 +422,7 @@ for (const explicitWallet of [true, false]) {
         await harness.flush();
         assert.equal(harness.avatarName(), '0xaaaa...aaaa');
         assert.equal(harness.avatarSrc(), '/default-avatar.png');
-        assert.ok(harness.menuHtml().includes(`class="avatar-menu-address-value">${WALLET.slice(0, 6)}...${WALLET.slice(-4)}</span>`));
+        assert.equal(harness.dropdown.getStableStructure().dropdown.querySelector('[data-avatar-name]').dataset.walletAddress, WALLET);
         assert.equal(harness.imageLoads.includes('https://fixture.invalid/foreign-avatar.png'), false);
     });
 }
@@ -443,7 +443,7 @@ test('a profile from the previous wallet generation cannot name the new wallet',
     harness.dropdown.identityWallet = OTHER_WALLET;
     harness.dropdown.resolvedIdentityWallet = OTHER_WALLET;
     harness.dropdown.profile = { wallet_address: WALLET, username: 'Previous Artist' };
-    const html = harness.dropdown.renderMenuIdentity(WALLET);
+    const html = JSON.stringify(harness.dropdown.getMenuIdentity(WALLET));
     assert.doesNotMatch(html, /Previous Artist/);
     assert.match(html, /0xaaaa\.\.\.aaaa/);
 });
@@ -452,8 +452,8 @@ test('restoring identity uses only the exact wallet-bound preview name', () => {
     const harness = networkHarness({ storage: {
         artsoul_header_identity: JSON.stringify({ wallet: WALLET, name: 'Preview Artist', avatarUrl: '/default-avatar.png' })
     } });
-    assert.match(harness.dropdown.renderMenuIdentity(WALLET, true), /Preview Artist/);
-    const differentWallet = harness.dropdown.renderMenuIdentity(OTHER_WALLET, true);
+    assert.match(JSON.stringify(harness.dropdown.getMenuIdentity(WALLET, true)), /Preview Artist/);
+    const differentWallet = JSON.stringify(harness.dropdown.getMenuIdentity(OTHER_WALLET, true));
     assert.doesNotMatch(differentWallet, /Preview Artist/);
     assert.ok(differentWallet.includes(OTHER_WALLET));
 });
@@ -464,7 +464,8 @@ test('guest identity is explicit and has no stale wallet address or name', () =>
     harness.dropdown.resolvedIdentityWallet = WALLET;
     harness.dropdown.profile = { wallet_address: WALLET, username: 'Previous Artist' };
     harness.dropdown.renderConnectButton();
-    assert.match(harness.menuHtml(), /class="avatar-menu-name">ArtSoul Guest<\/span>/);
+    assert.equal(harness.avatarName(), 'ArtSoul Guest');
+    assert.equal(harness.avatarAddress(), '');
     assert.doesNotMatch(harness.menuHtml(), /class="avatar-menu-address"|Previous Artist/);
 });
 
@@ -473,10 +474,10 @@ test('menu names are escaped and invalid wallet markup is discarded', () => {
     harness.dropdown.identityWallet = WALLET;
     harness.dropdown.resolvedIdentityWallet = WALLET;
     harness.dropdown.profile = { wallet_address: WALLET, username: '<img src=x onerror=alert(1)>' };
-    const html = harness.dropdown.renderMenuIdentity(WALLET);
-    assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
-    assert.doesNotMatch(html, /<img src=x/);
-    const invalid = harness.dropdown.renderMenuIdentity(`${WALLET}<script>`, true);
+    const html = JSON.stringify(harness.dropdown.getMenuIdentity(WALLET));
+    assert.equal(harness.dropdown.getMenuIdentity(WALLET).name, '<img src=x onerror=alert(1)>');
+    assert.doesNotMatch(harness.menuHtml(), /<img src=x/);
+    const invalid = JSON.stringify(harness.dropdown.getMenuIdentity(`${WALLET}<script>`, true));
     assert.match(invalid, /ArtSoul Guest/);
     assert.doesNotMatch(invalid, /<script|avatar-menu-address/);
 });
@@ -487,10 +488,10 @@ test('the menu identity refreshes after a same-wallet profile rename', async () 
     } });
     await harness.dropdown.sync(WALLET, { confirmed: true });
     await harness.flush();
-    assert.match(harness.menuHtml(), /class="avatar-menu-name">Original Artist<\/span>/);
+    assert.equal(harness.avatarName(), 'Original Artist');
     harness.setProfile(WALLET, { wallet_address: WALLET, username: 'Renamed Artist' });
     await harness.dropdown.refresh(WALLET);
     await harness.flush();
-    assert.match(harness.menuHtml(), /class="avatar-menu-name">Renamed Artist<\/span>/);
+    assert.equal(harness.avatarName(), 'Renamed Artist');
     assert.doesNotMatch(harness.menuHtml(), /Original Artist/);
 });

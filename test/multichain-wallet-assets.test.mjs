@@ -39,7 +39,7 @@ test('all network+mode calls are disabled by default, while Base legacy endpoint
   const config = readFileSync('src/api/routes/public/config.js','utf8');
   assert.match(config,/multichainWalletAssetsEnabled: process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED === 'true' && process.env.ARTSOUL_MULTICHAIN_ASSETS_ENABLED === 'true'/);
   assert.match(readFileSync('.env.example','utf8'),/ARTSOUL_MULTICHAIN_ASSETS_ENABLED=false/);
-  assert.match(readFileSync('src/features/profile/wallet-nfts.jsx','utf8'),/if \(multichainEnabled\) return <MultiChainWalletAssets wallet=\{wallet\} \/>/);
+  assert.match(readFileSync('src/features/profile/wallet-nfts.jsx','utf8'),/config.multichainWalletAssetsEnabled === true\s*\? <MultiChainWalletAssets key=\{wallet\} wallet=\{wallet\} \/>/);
 });
 
 test('rejects invalid network, wrong type and forged cursor before upstream', async t => {
@@ -205,7 +205,7 @@ test('unverified individual portfolio network is not silently declared empty', a
 test('profile shows Wallet NFTs only for its owner and directly before Saved',()=>{
   const profile=readFileSync('src/entries/profile.jsx','utf8');
   const markup=profile.slice(profile.indexOf('{/* Gallery Tabs */}'),profile.indexOf('{/* Gallery Content */}'));
-  assert.match(markup, /\.\.\.\(isOwnProfile \? \[WALLET_NFT_TAB\] : \[\]\)/);
+  assert.match(markup, /\.\.\.\(walletNftsEnabled && isOwnProfile \? \[WALLET_NFT_TAB\] : \[\]\)/);
   assert.ok(markup.indexOf('WALLET_NFT_TAB') < markup.indexOf("'saved'"));
-  assert.match(profile,/selectedGallery === 'wallet-nfts' \? \(isOwnProfile && <WalletNfts/);
+  assert.match(profile,/selectedGallery === 'wallet-nfts' \? \(isOwnProfile && walletNftsEnabled && <WalletNfts/);
 });

@@ -28,7 +28,8 @@ test('public pages publish canonical ArtSoul domain metadata', () => {
 
   for (const [page, canonicalUrl] of pages) {
     const source = read(page);
-    assert.match(source, new RegExp(`<link rel="canonical" href="${canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`));
+    if (page === 'profile.html') assert.match(source, /data-profile-canonical/);
+    else assert.match(source, new RegExp(`<link rel="canonical" href="${canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`));
     for (const tag of ['property="og:image"', 'name="twitter:image"']) {
       assert.ok(source.includes(`${tag} content="${canonicalOrigin}/artsoul-social-preview-v2.png"`), `${page} must use the versioned canonical social image for ${tag}`);
     }

@@ -92,6 +92,10 @@ Goal: validate the product with real users without changing frozen economics.
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
+  The November 9 [resume audit](../audits/B18_RESUME_ACCOUNT_SEO_2026-11-09.md)
+  reconciles the accepted account-plaque A and private inventory details with
+  incoming B36–B39 changes, and fixes distinct author profiles canonicalizing
+  to the generic profile route. HTTP-to-HTTPS redirection remains intentional.
   The November 2 [NFT record display](../audits/B18_NFT_RECORD_DETAILS_2026-11-02.md)
   adds exact indexed ArtSoul sale evidence and contract identity without inferring
   the current owner's acquisition price. The separately requested

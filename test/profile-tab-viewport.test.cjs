@@ -43,15 +43,13 @@ test('Saved navigation preserves the history entry and clears its hash when anot
   assert.deepEqual(writes[1], [historyState, '', '/profile?address=owner']);
 });
 
-
-test('Wallet NFTs tab retires old artwork requests and does not request a gallery reload', () => {
-  const changes = [], request = { current: 8 }, panel = { style: {}, getBoundingClientRect: () => ({ top: 150 }) };
-  const win = { innerHeight: 800, location: { pathname: '/profile', search: '', hash: '' }, history: {state: null, replaceState() {}} };
-  click({ id: 'wallet-nfts' }, 'collected', v => changes.push(['loading',v]), v => changes.push(['tab',v]), {current: panel}, win, request);
-  assert.equal(request.current, 9);
-  assert.deepEqual(changes,[['loading',false],['tab','wallet-nfts']]);
-  assert.match(source, /selectedGallery !== 'saved' && selectedGallery !== 'wallet-nfts'/);
-  assert.match(source, /galleryType === 'saved' \|\| galleryType === 'wallet-nfts'/);
-  assert.match(source, /selectedGallery === 'wallet-nfts' \? \(isOwnProfile && <WalletNfts/);
-  assert.doesNotMatch(source, /selectedGallery === 'collected' && <WalletNfts/);
+test('wallet inventory is a separate private tab with a shareable local tab hash', () => {
+  const changes = [], writes = [];
+  const window = { location: { pathname: '/profile', search: '', hash: '' }, history: { state: { retained: true }, replaceState: (...args) => writes.push(args) } };
+  click({ id: 'wallet-nfts' }, 'collected', value => changes.push(value), value => changes.push(value), { current: null }, window, { current: 0 });
+  assert.deepEqual(changes, [false, 'wallet-nfts'], 'protocol artwork loading is not triggered for private inventory');
+  assert.deepEqual(writes[0], [window.history.state, '', '/profile#wallet-nfts']);
+  window.location.hash = '#wallet-nfts';
+  click({ id: 'collected' }, 'wallet-nfts', () => {}, () => {}, { current: null }, window, { current: 1 });
+  assert.equal(writes[1][2], '/profile');
 });

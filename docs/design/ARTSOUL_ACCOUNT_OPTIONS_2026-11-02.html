@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en" class="classic">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>ArtSoul — account plaque options</title>
+  <!-- Read the actual palette definitions; this study does not redefine them. -->
+  <link rel="stylesheet" href="../../unified-styles.css">
+  <style>
+    html { scroll-behavior: auto; }
+    body.account-study { margin: 0; padding: 0; min-width: 280px; background: var(--c-bg); color: var(--c-text); font: 14px/1.5 Arial, sans-serif; }
+    .account-study *, .account-study *::before, .account-study *::after { box-sizing: border-box; }
+    .account-study [hidden] { display: none !important; }
+    .account-study button, .account-study input { font: inherit; }
+    .account-study button { cursor: pointer; touch-action: manipulation; }
+    .account-study button:disabled { cursor: default; }
+    .account-study button:focus-visible, .account-study input:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+    .account-study svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .study-main { width: min(1160px, 100%); margin: auto; padding: 32px 20px 56px; }
+    .study-heading { margin: 0 0 8px; font-size: clamp(24px, 4vw, 34px); line-height: 1.2; }
+    .study-intro { max-width: 740px; margin: 0 0 18px; color: var(--c-text-muted); }
+    .study-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 20px; }
+    .study-theme { display: flex; gap: 4px; }
+    .study-control { min-width: 44px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--c-border-soft); border-radius: 10px; color: var(--c-text); background: var(--c-surface); }
+    .study-control[aria-pressed="true"] { background: var(--c-surface-strong); border-color: var(--c-accent); }
+    .study-check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+    .study-check input { width: 20px; height: 20px; margin: 0; accent-color: var(--c-accent); }
+    .study-guidance { margin: 0; color: var(--c-text-muted); }
+    .study-options { display: grid; gap: 24px; margin-top: 28px; }
+    .study-option { min-width: 0; padding-top: 20px; border-top: 1px solid var(--c-border-soft); }
+    .study-option h2 { margin: 0 0 4px; font-size: 21px; line-height: 1.3; }
+    .study-option > p { margin: 0 0 20px; color: var(--c-text-muted); }
+    .study-label { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--c-text-muted); }
+    .study-frame { width: 100%; position: relative; isolation: isolate; border: 1px solid var(--c-border-soft); border-radius: 12px; background: var(--c-bg); }
+    .study-desktop { min-height: 320px; }
+    .study-bar { display: flex; align-items: center; gap: 20px; min-height: 78px; padding: 12px 20px; border-bottom: 1px solid var(--c-border-soft); }
+    .study-logo { font-size: 19px; font-weight: 700; letter-spacing: -.04em; white-space: nowrap; }
+    .study-account { position: relative; flex: none; margin-left: auto; }
+    .study-plaque { display: grid; grid-template-columns: minmax(0, 1fr) 44px; width: 184px; padding: 2px 4px 2px 10px; border: 1px solid var(--c-border); border-radius: 16px; background: var(--c-surface); }
+    .study-option-b .study-plaque { border-radius: 32px; padding-left: 14px; padding-right: 6px; }
+    .study-identity { min-width: 0; display: grid; grid-template-rows: 24px 24px; }
+    .study-copy { display: flex; align-items: center; gap: 5px; min-width: 24px; min-height: 24px; max-width: 100%; padding: 0 3px; border: 0; border-radius: 7px; color: var(--c-text); background: transparent; text-align: left; }
+    .study-copy + .study-copy { border-top: 1px solid var(--c-border-soft); border-radius: 0 0 7px 7px; }
+    .study-copy-name { font-size: 12px; font-weight: 600; }
+    .study-copy-address { font-size: 11px; color: var(--c-text-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .study-copy span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .study-copy svg { width: 12px; height: 12px; opacity: .6; }
+    .study-copy:is(:hover, :focus-visible) { background: var(--c-surface-strong); }
+    .study-copy:is(:hover, :focus-visible) svg { opacity: 1; }
+    .study-toggle { align-self: center; position: relative; display: grid; justify-items: center; align-content: center; gap: 2px; width: 44px; min-height: 44px; padding: 1px 4px; border: 0; border-radius: 12px; color: var(--c-text); background: transparent; }
+    .study-toggle:is(:hover, :focus-visible, [aria-expanded="true"]) { background: var(--c-surface-strong); }
+    .study-avatar { display: block; width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+    .study-provider { position: absolute; right: 3px; top: 18px; width: 14px; height: 14px; padding: 1px; border-radius: 50%; background: var(--c-surface); }
+    .study-toggle > svg { width: 12px; height: 12px; }
+    .study-popover { position: absolute; z-index: 3; top: calc(100% + 8px); right: 0; width: 184px; padding: 10px; border: 1px solid var(--c-border); border-radius: 14px; color: var(--c-text); background: var(--c-surface); box-shadow: 0 8px 22px var(--c-surface-strong); }
+    .study-network { display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 2px 4px 10px; }
+    .study-network img { flex: none; width: 24px; height: 24px; border-radius: 5px; }
+    .study-network-name { font-size: 12px; font-weight: 600; }
+    .study-balance { margin-top: 3px; font-size: 12px; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+    .study-disconnect { display: block; width: 100%; min-height: 44px; padding: 8px; border: 0; border-top: 1px solid var(--c-border-soft); border-radius: 0 0 7px 7px; color: var(--c-text); background: transparent; text-align: left; }
+    .study-disconnect:is(:hover, :focus-visible) { background: var(--c-surface-strong); }
+    .study-placeholder { padding: 22px 20px; color: var(--c-text-muted); font-size: 13px; }
+    .study-placeholder strong { color: var(--c-text); font-size: 18px; }
+    .study-status { margin: 12px 0 0; min-height: 42px; max-width: 300px; font-size: 12px; overflow-wrap: anywhere; }
+    .study-manual { display: block; width: min(100%, 280px); min-height: 44px; margin-top: 8px; padding: 10px; border: 1px solid var(--c-border); border-radius: 6px; color: var(--c-text); background: var(--c-surface); font-size: 16px !important; }
+    .study-mobile-examples { margin-top: 16px; }
+    .study-mobile-examples > summary { min-height: 44px; padding: 11px 4px; cursor: pointer; color: var(--c-text-muted); }
+    .study-mobile-examples > summary:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+    .study-phones { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 24px; margin-top: 12px; }
+    .study-phone-unit { min-width: 0; max-width: 100%; }
+    .study-phone-unit[data-width="390"] { width: 390px; }
+    .study-phone-unit[data-width="320"] { width: 320px; }
+    .study-phone-unit .study-frame { min-height: 342px; }
+    .study-phone-unit .study-bar { gap: 8px; padding: 10px; min-height: 74px; }
+    .study-phone-unit .study-logo { font-size: 15px; }
+    .study-phone-unit .study-placeholder { padding: 18px 12px; }
+    .study-footnote { margin: 24px 0 0; color: var(--c-text-muted); font-size: 12px; }
+    .classic .account-study *, .classic .account-study *::before, .classic .account-study *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    @media (min-width: 900px) {
+      .study-options { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+      .study-option > p { min-height: 42px; }
+    }
+    @media (max-width: 700px) {
+      .study-main { padding: 22px 12px 36px; }
+      .study-bar { gap: 8px; padding: 10px; }
+      .study-logo { font-size: 15px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .account-study *, .account-study *::before, .account-study *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body class="account-study classic">
+  <main class="study-main">
+    <h1 class="study-heading">Two account plaque options</h1>
+    <p class="study-intro">Interactive design examples with synthetic account data. Click the name or address to copy it; use the separate avatar and arrow to open the menu. No wallet is connected and no transaction can be sent.</p>
+    <div class="study-controls">
+      <div class="study-theme" role="group" aria-label="Example theme">
+        <button class="study-control" type="button" data-theme="classic" aria-pressed="true">Classic</button>
+        <button class="study-control" type="button" data-theme="future" aria-pressed="false">Future</button>
+      </div>
+      <label class="study-check"><input type="checkbox" id="long-name">Long display name</label>
+      <label class="study-check"><input type="checkbox" id="copy-failure">Simulate copy failure</label>
+      <button class="study-control" type="button" id="reset-demo">Reset examples</button>
+    </div>
+    <p class="study-guidance">Tab between the two copy controls and the menu button. Enter or Space activates them; Escape closes the menu. Hover only shows a tooltip. The name and address have separate 24px-high targets; the menu button is at least 44px.</p>
+    <label>Test the clipboard<input class="study-manual" aria-label="Paste copied demo text here" placeholder="Paste the copied name or address here" autocomplete="off"></label>
+    <div class="study-options">
+    <section class="study-option study-option-a" aria-labelledby="option-a">
+      <h2 id="option-a">A · Familiar rounded rectangle</h2>
+      <p>A narrow 184px plaque with clear rows and a restrained 16px corner.</p>
+      <div data-examples="a"></div>
+    </section>
+    <section class="study-option study-option-b" aria-labelledby="option-b">
+      <h2 id="option-b">B · Soft pill</h2>
+      <p>The same content, width and interactions with softer 32px corners and a little more inset.</p>
+      <div data-examples="b"></div>
+    </section>
+    </div>
+    <p class="study-footnote">Review draft only. The existing header is unchanged. Both plaques are 54px high: the compact name and address targets are 24px high, with a visible separator and no overlapping hit areas; the menu and other action buttons are at least 44px. Phone frames are 390px and 320px wide when space permits, and shrink with the page. Theme colors come directly from <code>unified-styles.css</code>. Rabby and Base marks are existing local brand assets; every displayed identity and balance is demo data.</p>
+  </main>
+  <template id="account-example">
+    <div class="study-frame">
+      <div class="study-bar">
+        <span class="study-logo">ArtSoul</span>
+        <div class="study-account">
+          <div class="study-plaque" role="group" aria-label="Synthetic account">
+            <div class="study-identity">
+              <button type="button" class="study-copy study-copy-name" data-copy="name" title="Copy display name"><span data-name>Nova Studio</span><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="6" y="6" width="7" height="7" rx="1.5"/><path d="M9 6V3H3v6h3"/></svg></button>
+              <button type="button" class="study-copy study-copy-address" data-copy="address" title="Copy wallet address"><span>0x1234…5678</span><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="6" y="6" width="7" height="7" rx="1.5"/><path d="M9 6V3H3v6h3"/></svg></button>
+            </div>
+            <button type="button" class="study-toggle" aria-label="Open demo account menu, Rabby wallet" aria-expanded="false" title="Open account menu · Rabby">
+              <img class="study-avatar" src="../../public/default-avatar.png" alt="" width="28" height="28">
+              <img class="study-provider" src="../../public/brand/rabby.png" alt="" width="14" height="14">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+            </button>
+          </div>
+          <div class="study-popover" role="region" aria-label="Demo account details" hidden>
+            <div class="study-network">
+              <img src="../../public/brand/base.svg" alt="" width="24" height="24">
+              <div><div class="study-network-name">Base Sepolia</div><div class="study-balance">0.0248 test ETH</div></div>
+            </div>
+            <button class="study-disconnect" type="button">Disconnect</button>
+          </div>
+        </div>
+      </div>
+      <div class="study-placeholder">
+        <strong>Your collection</strong>
+        <div>Synthetic preview · Rabby · Base Sepolia</div>
+        <p class="study-status" role="status" aria-live="polite" aria-atomic="true">Try copying a name or address.</p>
+        <input class="study-manual" aria-label="Demo text for manual copying" readonly hidden>
+      </div>
+    </div>
+  </template>
+  <script>
+    'use strict';
+    const demoAddress = '0x1234567890123456789012345678901234565678';
+    const template = document.getElementById('account-example');
+    const examples = [];
+    let copySequence = 0;
+
+    function displayName() {
+      return document.getElementById('long-name').checked ? 'Nova Studio — Contemporary Digital Art' : 'Nova Studio';
+    }
+
+    function closeExample(example, returnFocus = false) {
+      example.querySelector('.study-popover').hidden = true;
+      const toggle = example.querySelector('.study-toggle');
+      toggle.setAttribute('aria-expanded', 'false');
+      if (returnFocus && !toggle.disabled) toggle.focus();
+    }
+
+    function legacyCopy(text) {
+      const previous = document.activeElement;
+      const input = document.createElement('textarea');
+      input.value = text;
+      input.setAttribute('aria-label', 'Temporary copy field');
+      Object.assign(input.style, { position: 'fixed', left: '-10000px', top: '0', fontSize: '16px' });
+      document.body.append(input);
+      let copied = false;
+      try {
+        input.focus();
+        input.select();
+        input.setSelectionRange(0, input.value.length);
+        copied = document.execCommand('copy');
+      } catch (_) {
+        copied = false;
+      } finally {
+        input.remove();
+        previous?.focus({ preventScroll: true });
+      }
+      return copied;
+    }
+
+    async function copyDemo(example, button) {
+      if (button.disabled) return;
+      const sequence = copySequence;
+      const text = button.dataset.copy === 'name' ? displayName() : demoAddress;
+      const status = example.querySelector('.study-status');
+      const manual = example.querySelector('.study-manual');
+      const simulated = document.getElementById('copy-failure').checked;
+      manual.hidden = true;
+      status.textContent = 'Copying…';
+      button.disabled = true;
+      let copied = false;
+      try {
+        if (!simulated) {
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          if (isIOS) copied = legacyCopy(text);
+          if (!copied && navigator.clipboard?.writeText) {
+            try { await navigator.clipboard.writeText(text); copied = true; } catch (_) { /* Try the platform fallback below. */ }
+          }
+          if (!copied && !isIOS) copied = legacyCopy(text);
+        }
+        if (sequence !== copySequence || example.dataset.disconnected === 'true') return;
+        if (copied) {
+          status.textContent = button.dataset.copy === 'name' ? 'Display name copied.' : 'Demo wallet address copied.';
+        } else {
+          status.textContent = simulated ? 'Simulated failure: nothing copied. Select the demo text below to copy manually.' : 'Could not copy. Select the demo text below to copy manually.';
+          manual.value = text;
+          manual.hidden = false;
+          manual.focus();
+          manual.select();
+        }
+      } finally {
+        if (sequence === copySequence && example.dataset.disconnected !== 'true') button.disabled = false;
+      }
+    }
+
+    for (const option of ['a', 'b']) {
+      const host = document.querySelector('[data-examples="' + option + '"]');
+      const phones = document.createElement('div');
+      phones.className = 'study-phones';
+      const mobileExamples = document.createElement('details');
+      mobileExamples.className = 'study-mobile-examples';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Mobile examples · 390 / 320';
+      mobileExamples.append(summary, phones);
+      for (const size of ['desktop', '390', '320']) {
+        const unit = document.createElement('div');
+        unit.className = size === 'desktop' ? 'study-desktop-unit' : 'study-phone-unit';
+        unit.dataset.width = size;
+        const label = document.createElement('p');
+        label.className = 'study-label';
+        label.textContent = size === 'desktop' ? 'Desktop header · expands to the available width' : size + 'px phone header';
+        const example = template.content.firstElementChild.cloneNode(true);
+        example.dataset.example = option + '-' + size;
+        if (size === 'desktop') example.classList.add('study-desktop');
+        const popover = example.querySelector('.study-popover');
+        popover.id = 'account-menu-' + option + '-' + size;
+        const toggle = example.querySelector('.study-toggle');
+        toggle.setAttribute('aria-controls', popover.id);
+        toggle.addEventListener('click', () => {
+          const willOpen = popover.hidden;
+          examples.forEach(other => closeExample(other));
+          popover.hidden = !willOpen;
+          toggle.setAttribute('aria-expanded', String(willOpen));
+        });
+        example.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', () => copyDemo(example, button)));
+        example.querySelector('.study-disconnect').addEventListener('click', () => {
+          closeExample(example, true);
+          example.dataset.disconnected = 'true';
+          example.querySelectorAll('.study-copy').forEach(button => { button.disabled = true; });
+          toggle.disabled = true;
+          example.querySelector('.study-status').textContent = 'Disconnected in this example only. Use Reset examples to try again.';
+          example.querySelector('.study-manual').hidden = true;
+          document.getElementById('reset-demo').focus();
+        });
+        unit.append(label, example);
+        if (size === 'desktop') host.append(unit);
+        else phones.append(unit);
+        examples.push(example);
+      }
+      host.append(mobileExamples);
+    }
+
+    function updateNames() {
+      examples.forEach(example => {
+        example.querySelector('[data-name]').textContent = displayName();
+        example.querySelector('[data-copy="name"]').setAttribute('aria-label', 'Copy display name: ' + displayName());
+        example.querySelector('[data-copy="name"]').title = 'Copy display name: ' + displayName();
+        example.querySelector('[data-copy="address"]').setAttribute('aria-label', 'Copy demo wallet address: ' + demoAddress);
+        example.querySelector('[data-copy="address"]').title = 'Copy wallet address: ' + demoAddress;
+      });
+    }
+    updateNames();
+    document.getElementById('long-name').addEventListener('change', updateNames);
+    document.querySelectorAll('[data-theme]').forEach(button => button.addEventListener('click', () => {
+      const theme = button.dataset.theme;
+      for (const element of [document.documentElement, document.body]) {
+        element.classList.remove('classic', 'future');
+        element.classList.add(theme);
+      }
+      document.querySelectorAll('[data-theme]').forEach(choice => choice.setAttribute('aria-pressed', String(choice === button)));
+    }));
+    document.getElementById('reset-demo').addEventListener('click', () => {
+      copySequence += 1;
+      examples.forEach(example => {
+        closeExample(example);
+        example.dataset.disconnected = 'false';
+        example.querySelectorAll('button').forEach(button => { button.disabled = false; });
+        example.querySelector('.study-status').textContent = 'Example reset. Try copying a name or address.';
+        example.querySelector('.study-manual').hidden = true;
+      });
+    });
+    document.addEventListener('pointerdown', event => {
+      examples.forEach(example => {
+        if (!example.querySelector('.study-account').contains(event.target)) closeExample(example);
+      });
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      const open = examples.find(example => !example.querySelector('.study-popover').hidden);
+      if (open) { event.preventDefault(); closeExample(open, true); }
+    });
+    document.addEventListener('focusin', event => {
+      examples.forEach(example => {
+        if (!example.querySelector('.study-account').contains(event.target)) closeExample(example);
+      });
+    });
+  </script>
+</body>
+</html>

@@ -120,7 +120,7 @@ test('existing Base wallet renders its network over the media without another AP
     assert.match(legacy, /className="wallet-chain-chip" data-chain="base-mainnet"/);
     assert.match(legacy, /src="\/brand\/base\.svg"/);
     assert.match(legacy, /Preview unavailable/);
-    assert.match(legacy, /if \(multichainEnabled\) return <MultiChainWalletAssets/);
+    assert.match(legacy, /config.multichainWalletAssetsEnabled === true\s*\? <MultiChainWalletAssets/);
 });
 
 test('all primary NFT pages load one small theme-safe stylesheet and fresh card script', () => {

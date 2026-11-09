@@ -4,10 +4,11 @@
 
 The founder explicitly requested NFTs from other collections held by the user's
 wallet on Base, in addition to ArtSoul NFT records. This is a separate,
-read-only section in the owner's Collected tab. It is disabled by default.
+read-only Wallet NFTs tab in the owner's profile, before Saved. The rollout
+is disabled by default in code and enabled on the verified Free production app.
 Viewing it does not switch the wallet or activate mainnet transactions.
 
-The user loads a page explicitly. Each page contains at most 12 ERC-721 or
+Selecting the tab loads the first page. Each page contains at most 12 ERC-721 or
 ERC-1155 items, with contract, exact token ID, quantity and bounded metadata.
 Navigation replaces the page rather than appending an unbounded list. No
 inventory is fetched when opening a profile or another profile tab.
@@ -107,8 +108,63 @@ Unlike the existing profile and notification endpoints, this route lacked an
 explicit Vercel catch-all rewrite. The follow-up adds that same deployment
 mapping and exercises its actual query through the private dispatcher test.
 Owner binding and query rejection remain unchanged. Signed-in production
-acceptance must be rerun after the routing release; activation alone is not
-recorded as a successful browser inventory load.
+acceptance was rerun after PR464: the signed-in production browser loaded two
+12-item pages, with 11 raster previews and one safe SVG fallback on the first.
+The wallet stayed on Base Sepolia and no transaction was requested. Repeating
+the first page used the server cache. This completes that route acceptance,
+not the remaining native-device or whole-phase gates.
+
+## Profile and details follow-up
+
+The founder requested a dedicated profile tab, uniform cards and compact details.
+Wallet NFTs now appears before Saved only on the connected owner's profile when
+enabled. Collected retains ArtSoul NFTs. Selecting the private tab mounts the
+inventory; other tabs do not fetch it. Previous/Next replace the bounded page;
+horizontal swipes use the same pagination and do not intercept vertical scroll.
+
+Cards reserve equal title/collection space. Details open in one native dialog,
+with Escape, close/focus restoration and one scrollable surface. The background
+does not scroll while it is open. Images stay contained; missing or rejected
+images have a safe fallback. Exact IDs, quantities and text-only traits remain.
+
+A details-only ETH/USD reference uses the fixed public Coinbase spot endpoint,
+without a wallet address or credential. It has a two-second timeout, an 8 KiB
+response cap, five-minute cache, in-flight deduplication and a one-minute failure
+backoff. It reuses the signed owner route and existing per-wallet request budget.
+It adds no database, paid account, dependency or background polling. The price,
+source and retrieval time are distinct from NFT purchase evidence.
+
+Purchase amount and venue remain explicitly unverified. Alchemy's inventory
+response is not sale evidence, and its getNFTSales V2/V3 endpoints were retired
+on September 30, 2026 without a direct replacement. A future purchase adapter must
+verify a marketplace sale receipt, recipient, asset and payment rather than infer
+price from a transfer or floor. Other chains and external-NFT trading remain off.
+
+Official references:
+- [Alchemy NFT sales retirement](https://www.alchemy.com/docs/changelog/2026/8/18)
+- [Alchemy owner inventory](https://www.alchemy.com/docs/reference/nft-api-endpoints/nft-api-endpoints/nft-ownership-endpoints/get-nf-ts-for-owner-v-3)
+- [Coinbase public price API](https://docs.cdp.coinbase.com/coinbase-app/track-apis/prices)
+- [MetaMask wallet RPC](https://docs.metamask.io/metamask-connect/evm/reference/json-rpc-api/)
+- [Draft wallet_getAssets interface](https://eips.ethereum.org/EIPS/eip-7811)
+
+Provider wallet APIs are not assumed to expose a complete NFT inventory or sale
+history. Draft ERC-7811 is an optional future adapter, not claimed wallet support.
+The bounded Base index remains the current source. A different key does not
+increase the quota of its provider account.
+
+The related account-plaque request is prepared separately as
+`docs/design/ARTSOUL_ACCOUNT_OPTIONS_2026-11-02.html`: two compact shapes with
+separate name/address copy controls and a network/balance/Disconnect menu.
+Both use the existing palette variables. The founder subsequently selected A,
+with the same-width dropdown and B's distinct name/address copy feedback.
+That shared-header implementation and its November 9 integration are recorded
+in [the resume audit](B18_RESUME_ACCOUNT_SEO_2026-11-09.md).
+
+Rendered checks cover 320, 390, 768 and 1366 px in both themes: equal card heights,
+no page horizontal overflow, contained details, rejected late-wallet responses,
+and session-expiry/sign-in recovery. Clipboard name/address copies were verified
+by pasting into the prototype's test input; simulated failure exposes manual copy.
+These use synthetic data and desktop viewport overrides, not native iPhone proof.
 
 Native iPhone acceptance is not inferred from desktop fixtures or the provider
 probe. Phase B is not closed by this optional inventory feature.

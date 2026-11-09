@@ -83,7 +83,7 @@ test('ArtSoul and wallet NFT overlays use bottom-right round icons only, with vi
 
 test('B38 is presentation-only and does not enable Alchemy usage', () => {
   assert.match(readFileSync('src/features/profile/wallet-nfts.jsx', 'utf8'),
-    /if \(multichainEnabled\) return <MultiChainWalletAssets wallet=\{wallet\} \/>/);
+    /config.multichainWalletAssetsEnabled === true\s*\? <MultiChainWalletAssets key=\{wallet\} wallet=\{wallet\} \/>/);
   assert.doesNotMatch(baseline, /https?:\/\/|fetch\(|background-image:\s*url\(/i);
   assert.doesNotMatch(readFileSync('scripts/critical-first-paint.mjs','utf8'),
     /https?:\/\/|fetch\(|localStorage|document\./i);

@@ -60,10 +60,11 @@ test('the real async copy handler runs once and remains disabled until its own c
     const runtimeHarness = runtime();
     const avatar = createAvatarHarness();
     const wallet = `0x${'ab'.repeat(20)}`;
-    const holder = avatar.document.createElement('div');
-    holder.innerHTML = avatar.dropdown.renderMenuIdentity(wallet);
-    const button = holder.querySelector('.avatar-menu-address');
-    button.disabled = false;
+    const structure = avatar.dropdown.getStableStructure();
+    avatar.context.window.currentWalletAddress = wallet;
+    const button = structure.dropdown.querySelector('[data-avatar-address]');
+    button.hidden = false;
+    avatar.dropdown.syncHeaderCopyControls(structure, { previewWallet: wallet, name: 'Artist' });
     let resolve;
     const writes = [];
     avatar.context.navigator.clipboard = {
@@ -71,16 +72,16 @@ test('the real async copy handler runs once and remains disabled until its own c
     };
     const event = { currentTarget: button, preventDefault() {}, stopPropagation() {} };
     runtimeHarness.capture(button);
-    const pending = avatar.dropdown.copyMenuAddress(event);
+    const pending = avatar.dropdown.copyHeaderIdentity(event);
     assert.deepEqual(writes, [wallet], 'the first activation reaches its real handler');
     assert.equal(button.disabled, true);
     runtimeHarness.finishTimers();
     assert.equal(button.disabled, true, 'shared timers cannot finish the clipboard operation');
     runtimeHarness.capture(button);
-    await avatar.dropdown.copyMenuAddress(event);
+    await avatar.dropdown.copyHeaderIdentity(event);
     assert.equal(writes.length, 1);
     resolve();
     await pending;
     assert.equal(button.disabled, false);
-    assert.equal(button.querySelector('.avatar-menu-copy-status').textContent, 'Copied');
+    assert.equal(structure.dropdown.querySelector('[data-avatar-copy-status]').textContent, 'Address copied');
 });

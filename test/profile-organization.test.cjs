@@ -30,18 +30,22 @@ function elements(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)];
 }
 
-test('profile navigation orders the public sections and keeps Saved private', async () => {
+test('profile navigation orders public sections, then owner-only Wallet NFTs and Saved behind their flags', async () => {
   for (const isOwnProfile of [false, true]) {
     for (const savedEnabled of [false, true]) {
-      const view = await fixture(tabs, {isOwnProfile, savedEnabled, selectedGallery: 'sold', isClassic: true}, types);
-      const buttons = elements(view, item => item.type === 'button');
-      assert.deepEqual(buttons.map(button => React.Children.toArray(button.props.children).join('').trim()),
-        ['Artworks', 'Auctions', 'Collected', 'Activity', ...(isOwnProfile ? ['Wallet NFTs'] : []), ...(isOwnProfile && savedEnabled ? ['Saved'] : [])]);
-      assert.deepEqual(buttons.map(button => button.key), ['created', 'auction', 'collected', 'sold', ...(isOwnProfile ? ['wallet-nfts'] : []), ...(isOwnProfile && savedEnabled ? ['saved'] : [])]);
-      assert.deepEqual(buttons.filter(button => button.props['aria-pressed']).map(button => button.key), ['sold']);
-      assert.doesNotMatch(render(view), /Profile Sections/);
-      const navigation = elements(view, item => item.type === 'nav')[0];
-      assert.equal(navigation.props['aria-label'], 'Profile content');
+      for (const walletNftsEnabled of [false, true]) {
+        const view = await fixture(tabs, {isOwnProfile, savedEnabled, walletNftsEnabled, selectedGallery: 'sold', isClassic: true}, types);
+        const buttons = elements(view, item => item.type === 'button');
+        assert.deepEqual(buttons.map(button => React.Children.toArray(button.props.children).join('').trim()),
+          ['Artworks', 'Auctions', 'Collected', 'Activity', ...(isOwnProfile && walletNftsEnabled ? ['Wallet NFTs'] : []), ...(isOwnProfile && savedEnabled ? ['Saved'] : [])]);
+        assert.deepEqual(buttons.map(button => button.key), ['created', 'auction', 'collected', 'sold', ...(isOwnProfile && walletNftsEnabled ? ['wallet-nfts'] : []), ...(isOwnProfile && savedEnabled ? ['saved'] : [])]);
+        assert.deepEqual(buttons.filter(button => button.props['aria-pressed']).map(button => button.key), ['sold']);
+        assert.doesNotMatch(render(view), /Profile Sections/);
+        const navigation = elements(view, item => item.type === 'nav')[0];
+        assert.equal(navigation.props['aria-label'], 'Profile content');
+        const tabRow = elements(view, item => Object.hasOwn(item.props, 'data-wallet-nfts'))[0];
+        assert.equal(tabRow.props['data-wallet-nfts'], isOwnProfile && walletNftsEnabled);
+      }
     }
   }
 });
