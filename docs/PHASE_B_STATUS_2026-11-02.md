@@ -79,6 +79,12 @@ Sepolia. The newer founder request supersedes the previous account-menu-only
 network restriction and nested hover feedback. See
 [profile and network verification](audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
 for the local test/browser evidence and release boundary.
+PR472 is merged as `8edd5cb4` and deployed to the normal domain through
+`dpl_EzF6rHrj1ivAZ3pMi7Ec3kTDHB2N`. Static/Linux/Windows CI passed. Eight
+production route shells and 34 assets passed verification; the two-theme
+browser matrix also covers a short landscape viewport. These three reported
+implementation fixes are released; the operational and actual-device gates
+below remain open.
 
 The owner selected Google Password Manager for backup-key custody. Actual
 independent encrypted-copy and key-recovery verification remain pending.
