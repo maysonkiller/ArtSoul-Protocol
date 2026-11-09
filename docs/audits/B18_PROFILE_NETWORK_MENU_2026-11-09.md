@@ -51,13 +51,23 @@ confirmation. This follows the existing provider model and
   identical before/after adding the actual Admin-link class; both actions and
   the three-choice menu fit; no page overflow; no pointer-hover outline; keyboard
   focus remains visible. Screenshots at 390 and 1366 were inspected.
+- Both themes also pass at 844 x 390: the network menu stays within the
+  viewport, Disconnect remains reachable and Escape closes the menu.
 - The fixture makes no wallet transaction or authenticated service request.
   These measurements do not claim real iPhone or wallet-extension acceptance.
 
 ## Release and remaining gates
 
-Prepared from main `e8947b77`; CI and production verification are recorded after
-release. Unrelated unfinished local audit and authority-policy files are excluded.
+PR [472](https://github.com/maysonkiller/ArtSoul-Protocol/pull/472) merged as
+`8edd5cb46c95b1ea0909883dadfff911ff373198` from reviewed head `59326910`.
+GitHub workflow `42618470795` passed static checks, Linux/Windows builds, unit
+and contract tests; the Linux job included isolated PostgreSQL recovery tests.
+Production deployment `dpl_EzF6rHrj1ivAZ3pMi7Ec3kTDHB2N` is READY and serves
+the normal domain. Eight public route shells returned HTTP 200 with account
+script v67; all 34 checked shared/built assets match the committed source or
+validated build. The production guest menu opens and closes with Escape without
+horizontal overflow; public artwork links and protocol statistics loaded.
+Unrelated unfinished local audit and authority-policy files are excluded.
 
 This closes the reported implementation defects after release, not Phase B's
 remaining real-wallet journeys, native-device acceptance, independent encrypted
