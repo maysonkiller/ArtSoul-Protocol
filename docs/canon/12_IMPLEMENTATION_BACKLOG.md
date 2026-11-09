@@ -122,7 +122,16 @@ Goal: validate the product with real users without changing frozen economics.
   unsigned wallet relay response blocking the send promise. The
   [relay confirmation follow-up](../audits/B11_RELAYED_WALLET_CONFIRMATION_2026-11-09.md)
   validates the original call before recovering its canonical transaction;
-  no successful transaction is replayed to repair UI state.
+  PR #478 is released. Owner-signed assistant default for artwork 14 passed on
+  production `v19`, block `56614941` at `2026-11-09T17:20:57Z`, with matching
+  receipts from both public RPCs. Without reload, the page removed the default
+  action and showed Create New Auction; assistant input cleared and completion
+  links appeared. Artwork 25's later reload verifies indexed history, not its
+  earlier no-reload confirmation. Its owner-signed page re-auction then created
+  auction 74 at `0.001 ETH` for 24 hours, block `56615876` at
+  `2026-11-09T17:24:04Z`, verified by both public RPCs. The resulting gallery
+  showed a live Keeef card; in-place modal closure was not observed. Remaining
+  signed assistant scenarios stay open; no successful transaction is replayed.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.

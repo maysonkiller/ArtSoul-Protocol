@@ -63,8 +63,19 @@ This does not substitute for the remaining real-wallet journeys below.
 The owner then completed expired settlement for artwork 25 on-chain, exposing
 an unsigned relayed-transaction lookup from the wallet that stranded ethers
 before receipt reconciliation. The [relay confirmation correction](audits/B11_RELAYED_WALLET_CONFIRMATION_2026-11-09.md)
-recovers the exact approved call from canonical Base Sepolia data. That receipt
-is preserved; release and subsequent live UI acceptance remain distinct.
+recovers the exact approved call from canonical Base Sepolia data and is released
+in PR #478. On production `v19`, the owner then signed assistant default for
+artwork 14: transaction `0x95b45ef985719c8dd09ee82965245b994b3ba836c182522fc1144f8bef3bfb92`,
+block `56614941`, `2026-11-09T17:20:57Z`. Both public RPCs confirmed success.
+Without reload, the page replaced the default action with Create New Auction;
+the assistant cleared its input and showed a next-action prompt plus artwork
+and transaction links. This flow is accepted. Artwork 25's post-release reload
+confirms indexed default history only. Its subsequent owner-signed page
+re-auction is also verified: auction 74, `0.001 ETH`, 24 hours, block `56615876`
+at `2026-11-09T17:24:04Z`, with matching creation receipts on both RPCs. The
+resulting gallery showed a live Keeef card. In-place modal closure was not
+observed. Preserve both defaults and the new auction; remaining assistant
+scenarios stay open, as detailed in the same audit.
 
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.
@@ -135,7 +146,7 @@ for the 53 focused checks, 450 built-browser assertions and release boundary.
 | Gate | What remains | Boundary |
 | --- | --- | --- |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |
-| B11/B12 actual journeys | Current-page expired settlement/default/re-auction and the remaining signed assistant scenarios | Retain accepted receipts, voice acceptance and completed transactions. Never replay a completed operation merely to collect another test result. |
+| B11/B12 actual journeys | Remaining signed assistant start/bid and resale/withdrawal scenarios | Artwork 14 default replaced current-page actions without reload on v19. Artwork 25 page re-auction created live auction 74 and appeared in the gallery; in-place modal closure was not observed. Retain those receipts and prior voice acceptance; never replay completed transactions. |
 | B30/B35 operations | Provider exporter correction, representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; recovery, migrations, runtime bytes, bounded health and four populated APIs passed. Combined PostgreSQL/real-Redis recovery passes locally. Hosted cache and NFT-writer activation remain separate; the managed exporter cause is proved but its correction is pending. No new server was purchased. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
 

@@ -49,13 +49,105 @@ It does not upgrade ethers, change contracts, fees, authority or write networks.
 - The adapter cache version is increased on all five consuming pages together
   with its normalized content-hash guard.
 
-Local tests, hosted release and the next owner-signed acceptance are recorded
+Local tests, hosted release and owner-signed acceptance are recorded
 separately below. A successful past receipt does not prove the fixed live UI.
 
 Local verification: 91 existing wallet/auction/donation regressions and 18
 relay/cache-version tests passed with no skips. The 12 relay cases also passed
 against the exact browser ethers 6.7.0 UMD build. The production build passed
 11 route checks and all 172 required CSS utilities. No dependency was upgraded.
+
+## Hosted release — November 9
+
+[PR #478](https://github.com/maysonkiller/ArtSoul-Protocol/pull/478), reviewed
+head `4edd7e8f`, merged at `2026-11-09T17:19:12Z` as
+`d9a6175a6c3fc2be1802485e9cd8a5808e0d819d`.
+[CI run 42662678753](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42662678753)
+passed Linux, Windows and static checks. The initial run exposed an obsolete
+adapter-version assertion for `v18`; it was corrected to the released `v19`
+before the successful run.
+
+Deployment `dpl_5aHr5DHtrP5Vpa9ZVdevUUpPJUCB` is READY with the
+`artsoulprotocol.com` alias. The production probe verified five routes and ten
+assets with all expected-content matches true.
+
+The correction is deployed. The first post-release signed acceptance is recorded
+below. Artwork 25 was reloaded after release: indexed default history and Create
+New Auction appeared, but that is not evidence of confirmation without reload
+for its earlier `v18` transaction. Do not repeat default 25.
+
+## Owner-signed assistant acceptance — 17:20 UTC
+
+On production adapter `v19`, the assistant received the Russian-language request
+to close settlement for artwork 14. The owner signed transaction
+`0x95b45ef985719c8dd09ee82965245b994b3ba836c182522fc1144f8bef3bfb92`.
+Both public RPCs confirmed status 1 in block `56614941` at
+`2026-11-09T17:20:57Z`, with `SettlementDefaulted` for auction 14: `0.008 ETH`
+to artist credit and `0.002 ETH` to the platform. Post-confirmation reads showed
+auction status 4, artwork unminted, active auction 0 and owner pending credit
+`0.0609875 ETH`.
+
+Without reloading after submission, the page removed the expired-settlement
+action and showed Create New Auction. The assistant cleared the input and
+displayed its next-action prompt, artwork link and transaction link. This accepts
+the observed assistant default and current-page confirmation flow on `v19`.
+
+Private receipt evidence: `docs/private/b11-assistant-default-receipt-2026-11-09.json`.
+Screenshot: `output/b11-assistant-default14-confirmed-2026-11-09.png`.
+No completed operation was replayed. The remaining signed assistant journeys
+and Phase B are open.
+
+## Owner-signed page re-auction — 17:24 UTC
+
+The owner confirmed signing a new auction for Keeef, artwork 25, at `0.001 ETH`
+for 24 hours. Both public RPCs verified transaction
+`0x195a74c967dc7c25d14e698ab43c0c1ffd4bbb496985671f75a05db1150528c0`,
+status 1, block `56615876` at `2026-11-09T17:24:04Z`. Its exact
+`AuctionCreated` event creates auction 74 for artwork 25 and the existing
+creator, ending `2026-11-10T17:24:04Z`.
+
+The read-only check used bounded logs from block `56615266` through `56617074`.
+At that common observation block, both RPCs agreed that artwork 25 is unminted,
+floor remains zero, active auction is 74, auction status is 1 and no bid or
+deposit is locked. Core bytecode matches the existing deployment pin.
+Private evidence:
+`docs/private/b11-artwork25-reauction-receipt-2026-11-09T17-28-04-660Z.json`.
+
+The resulting `gallery#auctions` view showed one live Keeef card with 23h59m
+remaining. This accepts the signed page re-auction and resulting gallery state;
+in-place modal closure was not observed or claimed. Preserve this transaction
+alongside the two completed defaults. Assistant start/bid and the remaining
+signed assistant scenarios remain open.
+
+## New-auction dialog follow-up
+
+The signed creation exposed a separate presentation problem: the custom modal
+could sit behind the sticky header. New-auction setup now reuses the native
+top-layer dialog approach already used by Report and resale. It stays inside
+the dynamic viewport without changing the page's scroll root. Initial focus
+lands on Close rather than opening the mobile keyboard. Cancel and Escape
+abort optional guidance and return focus to the creation button without
+scrolling; they cannot close setup while a transaction is pending.
+After confirmation, the native dialog is synchronously closed before the
+existing shared success notice opens, keeping its OK button accessible.
+
+Local validation passed 64 focused action/dialog/creation tests and the full
+production build (11 routes and 172 CSS utilities). A local fixture extracted
+the actual form and shared styles for Classic and Future at 320x568, 844x390
+and 1440x900. All six cases fit the viewport without horizontal overflow; the
+field remained 16 px, pending Escape stayed open and cancellation restored
+focus without changing scroll position. Screenshots are retained under
+`output/b11-auction-dialog-*`; measurements are in
+`docs/private/b11-auction-dialog-render-2026-11-09.json`.
+The actual confirmation handler was also exercised with a local mocked wallet
+and the real shared notice: form pending, form closed, notice acknowledged,
+then the gallery-navigation branch completed. No network or wallet operation
+was used in that fixture. A regression asserts this presentation order and
+that failures leave the form editable.
+
+These are desktop-browser viewport checks, not native iPhone acceptance or a
+second signed creation. No completed auction was replayed. Hosted release is
+recorded separately when verified.
 
 ## Primary implementation references
 

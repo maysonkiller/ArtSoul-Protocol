@@ -136,7 +136,7 @@ test('double clicking the profile action performs one preflight and one navigati
 function confirmationHarness(input = {}, { price = '0,001', duration = 24, createError, createWait } = {}) {
     const h = environment(input);
     const busy = new Set();
-    const errors = [], writes = [], destinations = [];
+    const errors = [], writes = [], destinations = [], presentation = [];
     h.contracts.createAuction = async (...args) => {
         writes.push(args);
         if (createError) throw createError;
@@ -149,15 +149,18 @@ function confirmationHarness(input = {}, { price = '0,001', duration = 24, creat
         beginTransactionAction: key => { if (busy.has(key)) return false; busy.add(key); return true; },
         finishTransactionAction: key => busy.delete(key),
         setAuctionCreationError: error => errors.push(error),
+        newAuctionDialogRef: { current: { close: () => presentation.push('dialog-closed') } },
+        setIsNewAuctionModalOpen: value => presentation.push(['open', value]),
+        reauctionValuationControllerRef: { current: { abort: () => presentation.push('guidance-aborted') } },
         newAuctionPrice: price, newAuctionDuration: duration,
         auctionCreationCheckRef: { current: { context: { walletAddress: CREATOR, chainId: 84532 } } },
         artwork: { blockchain_id: '28', chain_id: 84532 },
-        getTransactionErrorMessage: error => error.message, alert: async () => {},
+        getTransactionErrorMessage: error => error.message, alert: async () => presentation.push('success-notice'),
         window: { web3Modal: { getWalletProvider: async () => h.provider }, ArtSoulContracts: h.contracts,
             location: { assign: value => destinations.push(value) } }
     };
     vm.runInNewContext(slice(artworkSource, 'async function handleConfirmNewAuction()', 'async function handleEndAuction()') + '\nthis.confirm = handleConfirmNewAuction;', scope);
-    return { ...h, scope, errors, writes, destinations, busy, run: scope.confirm };
+    return { ...h, scope, errors, writes, destinations, presentation, busy, run: scope.confirm };
 }
 
 test('confirmation normalizes a comma once, preserves exact value, and passes a wallet guard', async () => {
@@ -207,6 +210,7 @@ test('rejected wallet requests and reverted transactions preserve the form witho
         assert.equal(h.destinations.length, 0);
         assert.equal(h.errors.at(-1), message);
         assert.equal(h.scope.newAuctionPrice, '0,001');
+        assert.deepEqual(h.presentation, []);
         assert.equal(h.busy.size, 0);
     }
 });
@@ -220,8 +224,11 @@ test('double confirmation sends once and does not navigate before confirmation',
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(h.writes.length, 1);
     assert.equal(h.destinations.length, 0);
+    assert.deepEqual(h.presentation, []);
     confirm();
     await first;
+    assert.deepEqual(h.presentation, ['dialog-closed', ['open', false], 'guidance-aborted', 'success-notice']);
+    assert.equal(h.scope.auctionCreationCheckRef.current.context, null);
     assert.equal(h.destinations.length, 1);
 });
 
@@ -231,6 +238,8 @@ test('closing the form cancels guidance and never submits a transaction', () => 
         isTransactionActionPending: () => false,
         reauctionValuationControllerRef: { current: { abort: () => { aborted = true; } } },
         auctionCreationCheckRef: { current: { context: {} } },
+        newAuctionTriggerRef: { current: null },
+        window: { requestAnimationFrame: fn => fn() },
         setAuctionCreationError() {}, setIsNewAuctionModalOpen: value => { closed = value === false; }
     };
     vm.runInNewContext(slice(artworkSource, 'function closeNewAuctionModal()', 'async function handleConfirmNewAuction()') + '\ncloseNewAuctionModal();', scope);
