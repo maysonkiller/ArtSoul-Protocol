@@ -32,8 +32,8 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(read(page), /wallet-runtime-loader\.js/, `${page} must load the standard wallet flow`);
     }
     assert.match(read('wallet-runtime-loader.js'), /appkit-init\.js\?v=54/, 'the loader must import the pinned appkit entry');
-    assert.match(appKit, /wallet-core-connect\.js\?v=18/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=18/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=20/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=20/);
     assert.match(walletTest, /appkit-init\.js\?v=54/);
 });
 

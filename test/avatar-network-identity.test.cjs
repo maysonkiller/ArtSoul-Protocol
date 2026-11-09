@@ -6,7 +6,7 @@ const { createAvatarHarness } = require('./helpers/avatar-dropdown-harness.cjs')
 
 const WALLET = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const OTHER_WALLET = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-const BROWSING_IDS = [84532, 8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 143, 2741, 7777777];
+const BROWSING_IDS = [84532, 8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 7777777];
 
 function networkHarness({ chainId = 84532, confirmed = true, provider = null, ...options } = {}) {
     const harness = createAvatarHarness(options);

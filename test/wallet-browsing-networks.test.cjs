@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { createAvatarHarness } = require('./helpers/avatar-dropdown-harness.cjs');
 const source = fs.readFileSync('appkit-init.js', 'utf8');
 const configuredNetworks = source.slice(source.indexOf('const networks ='), source.indexOf('const customRpcUrls ='));
-const browsingIds = [8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 143, 2741, 7777777];
+const browsingIds = [8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 7777777];
 
 async function switchHarness({ core = false, chain = 84532, outcome = 'confirmed' } = {}) {
     const reownNetworks = await import('@reown/appkit/networks');
@@ -81,6 +81,16 @@ test('unknown chains are rejected before any provider call', async () => {
     assert.equal(await h.select(999), false);
     assert.deepEqual(h.calls.map(([kind]) => kind), ['alert']);
 });
+
+for (const chain of [143, 2741]) {
+    test(`owner-excluded network ${chain} cannot open a wallet switch`, async () => {
+        const h = await switchHarness();
+        assert.equal(await h.select(chain), false);
+        assert.deepEqual(h.calls.map(([kind]) => kind), ['alert']);
+        const menu = createAvatarHarness();
+        assert.equal(await menu.dropdown.selectNetwork(chain), false);
+    });
+}
 test('simultaneous choices cannot open conflicting wallet prompts', async () => {
     const h = await switchHarness();
     let release;
@@ -146,6 +156,6 @@ test('network search filters locally by name or chain ID and can recover from an
     assert.equal(visible().length, 0);
     assert.equal(options.querySelector('.avatar-network-empty').hidden, false);
     h.dropdown.filterNetworks('');
-    assert.equal(visible().length, 16);
+    assert.equal(visible().length, 14);
     assert.equal(options.querySelector('.avatar-network-empty').hidden, true);
 });

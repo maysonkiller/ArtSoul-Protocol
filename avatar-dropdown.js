@@ -156,12 +156,12 @@
         eth: '/brand/eth.png',
         rabby: '/brand/rabby.png',
         ...Object.fromEntries(['arbitrum-one', 'optimism', 'polygon', 'binance-smart-chain',
-            'avalanche', 'linea', 'robinhood', 'soneium', 'unichain', 'world', 'monad',
-            'abstract', 'zora'].map(mark => [mark, `/brand/wallet-networks/${mark}.svg`]))
+            'avalanche', 'linea', 'robinhood', 'soneium', 'unichain', 'world',
+            'zora'].map(mark => [mark, `/brand/wallet-networks/${mark}.svg`]))
     });
     // Selecting a wallet network does not enable ArtSoul writes there.
     // Keep this list aligned with appkit-init's configured EVM networks.
-    const SELECTABLE_NETWORK_IDS = Object.freeze([84532, 8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 143, 2741, 7777777]);
+    const SELECTABLE_NETWORK_IDS = Object.freeze([84532, 8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 7777777]);
     const NETWORK_IDENTITIES = Object.freeze({
         84532: { name: 'Base Sepolia', icon: IDENTITY_MARKS.base, mark: 'base', currency: 'ETH' },
         8453: { name: 'Base Mainnet', icon: IDENTITY_MARKS.base, mark: 'base', currency: 'ETH' },
@@ -178,8 +178,6 @@
             [1868, 'Soneium', 'soneium', 'ETH'],
             [130, 'Unichain', 'unichain', 'ETH'],
             [480, 'World Chain', 'world', 'ETH'],
-            [143, 'Monad', 'monad', 'MON'],
-            [2741, 'Abstract', 'abstract', 'ETH'],
             [7777777, 'Zora', 'zora', 'ETH']
         ].map(([chainId, name, mark, currency]) => [chainId, { name, mark, currency, icon: IDENTITY_MARKS[mark] }]))
     });

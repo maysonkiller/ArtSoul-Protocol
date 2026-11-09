@@ -10,7 +10,9 @@ matches names or chain IDs. The bounded list scrolls without widening the page.
 
 The existing pinned Reown network definitions configure Base Sepolia plus Base,
 Ethereum, Arbitrum One, OP Mainnet, Polygon, BNB Smart Chain, Avalanche, Linea,
-Robinhood Chain, Soneium, Unichain, World Chain, Monad, Abstract and Zora.
+Robinhood Chain, Soneium, Unichain, World Chain and Zora. Monad and Abstract
+were removed at the owner's explicit request before release; neither is offered
+or requested as an optional WalletConnect chain.
 These are wallet browsing choices, not activated ArtSoul deployments or a claim
 to enumerate every network installed in a wallet. Existing WalletConnect
 sessions may need reconnection if their approved optional chains exclude a
@@ -18,12 +20,33 @@ selection. The mobile Core path remains supported; provider confirmation is
 still required before treating a requested network as selected.
 
 The balance is for the selected chain only. Native symbols include POL, BNB,
-AVAX and MON; no cross-chain balance fan-out is introduced. Existing locally
+and AVAX; no cross-chain balance fan-out is introduced. Existing locally
 licensed brand marks retain their colors. No dependency, paid RPC plan,
 financial parameter, contract or write-network authorization changed.
 
 The public artwork heading and region label are now **AI insights**. The model
 integration, stored data and guidance-only behavior are unchanged.
+
+## Owner follow-up: network removal and legible marks
+
+Monad and Abstract are excluded from both the wallet selector and external NFT
+browser/API allowlist. Requests for either removed network are rejected before
+any upstream provider request. Historical data and licensed asset files are not
+deleted. The owner requested removal; this is not a statement that both chains
+have shut down. [Phantom's notice](https://help.phantom.com/articles/ending-support-for-monad-in-phantom-38674346854931)
+specifically ends wallet support for Monad and says assets remain on-chain.
+
+A bounded official-source review found no announced closure of the retained
+networks on November 9. In particular, [Unichain's upgrade](https://blog.uniswap.org/unichain-is-upgrading-to-op-enterprise)
+preserves chain identity and balances, and [Zora Network status](https://status.zora.energy/)
+reports operation. Polygon zkEVM, BNB Beacon Chain and Base Goerli shutdowns
+do not apply to the configured Polygon PoS, BNB Smart Chain and Base Sepolia.
+
+Transparent black Linea, Soneium and World marks now use the existing neutral
+brand background in both themes, without recoloring the source logos. The
+header avatar is constrained to a square 28px box; an older 30px minimum height
+had distorted that image. The canonical embedded bitmap is preserved, so this
+does not add image requests or replace the established guest identity.
 
 ## Evidence and limits
 
@@ -36,6 +59,13 @@ integration, stored data and guidance-only behavior are unchanged.
   the content-hash guard. The production build passes.
 - Native approval and availability of each added network are not claimed as
   tested. Protocol operations still pass through the 84532 write guard.
+- Follow-up validation: 294 of 295 combined targeted checks passed; the only
+  failure expected the old 16-network count. After updating that expectation,
+  the affected wallet suite and adjacent cache/layout suites passed 63/63.
+  External NFT removal checks passed 25/25, and the production build passed.
+- Browser fixture checks confirm Linea in Classic and Soneium in Future are
+  legible with unchanged source colors; the shared header avatar renders at
+  28 by 28 pixels. This is local visual evidence, not a native-wallet approval.
 
 Reown references: [network actions](https://docs.reown.com/appkit/javascript/core/actions)
 and [network configuration](https://docs.reown.com/appkit/javascript/core/options).

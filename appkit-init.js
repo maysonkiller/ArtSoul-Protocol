@@ -6,7 +6,7 @@
 import { createAppKit } from '@reown/appkit'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { baseSepolia, base, mainnet, arbitrum, optimism, polygon, bsc, avalanche,
-    linea, robinhood, soneium, unichain, worldchain, monad, abstract, zora } from '@reown/appkit/networks'
+    linea, robinhood, soneium, unichain, worldchain, zora } from '@reown/appkit/networks'
 // Mobile external browsers connect through the standard WalletConnect flow:
 // the proven bare @walletconnect/ethereum-provider driving the official
 // WalletConnect modal. AppKit stays for desktop and injected browsers.
@@ -26,7 +26,7 @@ import {
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome,
     setCoreAuthLifecycleState
-} from './wallet-core-connect.js?v=19'
+} from './wallet-core-connect.js?v=20'
 
 // ============================================
 // CONFIGURATION
@@ -63,7 +63,7 @@ const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2';
 // These are wallet browsing networks, not ArtSoul deployment targets.
 // ArtSoul operations and every write remain Base Sepolia-only.
 const networks = [baseSepolia, base, mainnet, arbitrum, optimism, polygon, bsc,
-    avalanche, linea, robinhood, soneium, unichain, worldchain, monad, abstract, zora];
+    avalanche, linea, robinhood, soneium, unichain, worldchain, zora];
 const customRpcUrls = {
     [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URLS.map(url => ({ url }))
 };

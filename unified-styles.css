@@ -7120,6 +7120,16 @@ body:is(.classic, .future) .site-header #navButtons .avatar-button {
 }
 .avatar-identity-mark { width: 24px; height: 24px; flex: 0 0 24px; object-fit: contain; }
 .avatar-identity-mark--eth { padding: 2px; border-radius: 50%; background: var(--c-brand-mark-background); }
+/* Black network artwork keeps its original colors on a neutral backing.
+   Preserve this backing when card overlays reset image backgrounds. */
+body:is(.classic, .future) img:is(
+    [src="/brand/wallet-networks/linea.svg"],
+    [src="/brand/wallet-networks/soneium.svg"],
+    [src="/brand/wallet-networks/world.svg"]
+) {
+    border-radius: 50%;
+    background: var(--c-brand-mark-background) !important;
+}
 .avatar-network-mark { display: inline-flex; align-items: center; }
 [data-network-balance] .avatar-identity-mark { width: 14px; height: 14px; flex-basis: 14px; }
 [data-network-balance] { display: inline-flex; align-items: center; gap: 4px; }
@@ -9457,6 +9467,9 @@ body:is(.classic, .future) .site-header #navButtons .avatar-button [data-avatar-
     width: 28px !important;
     height: 28px !important;
     min-width: 28px !important;
+    min-height: 28px !important;
+    max-width: 28px !important;
+    max-height: 28px !important;
 }
 body:is(.classic, .future) .site-header #navButtons .avatar-button .dropdown-arrow {
     display: block !important;

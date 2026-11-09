@@ -50,6 +50,13 @@ test('rejects invalid network, wrong type and forged cursor before upstream', as
     {view:'multichain-nfts',network:'all',cursor:'raw-provider-cursor'}]) {
     await assert.rejects(read(A,options),e => { assert.ok(['INVALID_WALLET_ASSET_QUERY','INVALID_WALLET_ASSET_CURSOR'].includes(e.code));return true; });
   }
+  for (const network of ['monad-mainnet', 'abstract-mainnet']) {
+    for (const view of ['multichain-nfts', 'multichain-tokens']) {
+      await assert.rejects(read(A, { view, network }), err('INVALID_WALLET_ASSET_QUERY', 400));
+    }
+  }
+  const jsx = readFileSync('src/features/profile/multichain-wallet-assets.jsx', 'utf8');
+  assert.doesNotMatch(jsx, /monad-mainnet|abstract-mainnet/);
 });
 
 test('one explicit portfolio call yields chain-specific items, exact IDs, raster artwork and safe marketplace links', async t => {
