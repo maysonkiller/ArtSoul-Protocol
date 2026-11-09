@@ -41,10 +41,14 @@ function fixture({ needsApproval = false, owner = SELLER, listingSeller = SELLER
     const iface = new ethers.Interface(window.resaleCoreABI);
     const nftInterface = new ethers.Interface(['function approve(address,uint256)']);
     const receipt = { status: 1, hash: HASH, blockNumber: 100, index: 2, logs: [] };
-    const transaction = (method, args) => {
+    const transaction = (method, args, value = 0n) => {
         writes.push({ method, args });
-        const tx = { hash: HASH, to: method === 'approve' ? NFT : CORE, value: 0n,
+        const tx = { hash: HASH, to: method === 'approve' ? NFT : CORE, value,
             data: (method === 'approve' ? nftInterface : iface).encodeFunctionData(method, args) };
+        if (method === 'buyResale') {
+            receipt.logs = [{ address: CORE, ...iface.encodeEventLog(iface.getEvent('ResaleCompleted'),
+                [args[0], state.listing.seller, state.signer, value, 0n, 0n]) }];
+        }
         tx.wait = async () => {
             const result = waits[method] ? await waits[method]({ tx, state, receipt }) : receipt;
             if (Number(result?.status) === 1) {
@@ -59,12 +63,14 @@ function fixture({ needsApproval = false, owner = SELLER, listingSeller = SELLER
     api.ensureBaseSepoliaWrite = async () => { reads.push(['network-gate']); };
     api.signer = { getAddress: async () => state.signer };
     api.coreContract = {
+        interface: iface,
         getAddress: async () => CORE,
         tokenToArtwork: async id => { reads.push(['tokenToArtwork', String(id)]); return state.tokenArtwork[String(id)] || 0n; },
         artworks: async id => { reads.push(['artworks', String(id)]); return state.artworks[String(id)]; },
         resaleListings: async id => { reads.push(['resaleListings', String(id)]); return state.listing; },
         listResale: async (...args) => transaction('listResale', args),
-        cancelResale: async (...args) => transaction('cancelResale', args)
+        cancelResale: async (...args) => transaction('cancelResale', args),
+        buyResale: async (tokenId, options) => transaction('buyResale', [tokenId], options.value)
     };
     api.nftContract = {
         getAddress: async () => NFT,
@@ -74,8 +80,88 @@ function fixture({ needsApproval = false, owner = SELLER, listingSeller = SELLER
         approve: async (...args) => transaction('approve', args)
     };
     const onStep = value => steps.push({ step: value.step, totalSteps: value.totalSteps });
-    return { api, state, writes, reads, records, steps, onStep, receipt, window };
+    return { api, state, writes, reads, records, steps, onStep, receipt, window, iface };
 }
+
+test('purchase waits for confirmation then removes the exact artwork listing through the shared receipt bridge', async () => {
+    let release, entered;
+    const waiting = new Promise(resolve => { release = resolve; });
+    const started = new Promise(resolve => { entered = resolve; });
+    const f = fixture({ listingSeller: OTHER, waits: { buyResale: async ({ receipt }) => { entered(); await waiting; return receipt; } } });
+    const action = f.api.buyResale(4, '0.002', { idType: 'artwork' });
+    await started;
+    assert.equal(f.records.length, 0);
+    release();
+    assert.equal(await action, HASH);
+    assert.deepEqual(JSON.parse(JSON.stringify(f.records)), [{ chain_id: 84532,
+        artwork_id: '4', token_id: '8', transaction_hash: HASH, block_number: 100,
+        transaction_index: 2, seller: OTHER, active: false, price: '0' }]);
+    assert.equal(f.state.artworks[4].canonicalFloor, FLOOR);
+});
+
+test('purchase receipt decoding rejects a different contract, event or token without undoing confirmed success', async () => {
+    for (const mismatch of ['contract', 'event', 'token', 'malformed']) {
+        const f = fixture({ listingSeller: OTHER, waits: { buyResale: async ({ receipt }) => {
+            const log = receipt.logs[0];
+            if (mismatch === 'contract') log.address = NFT;
+            if (mismatch === 'event') Object.assign(log, f.iface.encodeEventLog(f.iface.getEvent('ResaleListed'), [8n, OTHER, FLOOR]));
+            if (mismatch === 'token') Object.assign(log, f.iface.encodeEventLog(f.iface.getEvent('ResaleCompleted'), [4n, OTHER, SELLER, FLOOR, 0n, 0n]));
+            if (mismatch === 'malformed') log.data = '0xbad';
+            return receipt;
+        } } });
+        assert.equal(await f.api.buyResale(4, '0.002', { idType: 'artwork' }), HASH);
+        assert.equal(f.records.length, 0, mismatch);
+    }
+});
+
+test('purchase stays confirmed when receipt decoding or browser persistence throws', async () => {
+    for (const failure of ['decode', 'persist']) {
+        const f = fixture({ listingSeller: OTHER });
+        if (failure === 'decode') f.api.coreContract.interface = { parseLog() { throw new Error('decode unavailable'); } };
+        else f.window.ArtSoulDB.recordConfirmedResale = () => { throw new Error('storage unavailable'); };
+        assert.equal(await f.api.buyResale(4, '0.002', { idType: 'artwork' }), HASH);
+        assert.equal(f.records.length, 0);
+    }
+});
+
+test('purchase uses the confirmed gas replacement hash and rejects failed or cancelled receipts', async () => {
+    const replacement = (tx, receipt) => ({ code: 'TRANSACTION_REPLACED', reason: 'repriced', cancelled: false,
+        replacement: { to: tx.to, data: tx.data, value: tx.value }, receipt: { ...receipt, hash: REPLACEMENT_HASH } });
+    const repriced = fixture({ listingSeller: OTHER, waits: { buyResale: async ({ tx, receipt }) => { throw replacement(tx, receipt); } } });
+    assert.equal(await repriced.api.buyResale(4, '0.002', { idType: 'artwork' }), REPLACEMENT_HASH);
+    assert.equal(repriced.records[0].transaction_hash, REPLACEMENT_HASH);
+    for (const wait of [async () => null, async () => ({ status: 0 }),
+        async () => { throw Object.assign(new Error('Rejected'), { code: 'ACTION_REJECTED' }); },
+        async ({ tx, receipt }) => { throw { ...replacement(tx, receipt), cancelled: true, reason: 'cancelled' }; },
+        async ({ tx, receipt }) => { const error = replacement(tx, receipt); error.replacement.data = '0x1234'; throw error; }
+    ]) {
+        const f = fixture({ listingSeller: OTHER, waits: { buyResale: wait } });
+        await assert.rejects(f.api.buyResale(4, '0.002', { idType: 'artwork' }));
+        assert.equal(f.records.length, 0);
+    }
+});
+
+test('purchase refuses wallet, chain and runtime switches during mapping reads before sending', async () => {
+    for (const mutate of [f => { f.state.account = OTHER; }, f => { f.state.signer = OTHER; },
+        f => { f.state.chain = '0x1'; }, f => { f.api.coreContract = { ...f.api.coreContract }; },
+        f => { f.api.signer = { ...f.api.signer }; }
+    ]) {
+        const f = fixture({ listingSeller: OTHER });
+        f.api.coreContract.tokenToArtwork = async () => { mutate(f); return 4n; };
+        await assert.rejects(f.api.buyResale(4, '0.002', { idType: 'artwork' }), /wallet.*changed|network changed/);
+        assert.equal(f.writes.length, 0);
+        assert.equal(f.records.length, 0);
+    }
+});
+
+test('purchase decoding retains the submitted Core runtime if the wallet reconnects during confirmation', async () => {
+    const f = fixture({ listingSeller: OTHER, waits: { buyResale: async ({ receipt }) => {
+        f.api.coreContract = { interface: { parseLog() { throw new Error('new runtime'); } } };
+        return receipt;
+    } } });
+    assert.equal(await f.api.buyResale(4, '0.002', { idType: 'artwork' }), HASH);
+    assert.equal(f.records.length, 1);
+});
 
 test('listing resolves explicit artwork and token namespaces even when their numbers collide', async () => {
     const f = fixture();

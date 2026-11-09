@@ -905,12 +905,36 @@ class ArtSoulContracts {
     async buyResale(id, priceEth, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
+        const runtime = this.captureResaleRuntime();
+        const buyer = await runtime.signer.getAddress();
+        await this.assertExpectedWallet(options);
         const tokenId = await this.resolveTokenId(id, options);
+        const [artworkId, coreAddress] = await Promise.all([
+            runtime.core.tokenToArtwork(tokenId), runtime.core.getAddress()
+        ]);
         const price = this.parseEth(priceEth);
-        const tx = await this.coreContract.buyResale(tokenId, { value: price });
+        await this.assertExpectedWallet({ expectedWallet: buyer, expectedChainId: 84532 });
+        runtime.assertCurrent();
+        const tx = await runtime.core.buyResale(tokenId, { value: price });
         console.log('Buying resale...', tx.hash);
-        await tx.wait();
-        return tx.hash;
+        const receipt = await this.waitForConfirmedTransaction(tx);
+        // The receipt closes the listing while ownership and floor still come
+        // from the indexer. Optional refresh work cannot undo a confirmed sale.
+        try {
+            for (const log of receipt.logs || []) {
+                if (log.address?.toLowerCase() !== coreAddress.toLowerCase()) continue;
+                let event;
+                try { event = runtime.core.interface.parseLog(log); } catch { continue; }
+                if (event?.name !== 'ResaleCompleted' || event.args.tokenId !== tokenId) continue;
+                this.publishResaleReceipt(receipt, {
+                    artworkId, tokenId, seller: event.args.seller, active: false, price: '0'
+                });
+                break;
+            }
+        } catch (error) {
+            console.warn('Purchase confirmed; local refresh notice could not be saved.', error);
+        }
+        return receipt.hash || tx.hash;
     }
 
     async getAuctionBids(id, options = {}) {

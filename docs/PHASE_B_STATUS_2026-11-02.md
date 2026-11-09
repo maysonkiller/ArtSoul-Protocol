@@ -47,6 +47,12 @@ Release evidence and limitations are recorded in
 
 ## Remaining acceptance and operational work
 
+The November 9 [confirmed purchase correction](audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
+removes obsolete post-confirmation RPC/legacy-write calls that could report a
+successful settlement or resale as failed. Purchased listings use the existing
+receipt bridge to remove stale purchase actions while the indexer catches up.
+This is regression coverage, not a repeated real-wallet acceptance transaction.
+
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.
 It reuses provenance without extra requests and distinguishes sale evidence
@@ -119,6 +125,13 @@ limits. Dedicated official-release announcements remain off until the project's
 publisher address is designated; an artwork contract is not silently substituted
 for that publisher wallet.
 
+### Earlier operational evidence (November 2)
+
+The checkpoints below retain their original observation boundaries. The
+November 9 independent recovery and Core activation described above supersede
+their then-open backup and deployment prerequisites; NFT/cache activation and
+representative capacity remain open.
+
 November 2 operations: the explicitly free Nano-to-Micro upgrade increased
 database RAM to 1 GB at the same displayed price, and the previously disabled
 Spend Cap was enabled. Worker cursors/hashes survived the restart unchanged;
@@ -136,7 +149,7 @@ Per-file logging was disabled, so attribution remains open. No further database,
 worker or billing setting was changed. A provider trace or a reviewed bounded
 logging plan is the next diagnostic step, not an assumed application rewrite.
 
-The next B35 acceptance slice exercises actual confirmation polling, catch-up
+The November 2 B35 acceptance slice exercised actual confirmation polling, catch-up
 and coordinated publication against disposable local PostgreSQL. A failed cache
 purge recovers without replaying committed events, and an old delayed refill
 cannot repopulate stale data. It also verifies the existing publication interval
@@ -161,7 +174,9 @@ pending and previously acknowledged readable coverage without losing inbox
 state. These barrier checks are local rolled-back scenarios, not real
 cache/provider recovery.
 Production activation, independent encrypted durability/key custody and actual
-recovery cutover remain open. See [archive migration evidence](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
+recovery cutover were open at that November 2 checkpoint and completed on
+November 9. See [archive migration evidence](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md)
+and the current independent recovery/cutover evidence above.
 
 The 14:00 UTC read-only server comparison also passes: 50 installed package
 metadata records match the candidate dependency closure, with only documented

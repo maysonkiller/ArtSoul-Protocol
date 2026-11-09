@@ -450,6 +450,70 @@ test('a missing live provider account blocks the purchase gracefully', async () 
   assert.match(calls.alerts.join(' '), /Connect your wallet/);
 });
 
+for (const [handler, method, success] of [
+  ['settleAuctionOnce', 'completeSettlement', 'Settlement complete!'],
+  ['purchaseResaleOnce', 'buyResale', 'Purchase successful!']
+]) {
+  async function runPurchase(transactionError = null) {
+    const calls = { alerts: [], transactions: 0, refreshes: 0 };
+    const sandbox = vm.createContext({
+      window: {
+        currentWalletAddress: BIDDER,
+        web3Modal: liveAccountProvider([BIDDER]),
+        ArtSoulContracts: {
+          init: async () => {},
+          [method]: async () => {
+            calls.transactions++;
+            if (transactionError) throw transactionError;
+            return `0x${'ab'.repeat(32)}`;
+          },
+          getArtwork: async () => { throw new Error('RPC read timed out after confirmation'); }
+        },
+        ArtSoulDB: {
+          recordWinnerPurchase: async () => { throw new Error('Legacy writes are disabled'); },
+          recordDirectPurchase: async () => { throw new Error('Legacy writes are disabled'); }
+        }
+      },
+      artwork: { blockchain_id: '7', sale_price: '2', current_owner_address: COLLECTOR },
+      artworkId: 'v41:84532:7',
+      auction: { highestBid: '2' },
+      getAuctionActionId: () => '73',
+      getAuctionHighestBidder: () => BIDDER,
+      confirmAuctionAction: async () => true,
+      ensureArtworkWriteEnabled: () => true,
+      alert: message => calls.alerts.push(message),
+      loadArtwork: async () => { calls.refreshes++; return false; },
+      getTransactionErrorMessage: (error, fallback) => error.message || fallback,
+      console: { log() {}, warn() {}, error() {} },
+      exported: {}
+    });
+    vm.runInContext([
+      extractFunction(artworkSource, 'isSameAddress'),
+      extractFunction(artworkSource, 'getLiveProviderAccount'),
+      extractFunction(artworkSource, handler),
+      `exported.run = ${handler};`
+    ].join('\n'), sandbox);
+    await sandbox.exported.run();
+    return calls;
+  }
+
+  test(`${handler} preserves confirmed success when later RPC and projection reads are unavailable`, async () => {
+    const calls = await runPurchase();
+    assert.equal(calls.transactions, 1);
+    assert.equal(calls.alerts.length, 1);
+    assert.ok(calls.alerts[0].startsWith(success), calls.alerts[0]);
+    assert.equal(calls.refreshes, 1, 'the indexed refresh still runs without asking for another transaction');
+  });
+
+  test(`${handler} never announces success after the transaction rejects`, async () => {
+    const calls = await runPurchase(new Error('Transaction reverted'));
+    assert.equal(calls.transactions, 1);
+    assert.equal(calls.alerts.length, 1);
+    assert.match(calls.alerts[0], /failed: Transaction reverted/);
+    assert.equal(calls.refreshes, 0);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Canonical resale eligibility helper (behavioral, incl. wrong-chain wallet)
 // ---------------------------------------------------------------------------
