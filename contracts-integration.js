@@ -97,7 +97,9 @@ function formatTransactionError(error, fallback = 'The transaction could not be 
 // the button stays disabled. ethers dispatches these on the RAW provider, which
 // bypasses that handoff; route only these through the shared router. Reads stay
 // on the raw provider so gas/nonce/chain routing is unchanged, and desktop or
-// injected providers fall through untouched inside the router.
+// injected providers fall through untouched inside the router. A wallet may
+// return an unsigned inner call for a relayed transaction hash. Recover that
+// read from the chain, without changing the approved send or inventing fields.
 const WALLET_APPROVAL_METHODS = new Set([
     'eth_sendtransaction',
     'eth_signtransaction',
@@ -109,18 +111,90 @@ const WALLET_APPROVAL_METHODS = new Set([
     'eth_signtypeddata_v4'
 ]);
 
+const SUPPORTED_DELEGATION_MANAGER = '0xdb9b1e94b5b69df7e401ddbede43491141047db3';
+const SUPPORTED_DELEGATOR_CODE = '0xef010063c0c19a282a1b52b07dd5a65b58948a07dae32b';
+
+function matchesWalletCall(transaction, canonical) {
+    try {
+        const sameAddress = (a, b) => ethers.getAddress(a) === ethers.getAddress(b);
+        const input = transaction.input ?? transaction.data ?? '0x';
+        const value = BigInt(transaction.value ?? 0);
+        if (sameAddress(canonical.from, transaction.from) &&
+            sameAddress(canonical.to, transaction.to) &&
+            BigInt(canonical.value ?? 0) === value &&
+            canonical.input?.toLowerCase() === input.toLowerCase()) return true;
+
+        // Recover only the observed, revert-on-failure single-call relay.
+        // TRY/batch/unknown envelopes cannot prove inner success from status 1.
+        if (!sameAddress(canonical.to, SUPPORTED_DELEGATION_MANAGER) ||
+            BigInt(canonical.value ?? 0) !== 0n) return false;
+        const relay = new ethers.Interface([
+            'function redeemDelegations(bytes[] permissionContexts,bytes32[] modes,bytes[] executionCallDatas)'
+        ]);
+        const [contexts, modes, executions] = relay.decodeFunctionData('redeemDelegations', canonical.input);
+        if (contexts.length !== 1 || modes.length !== 1 || executions.length !== 1 ||
+            modes[0] !== ethers.ZeroHash) return false;
+        const [delegations] = ethers.AbiCoder.defaultAbiCoder().decode([
+            'tuple(address delegate,address delegator,bytes32 authority,tuple(address enforcer,bytes terms,bytes args)[] caveats,uint256 salt,bytes signature)[]'
+        ], contexts[0]);
+        if (delegations.length !== 1) return false;
+        const root = delegations[0];
+        if (!sameAddress(root.delegator, transaction.from) ||
+            BigInt(root.authority) !== ethers.MaxUint256 ||
+            (!sameAddress(root.delegate, canonical.from) &&
+                !sameAddress(root.delegate, '0x0000000000000000000000000000000000000a11'))) return false;
+        return executions[0].toLowerCase() === ethers.solidityPacked(
+            ['address', 'uint256', 'bytes'], [transaction.to, value, input]
+        ).toLowerCase();
+    } catch {
+        return false;
+    }
+}
+
 function wrapProviderForWalletApprovals(rawProvider) {
-    if (!rawProvider?.request || typeof window === 'undefined'
-        || typeof window.requestArtSoulWalletProvider !== 'function') {
+    if (!rawProvider?.request || typeof window === 'undefined') {
         return rawProvider;
     }
     return new Proxy(rawProvider, {
         get(target, prop, receiver) {
             if (prop === 'request') {
-                return (args) => {
+                return async (args) => {
                     const method = String(args?.method || '').toLowerCase();
-                    if (WALLET_APPROVAL_METHODS.has(method)) {
+                    if (WALLET_APPROVAL_METHODS.has(method) &&
+                        typeof window.requestArtSoulWalletProvider === 'function') {
                         return window.requestArtSoulWalletProvider(target, args);
+                    }
+                    if (method === 'eth_gettransactionbyhash') {
+                        const transaction = await target.request(args);
+                        if (!transaction || (transaction.r && transaction.s)) return transaction;
+                        // ethers 6.7 cannot parse the wallet's synthetic unsigned
+                        // call. Null means still pending; a failed read must never
+                        // cause a resend or a fabricated confirmation.
+                        try {
+                            const chainId = Number(await target.request({method: 'eth_chainId'}));
+                            if (chainId !== 84532) return transaction;
+                            const network = window.ArtSoulBaseSepolia;
+                            const hash = args.params?.[0];
+                            if (network?.chainId !== chainId || typeof network.rpc !== 'function' ||
+                                !/^0x[0-9a-f]{64}$/i.test(hash)) return null;
+                            const canonical = await network.rpc('eth_getTransactionByHash', [hash]);
+                            if (!canonical || canonical.hash?.toLowerCase() !== hash.toLowerCase() ||
+                                Number(canonical.chainId) !== chainId ||
+                                !/^0x[0-9a-f]{64}$/i.test(canonical.r) ||
+                                !/^0x[0-9a-f]{64}$/i.test(canonical.s) ||
+                                !matchesWalletCall(transaction, canonical)) return null;
+                            if (canonical.to?.toLowerCase() === SUPPORTED_DELEGATION_MANAGER) {
+                                // DEFAULT semantics belong to the delegated account's
+                                // implementation. Verify it at the mined block, not now.
+                                if (!canonical.blockNumber) return null;
+                                const code = await network.rpc('eth_getCode', [transaction.from, canonical.blockNumber]);
+                                if (code?.toLowerCase() !== SUPPORTED_DELEGATOR_CODE) return null;
+                            }
+                            if (Number(await target.request({method: 'eth_chainId'})) !== chainId) return null;
+                            return canonical;
+                        } catch {
+                            return null;
+                        }
                     }
                     return target.request(args);
                 };

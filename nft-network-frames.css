@@ -124,3 +124,7 @@ body:is(.classic, .future) :is(.wallet-nft-image, .wallet-asset-art) > .wallet-a
     width: 18px; height: 18px; flex: 0 0 18px; max-width: 18px; max-height: 18px;
     object-fit: contain; background: transparent;
 }
+body:is(.classic, .future) .artsoul-card-media .artsoul-chain-marker > img[src="/brand/eth.png"],
+body:is(.classic, .future) :is(.wallet-nft-image, .wallet-asset-art) > .wallet-asset-overlay .wallet-chain-chip > img[src="/brand/eth.png"] {
+    box-sizing: border-box; padding: 2px; border-radius: 50%; background: var(--c-brand-mark-background);
+}

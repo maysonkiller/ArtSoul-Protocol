@@ -686,6 +686,7 @@ body.future .artwork-page-compact-action {
 }
 
 .classic {
+    --c-brand-mark-background: #ffffff;
     --c-notification-alert: #b84a4e;
     --c-notification-on-alert: #ffffff;
     --c-qr-background: #ffffff;
@@ -715,6 +716,7 @@ body.future .artwork-page-compact-action {
 }
 
 .future {
+    --c-brand-mark-background: #ffffff;
     --c-notification-alert: #f05a71;
     --c-notification-on-alert: #17070b;
     --c-qr-background: #ffffff;
@@ -7134,7 +7136,7 @@ body:is(.classic, .future) .site-header #navButtons .avatar-button {
     box-shadow: none !important;
 }
 .avatar-identity-mark { width: 24px; height: 24px; flex: 0 0 24px; object-fit: contain; }
-.avatar-identity-mark--eth { padding: 2px; border-radius: 50%; background: var(--c-text); }
+.avatar-identity-mark--eth { padding: 2px; border-radius: 50%; background: var(--c-brand-mark-background); }
 .avatar-network-mark { display: inline-flex; align-items: center; }
 [data-network-balance] .avatar-identity-mark { width: 14px; height: 14px; flex-basis: 14px; }
 [data-network-balance] { display: inline-flex; align-items: center; gap: 4px; }
@@ -9752,7 +9754,7 @@ body:is(.classic, .future) .artsoul-card-price-mark {
     flex: 0 0 18px;
     padding: 3px;
     border-radius: 50%;
-    background: var(--c-text);
+    background: var(--c-brand-mark-background);
     object-fit: contain;
 }
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-status {
@@ -10091,6 +10093,10 @@ body:is(.classic,.future) .wallet-chain-chip {
 body:is(.classic,.future) .wallet-chain-chip img {
   position: static; inset: auto; width: 16px; height: 16px;
   flex: 0 0 16px; object-fit: contain; background: transparent;
+}
+/* Preserve the official black Ethereum mark on a neutral backing in both themes. */
+body:is(.classic,.future) .wallet-chain-chip img[src="/brand/eth.png"] {
+  box-sizing: border-box; padding: 2px; border-radius: 50%; background: var(--c-brand-mark-background);
 }
 body:is(.classic,.future) .wallet-chain-glyph {
   display: inline-grid; place-items: center; flex: 0 0 18px;
