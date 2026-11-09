@@ -54,7 +54,7 @@ receipt bridge to remove stale purchase actions while the indexer catches up.
 This is regression coverage, not a repeated real-wallet acceptance transaction.
 PR475 is merged and its production deployment is READY; exact release and
 CI evidence are recorded in that audit.
-The next bounded follow-up synchronizes receipt-adjusted artwork and auction
+The receipt follow-up synchronizes receipt-adjusted artwork and auction
 state immediately, so completed end/default actions disappear even while the
 API refresh stalls or fails. The 81-test focused suite includes late polling
 and unrelated receipt controls; release evidence belongs to the same audit.
@@ -80,9 +80,11 @@ scenarios stay open, as detailed in the same audit.
 PR #479 released the new-auction native dialog correction after both operating
 system checks passed. Assistant withdrawal is now accepted on artwork 38:
 `0.0609875 ETH` returned to the owner's wallet, pending credit became zero and
-the assistant cleared its command without a reload. A separate Gallery-only
-adapter readiness defect was reproduced and corrected locally; its release
-and no-funds retest are tracked in
+the assistant cleared its command without a reload. PR #480 released the
+separate Gallery adapter readiness correction with green Linux/Windows/static
+CI and a READY production deployment. The actual Gallery withdrawal command
+then returned "There is nothing to withdraw." without a wallet prompt or
+transaction. Exact release, production asset and acceptance evidence is in
 [the readiness audit](audits/B11_GALLERY_WALLET_READINESS_2026-11-09.md).
 The completed withdrawal must not be replayed.
 
@@ -155,7 +157,7 @@ for the 53 focused checks, 450 built-browser assertions and release boundary.
 | Gate | What remains | Boundary |
 | --- | --- | --- |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |
-| B11/B12 actual journeys | Remaining signed assistant start/bid and resale/withdrawal scenarios | Artwork 14 default replaced current-page actions without reload on v19. Artwork 25 page re-auction created live auction 74 and appeared in the gallery; in-place modal closure was not observed. Retain those receipts and prior voice acceptance; never replay completed transactions. |
+| B11/B12 actual journeys | Remaining signed assistant start, bid, initial listing and purchase | Artwork 14 default replaced current-page actions without reload on v19. Artwork 25 page re-auction created live auction 74 and appeared in the gallery; in-place modal closure was not observed. Assistant withdrawal is accepted at block 56622288 (0.0609875 ETH to zero), and Gallery's zero-funds check passed after PR #480. Prior voice and repricing/removal acceptance remain valid; never replay completed transactions. |
 | B30/B35 operations | Provider exporter correction, representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; recovery, migrations, runtime bytes, bounded health and four populated APIs passed. Combined PostgreSQL/real-Redis recovery passes locally. Hosted cache and NFT-writer activation remain separate; the managed exporter cause is proved but its correction is pending. No new server was purchased. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
 

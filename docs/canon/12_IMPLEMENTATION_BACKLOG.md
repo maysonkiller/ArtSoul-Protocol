@@ -134,10 +134,14 @@ Goal: validate the product with real users without changing frozen economics.
   signed assistant scenarios stay open; no successful transaction is replayed.
   PR #479 released the native new-auction dialog correction. Assistant withdrawal
   is accepted on artwork 38: `0.0609875 ETH`, block `56622288`, zero pending
-  credit afterward, cleared command without reload. The separate Gallery
-  initialization defect is corrected locally with passive selected-provider
-  preparation and race checks; hosted verification is tracked in the
+  credit afterward, cleared command without reload. PR #480 released the
+  separate Gallery initialization correction with passive selected-provider
+  preparation and race checks. Linux/Windows/static CI passed and production
+  is READY; the actual Gallery zero-funds command returned "There is nothing
+  to withdraw." without a wallet prompt or transaction. Evidence is in the
   [readiness audit](../audits/B11_GALLERY_WALLET_READINESS_2026-11-09.md).
+  Assistant start, bid, initial listing and purchase remain pending; prior
+  repricing/removal and the completed withdrawal must not become replay gates.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.

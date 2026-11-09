@@ -37,7 +37,23 @@ the production ethers 6.7.0 build. Cases include disappearing accounts, wrong
 chains, account/provider/chain changes during preparation, invalid retries,
 consent ordering and read-only activity. No live provider was used by tests.
 The production build passed verification for 11 routes and 172 CSS utilities.
-Hosted release and live no-funds confirmation are recorded when observed.
+
+## Released verification and Gallery acceptance
+
+[PR #480](https://github.com/maysonkiller/ArtSoul-Protocol/pull/480) merged at
+`2026-11-09T18:05:54Z` as `009c4c18de114689d6524318403d896b3dde9ea2`.
+[CI run 42670259771](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42670259771)
+passed Linux, Windows and static checks. The earlier run failed only on the
+obsolete cache-hash manifest; it was corrected before this green run.
+
+Production deployment `dpl_5yq8JD9vcgPW1e5fz6eQumVETCwM` is READY at that exact
+merge. The production probe matched all seven routes and both checked assets;
+evidence is `docs/private/b11-gallery-wallet-production-probe-2026-11-09.json`.
+On the actual Gallery, the withdrawal command then returned
+"There is nothing to withdraw." without a wallet prompt or transaction.
+Screenshot: `output/b11-gallery-withdraw-zero-confirmed-2026-11-09.png`.
+This accepts Gallery readiness with the already-zero balance; it does not
+repeat the completed withdrawal below.
 
 ## Accepted signed withdrawal before this correction
 
@@ -55,5 +71,7 @@ and showed profile and transaction links. This is accepted withdrawal
 evidence, not evidence that the then-broken Gallery preparation worked.
 Private evidence: `docs/private/b11-assistant-withdraw-receipt-2026-11-09.json`
 and `output/b11-assistant-withdraw-confirmed-2026-11-09.png`.
-Do not repeat the completed withdrawal. Other pending owner journeys remain
-open; this record does not declare Phase B or the future public beta complete.
+Do not repeat the completed withdrawal. Assistant start, bid, initial listing
+and purchase remain pending, alongside the existing real Phantom and latest
+native iPhone observations. Separate provider/cohort gates remain open; this
+record does not declare Phase B or the future public beta complete.
