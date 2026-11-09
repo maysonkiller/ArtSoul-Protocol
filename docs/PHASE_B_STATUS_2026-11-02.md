@@ -52,6 +52,8 @@ removes obsolete post-confirmation RPC/legacy-write calls that could report a
 successful settlement or resale as failed. Purchased listings use the existing
 receipt bridge to remove stale purchase actions while the indexer catches up.
 This is regression coverage, not a repeated real-wallet acceptance transaction.
+PR475 is merged and its production deployment is READY; exact release and
+CI evidence are recorded in that audit.
 
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.
@@ -99,6 +101,20 @@ was downloaded, decrypted and restored in isolation; all 159 Storage files and
 Core-only worker are now applied on that server. See
 [independent recovery and cutover evidence](audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md).
 
+The November 9 combined poll/cache scenario now also passes with actual Redis,
+including failed deletion, later acknowledgement and a rejected delayed refill.
+This closes the local transport gap; see the
+[combined acceptance follow-up](audits/B35_COMBINED_POLL_CACHE_ACCEPTANCE_2026-11-02.md#november-9-follow-up-actual-redis-in-the-combined-scenario).
+
+The temporary-file incident is now attributed: all six files in a five-minute
+window came from Supabase's managed `postgres_exporter`. Transaction-local
+memory of 16 MB eliminated spilling for both exact queries, but a persistent
+collector-only correction requires the provider. No global memory or paid
+change was made. See [the trace and reproduction](audits/B30_EXPORTER_TEMP_FILES_2026-11-09.md).
+The authorized provider request was submitted successfully with optional
+project-data access disabled. The current billing dashboard shows usage within
+included quotas and Spend Cap enabled; the provider fix is still pending.
+
 The next bounded B18 fix improves Classic controls over dark/light media and
 opens contextual Guide links only after the target section is expanded.
 It also removes a Saved/playback overlap in the compact desktop Home row.
@@ -109,7 +125,7 @@ for the 53 focused checks, 450 built-browser assertions and release boundary.
 | --- | --- | --- |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |
 | B11/B12 actual journeys | Current-page expired settlement/default/re-auction and the remaining signed assistant scenarios | Retain accepted receipts, voice acceptance and completed transactions. Never replay a completed operation merely to collect another test result. |
-| B30/B35 operations | Representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; the atomic migration batch, matching runtime bytes, bounded health observations, effective grants and four populated public APIs passed. Real Redis transport, NFT ownership/writer activation and representative capacity remain separate gates. No new server was purchased. |
+| B30/B35 operations | Provider exporter correction, representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; recovery, migrations, runtime bytes, bounded health and four populated APIs passed. Combined PostgreSQL/real-Redis recovery passes locally. Hosted cache and NFT-writer activation remain separate; the managed exporter cause is proved but its correction is pending. No new server was purchased. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
 
 Independent backup, restoration and owner key custody are completed prerequisites,

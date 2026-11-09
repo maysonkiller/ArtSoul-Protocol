@@ -101,8 +101,16 @@ Goal: validate the product with real users without changing frozen economics.
   The November 9 [independent recovery and Core cutover](../audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md)
   verifies off-PC encrypted storage, owner key access from iPhone, fresh isolated
   restoration, five atomic migrations and the newer worker on the existing host.
-  Representative IO/egress, optional NFT/cache activation and operator/cohort
-  coverage remain distinct gates; no additional paid infrastructure was enabled.
+  The [November 9 exporter trace](../audits/B30_EXPORTER_TEMP_FILES_2026-11-09.md)
+  attributes six temporary files totaling 20,277,852 bytes in five minutes to
+  the managed `postgres_exporter`. Each exact query reproduced 413 temporary
+  blocks read/written at session-local `work_mem=3500kB` and zero at `16MB`.
+  Attribution is complete for that window; the provider's collector-only
+  correction remains pending. The [combined PostgreSQL/Redis follow-up](../audits/B35_COMBINED_POLL_CACHE_ACCEPTANCE_2026-11-02.md#november-9-follow-up-actual-redis-in-the-combined-scenario)
+  passes locally, including purge failure, later token acknowledgement and
+  rejection of a delayed stale refill. NFT writer/ownership flags remain off;
+  hosted-cache activation, representative IO/egress and operator/cohort
+  coverage remain distinct gates. No additional paid infrastructure was enabled.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
   The November 9 [confirmed purchase fix](../audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
   prevents optional read failures from misreporting confirmed settlement/resale
