@@ -130,7 +130,8 @@ Goal: validate the product with real users without changing frozen economics.
   earlier no-reload confirmation. Its owner-signed page re-auction then created
   auction 74 at `0.001 ETH` for 24 hours, block `56615876` at
   `2026-11-09T17:24:04Z`, verified by both public RPCs. The resulting gallery
-  showed a live Keeef card; in-place modal closure was not observed. Remaining
+  showed a live Keeef card. This closes B11's original default-to-re-auction
+  gate; in-place modal closure was not observed and is not claimed. Remaining
   signed assistant scenarios stay open; no successful transaction is replayed.
   PR #479 released the native new-auction dialog correction. Assistant withdrawal
   is accepted on artwork 38: `0.0609875 ETH`, block `56622288`, zero pending
@@ -153,13 +154,31 @@ Goal: validate the product with real users without changing frozen economics.
   Assistant purchase of artwork 38/token 7 succeeded at block `56637436` for
   `0.001 ETH`; Buy retired and the command cleared without reload, but ownership
   and provenance remained stale. The same audit records the bounded receipt
-  reconciliation correction and the still-open complete UI acceptance.
-  Assistant bid remains pending using an eligible funded account other than
-  the creator. Completed purchase, repricing/removal, withdrawal, auction
-  creation and initial listing must not become replay gates.
+  reconciliation correction, released in PR #482, and the still-open complete
+  UI acceptance. Preview inspection showed the updated owner and six provenance
+  events; delayed convergence after a new receipt was not re-exercised.
+  Assistant bid for artwork 14 / auction 75 is accepted without reload:
+  `0.001 ETH` bid, `0.01 ETH` deposit, block `56674116` at
+  `2026-11-09T20:38:12Z`, successful on both RPCs. Transaction:
+  `0x0d92db6bc67f8e726bd87398094d944a6004b0da01f5c5c4f31942c2e285e3e1`.
+  The page showed the exact current bid and one correct-bidder activity entry,
+  disabled the bid input and explained that this wallet is already highest;
+  the assistant cleared the command and showed success follow-ups. The artwork
+  remains unminted with floor zero. Evidence is retained in
+  `docs/private/b12-assistant-bid14-receipt-2026-11-09.json`.
+  Delayed resale UI acceptance stays open. Completed bid, purchase,
+  repricing/removal, withdrawal, auction creation and initial listing must not
+  become replay gates.
   The [network picker follow-up](../audits/B18_NETWORK_PICKER_2026-11-09.md)
   aligns logo/label spacing, adds searchable configured EVM browsing networks,
   retains the Base Sepolia write boundary and renames the public AI panel.
+  PR #482 also removes Monad/Abstract from wallet and external NFT/token
+  selection, adds neutral backgrounds behind dark network marks and restores
+  the square 28px guest avatar. Exact-head CI `42681754394` passed Linux,
+  Windows and static checks; merge `dfc9f82a36405726bb42ba5b06c6133aa1927d8e`
+  is READY in production deployment `dpl_ArKDP1GHY96YmMt57EBEfgrV7tT4`.
+  Latest native iPhone and real Phantom disconnect/reconnect observations
+  remain open; no completed wallet transaction is repeated for this release.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.

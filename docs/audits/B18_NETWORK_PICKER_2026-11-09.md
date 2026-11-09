@@ -67,6 +67,27 @@ does not add image requests or replace the established guest identity.
   legible with unchanged source colors; the shared header avatar renders at
   28 by 28 pixels. This is local visual evidence, not a native-wallet approval.
 
+## Release evidence
+
+[PR #482](https://github.com/maysonkiller/ArtSoul-Protocol/pull/482) merged at
+`2026-11-09T19:21:55Z` as `dfc9f82a36405726bb42ba5b06c6133aa1927d8e`.
+Reviewed head `5829374624f6d40f8fe010dacfdaee00409da4b8` passed
+[CI 42681754394](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42681754394):
+Linux, Windows and static checks all succeeded. Production deployment
+`dpl_ArKDP1GHY96YmMt57EBEfgrV7tT4` is READY at the exact merge, with
+`artsoulprotocol.com` and `www.artsoulprotocol.com` aliases verified.
+
+The release includes the bounded resale artwork/provenance refresh. Preview
+accessibility inspection confirmed AI insights, the updated Taes owner and six
+provenance events. It does not prove delayed no-reload convergence after a new
+receipt. A subsequent browser screenshot/read was rejected by URL security
+policy; no alternate path was used to bypass it. This menu release does not
+establish native acceptance of the added browsing networks. Latest native
+iPhone composition and real Phantom
+Disconnect/reload/choose-another-wallet checks remain open. No signed purchase
+or other completed operation was replayed; Phase B is not declared complete.
+The local release journal is `output/PR482_RELEASE_2026-11-09.md`.
+
 Reown references: [network actions](https://docs.reown.com/appkit/javascript/core/actions)
 and [network configuration](https://docs.reown.com/appkit/javascript/core/options).
 The implementation reuses the configured definitions and the existing menu,

@@ -213,6 +213,7 @@
             this.identityWallet = null;
             this.resolvedIdentityWallet = null;
             this.walletProviderIdentity = null;
+            this.networkDisplayRequest = null;
             // Automatic (ArtSoulDB readiness) recoveries used by the current
             // wallet generation, and the single readiness listener.
             this.automaticRecoveries = 0;
@@ -1663,23 +1664,37 @@
          */
         async updateNetworkDisplay() {
             const walletAddress = window.currentWalletAddress;
+            if (!walletAddress) return;
             const renderKey = this.pendingRenderKey;
             const generation = this.identityGeneration;
-            const networkInfo = await this.getCurrentNetworkInfo();
-            if (walletAddress !== window.currentWalletAddress || renderKey !== this.pendingRenderKey || generation !== this.identityGeneration) return;
-            const networkButton = document.querySelector('.network-switcher-btn');
-            if (networkButton) {
-                const icon = networkButton.querySelector('[data-network-mark]');
-                const name = networkButton.querySelector('[data-network-name]');
-                const balance = networkButton.querySelector('[data-network-balance]');
-                if (icon) icon.innerHTML = this.renderIdentityMark(networkInfo.mark);
-                if (name) name.textContent = networkInfo.name;
-                if (balance) balance.innerHTML = this.renderNetworkBalance(networkInfo);
-                const providerSlot = document.querySelector('[data-wallet-provider]');
-                if (providerSlot) providerSlot.innerHTML = this.renderWalletProvider(networkInfo.walletProvider);
-                this.rememberWalletProvider(networkInfo.walletProvider, walletAddress);
-                this.syncAccountWalletProvider(networkInfo.walletProvider);
-            }
+            const pending = this.networkDisplayRequest;
+            // Rapid menu reopening shares the current read; a wallet transition
+            // starts its own read and cannot reuse the previous identity's result.
+            if (pending?.walletAddress === walletAddress && pending.renderKey === renderKey && pending.generation === generation) return pending.promise;
+            const request = { walletAddress, renderKey, generation };
+            request.promise = (async () => {
+                try {
+                    const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
+                    if (walletAddress !== window.currentWalletAddress || renderKey !== this.pendingRenderKey || generation !== this.identityGeneration) return;
+                    const networkButton = document.querySelector('.network-switcher-btn');
+                    if (networkButton) {
+                        const icon = networkButton.querySelector('[data-network-mark]');
+                        const name = networkButton.querySelector('[data-network-name]');
+                        const balance = networkButton.querySelector('[data-network-balance]');
+                        if (icon) icon.innerHTML = this.renderIdentityMark(networkInfo.mark);
+                        if (name) name.textContent = networkInfo.name;
+                        if (balance) balance.innerHTML = this.renderNetworkBalance(networkInfo);
+                        const providerSlot = document.querySelector('[data-wallet-provider]');
+                        if (providerSlot) providerSlot.innerHTML = this.renderWalletProvider(networkInfo.walletProvider);
+                        this.rememberWalletProvider(networkInfo.walletProvider, walletAddress);
+                        this.syncAccountWalletProvider(networkInfo.walletProvider);
+                    }
+                } finally {
+                    if (this.networkDisplayRequest === request) this.networkDisplayRequest = null;
+                }
+            })();
+            this.networkDisplayRequest = request;
+            return request.promise;
         }
 
         renderNetworkOptions(currentChainId, requiresConfirmation = false) {
@@ -1971,6 +1986,9 @@
             if (this.isOpen) {
                 void this.requestProtocolAdminAccessOnce();
                 this.recoverUnresolvedIdentity();
+                void this.updateNetworkDisplay().catch(error => {
+                    console.warn('Unable to refresh the account balance:', error);
+                });
             }
 
             if (menu) {

@@ -74,8 +74,10 @@ confirms indexed default history only. Its subsequent owner-signed page
 re-auction is also verified: auction 74, `0.001 ETH`, 24 hours, block `56615876`
 at `2026-11-09T17:24:04Z`, with matching creation receipts on both RPCs. The
 resulting gallery showed a live Keeef card. In-place modal closure was not
-observed. Preserve both defaults and the new auction; remaining assistant
-scenarios stay open, as detailed in the same audit.
+observed. These receipts and the gallery outcome close B11's original
+default-to-re-auction gate; they do not establish the unobserved modal behavior.
+Preserve both defaults and the new auction; remaining assistant scenarios stay
+open, as detailed in the same audit.
 
 PR #479 released the new-auction native dialog correction after both operating
 system checks passed. Assistant withdrawal is now accepted on artwork 38:
@@ -107,12 +109,42 @@ retains the receipt and screenshot. This completed listing must not be replayed.
 The subsequent assistant purchase of artwork 38/token 7 succeeded at block
 `56637436` for `0.001 ETH`. The command cleared and Buy disappeared without
 reload, but the owner/provenance remained stale. The readiness audit records
-the bounded reconciliation fix separately from the still-open complete UI
-acceptance. Do not repeat this completed purchase.
+the bounded reconciliation fix, now released in PR #482, separately from the
+still-open complete UI acceptance. Preview inspection showed the updated owner
+and six provenance events, but did not re-exercise delayed convergence after a
+new receipt without reload. Do not repeat this completed purchase.
+
+Assistant bidding is now accepted on production without reload. The owner
+signed transaction `0x0d92db6bc67f8e726bd87398094d944a6004b0da01f5c5c4f31942c2e285e3e1`;
+both public RPCs confirm status 1, block `56674116`, `2026-11-09T20:38:12Z`,
+artwork 14 / auction 75, a `0.001 ETH` bid and `0.01 ETH` deposit. The artwork
+remained unminted with floor zero. The page showed Current Bid `0.001 ETH` and
+one Bid Activity entry for the correct bidder, disabled the bid input and
+showed "You are already the highest bidder"; the assistant cleared the command
+and displayed success follow-ups. Evidence:
+`docs/private/b12-assistant-bid14-receipt-2026-11-09.json`.
+Do not repeat the bid. Delayed resale UI acceptance remains separate.
+
+That accepted bid also exposed an obsolete next-bid quote and a pre-deposit
+balance in the reopened account menu. The follow-up corrects both without
+changing contract increments or adding balance polling. The subsequent Phantom
+connection check reproduced a separate late-connection mismatch: the SDK kept
+Phantom linked after the website timed out and retained explicit logout intent.
+The [wallet freshness audit](audits/B18_WALLET_STATE_FRESHNESS_2026-11-09.md)
+separates these corrections, regression evidence and remaining native acceptance.
 
 The [network menu follow-up](audits/B18_NETWORK_PICKER_2026-11-09.md) adds
 compact searchable EVM browsing choices and provider-neutral AI insights copy.
-Protocol writes remain restricted to Base Sepolia.
+The release retains 14 browsing networks, removes Monad and Abstract from the
+wallet selector and external NFT/token allowlists, makes dark network marks
+legible and restores a square 28px guest avatar. Protocol writes remain
+restricted to Base Sepolia. PR #482 merged as
+`dfc9f82a36405726bb42ba5b06c6133aa1927d8e` at `2026-11-09T19:21:55Z`;
+[exact-head CI 42681754394](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42681754394)
+passed Linux, Windows and static checks. Production deployment
+`dpl_ArKDP1GHY96YmMt57EBEfgrV7tT4` is READY at that exact merge on both normal
+domain aliases. This release does not establish native acceptance of the added
+browsing networks.
 
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.
@@ -182,8 +214,10 @@ for the 53 focused checks, 450 built-browser assertions and release boundary.
 
 | Gate | What remains | Boundary |
 | --- | --- | --- |
+| B17 reminder acceptance | Real payment-due delivery/read state, live extension and physical-device observation | The November 9 read-only follow-up retains one real auction-ending/read marker and finds no persisted payment-due reminder. Existing isolated tests cover deadlines and read identity; they do not establish those missing live scenarios. Official broadcasts wait for the designated project publisher. |
+| B20 profile notice handling | Define and implement notice handling for profile identity content; preserve historical unused-cover uploads until a retention policy exists | Current reports target artwork and donation messages. Customization/cover uploads are paused, and no automatic deletion or broader editor is activated. This is a separately scoped implementation task, not a passed acceptance test. |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |
-| B11/B12 actual journeys | Remaining signed assistant bid; complete UI acceptance of delayed resale projection | Artwork 38/token 7 purchase succeeded at block 56637436; command/Buy retired but owner/history stayed stale, with a bounded correction prepared. Artwork 14 default and assistant-created auction 75, plus artwork 38/token 7 initial listing, are accepted without reload. Artwork 25 page re-auction created live auction 74 and appeared in the gallery; in-place modal closure was not observed. Assistant withdrawal is accepted at block 56622288 (0.0609875 ETH to zero), and Gallery's zero-funds check passed after PR #480. Prior voice and repricing/removal acceptance remain valid; never replay completed transactions. |
+| B11/B12 actual journeys | Complete UI acceptance of delayed resale projection | Artwork 38/token 7 purchase succeeded at block 56637436; command/Buy retired but owner/history stayed stale, with the bounded correction released in PR #482; preview showed the updated owner and six history events, but delayed no-reload convergence was not re-exercised. Artwork 14 default and assistant-created auction 75, plus artwork 38/token 7 initial listing, are accepted without reload. Artwork 25 page re-auction created live auction 74 and appeared in the gallery; in-place modal closure was not observed. Assistant withdrawal is accepted at block 56622288 (0.0609875 ETH to zero), and Gallery's zero-funds check passed after PR #480. Assistant bid for artwork 14 / auction 75 is accepted without reload at block 56674116: .001 ETH bid, .01 ETH deposit, correct activity and highest-bidder controls, command cleared. Prior voice and repricing/removal acceptance remain valid; never replay completed transactions. |
 | B30/B35 operations | Provider exporter correction, representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; recovery, migrations, runtime bytes, bounded health and four populated APIs passed. Combined PostgreSQL/real-Redis recovery passes locally. Hosted cache and NFT-writer activation remain separate; the managed exporter cause is proved but its correction is pending. No new server was purchased. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
 
@@ -191,7 +225,11 @@ Independent backup, restoration and owner key custody are completed prerequisite
 not remaining gates. The November 9 Core cutover retains the two-second poll and
 uses an explicit health lag below 50 post-Denim blocks (nominally ten seconds),
 with confirmation depth unchanged at three. The recorded seven samples were
-12–28 blocks behind, not zero lag. Long-term cost acceptance is still open.
+12–28 blocks behind, not zero lag. A 6-hour-44-minute follow-up retained the
+same process/restart count, showed zero further full-history transfer calls and
+ended healthy with 12 blocks of lag and no unresolved/RPC errors. Four evening
+public API probes returned populated HTTP-200 responses. Database temporary
+work still grew, so provider remediation and long-term cost acceptance stay open.
 
 The owner has prohibited extra paid infrastructure/API usage. Do not remove the
 Supabase spend cap or enable paid conversational voice. Existing browser voice

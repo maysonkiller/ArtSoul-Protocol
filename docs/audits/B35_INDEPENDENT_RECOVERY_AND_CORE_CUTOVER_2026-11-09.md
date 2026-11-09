@@ -122,6 +122,35 @@ that interval; neither the digest nor those range reads recorded temporary
 blocks. That growth is not reported as billed egress or attributed to the
 worker without matching evidence.
 
+## Evening follow-up: sustained operation
+
+Read-only snapshots at 13:43:53 and 20:27:56 UTC span 6 hours 44 minutes.
+The same process remained online, with unchanged restart count and all 27
+reviewed module digests matching. Its indexed boundary advanced by 121,213
+blocks and six events; the final observation was healthy and synchronized,
+12 blocks behind, with zero unresolved event errors or recent RPC errors.
+Legacy Ethereum Sepolia history remained unchanged. Recovery receipt permissions
+and restricted NFT reader grants also remained correct.
+
+Statement reset markers were unchanged. The old full-history transfer query
+recorded **zero additional calls or rows**. The active server-side digest
+returned 6,639 rows across 6,639 calls, and bounded hash-range reads returned
+4,824 rows across 402 calls. None of those tracked queries wrote temporary
+blocks. Database-wide counters nevertheless increased by 506 temporary files
+and 1,717,537,706 temporary bytes. This longer window does not attribute every
+byte; the separately traced managed-exporter issue remains awaiting provider
+correction. Cumulative temporary work is not stored artwork size or billed
+egress.
+
+At 20:33 UTC, the same four bounded production API probes returned HTTP 200:
+artwork data without warnings, four provenance events, five search results and
+a populated profile. They transferred 18,486 response bytes in total. This
+extends operational evidence without claiming a load benchmark, monthly cost
+ceiling or native-device acceptance. No configuration or data was changed.
+Private evidence: `b35-live-check-1794231833298.json`,
+`b35-live-check-1794256076399.json` and
+`b35-public-evening-2026-11-09.json` under `docs/private/`.
+
 ## Remaining boundaries
 
 - Representative IO, temporary-file and provider-egress observation remains
