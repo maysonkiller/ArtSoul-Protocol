@@ -54,6 +54,11 @@ receipt bridge to remove stale purchase actions while the indexer catches up.
 This is regression coverage, not a repeated real-wallet acceptance transaction.
 PR475 is merged and its production deployment is READY; exact release and
 CI evidence are recorded in that audit.
+The next bounded follow-up synchronizes receipt-adjusted artwork and auction
+state immediately, so completed end/default actions disappear even while the
+API refresh stalls or fails. The 81-test focused suite includes late polling
+and unrelated receipt controls; release evidence belongs to the same audit.
+This does not substitute for the remaining real-wallet journeys below.
 
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.

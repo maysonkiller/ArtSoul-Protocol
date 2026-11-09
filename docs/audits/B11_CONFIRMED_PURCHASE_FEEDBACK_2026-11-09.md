@@ -75,3 +75,27 @@ version 18 and the built artwork entry matched the locally verified content
 hashes. The private preview/production probe receipts retain those comparisons.
 This closes release verification for this correction, not the independent
 native-device or remaining signed-journey gates above.
+
+## Follow-up: confirmed auction actions during a delayed refresh
+
+The shared receipt listener updated the artwork immediately, but left its
+separate auction state unchanged until the API refresh completed. Reproduction:
+`artwork.status = defaulted` while `auction.state = WAITING_PAYMENT`, so
+Close Expired Settlement remained offered. A confirmed auction end could
+similarly leave End Expired Auction visible.
+
+An effect now synchronizes receipt-adjusted artwork into auction state using
+the existing round-aware merger. It runs only for `pending_auction_sync` and
+performs no additional request, profile hydration or transaction. State updaters
+remain pure. Existing indexed ownership, mint state, floor and provenance remain
+authoritative; receipt identity validation and expiry are unchanged.
+
+Four new regression cases exercise the actual page functions and shared receipt
+bridge: default, end without bids, end with a winner, and unrelated/older receipt
+controls. Each successful-action case stalls and then rejects the refresh, and
+resumes an older live poll paused in profile hydration. The previous action
+stays unavailable throughout. The focused five-file suite passes 81 tests with
+zero skips. Real-wallet expired-settlement/default/re-auction acceptance remains
+separate; no completed transaction was replayed.
+The production build also passes all 11 route-shell checks and all 172 required
+CSS utilities. Hosted release and CI are not inferred from these local checks.

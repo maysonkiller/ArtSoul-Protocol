@@ -1754,6 +1754,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 };
             }, [artworkId]);
 
+            useEffect(() => {
+                if (!artwork?.pending_auction_sync) return;
+                // Receipt-driven artwork updates must also retire the previous
+                // auction action while the indexed refresh is still pending.
+                setAuction(current => mergeProjectedAuction(current, artwork));
+            }, [artwork]);
+
             async function loadArtwork() {
                 const sequence = ++artworkLoadSequenceRef.current;
                 const isCurrent = () => sequence === artworkLoadSequenceRef.current;

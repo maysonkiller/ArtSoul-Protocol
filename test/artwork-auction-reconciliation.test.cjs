@@ -74,6 +74,102 @@ function page({ getArtwork, getLiveAuctionActivity, getProfile, getArtworkProven
   return { page: context, state, writes };
 }
 
+function receiptBridge(api, record) {
+  const storage = new Map();
+  const window = { localStorage: {
+    getItem: key => storage.get(key) || null,
+    setItem: (key, value) => storage.set(key, value)
+  }, addEventListener() {}, dispatchEvent() {} };
+  vm.runInNewContext(fs.readFileSync('supabase-client.js', 'utf8'), {
+    window, document: {}, console: quiet, URL, URLSearchParams,
+    CustomEvent: class { constructor(type, options = {}) { this.type = type; Object.assign(this, options); } }
+  });
+  window.ArtSoulDB.recordConfirmedAuction({ chain_id: 84532, artwork_id: '28', auction_id: '63',
+    transaction_hash: `0x${'12'.repeat(32)}`, block_number: 100, kind: 'defaulted', patch: {}, ...record });
+  api.window.ArtSoulDB.applyConfirmedAuctionUpdate = window.ArtSoulDB.applyConfirmedAuctionUpdate;
+}
+
+function refreshFromReceipt(api) {
+  const listener = source.match(/const refresh = \(\) => \{([\s\S]*?)\};\s*window\.addEventListener\('artsoul:auction-confirmed', refresh\)/);
+  assert.ok(listener, 'the shared receipt listener exists');
+  vm.runInContext(listener[1], api);
+  // Commit the effect keyed to the updated artwork without waiting for the
+  // refresh or profile hydration; React runs it after that state update.
+  const effect = source.match(/useEffect\(\(\) => \{\s*if \(!artwork\?\.pending_auction_sync\) return;[\s\S]*?\}, \[artwork\]\);/);
+  assert.ok(effect, 'receipt state synchronizes the auction');
+  api.useEffect = effect => effect();
+  vm.runInContext(effect[0], api);
+}
+
+for (const { kind, originalStatus, expectedState, patch } of [
+  { kind: 'defaulted', originalStatus: 'settlement_pending', expectedState: 'DEFAULTED', patch: {} },
+  { kind: 'ended', originalStatus: 'auction', expectedState: 'ENDED_NO_BIDS', patch: { has_winner: false } },
+  { kind: 'ended', originalStatus: 'auction', expectedState: 'WAITING_PAYMENT',
+    patch: { has_winner: true, settlement_deadline: Math.floor(Date.now() / 1000) + 86400 } }
+]) {
+  test(`a confirmed ${expectedState} retires the previous action while refresh stalls or fails`, async () => {
+    const refresh = deferred(), stalePoll = deferred(), profiles = deferred();
+    let refreshing = false, hydratingPoll = false, profileReads = 0;
+    const original = projection({ status: originalStatus, settlement_deadline: 1790000000,
+      current_owner_address: CREATOR, canonical_floor: '0', minted: false });
+    const { page: api, state } = page({
+      getArtwork: () => refreshing ? refresh.promise : original,
+      getLiveAuctionActivity: () => stalePoll.promise,
+      hydrateBidderProfiles: () => { profileReads++; return hydratingPoll ? profiles.promise : Promise.resolve(); }
+    });
+    await api.loadArtwork();
+    hydratingPoll = true;
+    const poll = api.refreshLiveBidActivity();
+    stalePoll.resolve({ auction: original, bids: [{ bidder: BIDDER, block_number: 99, log_index: 0 }] });
+    await new Promise(resolve => setImmediate(resolve));
+    const readsBeforeReceipt = profileReads;
+    receiptBridge(api, { kind, patch });
+    refreshing = true;
+    refreshFromReceipt(api);
+    assert.equal(state.auction.state, expectedState);
+    assert.equal(state.auction.ended, true);
+    assert.equal(state.artwork.current_owner_address, CREATOR);
+    assert.equal(state.artwork.canonical_floor, '0');
+    assert.equal(state.artwork.minted, false);
+    assert.equal(profileReads, readsBeforeReceipt, 'receipt synchronization does not repeat profile hydration');
+    if (kind === 'defaulted') {
+      const waiting = source.match(/const awaitingPayment = ([^;]+);/)[1];
+      assert.equal(vm.runInContext(waiting, api), false, 'Close Expired Settlement is no longer offered');
+    } else {
+      vm.runInContext([pageFunction('normalizeAuctionTimestamp'), pageFunction('isAuctionEndActionAvailable')].join('\n'), api);
+      api.getAuctionHelper = () => null;
+      assert.equal(api.isAuctionEndActionAvailable(state.auction), false, 'End Expired Auction is no longer offered');
+    }
+    profiles.resolve();
+    await poll;
+    assert.equal(state.auction.state, expectedState, 'an earlier live poll cannot restore the previous action');
+    refresh.reject(Object.assign(new Error('Offline'), { code: 'ARTWORK_READ_UNAVAILABLE' }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(state.auction.state, expectedState);
+    assert.match(state.refreshError, /could not be refreshed/);
+  });
+}
+
+test('unrelated or older auction receipts cannot close the displayed round', async () => {
+  for (const record of [{ artwork_id: '29' }, { chain_id: 11155111 }, { auction_id: '62' }]) {
+    const refresh = deferred();
+    let refreshing = false;
+    const original = projection({ status: 'settlement_pending', settlement_deadline: 1790000000 });
+    const { page: api, state } = page({ getArtwork: () => refreshing ? refresh.promise : original });
+    await api.loadArtwork();
+    const auction = state.auction;
+    receiptBridge(api, record);
+    refreshing = true;
+    refreshFromReceipt(api);
+    assert.equal(state.artwork, original);
+    assert.equal(state.auction, auction);
+    assert.equal(state.auction.state, 'WAITING_PAYMENT');
+    refresh.reject(Object.assign(new Error('Offline'), { code: 'ARTWORK_READ_UNAVAILABLE' }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(state.auction, auction);
+  }
+});
+
 test('artwork replaces all auction-round fields when artwork 28 advances from auction 35 to 63', () => {
   const { page: api } = page();
   const old = api.projectedAuctionFromArtwork(projection({ auction_id: '35', start_price: '1',
