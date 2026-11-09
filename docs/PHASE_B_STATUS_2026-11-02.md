@@ -88,6 +88,22 @@ transaction. Exact release, production asset and acceptance evidence is in
 [the readiness audit](audits/B11_GALLERY_WALLET_READINESS_2026-11-09.md).
 The completed withdrawal must not be replayed.
 
+Assistant auction creation for artwork 14 is also accepted: auction 75 at
+`0.001 ETH` for 24 hours, block `56631239`, `2026-11-09T18:15:16Z`, confirmed
+by both public RPCs. Without reload, the page showed the live auction and the
+assistant cleared its input, disabled Send and showed the next-action prompt
+plus artwork and transaction links. The same audit records its receipt and
+screenshot, PR #481's READY production deployment and green exact-merge CI,
+while retaining the earlier PR-run aggregate failure as a separate limitation.
+Do not repeat this accepted auction creation.
+
+Assistant initial listing of artwork 38/token 7 is accepted at `0.001 ETH`,
+block `56633575`, `2026-11-09T18:23:03Z`, with matching receipts on both RPCs.
+Without reload, the page showed the sale price and changed List NFT to
+Change price / Remove from sale; the assistant cleared its input, disabled
+Send and showed the next-action prompt and completion links. The same audit
+retains the receipt and screenshot. This completed listing must not be replayed.
+
 The founder-requested NFT record slice adds contract/token identity and exact
 last indexed ArtSoul sale details to the existing expandable artwork panel.
 It reuses provenance without extra requests and distinguishes sale evidence
@@ -157,7 +173,7 @@ for the 53 focused checks, 450 built-browser assertions and release boundary.
 | Gate | What remains | Boundary |
 | --- | --- | --- |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |
-| B11/B12 actual journeys | Remaining signed assistant start, bid, initial listing and purchase | Artwork 14 default replaced current-page actions without reload on v19. Artwork 25 page re-auction created live auction 74 and appeared in the gallery; in-place modal closure was not observed. Assistant withdrawal is accepted at block 56622288 (0.0609875 ETH to zero), and Gallery's zero-funds check passed after PR #480. Prior voice and repricing/removal acceptance remain valid; never replay completed transactions. |
+| B11/B12 actual journeys | Remaining signed assistant bid and purchase, using a different account from the relevant creator/seller | Artwork 14 default and assistant-created auction 75, plus artwork 38/token 7 initial listing, are accepted without reload. Artwork 25 page re-auction created live auction 74 and appeared in the gallery; in-place modal closure was not observed. Assistant withdrawal is accepted at block 56622288 (0.0609875 ETH to zero), and Gallery's zero-funds check passed after PR #480. Prior voice and repricing/removal acceptance remain valid; never replay completed transactions. |
 | B30/B35 operations | Provider exporter correction, representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; recovery, migrations, runtime bytes, bounded health and four populated APIs passed. Combined PostgreSQL/real-Redis recovery passes locally. Hosted cache and NFT-writer activation remain separate; the managed exporter cause is proved but its correction is pending. No new server was purchased. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
 
