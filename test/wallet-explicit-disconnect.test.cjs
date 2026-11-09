@@ -68,6 +68,7 @@ function harness({ local = storage(), session = storage(), mobile = false } = {}
         setTimeout: (callback, ms) => { timers.set(++nextTimer, { callback, ms }); return nextTimer; },
         clearTimeout: id => timers.delete(id),
         walletConnectionRevision: 0, walletDisconnectPromise: null, activeConnectAttempt: null,
+        desktopRetryCleanupPromise: null,
         modalClosePromise: null, modalCloseRetryTimer: null,
         activeWalletProvider: null, latestAppKitAccountSnapshot: null, appKitAccountRevision: 0,
         lastObservedAppKitAccountKey: null, lastProcessedAddress: null, lastProcessedChainId: null,
@@ -272,6 +273,164 @@ test('cancelling a reconnect restores logout intent, including after reload', as
     const reload = harness({ local: c.localStorage });
     reload.window.ethereum = provider(A);
     assert.equal(reload.getRestoredWalletState().isConnected, false);
+});
+
+for (const reloadBeforeRetry of [false, true]) {
+    test(`explicit retry clears a late linked SDK account before fresh selection${reloadBeforeRetry ? ' after reload' : ''}`, async () => {
+        let c = harness();
+        await c.window.resetWalletConnection();
+        let sdkAccount = { isConnected: false, allAccounts: [] };
+        let disconnects = 0;
+        const phantom = provider(B, 84532);
+        const sdk = {
+            getAccount(namespace) { assert.equal(namespace, 'eip155'); return sdkAccount; },
+            async disconnect(namespace) {
+                assert.equal(namespace, 'eip155');
+                assert.equal(c.isWalletExplicitlyDisconnected(), true, 'cleanup retains the logout barrier');
+                disconnects++;
+                await c.onAccount(sdkAccount);
+                assert.equal(c.window.currentWalletAddress, null);
+                sdkAccount = { isConnected: false, allAccounts: [] };
+            }
+        };
+        c.window.web3Modal = sdk;
+        c.openAppKitConnectModal = async () => selectEvent(c, 'SELECT_WALLET', 'Phantom', { platform: 'browser' });
+        c.WALLET_CONNECT_TIMEOUT_DESKTOP = 0;
+        assert.equal(await c.window.safeConnectWallet(), null);
+        sdkAccount = { address: B, chainId: 84532, isConnected: true, allAccounts: [{ address: B }] };
+        await c.onAccount(sdkAccount);
+        selectEvent(c, 'CONNECT_SUCCESS', 'Phantom', { method: 'browser' });
+        assert.equal(c.window.currentWalletAddress, null, 'late approval must not override logout');
+        assert.equal(disconnects, 0, 'cleanup requires a new explicit Connect');
+
+        if (reloadBeforeRetry) c = harness({ local: c.localStorage, session: c.sessionStorage });
+        c.window.web3Modal = sdk;
+        c.selectedProvider = phantom;
+        c.window.ethereum = provider(A);
+        c.localStorage.setItem('appkit-unrelated-test-setting', 'preserved');
+        c.WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;
+        c.openAppKitConnectModal = async () => {
+            assert.equal(disconnects, 1);
+            assert.equal(sdkAccount.isConnected, false);
+            assert.equal(await c.reconcileActiveWalletFromProviders(), null, 'cleanup is not connection approval');
+            selectEvent(c, 'SELECT_WALLET', 'Phantom', { platform: 'browser' });
+            sdkAccount = { address: B, chainId: 84532, isConnected: true };
+            await c.onAccount(sdkAccount);
+            assert.equal(c.window.currentWalletAddress, null);
+            selectEvent(c, 'CONNECT_SUCCESS', 'Phantom', { method: 'browser' });
+        };
+        assert.equal(await c.window.safeConnectWallet(), B);
+        assert.equal(c.activeWalletProvider, phantom);
+        assert.equal(c.window.currentChainId, 84532);
+        assert.equal(c.isWalletExplicitlyDisconnected(), false);
+        assert.equal(c.localStorage.getItem('appkit-unrelated-test-setting'), 'preserved');
+        assert.equal(c.window.ethereum.reads.length, 0, 'the other installed wallet remains unused');
+        assert.equal(phantom.selectedAddress, B, 'SDK cleanup does not revoke extension authorization');
+    });
+}
+
+test('cancelling the fresh picker after retry cleanup keeps logout across reload', async () => {
+    const c = harness({ local: storage({ artsoul_disconnecting: 'true' }) });
+    let sdkAccount = { address: B, isConnected: true };
+    let disconnects = 0;
+    c.window.web3Modal = {
+        getAccount: () => sdkAccount,
+        async disconnect() { disconnects++; sdkAccount = { isConnected: false }; }
+    };
+    c.openAppKitConnectModal = async () => selectEvent(c, 'SELECT_WALLET', 'Phantom', { platform: 'browser' });
+    c.waitForConfirmedDesktopWallet = async () => null;
+    assert.equal(await c.window.safeConnectWallet(), null);
+    assert.equal(disconnects, 1);
+    await c.onAccount({ address: B, isConnected: true });
+    assert.equal(c.window.currentWalletAddress, null);
+    assert.equal(c.isWalletExplicitlyDisconnected(), true);
+    const reload = harness({ local: c.localStorage });
+    reload.window.web3Modal = c.window.web3Modal;
+    assert.equal(reload.getRestoredWalletState().isConnected, false);
+});
+
+for (const failure of ['rejected', 'still linked']) {
+    test(`retry cleanup ${failure} leaves logout intact without opening the picker or clearing storage`, async () => {
+        const c = harness({ local: storage({ artsoul_disconnecting: 'true', 'appkit-test-setting': 'preserved' }) });
+        const alerts = [];
+        c.alert = message => alerts.push(message);
+        c.selectedProvider = c.window.ethereum = provider(B);
+        c.window.web3Modal = {
+            getAccount: () => ({ address: B, isConnected: true }),
+            async disconnect() { if (failure === 'rejected') throw new Error('previous request declined'); }
+        };
+        let opens = 0;
+        c.openAppKitConnectModal = async () => { opens++; };
+        assert.equal(await c.window.safeConnectWallet(), null);
+        assert.equal(opens, 0);
+        assert.equal(c.isWalletExplicitlyDisconnected(), true);
+        assert.equal(c.window.currentWalletAddress, null);
+        assert.equal(c.selectedProvider.reads.length, 0);
+        assert.equal(c.localStorage.getItem('appkit-test-setting'), 'preserved');
+        assert.deepEqual(alerts, ['Wallet retry could not be prepared. Please retry.']);
+    });
+}
+
+test('retry cleanup cannot open a picker after another logout and ignores duplicate Connect', async () => {
+    const c = harness({ local: storage({ artsoul_disconnecting: 'true' }) });
+    const cleanup = deferred();
+    let disconnects = 0;
+    let opens = 0;
+    c.window.web3Modal = {
+        getAccount: () => ({ address: B, isConnected: true }),
+        async disconnect(namespace) { if (namespace === 'eip155') { disconnects++; await cleanup.promise; } }
+    };
+    c.openAppKitConnectModal = async () => { opens++; };
+    const pending = c.window.safeConnectWallet();
+    assert.equal(await c.window.safeConnectWallet(), null);
+    assert.equal(disconnects, 1);
+    await c.window.resetWalletConnection();
+    cleanup.resolve();
+    assert.equal(await pending, null);
+    assert.equal(opens, 0);
+    assert.equal(c.isWalletExplicitlyDisconnected(), true);
+    assert.equal(c.window.currentWalletAddress, null);
+});
+
+test('timed-out cleanup retains logout and a retry waits for the same teardown before connecting', async () => {
+    const c = harness({ local: storage({ artsoul_disconnecting: 'true' }) });
+    const cleanup = deferred();
+    let sdkAccount = { address: B, isConnected: true };
+    let disconnects = 0;
+    let opens = 0;
+    c.selectedProvider = provider(B, 84532);
+    c.window.web3Modal = {
+        getAccount: () => sdkAccount,
+        async disconnect() { disconnects++; await cleanup.promise; }
+    };
+    c.openAppKitConnectModal = async () => {
+        opens++;
+        selectEvent(c, 'SELECT_WALLET', 'Phantom', { platform: 'browser' });
+        sdkAccount = { address: B, chainId: 84532, isConnected: true };
+        await c.onAccount(sdkAccount);
+        selectEvent(c, 'CONNECT_SUCCESS', 'Phantom', { method: 'browser' });
+    };
+    const first = c.window.safeConnectWallet();
+    const timeout = [...c.timers.values()].find(timer => timer.ms === c.APPKIT_MODAL_OPEN_TIMEOUT);
+    assert.ok(timeout);
+    timeout.callback();
+    assert.equal(await first, null);
+    assert.equal(c.isWalletExplicitlyDisconnected(), true);
+    assert.equal(c.window.currentWalletAddress, null);
+    assert.equal(opens, 0);
+    assert.equal(c.activeConnectAttempt, null, 'Connect becomes available after the bounded wait');
+
+    sdkAccount = { isConnected: false };
+    const retry = c.window.safeConnectWallet();
+    await Promise.resolve();
+    assert.equal(opens, 0, 'even cleared SDK accounts cannot skip an unfinished teardown');
+    assert.equal(disconnects, 1);
+    cleanup.resolve();
+    assert.equal(await retry, B);
+    assert.equal(opens, 1);
+    assert.equal(disconnects, 1);
+    assert.equal(c.isWalletExplicitlyDisconnected(), false);
+    assert.equal(c.timers.size, 0);
 });
 
 test('new Connect waits for ongoing logout teardown before allowing the chosen wallet', async () => {

@@ -40,7 +40,8 @@ function projection(overrides = {}) {
 
 const functionNames = [
   'normalizeTimestampMs', 'firstPositiveTimestamp', 'firstDefined', 'parseEthToWei',
-  'getAuctionHighestBidWei', 'projectedAuctionFromArtwork', 'mergeProjectedAuction',
+  'formatWeiToEth', 'getAuctionHighestBidWei', 'getAuctionStartingBidWei', 'calculateMinimumBidDetails',
+  'projectedAuctionFromArtwork', 'mergeProjectedAuction',
   'bidIdentity', 'advanceBidCursor', 'applyLiveAuctionProjection', 'refreshLiveBidActivity',
   'getAuctionActionId', 'isZeroAddress', 'isSameAddress', 'hasProtocolId', 'loadArtwork', 'startResaleProjectionRefresh'
 ];
@@ -73,7 +74,13 @@ function page({ getArtwork, getLiveAuctionActivity, getProfile, getArtworkProven
       if (key === 'provenanceState') context.provenanceSnapshotRef.current = state[key];
     };
   }
-  vm.runInContext(functionNames.map(pageFunction).join('\n'), context, { filename: 'shipped-artwork-functions.js' });
+  const minimumBidConstants = ['MIN_ABSOLUTE_BID_INCREMENT_WEI', 'BID_INCREMENT_BPS', 'BPS_DENOMINATOR']
+    .map(name => {
+      const declaration = source.match(new RegExp(`const ${name} = [^;]+;`))?.[0];
+      assert.ok(declaration, `Shipped constant ${name} exists`);
+      return declaration;
+    });
+  vm.runInContext([...minimumBidConstants, ...functionNames.map(pageFunction)].join('\n'), context, { filename: 'shipped-artwork-functions.js' });
   return { page: context, state, writes };
 }
 
@@ -370,6 +377,65 @@ test('bid monotonicity is retained within one round but not shared between chain
     assert.equal(result.highestBid, '0');
     assert.equal(result.highestBidder, ZERO_ADDRESS);
   }
+});
+
+test('live first-bid polling advances the displayed minimum and prefill beyond the initial RPC quote', async () => {
+  const initial = projection({ artwork_id: '14', auction_id: '75', active_auction_id: '75' });
+  let live = {
+    bids: [{ bidder: BIDDER, bid_amount: '0.001', block_number: 56674116, log_index: 1 }],
+    auction: { ...initial, current_bid: '0.001', highest_bid: '0.001', current_bidder: BIDDER }
+  };
+  const { page: api, state } = page({ getLiveAuctionActivity: async () => live });
+  await api.applyLiveAuctionProjection(initial);
+  api.setAuction(current => ({ ...current, minimumBid: '0.001', requiredNextBid: '0.001', minimum_bid: '0.001' }));
+  assert.equal(api.calculateMinimumBidDetails(state.auction).eth, '0.001');
+
+  await api.refreshLiveBidActivity();
+  assert.equal(state.auction.highestBid, '0.001');
+  assert.equal(state.bidActivity.length, 1);
+  assert.equal(api.calculateMinimumBidDetails(state.auction).wei, 11000000000000000n);
+  assert.equal(api.calculateMinimumBidDetails(state.auction).eth, '0.011');
+
+  let bidAmount = '0.001';
+  api.setBidAmount = update => { bidAmount = update(bidAmount); };
+  api.isAuctionClosedForBidding = () => false;
+  api.useEffect = effect => effect();
+  const prefillEffect = source.match(/useEffect\(\(\) => \{\s*if \(!auction \|\| isAuctionClosedForBidding\(auction\)\) return;\s*const minimumBidDetails = calculateMinimumBidDetails\(auction\);[\s\S]*?\}, \[auction\]\);/);
+  assert.ok(prefillEffect, 'the shipped auction-change effect updates the bid prefill');
+  vm.runInContext(prefillEffect[0], api);
+  assert.equal(bidAmount, '0.011');
+  bidAmount = '0.02';
+  vm.runInContext(prefillEffect[0], api);
+  assert.equal(bidAmount, '0.02', 'a valid higher user amount is retained');
+
+  live = { bids: [], auction: initial };
+  await api.refreshLiveBidActivity();
+  assert.equal(state.auction.highestBid, '0.001', 'an older indexer response cannot lower the bid');
+  assert.equal(api.calculateMinimumBidDetails(state.auction).eth, '0.011');
+});
+
+test('minimum quotes remain valid for unchanged bids and reset with newer bids or auction rounds', () => {
+  const { page: api } = page();
+  const current = {
+    ...api.projectedAuctionFromArtwork(projection({ current_bid: '0.4', highest_bid: '0.4' })),
+    minimumBid: '0.410000000000000002', requiredNextBid: '0.410000000000000002'
+  };
+  for (const highestBid of ['0.4', '0.1']) {
+    const unchanged = api.mergeProjectedAuction(current, projection({ current_bid: highestBid, highest_bid: highestBid }));
+    assert.equal(api.calculateMinimumBidDetails(unchanged).eth, '0.410000000000000002',
+      'keep a contract quote ahead of an unchanged or lagging projection');
+  }
+  const quoteAhead = { ...current, minimumBid: '0.512500000000000002', requiredNextBid: '0.512500000000000002' };
+  const partlyCaughtUp = api.mergeProjectedAuction(quoteAhead,
+    projection({ current_bid: '0.400000000000000001', highest_bid: '0.400000000000000001' }));
+  assert.equal(api.calculateMinimumBidDetails(partlyCaughtUp).eth, '0.512500000000000002',
+    'a partial indexer catch-up cannot lower a newer contract quote');
+  const advanced = api.mergeProjectedAuction(current,
+    projection({ current_bid: '1.000000000000000001', highest_bid: '1.000000000000000001' }));
+  assert.equal(api.calculateMinimumBidDetails(advanced).eth, '1.025000000000000002',
+    'the new bid uses the exact contract ceiling rule');
+  const nextRound = api.mergeProjectedAuction(advanced, projection({ auction_id: '64', start_price: '0.002' }));
+  assert.equal(api.calculateMinimumBidDetails(nextRound).eth, '0.002', 'a new round does not inherit the previous minimum');
 });
 
 test('two artwork loads finishing in reverse order retain the latest artwork, auction, and page title', async () => {

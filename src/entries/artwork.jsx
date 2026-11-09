@@ -1541,22 +1541,20 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     auctionData?.requiredNextBid,
                     auctionData?.minimum_bid
                 ));
-                if (contractMinimumWei && contractMinimumWei > 0n) {
-                    return { wei: contractMinimumWei, eth: formatWeiToEth(contractMinimumWei) };
-                }
-
                 // Match the contract's integer ceiling rule without passing
                 // through floating-point helpers or rounding the input value.
                 const currentBidWei = getAuctionHighestBidWei(auctionData);
+                let minimumWei = getAuctionStartingBidWei(auctionData);
                 if (currentBidWei > 0n) {
                     const absoluteIncrement = currentBidWei + MIN_ABSOLUTE_BID_INCREMENT_WEI;
                     const percentIncrement = (currentBidWei * (BPS_DENOMINATOR + BID_INCREMENT_BPS) + (BPS_DENOMINATOR - 1n)) / BPS_DENOMINATOR;
-                    const minimumWei = absoluteIncrement > percentIncrement ? absoluteIncrement : percentIncrement;
-                    return { wei: minimumWei, eth: formatWeiToEth(minimumWei) };
+                    minimumWei = absoluteIncrement > percentIncrement ? absoluteIncrement : percentIncrement;
                 }
 
-                const startingBidWei = getAuctionStartingBidWei(auctionData);
-                return { wei: startingBidWei, eth: formatWeiToEth(startingBidWei) };
+                // Polling can advance the bid beyond a cached RPC quote, while
+                // a newer RPC quote may itself be ahead of the indexed bid.
+                if (contractMinimumWei && contractMinimumWei > minimumWei) minimumWei = contractMinimumWei;
+                return { wei: minimumWei, eth: formatWeiToEth(minimumWei) };
             }
 
             function calculateMinimumBidSafe(auctionData) {

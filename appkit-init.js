@@ -211,6 +211,7 @@ let lastObservedAppKitAccountKey = null;
 let modalClosePromise = null;
 let modalCloseRetryTimer = null;
 let activeConnectAttempt = null;
+let desktopRetryCleanupPromise = null;
 let connectAttemptSequence = 0;
 let lastSelectedWallet = null;
 let lastWalletConnectUri = null;
@@ -2963,6 +2964,7 @@ window.safeConnectWallet = async () => {
     if (mobileConnect && !injectedMobileConnect) {
         return connectExternalMobileStandard();
     }
+    if (!injectedMobileConnect && activeConnectAttempt && !activeConnectAttempt.cancelled) return null;
 
     lastSelectedWallet = null;
     lastWalletConnectUri = null;
@@ -2999,6 +3001,49 @@ window.safeConnectWallet = async () => {
     });
 
     try {
+        if (!injectedMobileConnect && attempt.restoreDisconnectIntent) {
+            // A late approval can leave AppKit linked after our timeout restored
+            // logout intent. Its already-linked view cannot emit a fresh connect.
+            // Tear down only that SDK connection on this explicit retry, while
+            // passive account events are still blocked by the logout flag.
+            const sdk = window.web3Modal;
+            const hasLinkedAccount = () => {
+                const account = sdk?.getAccount?.('eip155');
+                return Boolean(account?.isConnected || account?.address || account?.allAccounts?.length);
+            };
+            if (hasLinkedAccount() || desktopRetryCleanupPromise) {
+                const cleanupRevision = walletConnectionRevision;
+                const cleanupError = createWalletConnectError(
+                    'WALLET_RETRY_CLEANUP_FAILED',
+                    'Wallet retry could not be prepared. Please retry.'
+                );
+                let cleanupTimer = null;
+                try {
+                    if (!desktopRetryCleanupPromise) {
+                        const cleanup = Promise.resolve().then(() => sdk.disconnect('eip155'));
+                        desktopRetryCleanupPromise = cleanup;
+                        const settled = () => {
+                            if (desktopRetryCleanupPromise === cleanup) desktopRetryCleanupPromise = null;
+                        };
+                        cleanup.then(settled, settled);
+                    }
+                    // A timeout keeps the same teardown task. A subsequent retry
+                    // must await it before a late disconnect can affect a new session.
+                    await Promise.race([
+                        desktopRetryCleanupPromise,
+                        new Promise((_, reject) => {
+                            cleanupTimer = setTimeout(() => reject(cleanupError), APPKIT_MODAL_OPEN_TIMEOUT);
+                        })
+                    ]);
+                } catch {
+                    throw cleanupError;
+                } finally {
+                    if (cleanupTimer) clearTimeout(cleanupTimer);
+                }
+                if (attempt.cancelled || activeConnectAttempt !== attempt || walletConnectionRevision !== cleanupRevision) return null;
+                if (hasLinkedAccount()) throw cleanupError;
+            }
+        }
         const revision = beginWalletConnection();
         activeWalletProvider = null;
         latestAppKitAccountSnapshot = null;

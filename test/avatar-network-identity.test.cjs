@@ -296,6 +296,95 @@ test('live balance refresh retains currency text and removes an unavailable prov
     assert.equal(harness.menu().querySelector('[data-wallet-provider]'), null);
 });
 
+test('opening the account menu refreshes a balance changed since the header rendered', async () => {
+    const harness = networkHarness({ profiles: {
+        [WALLET]: { wallet_address: WALLET, username: 'Current Artist' }
+    } });
+    let balanceWei = 319700000000000000n;
+    const calls = [];
+    harness.context.window.ArtSoulBaseSepolia = { rpc: async (method, params) => {
+        calls.push({ method, params });
+        return `0x${balanceWei.toString(16)}`;
+    } };
+    await harness.dropdown.sync(WALLET, { confirmed: true });
+    await harness.flush();
+    const balance = harness.menu().querySelector('[data-network-balance]');
+    const button = harness.button();
+    assert.match(balance.innerHTML, /0\.3197 test ETH/);
+    const initialCalls = calls.length;
+    balanceWei = 309700000000000000n;
+
+    assert.equal(harness.dropdown.toggle(), true);
+    assert.match(balance.innerHTML, /0\.3197 test ETH/, 'the last balance stays visible during the read');
+    await harness.flush();
+    assert.match(balance.innerHTML, /0\.3097 test ETH/);
+    assert.equal(harness.button(), button, 'refresh does not rebuild the account identity');
+    assert.equal(calls.length, initialCalls + 1);
+    assert.equal(calls.at(-1).method, 'eth_getBalance');
+    assert.deepEqual(Array.from(calls.at(-1).params), [WALLET, 'latest']);
+
+    assert.equal(harness.dropdown.toggle(), false);
+    await harness.flush();
+    assert.equal(calls.length, initialCalls + 1, 'closing does not request a balance');
+});
+
+test('rapid account-menu reopening shares one pending balance read and later opening can retry', async () => {
+    const harness = networkHarness({ profiles: {
+        [WALLET]: { wallet_address: WALLET, username: 'Current Artist' }
+    } });
+    await harness.dropdown.sync(WALLET, { confirmed: true });
+    await harness.flush();
+    const pending = [];
+    harness.context.window.ArtSoulBaseSepolia = { rpc: () => new Promise((resolve, reject) => pending.push({ resolve, reject })) };
+    harness.dropdown.toggle();
+    harness.dropdown.toggle();
+    harness.dropdown.toggle();
+    await harness.flush();
+    assert.equal(pending.length, 1, 'open-close-open does not duplicate the RPC');
+    pending[0].reject(new Error('Temporary RPC failure'));
+    await harness.flush();
+    assert.equal(pending.length, 1, 'a failed read does not start automatic polling');
+
+    harness.dropdown.toggle();
+    harness.dropdown.toggle();
+    await harness.flush();
+    assert.equal(pending.length, 2, 'a later opening makes one fresh attempt');
+    pending[1].resolve('0xde0b6b3a7640000');
+    await harness.flush();
+    assert.match(harness.menu().querySelector('[data-network-balance]').innerHTML, /1\.0000 test ETH/);
+    assert.equal(pending.length, 2);
+});
+
+test('opening the guest menu makes no live network or balance request', async () => {
+    const harness = networkHarness();
+    harness.context.window.currentWalletAddress = null;
+    harness.dropdown.renderConnectButton();
+    let reads = 0;
+    harness.dropdown.getCurrentNetworkInfo = async () => { reads += 1; };
+    assert.equal(harness.dropdown.toggle(), true);
+    await harness.flush();
+    assert.equal(reads, 0);
+});
+
+test('a new wallet generation never shares an old pending balance read', async () => {
+    const harness = networkHarness();
+    const { network, html } = await readMenu(harness);
+    harness.menu().innerHTML = html;
+    const pending = [];
+    harness.dropdown.getCurrentNetworkInfo = () => new Promise(resolve => pending.push(resolve));
+    const first = harness.dropdown.updateNetworkDisplay();
+    harness.dropdown.beginIdentityTransition(null);
+    harness.dropdown.beginIdentityTransition(WALLET);
+    const second = harness.dropdown.updateNetworkDisplay();
+    assert.equal(pending.length, 2);
+    pending[0]({ ...network, balance: '100.0000' });
+    await first;
+    assert.doesNotMatch(harness.menu().querySelector('[data-network-balance]').innerHTML, /100\.0000/);
+    pending[1]({ ...network, balance: '0.3000' });
+    await second;
+    assert.match(harness.menu().querySelector('[data-network-balance]').innerHTML, /0\.3000 test ETH/);
+});
+
 test('a late network refresh cannot apply the previous wallet provider or balance', async () => {
     const harness = networkHarness({ provider: { isRabby: true } });
     const { html } = await readMenu(harness);
