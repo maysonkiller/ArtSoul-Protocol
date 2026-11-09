@@ -59,8 +59,8 @@ const BASE_SEPOLIA_RPC_URLS = window.ArtSoulBaseSepolia?.rpcUrls?.length
     ];
 const BASE_SEPOLIA_RPC_URL = BASE_SEPOLIA_RPC_URLS[0];
 const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2';
-// Mainnet entries are negotiation-only compatibility routes for mobile
-// WalletConnect. ArtSoul operations and every write remain Base Sepolia-only.
+// These are wallet browsing networks, not ArtSoul deployment targets.
+// ArtSoul operations and every write remain Base Sepolia-only.
 const networks = [baseSepolia, base, mainnet];
 const customRpcUrls = {
     [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URLS.map(url => ({ url }))
@@ -75,7 +75,16 @@ const SUPPORTED_NETWORKS = {
         nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
         rpcUrls: BASE_SEPOLIA_RPC_URLS,
         blockExplorerUrls: ['https://sepolia.basescan.org']
-    }
+    },
+    ...Object.fromEntries([base, mainnet].map(network => [network.id, {
+        appKitNetwork: network,
+        chainId: network.id,
+        hexChainId: `0x${network.id.toString(16)}`,
+        chainName: network.name,
+        nativeCurrency: network.nativeCurrency,
+        rpcUrls: network.rpcUrls.default.http,
+        blockExplorerUrls: [network.blockExplorers.default.url]
+    }]))
 };
 
 // metadata.url MUST match the actual origin the dApp is served from.
@@ -3187,7 +3196,7 @@ window.openArtSoulNetworkSelector = async () => {
             return true;
         }
 
-        // Fallback AppKit selector contains Base Sepolia only.
+        // The fallback uses the same configured wallet browsing networks.
         markNetworkModalIntent();
         if (window.web3Modal?.open) await window.web3Modal.open({ view: 'Networks' });
         else alert('Please wait, wallet modal is still loading...');
@@ -3201,16 +3210,17 @@ window.openArtSoulNetworkSelector = async () => {
 window.switchArtSoulNetwork = async (chainId) => {
     const target = getSupportedNetworkTarget(chainId);
     if (!target) {
-        alert('Unsupported network. Please choose Base Sepolia.');
+        alert('Choose a supported wallet network: Base Sepolia, Base or Ethereum.');
         return false;
     }
 
-    if (activeNetworkSwitchChainId === target.chainId) {
+    if (activeNetworkSwitchChainId !== null) {
         console.log('Network switch already in progress:', target.chainName);
         return false;
     }
 
     activeNetworkSwitchChainId = target.chainId;
+    markNetworkModalIntent('account network selection');
 
     try {
         const provider = await getSwitchProvider({ connectIfMissing: true });
@@ -3221,7 +3231,7 @@ window.switchArtSoulNetwork = async (chainId) => {
             );
         }
         const coreProvider = getConnectedCoreProvider();
-        const requiresCoreConfirmation = provider === coreProvider &&
+        const requiresCoreConfirmation = target.chainId === BASE_SEPOLIA_CHAIN_ID && provider === coreProvider &&
             coreSessionNeedsBaseSepoliaConfirmation(coreProvider);
         const currentChainId = await getProviderTruthChainId(provider);
         if (currentChainId === target.chainId && !requiresCoreConfirmation) {
@@ -3236,7 +3246,7 @@ window.switchArtSoulNetwork = async (chainId) => {
         }
 
         let appKitError = null;
-        if (window.web3Modal?.switchNetwork) {
+        if (provider !== coreProvider && window.web3Modal?.switchNetwork) {
             try {
                 await window.web3Modal.switchNetwork(target.appKitNetwork);
                 const confirmedChainId = await waitForProviderChainId(target.chainId, NETWORK_CONFIRMATION_TIMEOUT);
@@ -3246,6 +3256,8 @@ window.switchArtSoulNetwork = async (chainId) => {
                 }
             } catch (error) {
                 appKitError = error;
+                // A deliberate cancellation must not open a second provider prompt.
+                if (isUserRejectedError(error)) throw error;
                 console.warn('AppKit network switch did not complete:', error);
             }
         }

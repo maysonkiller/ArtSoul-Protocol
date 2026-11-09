@@ -156,8 +156,9 @@
         eth: '/brand/eth.png',
         rabby: '/brand/rabby.png'
     });
-    // Foreign wallet networks are display-only. Base Sepolia remains the only
-    // selectable product network and the shared write guard is unchanged.
+    // Selecting a wallet network does not enable ArtSoul writes there.
+    // Keep this list aligned with appkit-init's configured EVM networks.
+    const SELECTABLE_NETWORK_IDS = Object.freeze([84532, 8453, 1]);
     const NETWORK_IDENTITIES = Object.freeze({
         84532: { name: 'Base Sepolia', icon: IDENTITY_MARKS.base, mark: 'base', currency: 'ETH' },
         8453: { name: 'Base Mainnet', icon: IDENTITY_MARKS.base, mark: 'base', currency: 'ETH' },
@@ -1396,7 +1397,7 @@
             // left if every route is unreachable.
             let balance = cachedNetwork?.chainId === chainId && cachedNetwork.balance
                 ? cachedNetwork.balance
-                : (chainId === 84532 ? '…' : '0.0000');
+                : '…';
             if (options.includeBalance !== false && chainId && window.currentWalletAddress) {
                 try {
                     let balanceHex = null;
@@ -1666,23 +1667,20 @@
         }
 
         renderNetworkOptions(currentChainId, requiresConfirmation = false) {
-            // Hide the Base Sepolia switch option when it would duplicate the
-            // current row: the wallet is already on Base Sepolia, or the row is
-            // itself the "Tap to switch" control (requiresConfirmation, where
-            // chainId is intentionally null while a mobile session still awaits
-            // a Base Sepolia confirmation).
-            const alreadyOnBaseSepolia = Number(currentChainId) === 84532 || requiresConfirmation === true;
-            if (alreadyOnBaseSepolia) return '';
             return `
                 <div id="avatarNetworkOptions" class="avatar-network-options" hidden>
-                    <button
-                        type="button"
-                        class="dropdown-item avatar-network-option"
-                        onclick="window.AvatarDropdown.selectNetwork(84532, event)"
-                    >
-                        ${this.renderIdentityMark('base')}
-                        <span class="network-option-name">Base Sepolia</span>
-                    </button>
+                    <p class="avatar-network-guidance">Wallet network. ArtSoul transactions use Base Sepolia testnet.</p>
+                    ${SELECTABLE_NETWORK_IDS.map(chainId => {
+                        const network = NETWORK_IDENTITIES[chainId];
+                        const selected = !requiresConfirmation && Number(currentChainId) === chainId;
+                        return `<button type="button" class="dropdown-item avatar-network-option"
+                            aria-pressed="${selected}" ${selected ? 'disabled' : ''}
+                            onclick="window.AvatarDropdown.selectNetwork(${chainId}, event)">
+                            ${this.renderIdentityMark(network.mark)}
+                            <span class="network-option-name">${network.name}</span>
+                            ${selected ? '<span aria-hidden="true">✓</span>' : ''}
+                        </button>`;
+                    }).join('')}
                 </div>
             `;
         }
@@ -1690,7 +1688,7 @@
         // The stable menu is only re-rendered when its key changes, so the key
         // must encode the network state. Otherwise the options list built while
         // a mobile session is unconfirmed (requiresConfirmation) survives after
-        // the switch to Base Sepolia, leaving a duplicate "Base Sepolia" row.
+        // a switch, leaving the wrong selection or confirmation state.
         networkMenuKeySegment(networkInfo) {
             if (!networkInfo) return 'none';
             if (networkInfo.requiresConfirmation) return 'pending';
@@ -1710,17 +1708,7 @@
                     </div>
             ` : '';
             let networkCurrentRow = '';
-            if (networkInfo?.requiresConfirmation) {
-                networkCurrentRow = `
-                    <button
-                        type="button"
-                        class="dropdown-item network-switcher-btn network-current-row"
-                        onclick="window.AvatarDropdown.handleNetworkRowClick(event)"
-                    >
-                        ${networkRowContent}
-                    </button>
-                `;
-            } else if (networkOptions) {
+            if (networkOptions) {
                 networkCurrentRow = `
                     <button
                         type="button"
@@ -1795,9 +1783,6 @@
         }
 
         async handleNetworkRowClick(event) {
-            if (window.isArtSoulBaseSepoliaConfirmed?.() === false) {
-                return this.selectNetwork(84532, event);
-            }
             return this.toggleNetworkOptions(event);
         }
 
@@ -1821,8 +1806,15 @@
         async selectNetwork(chainId, event) {
             event?.preventDefault?.();
             event?.stopPropagation?.();
-            if (Number(chainId) !== 84532) return false;
-            const switched = await window.switchArtSoulNetwork?.(84532);
+            const target = Number(chainId);
+            if (!SELECTABLE_NETWORK_IDS.includes(target) || this.networkSelectionPending) return false;
+            this.networkSelectionPending = true;
+            let switched = false;
+            try {
+                switched = await window.switchArtSoulNetwork?.(target);
+            } finally {
+                this.networkSelectionPending = false;
+            }
             if (switched) this.closeNetworkOptions();
             return Boolean(switched);
         }

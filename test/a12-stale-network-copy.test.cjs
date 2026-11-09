@@ -28,15 +28,15 @@ test('public documentation matches the Base-only network and Genesis trust canon
   assert.doesNotMatch(protocolDocs, /Genesis 2x/);
 });
 
-test('wallet-facing copy offers Base Sepolia only while legacy records remain read-only', () => {
+test('wallet browsing does not change the Base Sepolia write boundary', () => {
   const accountMenu = read('avatar-dropdown.js');
   const contracts = read('contracts-integration.js');
   const checklist = read('docs/testnet/WALLET_QA_CHECKLIST.md');
 
-  assert.match(accountMenu, /window\.AvatarDropdown\.selectNetwork\(84532, event\)/);
+  assert.match(accountMenu, /ArtSoul transactions use Base Sepolia testnet/);
   assert.doesNotMatch(accountMenu, /<span class="network-option-name">ETH Sepolia<\/span>/);
   assert.doesNotMatch(accountMenu, /name: 'Rialo'/);
-  assert.match(accountMenu, /if \(alreadyOnBaseSepolia\) return '';/);
+
   assert.match(accountMenu, /else if \(networkInfo\) \{[\s\S]*?role="status"/);
 
   assert.match(contracts, /Please switch to Base Sepolia/);
@@ -69,7 +69,7 @@ test('all consumers receive the updated shared runtime assets', () => {
   for (const path of accountMenuPages) {
     const source = read(path);
     assert.match(source, /header-prepaint\.js\?v=11/, path);
-    assert.match(source, /avatar-dropdown\.js\?v=66/, path);
+    assert.match(source, /avatar-dropdown\.js\?v=67/, path);
   }
   for (const path of contractPages) {
     assert.match(read(path), /contracts-integration\.js\?v=17/, path);

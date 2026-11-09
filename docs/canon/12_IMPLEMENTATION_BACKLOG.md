@@ -83,6 +83,13 @@ enabled; they are not marked complete or replaced by a test-only bypass. See
 - [x] **A11 — Base product commitments.** Accepted 2026-07-28 through PR #160 and the production evidence in `docs/runbooks/A11_PUBLIC_METRICS_ROLLOUT.md`. The first screen states that collector demand comes before minting, presents the compact Publish → build collector demand → settle and mint path, and positions ArtSoul as a curation layer. Artists onboarded, Auctions completed, Unique collectors, and Settled volume come from the idempotent, reorg-safe Base Sepolia projection introduced by migration 015. The public API reads one precomputed chain row inside the existing server/CDN cache; the homepage reuses that response and adds no browser request, chain RPC fan-out, full-table runtime aggregation, or per-card recomputation.
 - [x] **A12 — Remove stale network copy.** Accepted 2026-07-28 through PRs #162-#164 and `docs/testnet/A12_NETWORK_COPY_ACCEPTANCE.md`. Active public copy identifies Base Sepolia as the only product testnet and Base as the production chain, the account menu offers only Base Sepolia as a product-network switch, and Protocol Docs use the canonical Genesis trust weight of `1.3x`. Historical Ethereum Sepolia records remain readable only where migration compatibility requires them. PR #163 corrected the async module-entry race discovered during production acceptance and added source/build regression coverage.
 
+  **Account-network amendment, 2026-11-09:** the founder now permits choosing
+  existing configured wallet networks. The account menu offers Base Sepolia,
+  Base mainnet and Ethereum mainnet for wallet browsing; the write guard and
+  active ArtSoul deployment remain Base Sepolia-only. This supersedes A12's
+  account-menu restriction, not its operational testnet or historical-data rules.
+  See [the bounded follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md).
+
 Phase A exit: A1–A12 accepted, the local and CI baselines are green, production health is observed, and no P1 issue remains.
 
 ## Phase B — Public Beta
@@ -92,6 +99,9 @@ Goal: validate the product with real users without changing frozen economics.
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
+  The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
+  stabilizes late staff actions, removes account hover frames and adds explicit
+  choices for configured wallet networks without enabling mainnet writes.
   The November 9 [resume audit](../audits/B18_RESUME_ACCOUNT_SEO_2026-11-09.md)
   reconciles the accepted account-plaque A and private inventory details with
   incoming B36–B39 changes, and fixes distinct author profiles canonicalizing
