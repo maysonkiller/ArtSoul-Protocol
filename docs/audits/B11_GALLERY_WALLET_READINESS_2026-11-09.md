@@ -117,8 +117,33 @@ Evidence: `docs/private/b11-assistant-list38-receipt-2026-11-09.json`, its
 matching read-only `.mjs` verifier, and
 `output/b11-assistant-list38-confirmed-2026-11-09.png`.
 
-Assistant bid and purchase remain pending and require a different account from
-the relevant creator/seller. Existing real Phantom and latest native iPhone
+Assistant bid remains pending and requires an eligible funded account different
+from the creator. Existing real Phantom and latest native iPhone
 observations, plus separate provider/cohort gates, remain open. Do not repeat
 the accepted auction creation or listing; this record does not declare Phase B
 or the future public beta complete.
+
+## Signed purchase and delayed resale projection
+
+The owner signed purchase of artwork 38/token 7 through the assistant for
+`0.001 ETH`. Two public RPCs agree on transaction
+`0xf029a10c9863601eeab56b43807ff455e52199378f54ad11db3c576329c45ec4`,
+status 1, block `56637436`, `2026-11-09T18:35:56Z`. Ownership moved from
+`0x6EC8C121043357aC231E36D403EdAbf90AE6989B` to
+`0x2d49162fcf065dae43c4a0dc2feb3d1cc9ff1824`; the listing became inactive and
+floor remained `0.001 ETH`. Evidence:
+`docs/private/b11-assistant-buy38-receipt-2026-11-09.json` and its read-only
+verifier. Do not replay the completed purchase.
+
+The assistant cleared its input and retired Buy without reload, but the owner
+label and five-event provenance remained stale in the observed page. This is
+a confirmed UI defect, not a failed purchase or accepted complete UI journey.
+Screenshot: `output/b11-assistant-buy38-initial-2026-11-09.png`.
+
+The correction refreshes only the affected artwork after a confirmed resale:
+one immediate read and at most six delayed reads across 60 seconds of scheduled
+delays. It waits for both the newer indexed resale block and matching provenance,
+pauses reads while hidden, and cancels on cleanup or a newer resale. It does not
+resubmit transactions or add permanent polling. Focused tests cover delayed
+history, visibility, cleanup, unrelated receipts, failed reads and exhaustion.
+New native-wallet acceptance is still distinct from local regression evidence.

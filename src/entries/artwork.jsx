@@ -432,6 +432,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const bidCursorRef = useRef(null);
             const artworkLoadSequenceRef = useRef(0);
             const loadedArtworkIdRef = useRef(null);
+            const artworkSnapshotRef = useRef(null);
+            const provenanceSnapshotRef = useRef(null);
             const liveAuctionIdentityRef = useRef('');
             const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
@@ -1731,17 +1733,81 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             }, [artworkId, isV41CompositeId, auction?.auctionId, auction?.status, auction?.state, auction?.endTime]);
 
             useEffect(() => {
+                artworkSnapshotRef.current = artwork;
+                provenanceSnapshotRef.current = provenanceState;
+            }, [artwork, provenanceState]);
+
+            function startResaleProjectionRefresh(snapshot) {
+                // A receipt retires Buy immediately, while both indexed reads
+                // may still be old. Retry only this artwork, for a finite window.
+                const delays = [0, 1000, 2000, 4000, 8000, 15000, 30000];
+                const previousBlock = Number(snapshot.resale_updated_block || 0);
+                let cancelled = false, timer = null, attempt = 0, inFlight = false;
+                const stop = () => {
+                    cancelled = true;
+                    if (timer !== null) clearTimeout(timer);
+                    document.removeEventListener('visibilitychange', resume);
+                };
+                const schedule = () => {
+                    if (cancelled || inFlight || timer !== null || document.visibilityState !== 'visible') return;
+                    if (attempt >= delays.length) { stop(); return; }
+                    timer = setTimeout(refresh, delays[attempt]);
+                };
+                const resume = () => { if (document.visibilityState === 'visible') schedule(); };
+                const refresh = async () => {
+                    timer = null;
+                    if (cancelled || document.visibilityState !== 'visible') return;
+                    attempt++;
+                    inFlight = true;
+                    await loadArtwork();
+                    inFlight = false;
+                    if (cancelled) return;
+                    const current = artworkSnapshotRef.current;
+                    if (!current || current.id !== snapshot.id || current.token_id !== snapshot.token_id) {
+                        stop();
+                        return;
+                    }
+                    const indexedBlock = Number(current.resale_updated_block || 0);
+                    const history = provenanceSnapshotRef.current;
+                    // History can trail the artwork response. A caught-up
+                    // listing alone must not end the history refresh.
+                    if (!current.pending_resale_sync && indexedBlock > previousBlock &&
+                        history?.status === 'ready' && history.events.some(event => Number(event.block_number) >= indexedBlock)) {
+                        stop();
+                        return;
+                    }
+                    schedule();
+                };
+                document.addEventListener('visibilitychange', resume);
+                schedule();
+                return stop;
+            }
+
+            useEffect(() => {
+                let stopResaleRefresh = () => {};
                 const refresh = () => {
                     // Apply the confirmed receipt before waiting for API/profile
                     // reads. The shared bridge preserves ownership and floor.
                     setArtwork(current => current && (window.ArtSoulDB.applyConfirmedAuctionUpdate?.(current) || current));
                     void loadArtwork();
                 };
+                const refreshResale = () => {
+                    const current = artworkSnapshotRef.current;
+                    const updated = current && (window.ArtSoulDB.applyConfirmedAuctionUpdate?.(current) || current);
+                    if (!updated?.pending_resale_sync) { refresh(); return; }
+                    // Read the current snapshot outside the React updater;
+                    // StrictMode may replay state updaters.
+                    artworkSnapshotRef.current = updated;
+                    setArtwork(updated);
+                    stopResaleRefresh();
+                    stopResaleRefresh = startResaleProjectionRefresh(updated);
+                };
                 window.addEventListener('artsoul:auction-confirmed', refresh);
-                window.addEventListener('artsoul:resale-confirmed', refresh);
+                window.addEventListener('artsoul:resale-confirmed', refreshResale);
                 return () => {
                     window.removeEventListener('artsoul:auction-confirmed', refresh);
-                    window.removeEventListener('artsoul:resale-confirmed', refresh);
+                    window.removeEventListener('artsoul:resale-confirmed', refreshResale);
+                    stopResaleRefresh();
                     artworkLoadSequenceRef.current++;
                 };
             }, [artworkId]);
@@ -3082,9 +3148,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             );
 
             const guidancePanel = (
-                <GuidancePanel key="guidance" className="artwork-page-panel artwork-page-ai artwork-mobile-ai" aria-label="Gemini analysis">
+                <GuidancePanel key="guidance" className="artwork-page-panel artwork-page-ai artwork-mobile-ai" aria-label="AI insights">
                         <DisclosureHeading className="artwork-page-panel-heading">
-                            <h2>Gemini Analysis</h2>
+                            <h2>AI insights</h2>
                             {aiGuidance?.confidence != null && (
                                 <span className="artwork-page-chip">
                                     {Number.isFinite(Number(aiGuidance.confidence)) ? `${Number(aiGuidance.confidence)}%` : String(aiGuidance.confidence)} confidence

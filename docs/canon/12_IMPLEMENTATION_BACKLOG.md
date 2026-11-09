@@ -150,9 +150,16 @@ Goal: validate the product with real users without changing frozen economics.
   `0.001 ETH`, block `56633575` at `2026-11-09T18:23:03Z`, verified on both RPCs.
   Without reload, the sale price and Change price / Remove from sale actions
   appeared, and the assistant cleared its input and showed completion links.
-  Assistant bid and purchase remain pending using a different account from the
-  relevant creator/seller. Prior repricing/removal, withdrawal, auction creation
-  and initial listing must not become replay gates.
+  Assistant purchase of artwork 38/token 7 succeeded at block `56637436` for
+  `0.001 ETH`; Buy retired and the command cleared without reload, but ownership
+  and provenance remained stale. The same audit records the bounded receipt
+  reconciliation correction and the still-open complete UI acceptance.
+  Assistant bid remains pending using an eligible funded account other than
+  the creator. Completed purchase, repricing/removal, withdrawal, auction
+  creation and initial listing must not become replay gates.
+  The [network picker follow-up](../audits/B18_NETWORK_PICKER_2026-11-09.md)
+  aligns logo/label spacing, adds searchable configured EVM browsing networks,
+  retains the Base Sepolia write boundary and renames the public AI panel.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.

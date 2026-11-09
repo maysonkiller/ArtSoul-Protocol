@@ -154,16 +154,34 @@
     const IDENTITY_MARKS = Object.freeze({
         base: '/brand/base.svg',
         eth: '/brand/eth.png',
-        rabby: '/brand/rabby.png'
+        rabby: '/brand/rabby.png',
+        ...Object.fromEntries(['arbitrum-one', 'optimism', 'polygon', 'binance-smart-chain',
+            'avalanche', 'linea', 'robinhood', 'soneium', 'unichain', 'world', 'monad',
+            'abstract', 'zora'].map(mark => [mark, `/brand/wallet-networks/${mark}.svg`]))
     });
     // Selecting a wallet network does not enable ArtSoul writes there.
     // Keep this list aligned with appkit-init's configured EVM networks.
-    const SELECTABLE_NETWORK_IDS = Object.freeze([84532, 8453, 1]);
+    const SELECTABLE_NETWORK_IDS = Object.freeze([84532, 8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 143, 2741, 7777777]);
     const NETWORK_IDENTITIES = Object.freeze({
         84532: { name: 'Base Sepolia', icon: IDENTITY_MARKS.base, mark: 'base', currency: 'ETH' },
         8453: { name: 'Base Mainnet', icon: IDENTITY_MARKS.base, mark: 'base', currency: 'ETH' },
         11155111: { name: 'Ethereum Sepolia', icon: IDENTITY_MARKS.eth, mark: 'eth', currency: 'ETH' },
-        1: { name: 'Ethereum Mainnet', icon: IDENTITY_MARKS.eth, mark: 'eth', currency: 'ETH' }
+        1: { name: 'Ethereum Mainnet', icon: IDENTITY_MARKS.eth, mark: 'eth', currency: 'ETH' },
+        ...Object.fromEntries([
+            [42161, 'Arbitrum One', 'arbitrum-one', 'ETH'],
+            [10, 'OP Mainnet', 'optimism', 'ETH'],
+            [137, 'Polygon', 'polygon', 'POL'],
+            [56, 'BNB Smart Chain', 'binance-smart-chain', 'BNB'],
+            [43114, 'Avalanche', 'avalanche', 'AVAX'],
+            [59144, 'Linea', 'linea', 'ETH'],
+            [4663, 'Robinhood Chain', 'robinhood', 'ETH'],
+            [1868, 'Soneium', 'soneium', 'ETH'],
+            [130, 'Unichain', 'unichain', 'ETH'],
+            [480, 'World Chain', 'world', 'ETH'],
+            [143, 'Monad', 'monad', 'MON'],
+            [2741, 'Abstract', 'abstract', 'ETH'],
+            [7777777, 'Zora', 'zora', 'ETH']
+        ].map(([chainId, name, mark, currency]) => [chainId, { name, mark, currency, icon: IDENTITY_MARKS[mark] }]))
     });
     const escapeMenuText = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -1477,7 +1495,7 @@
             if (networkInfo?.requiresConfirmation) return '<span class="network-balance-value">Tap to switch</span>';
             const network = NETWORK_IDENTITIES[Number(networkInfo?.chainId)];
             if (!network) return '';
-            const currency = [84532, 11155111].includes(Number(networkInfo.chainId)) ? 'test ETH' : 'ETH';
+            const currency = [84532, 11155111].includes(Number(networkInfo.chainId)) ? 'test ETH' : network.currency;
             return `<span class="network-balance-value">${networkBalanceText(networkInfo.balance)} ${currency}</span>`;
         }
 
@@ -1669,18 +1687,24 @@
         renderNetworkOptions(currentChainId, requiresConfirmation = false) {
             return `
                 <div id="avatarNetworkOptions" class="avatar-network-options" hidden>
-                    <p class="avatar-network-guidance">Wallet network. ArtSoul transactions use Base Sepolia testnet.</p>
+                    <p class="avatar-network-guidance">ArtSoul transactions use Base Sepolia testnet.</p>
+                    <input type="search" class="avatar-network-search" aria-label="Find a wallet network"
+                        placeholder="Find a network" autocomplete="off"
+                        oninput="window.AvatarDropdown.filterNetworks(this.value)" />
+                    <div class="avatar-network-list" aria-label="Wallet networks">
                     ${SELECTABLE_NETWORK_IDS.map(chainId => {
                         const network = NETWORK_IDENTITIES[chainId];
                         const selected = !requiresConfirmation && Number(currentChainId) === chainId;
-                        return `<button type="button" class="dropdown-item avatar-network-option"
+                        return `<button type="button" class="dropdown-item avatar-network-option" data-network-search="${network.name.toLowerCase()} ${chainId}"
                             aria-pressed="${selected}" ${selected ? 'disabled' : ''}
                             onclick="window.AvatarDropdown.selectNetwork(${chainId}, event)">
                             ${this.renderIdentityMark(network.mark)}
                             <span class="network-option-name">${network.name}</span>
-                            ${selected ? '<span aria-hidden="true">✓</span>' : ''}
+                            <span class="network-option-check" aria-hidden="true">${selected ? '✓' : ''}</span>
                         </button>`;
                     }).join('')}
+                    </div>
+                    <p class="avatar-network-empty" hidden>No matching network.</p>
                 </div>
             `;
         }
@@ -1768,6 +1792,19 @@
                     ${accountAction}
                 </div>
             `;
+        }
+
+        filterNetworks(value) {
+            const query = String(value || '').trim().toLowerCase();
+            const options = document.getElementById('avatarNetworkOptions');
+            if (!options) return;
+            let matches = 0;
+            options.querySelectorAll('.avatar-network-option').forEach(option => {
+                option.hidden = !option.dataset.networkSearch.includes(query);
+                if (!option.hidden) matches++;
+            });
+            const empty = options.querySelector('.avatar-network-empty');
+            if (empty) empty.hidden = matches !== 0;
         }
 
         toggleNetworkOptions(event) {

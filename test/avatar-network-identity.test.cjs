@@ -6,6 +6,7 @@ const { createAvatarHarness } = require('./helpers/avatar-dropdown-harness.cjs')
 
 const WALLET = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const OTHER_WALLET = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const BROWSING_IDS = [84532, 8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 143, 2741, 7777777];
 
 function networkHarness({ chainId = 84532, confirmed = true, provider = null, ...options } = {}) {
     const harness = createAvatarHarness(options);
@@ -65,7 +66,7 @@ for (const [chainId, name, mark, currency] of [
         const balance = html.match(/data-network-balance>(.*?)<\/div>/)?.[1];
         assert.ok(balance);
         assert.equal(balance.includes('<img'), false, 'the currency is text beside one network mark');
-        assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), [84532, 8453, 1]);
+        assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), BROWSING_IDS);
         assert.match(html, /aria-controls="avatarNetworkOptions"/);
     });
 }
@@ -87,7 +88,7 @@ for (const [chainId, label] of [[999, 'Unsupported'], [null, 'Connecting...']]) 
         assert.match(html, /data-network-mark><\/span>/);
         assert.match(html, /data-network-balance><\/div>/);
         assert.doesNotMatch(html, /src=""|0\.0000 ETH/);
-        assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), [84532, 8453, 1]);
+        assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), BROWSING_IDS);
     });
 }
 

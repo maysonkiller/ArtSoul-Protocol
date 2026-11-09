@@ -55,10 +55,10 @@ const CORE_RESTORE_POLL_INTERVAL_MS = 120;
 // wallet. ArtSoul needs personal_sign for SIWE and eth_sendTransaction for the
 // product lifecycle, so Base Sepolia and those two methods are required by the
 // session proposal. This grants capabilities; it does not replace the explicit
-// Base Sepolia confirmation that still runs before every write. Base Mainnet
-// and Ethereum remain optional read/display networks.
+// Base Sepolia confirmation that still runs before every write. The other
+// configured EVM networks remain optional wallet browsing networks.
 const REQUIRED_CHAIN_IDS = [BASE_SEPOLIA_CHAIN_ID];
-const OPTIONAL_CHAIN_IDS = [8453, 1];
+const OPTIONAL_CHAIN_IDS = [8453, 1, 42161, 10, 137, 56, 43114, 59144, 4663, 1868, 130, 480, 143, 2741, 7777777];
 const REQUIRED_METHODS = ['personal_sign', 'eth_sendTransaction'];
 const REQUIRED_EVENTS = ['chainChanged', 'accountsChanged'];
 // Readiness gate: a Connect attempt may not report success until the
