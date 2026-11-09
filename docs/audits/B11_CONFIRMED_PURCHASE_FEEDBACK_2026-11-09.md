@@ -39,7 +39,7 @@ preserve indexed ownership and floor.
 No real transaction was replayed. This correction does not replace the remaining
 observed expired-settlement/default/re-auction journey or native-wallet checks.
 
-Local verification on November 9: 184 focused tests passed with zero skips,
+Local verification on November 9: 188 focused tests passed with zero skips,
 including the adapter, assistant dispatch, ID collision, auction reconciliation,
 purchase-handler and runtime cache-version checks. The 11-route production build
 and all 172 required CSS utilities passed. The four original adapter regressions
@@ -49,6 +49,11 @@ The shared contract adapter is served as `contracts-integration.js?v=18` on all
 five consuming pages. Its normalized content hash and version checks were
 updated together. The release requires Linux/Windows CI and deployment checks;
 local verification alone does not establish production release.
+
+The full CI run also exposed an incomplete token-ID collision fixture: it had
+neither a connected provider nor a successful purchase receipt. The fixture now
+supplies those real adapter prerequisites and asserts account/chain checks for
+both purchases, without bypassing the production wallet guard.
 
 The existing local receipt bridge expires after two minutes. If receipt decoding
 is unavailable, indexed refresh remains the fallback. Neither condition changes
