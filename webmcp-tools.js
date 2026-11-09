@@ -512,6 +512,17 @@
          * that loaded but did not provide it is still reported as unavailable.
          */
         async function walletReadyFor(method) {
+            if (typeof deps.prepareContracts === 'function') {
+                try {
+                    const contracts = await deps.prepareContracts();
+                    return contracts && typeof contracts[method] === 'function' &&
+                        (typeof contracts.isReady !== 'function' || contracts.isReady()) ? contracts : null;
+                } catch {
+                    // A partially initialized singleton is not evidence that
+                    // the selected account still matches this invocation.
+                    return null;
+                }
+            }
             const immediate = readContracts();
             if (immediate && typeof immediate[method] === 'function' &&
                 (typeof immediate.isReady !== 'function' || immediate.isReady())) {
@@ -1086,9 +1097,8 @@
                 }
 
                 let pendingWithdrawal = null;
-                const contracts = readContracts();
-                if (contracts && typeof contracts.getPendingWithdrawal === 'function' &&
-                    (typeof contracts.isReady !== 'function' || contracts.isReady())) {
+                const contracts = await walletReadyFor('getPendingWithdrawal');
+                if (contracts) {
                     try {
                         pendingWithdrawal = text(await contracts.getPendingWithdrawal(address)) || null;
                     } catch {
@@ -1102,6 +1112,10 @@
                 }
 
                 const capped = list => ({ count: list.length, items: list.slice(0, MAX_RESULTS).map(brief) });
+                if (!sameAddress(readWalletAddress(), address)) {
+                    return JSON.stringify({ connected: false,
+                        reason: 'The wallet changed while loading activity. Request activity again.' });
+                }
                 return JSON.stringify({
                     connected: true,
                     address,
@@ -1726,6 +1740,37 @@
                 return window.ArtSoulArtworkCard?.cardActionItems?.(card, config || {}) || [];
             },
             readContracts: () => window.ArtSoulContracts || null,
+            prepareContracts: async () => {
+                await window.ArtSoulWalletRuntime?.load?.();
+                const contracts = window.ArtSoulContracts;
+                const address = text(window.getCurrentWalletAddress?.()).toLowerCase();
+                const provider = await window.web3Modal?.getWalletProvider?.();
+                if (!contracts || !/^0x[0-9a-f]{40}$/.test(address) || !provider?.request) return null;
+
+                // Only the selected provider may supply this account. These
+                // passive reads never connect, switch chains or request consent.
+                const matches = async () => {
+                    const [accounts, chain, signer] = await Promise.all([
+                        provider.request({ method: 'eth_accounts' }),
+                        provider.request({ method: 'eth_chainId' }),
+                        contracts.signer?.getAddress?.()
+                    ]);
+                    return {
+                        account: text(accounts?.[0]).toLowerCase() === address && Number(chain) === CHAIN_ID &&
+                            provider === await window.web3Modal?.getWalletProvider?.() &&
+                            address === text(window.getCurrentWalletAddress?.()).toLowerCase(),
+                        signer: text(signer).toLowerCase() === address
+                    };
+                };
+                const before = await matches();
+                if (!before.account) return null;
+                if (!contracts.isReady?.() || !before.signer || contracts.currentNetwork !== 'baseSepolia') {
+                    if (typeof contracts.init !== 'function') return null;
+                    await contracts.init(provider, { passiveWallet: address });
+                }
+                const after = await matches();
+                return after.account && after.signer && contracts === window.ArtSoulContracts ? contracts : null;
+            },
             searchCatalog: input => window.ArtSoulSearch?.query?.(input) ||
                 { error: 'Open Gallery, Profile or an artwork to search ArtSoul. If it is still loading, try again shortly.' },
             setSavedArtwork: (id, saved) => window.ArtSoulSaved?.setArtwork?.(id, saved) ||

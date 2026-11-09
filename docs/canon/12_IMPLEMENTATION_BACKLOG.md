@@ -132,6 +132,12 @@ Goal: validate the product with real users without changing frozen economics.
   `2026-11-09T17:24:04Z`, verified by both public RPCs. The resulting gallery
   showed a live Keeef card; in-place modal closure was not observed. Remaining
   signed assistant scenarios stay open; no successful transaction is replayed.
+  PR #479 released the native new-auction dialog correction. Assistant withdrawal
+  is accepted on artwork 38: `0.0609875 ETH`, block `56622288`, zero pending
+  credit afterward, cleared command without reload. The separate Gallery
+  initialization defect is corrected locally with passive selected-provider
+  preparation and race checks; hosted verification is tracked in the
+  [readiness audit](../audits/B11_GALLERY_WALLET_READINESS_2026-11-09.md).
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.

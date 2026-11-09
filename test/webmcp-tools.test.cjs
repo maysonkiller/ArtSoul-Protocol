@@ -914,6 +914,137 @@ test('an unknown connected address leaves the decision to the contract', async (
   assert.deepEqual(wallet.calls, [['31', '0.5']]);
 });
 
+function connectedBrowserWithdrawal({ accounts, chainId = '0x14a34', duringInit } = {}) {
+  const address = '0x1111111111111111111111111111111111111111';
+  const calls = [];
+  const requests = [];
+  const state = { address, accounts: accounts ?? [address], chainId, ready: false };
+  const provider = {
+    request: async ({ method }) => {
+      requests.push(method);
+      if (method === 'eth_accounts') return [...state.accounts];
+      if (method === 'eth_chainId') return state.chainId;
+      throw new Error(`Unexpected wallet request: ${method}`);
+    }
+  };
+  state.provider = provider;
+  const contracts = {
+    isReady: () => state.ready,
+    init: async (selected, options) => {
+      calls.push('init');
+      assert.equal(selected, provider, 'initialize the selected wallet provider');
+      const signerAddress = state.accounts[0];
+      assert.deepEqual(options, { passiveWallet: signerAddress });
+      contracts.signer = { getAddress: async () => signerAddress };
+      contracts.currentNetwork = 'baseSepolia';
+      state.ready = true;
+      await duringInit?.(state);
+      return true;
+    },
+    getPendingWithdrawal: async wallet => {
+      calls.push('pending');
+      assert.equal(wallet.toLowerCase(), address);
+      assert.equal(state.ready, true);
+      return '0.0042';
+    },
+    withdraw: async () => { calls.push('withdraw'); return '0xwithdraw'; }
+  };
+  const win = load({ contracts });
+  win.ArtSoulWalletRuntime = { load: async () => { calls.push('runtime'); } };
+  win.getCurrentWalletAddress = () => state.address;
+  win.web3Modal = { getWalletProvider: async () => state.provider };
+  win.localStorage = memoryStorage();
+  win.confirm = async message => {
+    calls.push('consent');
+    assert.match(message, /withdraw 0\.0042 ETH/);
+    return true;
+  };
+  win.safeConnectWallet = win.ensureArtSoulWriteNetwork = async () => {
+    calls.push('interactive-wallet-request');
+    throw new Error('Readiness must not open a wallet or switch its network');
+  };
+  win.ethereum = {
+    request: async () => {
+      calls.push('injected-fallback');
+      throw new Error('The selected wallet must take precedence');
+    }
+  };
+  const dependencies = win.ArtSoulWebMCP.browserDependencies();
+  dependencies.fetchJson = jsonFetch({
+    '/api/public/artworks': { data: [] },
+    '/api/public/indexer-status': { chains: [] }
+  });
+  const tools = toolsFrom(win, dependencies);
+  return { calls, requests, run: async (name = 'withdraw_pending_funds') =>
+    JSON.parse(await tools.get(name).execute({})) };
+}
+
+test('browser withdrawal initializes a connected adapter before reading funds and requesting consent', async () => {
+  const fixture = connectedBrowserWithdrawal();
+  const result = await fixture.run();
+  assert.equal(result.submitted, true);
+  assert.equal(result.amount_eth, '0.0042');
+  assert.equal(result.transaction_hash, '0xwithdraw');
+  assert.deepEqual(fixture.calls, ['runtime', 'init', 'pending', 'consent', 'withdraw']);
+  assert.ok(fixture.requests.includes('eth_accounts'));
+  assert.ok(fixture.requests.includes('eth_chainId'));
+  assert.ok(fixture.requests.every(method => ['eth_accounts', 'eth_chainId'].includes(method)));
+});
+
+test('browser withdrawal does not initialize or prompt when the selected wallet has no accounts', async () => {
+  const fixture = connectedBrowserWithdrawal({ accounts: [] });
+  assert.equal((await fixture.run()).submitted, false);
+  assert.deepEqual(fixture.calls, ['runtime']);
+  assert.ok(fixture.requests.includes('eth_accounts'));
+});
+
+test('browser withdrawal does not initialize or switch a selected wallet on another chain', async () => {
+  const fixture = connectedBrowserWithdrawal({ chainId: '0x1' });
+  assert.equal((await fixture.run()).submitted, false);
+  assert.deepEqual(fixture.calls, ['runtime']);
+  assert.ok(fixture.requests.includes('eth_chainId'));
+});
+
+test('browser withdrawal refuses an account change during adapter initialization before consent', async () => {
+  const fixture = connectedBrowserWithdrawal({ duringInit: state => {
+    state.address = '0x2222222222222222222222222222222222222222';
+    state.accounts = [state.address];
+  } });
+  assert.equal((await fixture.run()).submitted, false);
+  assert.deepEqual(fixture.calls, ['runtime', 'init']);
+});
+
+test('browser withdrawal refuses a provider change during adapter initialization before consent', async () => {
+  const fixture = connectedBrowserWithdrawal({ duringInit: state => {
+    state.provider = { request: state.provider.request };
+  } });
+  assert.equal((await fixture.run()).submitted, false);
+  assert.deepEqual(fixture.calls, ['runtime', 'init']);
+});
+
+test('browser withdrawal refuses a chain change during adapter initialization before consent', async () => {
+  const fixture = connectedBrowserWithdrawal({ duringInit: state => { state.chainId = '0x1'; } });
+  assert.equal((await fixture.run()).submitted, false);
+  assert.deepEqual(fixture.calls, ['runtime', 'init']);
+});
+
+test('browser withdrawal retries cannot reuse a ready adapter after its account disappeared during init', async () => {
+  const fixture = connectedBrowserWithdrawal({ duringInit: state => { state.accounts = []; } });
+  assert.equal((await fixture.run()).submitted, false);
+  assert.equal((await fixture.run()).submitted, false);
+  assert.deepEqual(fixture.calls, ['runtime', 'init', 'runtime']);
+});
+
+test('browser activity initializes the selected wallet adapter and reads funds without consent or a write', async () => {
+  const fixture = connectedBrowserWithdrawal();
+  const result = await fixture.run('get_my_activity');
+  assert.equal(result.connected, true);
+  assert.equal(result.pending_withdrawal_eth, '0.0042');
+  assert.deepEqual(result.needs_attention.map(action => action.tool), ['withdraw_pending_funds']);
+  assert.deepEqual(fixture.calls, ['runtime', 'init', 'pending']);
+  assert.ok(fixture.requests.every(method => ['eth_accounts', 'eth_chainId'].includes(method)));
+});
+
 test('a tool waits for the deferred wallet runtime before saying there is no wallet', async () => {
   // A-80. The wallet SDK is moving off the first-load path, so a page can be
   // interactive before the runtime exists. Deciding from the first read alone

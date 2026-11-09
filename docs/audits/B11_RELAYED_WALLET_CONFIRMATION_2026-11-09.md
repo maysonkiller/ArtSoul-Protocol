@@ -146,8 +146,17 @@ was used in that fixture. A regression asserts this presentation order and
 that failures leave the form editable.
 
 These are desktop-browser viewport checks, not native iPhone acceptance or a
-second signed creation. No completed auction was replayed. Hosted release is
-recorded separately when verified.
+second signed creation. No completed auction was replayed.
+
+PR #479 passed Linux, Windows, static checks and its hosted preview in
+[CI run 42667336887](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42667336887).
+It merged at `2026-11-09T17:49:06Z` as
+`9e5a7b2216b7d761ff2976e41b6cec0da79e67c0`. Production deployment
+`dpl_AG2hSFiCujJCmTCmb8RmZWtUy3yY` is READY with the normal site alias.
+
+The subsequent accepted assistant withdrawal and the separately discovered
+Gallery preparation defect are recorded in
+[the wallet readiness audit](B11_GALLERY_WALLET_READINESS_2026-11-09.md).
 
 ## Primary implementation references
 
