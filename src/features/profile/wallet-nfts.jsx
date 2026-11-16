@@ -29,11 +29,6 @@ function NftPreview({ item }) {
   return <div className="wallet-nft-image">
     {(!available || loaded !== item.imageUrl) && <span>{available ? 'Loading preview…' : 'Preview unavailable'}</span>}
     {available && <img key={item.imageUrl} src={item.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onLoad={() => setLoaded(item.imageUrl)} onError={() => setFailed(item.imageUrl)} />}
-    <span className="wallet-asset-overlay" aria-label="Network: Base" title="Base">
-      <span className="wallet-chain-chip" data-chain="base-mainnet">
-        <img src="/brand/base.svg" alt="" loading="lazy" decoding="async" /><span>Base</span>
-      </span>
-    </span>
   </div>;
 }
 
@@ -215,7 +210,12 @@ function BaseWalletNfts({ wallet }) {
         {page.items.map(item => <article key={item.id} className="wallet-nft-card">
           <NftPreview item={item} />
           <div className="wallet-nft-body">
-            <h4 title={item.name || `Token ${item.tokenId}`}>{item.name || `Token ${item.tokenId}`}</h4>
+            <div className="wallet-nft-title-row">
+              <h4 title={item.name || `Token ${item.tokenId}`}>{item.name || `Token ${item.tokenId}`}</h4>
+              <span className="wallet-chain-chip" data-chain="base-mainnet" role="img" aria-label="Network: Base" title="Base">
+                <img src="/brand/base.svg" alt="" loading="lazy" decoding="async" /><span>Base</span>
+              </span>
+            </div>
             <p className="wallet-nft-collection" title={item.collection || ''}>{item.collection || 'Unnamed collection'}</p>
             <p className="wallet-nfts-note">{item.tokenType}{item.quantity !== '1' ? ` · Quantity ${item.quantity}` : ''}</p>
             <button type="button" className="btn-secondary" aria-label={`View details for ${item.name || `Token ${item.tokenId}`}`} onClick={() => void openDetails(item)}>View details ↗</button>

@@ -171,6 +171,7 @@
         if (!info) return null;
         const marker = document.createElement('span');
         marker.className = 'artsoul-chain-marker';
+        marker.setAttribute('role', 'img');
         marker.setAttribute('aria-label', 'Network: ' + info.name);
         marker.title = info.name;
         const icon = document.createElement('img');
@@ -186,7 +187,7 @@
 
     function reactNetworkMarker(h, artwork = {}) {
         const info = networkInfo(artwork);
-        return info ? h('span', { className: 'artsoul-chain-marker', 'aria-label': 'Network: ' + info.name, title: info.name },
+        return info ? h('span', { className: 'artsoul-chain-marker', role: 'img', 'aria-label': 'Network: ' + info.name, title: info.name },
             h('img', { src: info.icon, alt: '', loading: 'lazy', decoding: 'async' }), h('span', null, info.name)) : null;
     }
 
@@ -771,8 +772,6 @@
         const { type, url } = descriptor;
         const container = document.createElement('div');
         container.className = 'artsoul-card-media';
-        const chainMarker = createNetworkMarker(artwork);
-        if (chainMarker) container.appendChild(chainMarker);
 
         if (!descriptor.known) {
             container.appendChild(createMediaLoadingElement());
@@ -888,6 +887,11 @@
         const title = document.createElement('h3');
         title.className = 'artsoul-card-title';
         title.textContent = artwork.title || 'Untitled Artwork';
+        const titleRow = document.createElement('div');
+        titleRow.className = 'artsoul-card-title-row';
+        titleRow.appendChild(title);
+        const chainMarker = createNetworkMarker(artwork);
+        if (chainMarker) titleRow.appendChild(chainMarker);
 
         const creator = document.createElement('p');
         creator.className = 'artsoul-card-creator';
@@ -918,7 +922,7 @@
         value.textContent = summary.value;
         priceEl.appendChild(value);
         meta.append(priceLabel, priceEl);
-        body.appendChild(title);
+        body.appendChild(titleRow);
         body.appendChild(creator);
         body.appendChild(meta);
         const menu = href ? createActionMenu(artwork) : null;
@@ -971,7 +975,7 @@
         const { type, url } = descriptor;
         if (!url || !hasSafeMedia(artwork)) return null;
         if (!descriptor.known) {
-            return h('div', { className: 'artsoul-card-media' }, reactMediaLoading(h), reactNetworkMarker(h, artwork));
+            return h('div', { className: 'artsoul-card-media' }, reactMediaLoading(h));
         }
         if (type === 'video') return h(ReactVideoPreview, { artwork, descriptor, onUnavailable });
         if (type === 'audio') return h(ReactAudioPreview, { artwork, url, onUnavailable });
@@ -985,8 +989,7 @@
                 decoding: 'async',
                 onError: onUnavailable || undefined
             }),
-            h('span', { className: 'artsoul-card-media-badge artsoul-card-media-badge-image' }, 'IMAGE'),
-            reactNetworkMarker(h, artwork)
+            h('span', { className: 'artsoul-card-media-badge artsoul-card-media-badge-image' }, 'IMAGE')
         );
     }
 
@@ -1041,7 +1044,6 @@
                 onError: onUnavailable || undefined,
                 onVolumeChange: event => setMuted(event.currentTarget.muted) }),
             h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO'),
-            reactNetworkMarker(h, artwork),
             h('div', { className: 'artsoul-card-media-controls', draggable: false,
                 onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                 onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
@@ -1090,7 +1092,6 @@
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
                 h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
-                reactNetworkMarker(h, artwork),
                 h('img', { src: '/ARTSOULlogo.png', alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
                 h('div', { className: 'artsoul-card-media-controls', draggable: false,
                     onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
@@ -1172,7 +1173,9 @@
         },
             h(ReactMedia, { artwork, onUnavailable: () => setMediaUnavailable(true) }),
             h('div', { className: 'artsoul-card-body' },
-                h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
+                h('div', { className: 'artsoul-card-title-row' },
+                    h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
+                    reactNetworkMarker(h, artwork)),
                 h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
@@ -1214,6 +1217,7 @@
     window.ArtSoulArtworkCard = {
         createCardElement,
         createMediaElement,
+        createNetworkMarker,
         ReactCard,
         ReactMedia,
         ReactSavedControl,

@@ -8,6 +8,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
 const style = fs.readFileSync('nft-network-frames.css', 'utf8');
 const legacy = fs.readFileSync('src/features/profile/wallet-nfts.jsx', 'utf8');
+const multichain = fs.readFileSync('src/features/profile/multichain-wallet-assets.jsx', 'utf8');
 
 class FakeElement {
     constructor(tag) {
@@ -54,6 +55,13 @@ function markers(node) {
     });
     return arr;
 }
+function byClass(node, className) {
+    const matches = [];
+    walk(node, el => {
+        if (String(el.className || el.props?.className || '').split(/\s+/).includes(className)) matches.push(el);
+    });
+    return matches;
+}
 function imageNodes(node) {
     const arr = [];
     walk(node, el => {
@@ -86,41 +94,62 @@ test('chain identity is drawn from exact NFT metadata, not connected wallet', ()
     assert.equal(requests(), 0);
 });
 
-test('DOM images, video and audio each carry a locally hosted chain mark', () => {
+test('DOM cards keep one accessible network mark beside the title and clear of all media controls', () => {
     const { api, requests } = runtime();
     for (const [type, url] of [['image/png','a.png'],['video/mp4','v.mp4'],['audio/mpeg','a.mp3']]) {
-        const root = api.createMediaElement(imageArtwork({ file_type: type,
-            file_url: 'https://storage.example.test/' + url }));
+        const artwork = imageArtwork({ file_type: type, file_url: 'https://storage.example.test/' + url });
+        const root = api.createCardElement(artwork, { href: false });
         const badges = markers(root);
         assert.equal(badges.length, 1, type);
+        const body = byClass(root, 'artsoul-card-body')[0];
+        const row = byClass(body, 'artsoul-card-title-row')[0];
+        assert.ok(row, 'network identity belongs below the preview');
+        assert.ok(row.children.includes(byClass(row, 'artsoul-card-title')[0]), 'title is a direct row child');
+        assert.ok(row.children.includes(badges[0]), 'network mark is a title sibling');
+        assert.equal(markers(byClass(root, 'artsoul-card-media')[0]).length, 0, 'media controls remain unobstructed');
+        assert.equal(badges[0].attributes.role, 'img');
         assert.equal(badges[0].attributes['aria-label'], 'Network: Base Sepolia');
         assert.equal(imageNodes(badges[0])[0].src, '/brand/base.svg');
         assert.equal(imageNodes(badges[0])[0].alt, '');
+        assert.equal(markers(api.createCardElement({ ...artwork, chain_id: 999999 }, { href: false })).length, 0,
+            'unknown chain must not acquire a guessed network mark');
     }
-    const without = api.createMediaElement(imageArtwork({ chain_id: 999999 }));
-    assert.equal(markers(without).length, 0);
     assert.equal(requests(), 0);
 });
 
-test('React still image, video and audio previews preserve chain marks', () => {
+test('React cards preserve the same title identity for image, video and audio', () => {
     const { api, requests } = runtime();
     for (const [type, url] of [['image/png','a.png'],['video/mp4','v.mp4'],['audio/mpeg','a.mp3']]) {
         const art = imageArtwork({ file_type: type, file_url: 'https://storage.example.test/' + url });
-        let root = api.ReactMedia({ artwork: art });
-        // ReactMedia returns a component type for video/audio. Render that
-        // pure function with the fake hook surface; never mount or play media.
-        if (typeof root.type === 'function') root = root.type(root.props);
+        const root = api.ReactCard({ artwork: art });
         const badges = markers(root);
         assert.equal(badges.length, 1, type);
+        const row = byClass(byClass(root, 'artsoul-card-body')[0], 'artsoul-card-title-row')[0];
+        assert.ok(row, 'network identity belongs below the preview');
+        assert.ok(row.children.includes(byClass(row, 'artsoul-card-title')[0]), 'title is a direct row child');
+        assert.ok(row.children.includes(badges[0]), 'network mark is a title sibling');
+        assert.equal(badges[0].props.role, 'img');
         assert.equal(badges[0].props['aria-label'], 'Network: Base Sepolia');
         assert.equal(imageNodes(badges[0])[0].props.src, '/brand/base.svg');
+        assert.equal(imageNodes(badges[0])[0].props.alt, '');
+        let media = api.ReactMedia({ artwork: art });
+        // ReactMedia returns a component type for video/audio. Render that
+        // pure function with the fake hook surface; never mount or play media.
+        if (typeof media.type === 'function') media = media.type(media.props);
+        assert.equal(markers(media).length, 0, 'media controls remain unobstructed');
+        assert.equal(markers(api.ReactCard({ artwork: { ...art, chain_id: 999999 } })).length, 0,
+            'unknown chain must not acquire a guessed network mark');
     }
     assert.equal(requests(), 0);
 });
 
-test('existing Base wallet renders its network over the media without another API call', () => {
+test('both wallet NFT renderers place network identity beside the title without a media overlay', () => {
     assert.match(legacy, /className="wallet-nft-image"/);
-    assert.match(legacy, /className="wallet-asset-overlay" aria-label="Network: Base"/);
+    assert.match(legacy, /className="wallet-nft-title-row"/);
+    assert.match(multichain, /className="wallet-nft-title-row"/);
+    assert.doesNotMatch(legacy, /className="wallet-asset-overlay"/);
+    assert.doesNotMatch(multichain, /className="wallet-asset-overlay"/);
+    assert.match(legacy, /aria-label="Network: Base"/);
     assert.match(legacy, /className="wallet-chain-chip" data-chain="base-mainnet"/);
     assert.match(legacy, /src="\/brand\/base\.svg"/);
     assert.match(legacy, /Preview unavailable/);
@@ -130,13 +159,13 @@ test('existing Base wallet renders its network over the media without another AP
 test('all primary NFT pages load one small theme-safe stylesheet and fresh card script', () => {
     for (const path of ['index.html', 'gallery.html', 'profile.html', 'artwork.html']) {
         const html = fs.readFileSync(path, 'utf8');
-        assert.match(html, /\/nft-network-frames\.css\?v=1/);
-        assert.match(html, /\/src\/ui\/components\/artwork-card\.js\?v=30/);
+        assert.match(html, /\/nft-network-frames\.css\?v=2/);
+        assert.match(html, /\/src\/ui\/components\/artwork-card\.js\?v=31/);
     }
     assert.match(style, /\.wallet-nfts-grid[\s\S]*align-items:\s*stretch/);
     assert.match(style, /\.wallet-nft-image[\s\S]*aspect-ratio:\s*1\s*\/\s*1/);
-    assert.match(style, /\.artsoul-card-media \.artsoul-chain-marker/);
-    assert.match(style, /pointer-events:\s*none/);
+    assert.match(style, /\.artsoul-card-title-row/);
+    assert.doesNotMatch(style, /\.artsoul-card-media[^{}]*\.artsoul-chain-marker/);
     assert.doesNotMatch(style, /#[a-f0-9]{3,8}\b/i, 'no hardcoded theme colors');
     assert.doesNotMatch(style, /https?:\/\//i, 'styles never load new third-party assets');
 });

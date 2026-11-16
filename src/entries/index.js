@@ -444,7 +444,12 @@ let morphActive = false;
                 voteCount.className = 'text-xs opacity-60 mt-1';
                 voteCount.textContent = `${art.vote_count || 0} votes`;
 
-                info.appendChild(title);
+                const titleRow = document.createElement('div');
+                titleRow.className = 'artsoul-card-title-row';
+                titleRow.appendChild(title);
+                const network = window.ArtSoulArtworkCard?.createNetworkMarker?.(art);
+                if (network) titleRow.appendChild(network);
+                info.appendChild(titleRow);
                 info.appendChild(desc);
                 info.appendChild(price);
                 info.appendChild(voteCount);

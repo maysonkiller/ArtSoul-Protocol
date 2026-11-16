@@ -68,14 +68,13 @@ test('Vite applies the fallback in every HTML entry before the existing async bu
   }
 });
 
-test('ArtSoul and wallet NFT overlays use bottom-right round icons only, with video controls clear', () => {
-  assert.match(baseline, /artsoul-card-media \.artsoul-chain-marker \{[\s\S]*right: 8px; bottom: 8px;/);
-  assert.match(baseline, /artsoul-card-media \.artsoul-chain-marker > span \{ display: none;/);
-  assert.match(baseline, /artsoul-card-media:has\(\.artsoul-card-media-controls\) \.artsoul-chain-marker \{ bottom: 60px;/);
-  assert.match(baseline, /wallet-nft-image, \.wallet-asset-art/);
-  assert.match(baseline, /wallet-asset-overlay \.wallet-chain-chip > span:not\(\.wallet-chain-glyph\)/);
-  assert.match(baseline, /border-radius: 50%/);
-  assert.match(legacy, /aria-label="Network: Base" title="Base"/);
+test('ArtSoul and wallet NFT network marks share title rows and leave media controls clear', () => {
+  assert.match(baseline, /\.artsoul-card-title-row/);
+  assert.match(baseline, /\.wallet-nft-title-row/);
+  assert.doesNotMatch(baseline, /\.artsoul-card-media[^{}]*\.artsoul-chain-marker/);
+  assert.doesNotMatch(baseline, /:has\(\.artsoul-card-media-controls\)[^{}]*\.artsoul-chain-marker/);
+  assert.doesNotMatch(baseline, /\.wallet-asset-overlay/);
+  assert.match(legacy, /aria-label="Network: Base"/);
   assert.match(multichain, /title=\{info\[1\]\} aria-label=\{"Network: " \+ info\[1\]\}/);
   assert.match(multichain, /quickNetworkChoices\.map/);
   assert.doesNotMatch(baseline, /#[a-f0-9]{3,8}\b/i, 'themes remain CSS-token based');
