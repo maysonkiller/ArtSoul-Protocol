@@ -43,7 +43,7 @@ const functionNames = [
   'formatWeiToEth', 'getAuctionHighestBidWei', 'getAuctionStartingBidWei', 'calculateMinimumBidDetails',
   'projectedAuctionFromArtwork', 'mergeProjectedAuction',
   'bidIdentity', 'advanceBidCursor', 'applyLiveAuctionProjection', 'refreshLiveBidActivity',
-  'getAuctionActionId', 'isZeroAddress', 'isSameAddress', 'hasProtocolId', 'loadArtwork', 'startResaleProjectionRefresh'
+  'getAuctionActionId', 'isZeroAddress', 'isSameAddress', 'hasProtocolId', 'loadArtwork', 'startReceiptProjectionRefresh'
 ];
 
 function page({ getArtwork, getLiveAuctionActivity, getProfile, getArtworkProvenance, hydrateBidderProfiles } = {}) {
@@ -126,14 +126,21 @@ function mountReceiptRefresh(api) {
   api.document.addEventListener = (_, listener) => visibility.add(listener);
   api.document.removeEventListener = (_, listener) => visibility.delete(listener);
   api.useEffect = effect => { cleanup = effect(); };
-  const marker = source.indexOf('let stopResaleRefresh = () => {};');
+  const marker = source.indexOf('let stopReceiptRefresh = () => {};');
   const start = source.lastIndexOf('useEffect(() => {', marker);
-  const end = source.indexOf('}, [artworkId]);', marker) + '}, [artworkId]);'.length;
+  const dependencies = '}, [artworkId]);';
+  const end = source.indexOf(dependencies, marker) + dependencies.length;
   assert.ok(start >= 0 && end > start, 'mount the shipped receipt listener effect');
   vm.runInContext(source.slice(start, end), api);
   return {
     timers, visibility, cleanup,
     receipt: () => listeners.get('artsoul:resale-confirmed')(),
+    auctionReceipt: detail => listeners.get('artsoul:auction-confirmed')({ detail }),
+    retry: () => listeners.get('artsoul:receipt-retry')(),
+    walletChanged: address => {
+      api.window.currentWalletAddress = address;
+      listeners.get('artsoul:wallet-state-changed')?.();
+    },
     setVisible: visible => {
       api.document.visibilityState = visible ? 'visible' : 'hidden';
       [...visibility].forEach(listener => listener());
@@ -167,6 +174,201 @@ async function resalePage(record = {}) {
   bridge = receiptBridge(fixture.page, record, true);
   return { ...fixture, feed, clock: mountReceiptRefresh(fixture.page) };
 }
+
+async function auctionPage(record = {}) {
+  const original = projection({ status: 'settlement_pending', minted: false, token_id: null,
+    current_owner_address: null, auction_winner_address: null, canonical_floor: '0' });
+  const feed = { row: original, events: [{ type: 'auction_ended', auction_id: '63', block_number: 20 }], reads: 0, historyReads: 0 };
+  let bridge;
+  const fixture = page({
+    getArtwork: () => {
+      feed.reads++;
+      if (feed.pending) return feed.pending;
+      return bridge ? bridge.applyConfirmedAuctionUpdate(feed.row) : feed.row;
+    },
+    getArtworkProvenance: () => { feed.historyReads++; return { events: [...feed.events], complete: true }; }
+  });
+  await fixture.page.loadArtwork();
+  bridge = receiptBridge(fixture.page, { kind: 'settled', ...record });
+  return { ...fixture, feed, bridge, clock: mountReceiptRefresh(fixture.page) };
+}
+
+test('a settlement receipt retries delayed indexed mint, roles and independently delayed provenance', async () => {
+  const { state, feed, clock } = await auctionPage();
+  clock.auctionReceipt();
+  assert.equal(state.artwork.status, 'sold');
+  assert.equal(state.artwork.minted, false, 'a local receipt cannot invent a mint or owner');
+  assert.equal(state.artwork.current_owner_address, null);
+  await clock.tick();
+  assert.equal(state.artwork.pending_auction_sync, true);
+  feed.row = { ...feed.row, status: 'sold', minted: true, token_id: '8', canonical_floor: '0.001',
+    current_owner_address: BIDDER, auction_winner_address: BIDDER };
+  await clock.tick();
+  assert.equal(state.artwork.current_owner_address, BIDDER);
+  assert.equal(state.artwork.auction_winner_address, BIDDER);
+  assert.equal(state.artwork.pending_auction_sync, undefined);
+  assert.equal(clock.timers.size, 1, 'indexed ownership cannot stop the separately delayed history refresh');
+  feed.events.push({ type: 'settlement_completed', auction_id: '62', block_number: 100 });
+  await clock.tick();
+  assert.equal(clock.timers.size, 1, 'settlement history from a different auction is not sufficient');
+  feed.events.push({ type: 'settlement_completed', auction_id: '63', block_number: 101 });
+  await clock.tick();
+  assert.equal(state.provenanceState.events.at(-1).type, 'settlement_completed');
+  assert.equal(clock.timers.size, 0);
+  assert.equal(clock.visibility.size, 0);
+  assert.equal(state.refreshError, '');
+  clock.cleanup();
+});
+
+test('settlement replaces an in-flight end-auction refresh without accepting its late response', async () => {
+  const { state, feed, clock, bridge } = await auctionPage({ kind: 'ended', patch: { has_winner: true } });
+  feed.row = { ...feed.row, status: 'auction' };
+  state.artwork.status = 'auction';
+  clock.auctionReceipt();
+  const old = deferred();
+  feed.pending = old.promise;
+  const endingRead = clock.tick();
+  await new Promise(resolve => setImmediate(resolve));
+  bridge.recordConfirmedAuction({ chain_id: 84532, artwork_id: '28', auction_id: '63',
+    transaction_hash: `0x${'34'.repeat(32)}`, block_number: 101, kind: 'settled', patch: {} });
+  clock.auctionReceipt();
+  assert.equal(state.artwork.status, 'sold');
+  feed.pending = null;
+  feed.row = { ...feed.row, status: 'sold', minted: true, token_id: '8',
+    current_owner_address: BIDDER, auction_winner_address: BIDDER };
+  feed.events.push({ type: 'settlement_completed', auction_id: '63', block_number: 101 });
+  await clock.tick();
+  old.resolve(projection({ status: 'settlement_pending', minted: false, pending_auction_sync: true }));
+  await endingRead;
+  assert.equal(state.artwork.status, 'sold');
+  assert.equal(state.artwork.minted, true);
+  assert.equal(state.artwork.current_owner_address, BIDDER);
+  assert.equal(state.provenanceState.events.at(-1).type, 'settlement_completed');
+  assert.equal(clock.timers.size, 0);
+  clock.cleanup();
+});
+
+test('auction receipt retries have a finite read budget and leave an explicit manual retry state', async () => {
+  const { state, feed, clock } = await auctionPage();
+  clock.auctionReceipt();
+  for (let attempt = 0; attempt < 7; attempt++) await clock.tick();
+  assert.equal(feed.reads, 8);
+  assert.equal(feed.historyReads, 8);
+  assert.equal(clock.timers.size, 0);
+  assert.equal(clock.visibility.size, 0);
+  assert.equal(state.artwork.pending_auction_sync, true);
+  assert.match(state.refreshError, /still catching up.*Retry/);
+  clock.retry();
+  assert.equal(clock.timers.size, 1, 'manual retry can start a new bounded window');
+  clock.cleanup();
+});
+
+test('manual retry retains the auction target when ownership caught up before delayed history', async () => {
+  const { state, feed, clock } = await auctionPage();
+  clock.auctionReceipt();
+  feed.row = { ...feed.row, status: 'sold', minted: true, token_id: '8',
+    current_owner_address: BIDDER, auction_winner_address: BIDDER };
+  for (let attempt = 0; attempt < 7; attempt++) await clock.tick();
+  assert.equal(state.artwork.pending_auction_sync, undefined);
+  assert.match(state.refreshError, /still catching up/);
+  clock.retry();
+  await clock.tick();
+  assert.equal(clock.timers.size, 1, 'history-only retry continues after an unchanged history read');
+  feed.events.push({ type: 'settlement_completed', auction_id: '63', block_number: 100 });
+  await clock.tick();
+  assert.equal(state.provenanceState.events.at(-1).type, 'settlement_completed');
+  assert.equal(clock.timers.size, 0);
+  assert.equal(state.refreshError, '');
+  clock.cleanup();
+});
+
+test('manual retry preserves the resale target after the listing catches up before history', async () => {
+  const { state, feed, clock } = await resalePage();
+  clock.receipt();
+  feed.row = { ...feed.row, status: 'sold', sale_price: '0', current_owner_address: BIDDER, resale_updated_block: 100 };
+  for (let attempt = 0; attempt < 7; attempt++) await clock.tick();
+  assert.equal(state.artwork.pending_resale_sync, undefined);
+  assert.match(state.refreshError, /still catching up/);
+  clock.retry();
+  await clock.tick();
+  assert.equal(clock.timers.size, 1, 'retry keeps the resale block boundary, not an auction event target');
+  feed.events.push({ type: 'resale_completed', block_number: 100 });
+  await clock.tick();
+  assert.equal(clock.timers.size, 0);
+  assert.equal(state.refreshError, '');
+  clock.cleanup();
+});
+
+test('duplicate receipt events preserve history-only retries and their exhausted warning', async () => {
+  for (const auction of [true, false]) {
+    const { state, feed, clock } = await (auction ? auctionPage() : resalePage());
+    const receipt = auction ? clock.auctionReceipt : clock.receipt;
+    receipt();
+    feed.row = { ...feed.row, status: 'sold', minted: true, token_id: auction ? '8' : '7',
+      current_owner_address: BIDDER, auction_winner_address: BIDDER, resale_updated_block: 100 };
+    await clock.tick();
+    const pendingTimer = [...clock.timers.keys()][0];
+    receipt();
+    assert.deepEqual([...clock.timers.keys()], [pendingTimer], 'a duplicate cannot cancel or restart the bounded window');
+    for (let attempt = 1; attempt < 7; attempt++) await clock.tick();
+    const warning = state.refreshError;
+    const reads = feed.reads;
+    receipt();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.match(warning, /still catching up/);
+    assert.equal(state.refreshError, warning, 'a detail-less event cannot hide unfinished history');
+    assert.equal(feed.reads, reads);
+    assert.equal(clock.timers.size, 0);
+    clock.cleanup();
+  }
+});
+
+test('auction receipt retries pause when hidden and artwork cleanup rejects late responses', async () => {
+  const { state, writes, feed, clock } = await auctionPage();
+  clock.setVisible(false);
+  clock.auctionReceipt();
+  assert.equal(clock.timers.size, 0);
+  assert.equal(feed.reads, 1);
+  clock.setVisible(true);
+  const delayed = deferred();
+  feed.pending = delayed.promise;
+  const read = clock.tick();
+  const writesBeforeCleanup = writes.length;
+  clock.cleanup();
+  delayed.resolve({ ...feed.row, status: 'sold', minted: true, token_id: '8', current_owner_address: BIDDER });
+  await read;
+  assert.equal(writes.length, writesBeforeCleanup);
+  assert.equal(state.artwork.current_owner_address, null);
+  assert.equal(clock.timers.size, 0);
+  assert.equal(clock.visibility.size, 0);
+});
+
+test('account changes cancel only the active receipt read and leave no background retry', async () => {
+  const { state, writes, feed, clock } = await auctionPage();
+  clock.auctionReceipt();
+  const delayed = deferred();
+  feed.pending = delayed.promise;
+  const read = clock.tick();
+  const writesBeforeChange = writes.length;
+  clock.walletChanged(CREATOR);
+  delayed.resolve({ ...feed.row, status: 'sold', minted: true, token_id: '8', current_owner_address: BIDDER });
+  await read;
+  assert.equal(writes.length, writesBeforeChange);
+  assert.equal(state.artwork.current_owner_address, null);
+  assert.equal(clock.timers.size, 0);
+  assert.equal(clock.visibility.size, 0);
+  clock.cleanup();
+});
+
+test('a receipt for another artwork cannot interrupt pending settlement reconciliation', async () => {
+  const { clock, state } = await auctionPage();
+  clock.auctionReceipt();
+  const timer = [...clock.timers.keys()][0];
+  clock.auctionReceipt({ chain_id: 84532, artwork_id: '29' });
+  assert.deepEqual([...clock.timers.keys()], [timer]);
+  assert.equal(state.artwork.pending_auction_sync, true);
+  clock.cleanup();
+});
 
 test('a resale receipt refreshes indexed ownership and separately delayed history without restoring Buy', async () => {
   const { state, feed, clock } = await resalePage();

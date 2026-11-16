@@ -131,11 +131,25 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   IO acceptance remain pending. Current readings do not guarantee future costs.
   The [reminder recheck](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md)
   passes 66 tests. The owner's new ending of existing auction 75 subsequently
-  opened its real payment window and produced one winner-only payment reminder;
-  read acknowledgement, phone viewing, settlement and preference restoration
-  are tracked separately in that record. Live-extension acceptance remains open;
-  previously accepted signed journeys are not replay prerequisites.
+  opened its real payment window and produced one winner-only payment reminder.
+  The owner confirmed iPhone viewing and independently settled it; NFT 8,
+  zero additional payment, 0.009 test ETH withdrawable credit and restored
+  one-hour preferences are verified. The payment reminder was not marked read,
+  and live-extension acceptance remains open. The stale ownership/history UI
+  observed after settlement now has a [local bounded correction](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#local-receipt-refresh-correction),
+  still under verification and not yet released. Previously accepted signed
+  journeys are not replay prerequisites.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
+  November 16: the auction receipt handler performed one indexed read, then
+  Sold stopped ordinary polling while ownership/history could remain stale.
+  The [local correction](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#local-receipt-refresh-correction)
+  shares seven serial visible-only refresh attempts across auction/resale, waits
+  separately for matching indexed history, cancels replaced receipt/account
+  work and unmount, and exposes explicit Retry after the bounded window. The
+  history-only Retry target and duplicate-event gaps found in review are fixed.
+  Independent review, 101 focused checks and the local build pass. Hosted
+  checks, release and live convergence remain pending; no completed transaction
+  is replayed.
   The November 9 [confirmed purchase fix](../audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
   prevents optional read failures from misreporting confirmed settlement/resale
   transactions and uses the receipt bridge to suppress stale purchase actions.
