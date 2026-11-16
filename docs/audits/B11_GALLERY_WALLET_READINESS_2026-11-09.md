@@ -123,8 +123,10 @@ assistant bidding on artwork 14 / auction 75 passed without reload at block
 `56674116`, as recorded in [the current Phase B status](../PHASE_B_STATUS_2026-11-02.md);
 Phantom connection, Disconnect, reload remaining guest and Rabby connection
 passed in [native wallet acceptance](B18_WALLET_STATE_FRESHNESS_2026-11-09.md#native-production-acceptance).
-Delayed resale UI convergence below, latest native iPhone composition and
-separate provider/cohort gates remain open. Do not repeat accepted transactions;
+The November 16 [Music 2 acceptance](B12_RESALE_UI_ACCEPTANCE_2026-11-16.md)
+supersedes the open complete resale UI outcome below. Unrecorded live retry
+timing, mobile sign-in follow-up and separate provider/cohort gates retain their
+own boundaries. Do not repeat accepted transactions;
 this record does not declare Phase B or the future public beta complete.
 
 ## Signed purchase and delayed resale projection

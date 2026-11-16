@@ -179,7 +179,12 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   the assistant cleared the command and showed success follow-ups. The artwork
   remains unminted with floor zero. Evidence is retained in
   `docs/private/b12-assistant-bid14-receipt-2026-11-09.json`.
-  Delayed resale UI acceptance stays open. Completed bid, purchase,
+  November 16 closes the complete resale UI outcome: Music 2/artwork 32/token 5,
+  block `59568267`, `0.0001 ETH`, changed owner to lys, retired Buy, added the
+  exact tenth provenance event and cleared the assistant without reload.
+  [The acceptance record](../audits/B12_RESALE_UI_ACCEPTANCE_2026-11-16.md) keeps
+  unobserved initial-stale/retry timing separate from controlled delay tests.
+  Completed bid, purchase,
   repricing/removal, withdrawal, auction creation and initial listing must not
   become replay gates.
   The [network picker follow-up](../audits/B18_NETWORK_PICKER_2026-11-09.md)

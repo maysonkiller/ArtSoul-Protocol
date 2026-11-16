@@ -68,6 +68,7 @@ function harness({ active = '', hint = OWNER, view = '', result = { success: tru
     setEditMode: value => { state.editing = value; },
     setProfileEditLoading: value => { state.editLoading = value; },
     setProfileEditError: value => { state.editError = value; },
+    setProfileEditErrorIsNotice: value => { state.editNotice = value; },
     setIsOwnProfile: value => { state.own = value; scope.isOwnProfile = value; },
     setLoading: value => { state.loading = value; },
     setArtworksLoading: value => { state.artworksLoading = value; }, setSelectedGallery() {},
@@ -147,6 +148,21 @@ test('changing the wallet during authentication cancels the old profile save', a
   await h.saveProfile();
   assert.deepEqual(h.state.writes, []);
   assert.match(h.state.alerts[0], /wallet.*changed/i);
+});
+
+test('failed save authentication keeps the draft and does not repeat the wallet notice', async () => {
+  const h = harness({ active: OWNER });
+  h.scope.profileDraft = stored({ username: 'Unsaved name' });
+  h.scope.window.ensureAuthenticated = async () => {
+    h.state.authenticated++;
+    h.scope.alert('Authentication was not completed.');
+    return false;
+  };
+  await h.saveProfile();
+  assert.equal(h.state.authenticated, 1);
+  assert.deepEqual(h.state.alerts, ['Authentication was not completed.']);
+  assert.deepEqual(h.state.writes, []);
+  assert.equal(h.scope.profileDraft.username, 'Unsaved name');
 });
 
 test('saving edits profile fields without rewriting a retained public link or provider identity', async () => {

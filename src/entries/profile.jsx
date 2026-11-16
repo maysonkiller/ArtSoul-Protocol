@@ -145,6 +145,7 @@ const { useState, useEffect, useRef } = React;
             const [profileDraft, setProfileDraft] = useState(null);
             const [profileEditLoading, setProfileEditLoading] = useState(false);
             const [profileEditError, setProfileEditError] = useState('');
+            const [profileEditErrorIsNotice, setProfileEditErrorIsNotice] = useState(false);
             const [profileReportingEnabled, setProfileReportingEnabled] = useState(false);
             const [profileReportOpen, setProfileReportOpen] = useState(false);
             const [profileLoadError, setProfileLoadError] = useState(null);
@@ -1243,8 +1244,16 @@ const { useState, useEffect, useRef } = React;
                     requestId === profileRequestRef.current && getActiveWalletAddress().toLowerCase() === wallet;
                 setProfileEditLoading(true);
                 setProfileEditError('');
+                setProfileEditErrorIsNotice(false);
                 try {
-                    if (!await window.ensureAuthenticated?.()) throw new Error('Verify your wallet to edit your profile.');
+                    let authFailure = null;
+                    if (!await window.ensureAuthenticated?.({ onError: failure => { authFailure = failure; } })) {
+                        if (current()) {
+                            setProfileEditErrorIsNotice(authFailure?.code === 'AUTH_CANCELED');
+                            setProfileEditError(authFailure?.message || 'Verify your wallet to edit your profile.');
+                        }
+                        return;
+                    }
                     if (!current()) return;
                     const sessionMatches = () => String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase() === wallet;
                     if (!sessionMatches()) throw new Error('Your sign-in wallet changed. Please try again.');
@@ -1344,7 +1353,6 @@ const { useState, useEffect, useRef } = React;
                     // Authenticate before saving (only once)
                     const isAuthenticated = await window.ensureAuthenticated?.();
                     if (!isAuthenticated) {
-                        alert('Authentication required to save profile');
                         return;
                     }
                     if (requestId !== profileRequestRef.current || editId !== profileEditRef.current ||
@@ -1835,7 +1843,7 @@ const { useState, useEffect, useRef } = React;
 
 
                                     {profile?.profile_content_hidden && <p className="profile-oauth-notice mt-4" role="status">Profile content is hidden pending review. Wallet identity and artwork ownership are unchanged.</p>}
-                                    {profileEditError && <p className="profile-oauth-notice is-error mt-4" role="alert">{profileEditError}</p>}
+                                    {profileEditError && <p className={`profile-oauth-notice mt-4${profileEditErrorIsNotice ? '' : ' is-error'}`} role={profileEditErrorIsNotice ? 'status' : 'alert'}>{profileEditError}</p>}
                                     {profileLoadError && (
                                         <div className="profile-oauth-notice is-error mt-4" role="alert">
                                             {profileLoadError}{' '}
