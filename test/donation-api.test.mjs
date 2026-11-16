@@ -9,7 +9,8 @@ const record = {creator, donor, amount:'500000000000000', anonymous:true, messag
     transaction_hash:hash, log_index:1, block_number:42, recorded_at:'2026-09-30T00:00:00Z'};
 function response() { return {statusCode:200, headers:{},setHeader(k,v){this.headers[k]=v;},
     status(code){this.statusCode=code;return this;},json(body){this.body=body;return this;},end(){}}; }
-async function request(t, {query={},enabled=true, hidden=false, messages=false, records=[record], failure=false}={}) {
+async function request(t, {query={},enabled=true, hidden=false, messages=false, records=[record], failure=false,
+    profiles=[{wallet_address:donor,username:'Private donor'}], beforeRead=()=>{}}={}) {
     const oldFetch=globalThis.fetch, before={...process.env}, paths=[];
     Object.assign(process.env,{SUPABASE_URL:'https://database.example',SUPABASE_ANON_KEY:'test-anon-only',SUPABASE_SERVICE_ROLE_KEY:'test-only',
         ARTSOUL_DONATIONS_ENABLED:String(enabled),ARTSOUL_DONATIONS_ADDRESS_BASE_SEPOLIA:address});
@@ -17,9 +18,10 @@ async function request(t, {query={},enabled=true, hidden=false, messages=false, 
     globalThis.fetch=async value=>{
         const url=new URL(value), table=url.pathname.split('/').at(-1); paths.push(url);
         if(failure) throw new Error('unavailable');
+        await beforeRead(table);
         const rows={v41_artworks:[{creator}],artwork_moderation_visibility:hidden?[{hidden:true}]:[],
             artwork_donations:url.searchParams.get('limit')==='1'?records.slice(0,1):records,
-            profiles:[{wallet_address:donor,username:'Private donor'}],
+            public_profile_content:profiles,
             donation_message_visibility:messages?[{transaction_hash:hash,log_index:1,hidden:true}]:[]}[table];
         assert.ok(rows,`Unexpected read ${table}`);
         return {ok:true,status:200,text:async()=>JSON.stringify(rows)};
@@ -50,19 +52,57 @@ test('only exact Base Sepolia artwork queries and bounded orders/pages are accep
 });
 test('hidden artworks disclose no donation or profile data',async t=>{
     const {res,paths}=await request(t,{hidden:true}); assert.equal(res.statusCode,404);
-    assert.equal(paths.length,2); assert.equal(res.headers['Cache-Control'],undefined);
+    assert.equal(paths.length,2); assert.equal(res.headers['Cache-Control'],'private, no-store');
 });
 test('anonymous donations never request or disclose donor profiles',async t=>{
     const {res,paths}=await request(t); assert.equal(res.statusCode,200);
     assert.equal(res.body.donations[0].donor,null); assert.equal(res.body.top.donor_name,null);
     assert.ok(!JSON.stringify(res.body).includes(donor));
-    assert.ok(!paths.some(url=>url.pathname.endsWith('/profiles')));
+    assert.ok(!paths.some(url=>url.pathname.endsWith('/public_profile_content')));
     assert.equal(res.body.top.creator,creator);
 });
 test('public donor names use one bounded batch and messages obey independent visibility',async t=>{
     const {res,paths}=await request(t,{records:[{...record,anonymous:false}],messages:true});
     assert.equal(res.body.donations[0].donor_name,'Private donor'); assert.equal(res.body.donations[0].message,null);
-    assert.equal(paths.filter(url=>url.pathname.endsWith('/profiles')).length,1);
+    assert.equal(paths.filter(url=>url.pathname.endsWith('/public_profile_content')).length,1);
+    assert.equal(res.headers['Cache-Control'],'private, no-store');
+});
+test('repeated donation history reads reflect current public identities without a stale failure fallback',async t=>{
+    const profiles=[{wallet_address:donor,username:'Visible donor'}];
+    let profileUnavailable=false;
+    const {res:first,paths}=await request(t,{records:[{...record,anonymous:false}],profiles,beforeRead:table=>{
+        if(profileUnavailable&&table==='public_profile_content') throw new Error('unavailable');
+    }});
+    const read=async()=>{
+        const res=response();
+        await handler({method:'GET',query:{chain_id:'84532',artwork_id:'1'}},res);
+        assert.equal(res.headers['Cache-Control'],'private, no-store');
+        return res;
+    };
+    assert.equal(first.body.donations[0].donor_name,'Visible donor');
+    assert.equal(first.body.top.donor_name,'Visible donor');
+    assert.equal(first.headers['Cache-Control'],'private, no-store');
+    profiles[0].username=null;
+    paths.length=0;
+    const hidden=await read();
+    assert.equal(hidden.statusCode,200);
+    assert.equal(hidden.body.donations[0].donor_name,null);
+    assert.equal(hidden.body.top.donor_name,null);
+    assert.equal(hidden.body.donations[0].donor,donor);
+    assert.equal(hidden.body.donations[0].amount,record.amount);
+    assert.equal(paths.filter(url=>url.pathname.endsWith('/public_profile_content')).length,1);
+    assert.ok(!paths.some(url=>url.pathname.endsWith('/profiles')));
+    profileUnavailable=true;
+    const failed=await read();
+    assert.ok(failed.statusCode>=500);
+    assert.equal(failed.body.success,undefined);
+    assert.doesNotMatch(JSON.stringify(failed.body),/Visible donor/);
+    profileUnavailable=false;
+    profiles[0].username='Restored donor';
+    const restored=await read();
+    assert.equal(restored.statusCode,200);
+    assert.equal(restored.body.donations[0].donor_name,'Restored donor');
+    assert.equal(restored.body.top.donor_name,'Restored donor');
 });
 test('largest and newest views keep deterministic ordering and exact deployment scope',async t=>{
     const {res,paths}=await request(t,{query:{sort:'amount'},records:Array.from({length:21},()=>record)});
@@ -75,6 +115,7 @@ test('largest and newest views keep deterministic ordering and exact deployment 
 });
 test('database failures do not become an empty successful support history',async t=>{
     const {res}=await request(t,{failure:true}); assert.ok(res.statusCode>=500); assert.equal(res.body.success,undefined);
+    assert.equal(res.headers['Cache-Control'],'private, no-store');
 });
 
 test('the last permitted page does not advertise an unusable next offset',async t=>{

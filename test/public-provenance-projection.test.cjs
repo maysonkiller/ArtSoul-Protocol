@@ -157,7 +157,7 @@ const FIXTURES = {
   artwork_moderation_visibility: [
     { chain_id: 84532, artwork_id: '9', hidden: true }
   ],
-  profiles: [
+  public_profile_content: [
     {
       wallet_address: CREATOR.toLowerCase(),
       username: 'soulpainter',
@@ -212,6 +212,7 @@ function loadHandler({ fixtures = FIXTURES, calls = [], tableRead, metadataRead 
 
   const context = vm.createContext({
     allowMethods: () => true,
+    PUBLIC_PROFILE_SOURCE: 'public_profile_content',
     readNftOwnershipConfig: () => null,
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,
@@ -411,12 +412,109 @@ test('an exact resale artwork returns only its three public ownership identities
     assert.deepEqual(Object.keys(profile).sort(),['avatar_url','username','wallet_address']);
     assert.equal(profile.wallet_address,wallet);
   }
-  const reads=calls.filter(path=>path.startsWith('profiles?'));
+  const reads=calls.filter(path=>path.startsWith('public_profile_content?'));
   assert.equal(reads.length,1);
   const query=new URLSearchParams(reads[0].split('?')[1]);
   assert.equal(query.get('select'),'wallet_address,username,avatar_url');
   assert.equal(query.get('limit'),'3');
   assert.deepEqual(query.get('wallet_address').slice(4,-1).split(',').sort(),addresses);
+});
+
+test('warm feed and exact caches refresh hidden/restored profile content without rebuilding lifecycle data', async () => {
+  for (const query of [{}, { id: '6' }, { id: 'v41:11155111:4' }]) {
+    const fixtures = structuredClone(FIXTURES), calls = [];
+    const handler = loadHandler({ fixtures, calls });
+    const read = async () => {
+      const res = fakeRes();
+      await handler({ query }, res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.headers['cache-control'], 'private, no-store');
+      return res.body;
+    };
+    const id = query.id === 'v41:11155111:4' ? query.id : 'v41:84532:6';
+    const original = cardById(await read(), id);
+    assert.equal(original.creator_name, 'soulpainter');
+    const lifecycleCalls = calls.filter(path => !path.startsWith('public_profile_content?'));
+    assert.equal(calls.filter(path => path.startsWith('public_profile_content?')).length, 1, 'a fresh projection reads identities only once');
+    const originalProfiles = structuredClone(fixtures.public_profile_content);
+    fixtures.public_profile_content = fixtures.public_profile_content.map(row => ({ ...row, username: null, avatar_url: null }));
+    calls.length = 0;
+    const hidden = cardById(await read(), id);
+    assert.equal(hidden.creator_name, null);
+    assert.equal(original.creator_name, 'soulpainter', 'refresh never mutates an already returned response');
+    assert.equal(calls.length, 1, 'warm read only refreshes one public identity batch');
+    assert.match(calls[0], /^public_profile_content\?/);
+    assert.equal(hidden.current_owner_address, original.current_owner_address);
+    assert.equal(hidden.status, original.status);
+    if (query.id) {
+      assert.equal(hidden.creator_avatar_url, null);
+      assert.deepEqual(Object.keys(hidden.ownership_profiles), Object.keys(original.ownership_profiles));
+      for (const profile of Object.values(hidden.ownership_profiles)) {
+        assert.equal(profile.username, null);
+        assert.equal(profile.avatar_url, null);
+      }
+    } else {
+      assert.equal('ownership_profiles' in hidden, false);
+      assert.equal('creator_avatar_url' in hidden, false);
+    }
+    fixtures.public_profile_content = originalProfiles;
+    calls.length = 0;
+    const restored = cardById(await read(), id);
+    assert.equal(restored.creator_name, 'soulpainter');
+    if (query.id) assert.equal(restored.creator_avatar_url, CREATOR_AVATAR);
+    assert.equal(calls.length, 1);
+    assert.ok(lifecycleCalls.length > 1, 'the fixture exercises an expensive lifecycle snapshot');
+  }
+});
+
+test('warm identity lookup failures remove cached content and recover without an unmasked fallback', async () => {
+  for (const query of [{}, { id: '6' }]) {
+    const calls = [];
+    let unavailable = false;
+    const handler = loadHandler({ calls, tableRead: async path => {
+      if (unavailable && path.startsWith('public_profile_content?')) throw Object.assign(new Error('private diagnostic'), { code: 'QUERY_FAILED' });
+    } });
+    const read = async () => {
+      const res = fakeRes();
+      await handler({ query }, res);
+      assert.equal(res.statusCode, 200);
+      return res.body;
+    };
+    assert.equal(cardById(await read(), 'v41:84532:6').creator_name, 'soulpainter');
+    unavailable = true;
+    calls.length = 0;
+    const failed = await read(), card = cardById(failed, 'v41:84532:6');
+    assert.equal(card.creator_name, null);
+    assert.equal('ownership_profiles' in card, false);
+    if (query.id) assert.equal(card.creator_avatar_url, null);
+    assert.ok(failed.warnings.some(warning => warning.table === 'public_profile_content'));
+    assert.doesNotMatch(JSON.stringify(failed), /soulpainter|cdn\.example\/owner|private diagnostic/);
+    assert.equal(calls.length, 1);
+    unavailable = false;
+    const recovered = await read();
+    assert.equal(cardById(recovered, 'v41:84532:6').creator_name, 'soulpainter');
+    assert.equal(recovered.warnings.some(warning => warning.table === 'public_profile_content'), false);
+  }
+});
+
+test('cached direct identities retain pending bidder roles and explicit missing profiles', async () => {
+  const fixtures = structuredClone(FIXTURES), calls = [];
+  const handler = loadHandler({ fixtures, calls });
+  const read = async () => {
+    const res = fakeRes();
+    await handler({ query: { id: '3' } }, res);
+    assert.equal(res.statusCode, 200);
+    return cardById(res.body, 'v41:84532:3');
+  };
+  await read();
+  fixtures.public_profile_content = fixtures.public_profile_content.filter(row => row.wallet_address !== PENDING_WINNER.toLowerCase());
+  calls.length = 0;
+  const card = await read();
+  assert.deepEqual(Object.keys(card.ownership_profiles).sort(), [CREATOR, PENDING_WINNER].map(address => address.toLowerCase()).sort());
+  assert.equal(card.ownership_profiles[PENDING_WINNER.toLowerCase()], null);
+  assert.equal(card.auction_winner_address, null);
+  assert.equal(card.current_owner_address, null);
+  assert.equal(calls.length, 1);
 });
 
 test('exact ownership identities include the pending highest bidder without inventing settled roles',async()=>{
@@ -429,18 +527,18 @@ test('exact ownership identities include the pending highest bidder without inve
 });
 
 test('ownership profile absence is explicit while a failed lookup keeps client fallback available',async()=>{
-  const fixtures={...FIXTURES,profiles:FIXTURES.profiles.filter(row=>row.wallet_address!==FIRST_COLLECTOR.toLowerCase())};
+  const fixtures={...FIXTURES,public_profile_content:FIXTURES.public_profile_content.filter(row=>row.wallet_address!==FIRST_COLLECTOR.toLowerCase())};
   const card=cardById(await projectCards({id:'4'},{fixtures}),'v41:84532:4');
   assert.equal(card.ownership_profiles[FIRST_COLLECTOR.toLowerCase()],null);
   const calls=[];
   const body=await projectCards({id:'4'},{calls,tableRead:async path=>{
-    if(path.startsWith('profiles?'))throw Object.assign(new Error('private backend detail'),{code:'QUERY_FAILED'});
+    if(path.startsWith('public_profile_content?'))throw Object.assign(new Error('private backend detail'),{code:'QUERY_FAILED'});
   }});
   const failed=cardById(body,'v41:84532:4');
   assert.equal('ownership_profiles' in failed,false);
   assert.equal(failed.auction_winner_address,FIRST_COLLECTOR);
-  assert.equal(body.warnings.some(warning=>warning.table==='profiles'&&warning.code==='QUERY_FAILED'),true);
-  assert.equal(calls.filter(path=>path.startsWith('profiles?')).length,1);
+  assert.equal(body.warnings.some(warning=>warning.table==='public_profile_content'&&warning.code==='QUERY_FAILED'),true);
+  assert.equal(calls.filter(path=>path.startsWith('public_profile_content?')).length,1);
   assert.doesNotMatch(JSON.stringify(body),/private backend detail/);
 });
 
@@ -450,7 +548,7 @@ test('an identity shared by creator, first collector and owner is queried once',
   const calls = [];
   const card = cardById(await projectCards({ id: '4' }, { fixtures, calls }), 'v41:84532:4');
   assert.deepEqual(Object.keys(card.ownership_profiles), [FIRST_COLLECTOR.toLowerCase()]);
-  const reads = calls.filter(path => path.startsWith('profiles?'));
+  const reads = calls.filter(path => path.startsWith('public_profile_content?'));
   assert.equal(reads.length, 1);
   assert.equal(new URLSearchParams(reads[0].split('?')[1]).get('limit'), '1');
 });
@@ -461,7 +559,7 @@ test('exact ownership identities remain isolated across colliding chain and artw
     const card = cardById(await projectCards({ id: `v41:${chain}:4` }, { calls }), `v41:${chain}:4`);
     assert.equal(card.auction_winner_address, collector);
     assert.deepEqual(Object.keys(card.ownership_profiles).sort(), [CREATOR, collector].map(address => address.toLowerCase()).sort());
-    assert.equal(calls.filter(path => path.startsWith('profiles?')).length, 1);
+    assert.equal(calls.filter(path => path.startsWith('public_profile_content?')).length, 1);
   }
 });
 
@@ -483,7 +581,7 @@ test('ownership identity lookup starts while unrelated metadata, bids and signal
   try {
     await new Promise(setImmediate);
     assert.equal(complete, false);
-    assert.equal(calls.filter(path => path.startsWith('profiles?')).length, 1);
+    assert.equal(calls.filter(path => path.startsWith('public_profile_content?')).length, 1);
   } finally {
     release();
     await request;

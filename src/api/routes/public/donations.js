@@ -1,6 +1,7 @@
 import { allowMethods, sendError, supabaseRest } from '../../backend.js';
 import { readDonationConfig } from '../../donation-config.js';
 import { visibleDonationMessage } from '../../../features/artwork/donation-message.js';
+import { PUBLIC_PROFILE_SOURCE } from '../../profile-fields.js';
 
 export function publicDonation(row, names = new Map(), hidden = false) {
     const anonymous = row.anonymous === true;
@@ -20,6 +21,9 @@ export function publicDonation(row, names = new Map(), hidden = false) {
 
 export default async function donationsHandler(req, res) {
     if (!allowMethods(req, res, ['GET'])) return;
+    // Donor display names and message visibility can change after moderation.
+    // Neither successful history nor an unavailable response may be cached.
+    res.setHeader('Cache-Control', 'private, no-store');
     try {
         const config = readDonationConfig();
         if (!config.enabled) return res.status(503).json({ error: 'DONATIONS_UNAVAILABLE' });
@@ -52,13 +56,12 @@ export default async function donationsHandler(req, res) {
         const donors = [...new Set(records.filter(row => row.anonymous !== true).map(row => row.donor))];
         const transactions = [...new Set(records.map(row => row.transaction_hash))];
         const [profiles, hiddenMessages] = await Promise.all([
-            donors.length ? supabaseRest(`profiles?select=wallet_address,username&wallet_address=in.(${donors.join(',')})`) : [],
+            donors.length ? supabaseRest(`${PUBLIC_PROFILE_SOURCE}?select=wallet_address,username&wallet_address=in.(${donors.join(',')})`) : [],
             transactions.length ? supabaseRest(`donation_message_visibility?select=transaction_hash,log_index,hidden&chain_id=eq.${chainId}&transaction_hash=in.(${transactions.join(',')})&hidden=eq.true`) : []
         ]);
         const names = new Map(profiles.map(row => [row.wallet_address, row.username]));
         const hidden = new Set(hiddenMessages.map(row => `${row.transaction_hash}:${row.log_index}`));
         const project = row => publicDonation(row, names, hidden.has(`${row.transaction_hash}:${row.log_index}`));
-        res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=15');
         return res.status(200).json({
             success: true, chain_id: chainId, artwork_id: artworkId,
             contract_address: config.address, creator: artworks[0].creator,

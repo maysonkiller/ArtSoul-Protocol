@@ -26,8 +26,11 @@ function mapReviewError(error) {
   if (detail.includes('REPORT_TARGET_MISMATCH')) {
     return requestError('This report targets different content. Refresh the review queue.', 'REPORT_TARGET_MISMATCH', 409);
   }
+  if (detail.includes('PROFILE_CONTENT_CHANGED')) {
+    return requestError('This profile content changed after it was reported. Review a report of its current content.', 'PROFILE_CONTENT_CHANGED', 409);
+  }
   if (detail.includes('REPORT_ALREADY_PENDING') || /23505|idx_artwork_reports_one_pending_category/.test(detail)) {
-    return requestError('A newer pending report from the same reporter and category already exists for this artwork.', 'REPORT_ALREADY_PENDING', 409);
+    return requestError('A newer pending report from the same reporter and category already exists for this content.', 'REPORT_ALREADY_PENDING', 409);
   }
   if (detail.includes('REPORT_ACTION_NOT_ALLOWED')) {
     return requestError('This action is not valid for the report\'s current state.', 'REPORT_ACTION_NOT_ALLOWED', 409);
@@ -35,7 +38,7 @@ function mapReviewError(error) {
   if (detail.includes('REPORT_NOT_FOUND')) {
     return requestError('The report was not found.', 'REPORT_NOT_FOUND', 404);
   }
-  if (/42P01|PGRST202|PGRST205|review_artwork_report|review_moderation_report/i.test(detail)) {
+  if (/42P01|PGRST202|PGRST205|review_artwork_report|review_moderation_report|review_profile_content_report/i.test(detail)) {
     return requestError('Protocol Admin storage is not available yet.', 'PROTOCOL_ADMIN_SCHEMA_UNAVAILABLE', 503);
   }
   return error;
@@ -61,7 +64,7 @@ export default async function handler(req, res) {
     const targetType = body.target_type === undefined ? 'artwork' : body.target_type;
 
     if (!id) throw requestError('Valid report_id is required.', 'INVALID_REPORT_ID');
-    if (!['artwork', 'donation_message'].includes(targetType)) throw requestError('Choose a valid report target.', 'INVALID_REPORT_TARGET');
+    if (!['artwork', 'donation_message', 'profile_content'].includes(targetType)) throw requestError('Choose a valid report target.', 'INVALID_REPORT_TARGET');
     if (!REVIEW_ACTIONS.has(action)) throw requestError('Choose a valid review action.', 'INVALID_REVIEW_ACTION');
     if (!reason || reason.length > 500) {
       throw requestError('A review reason is required and must not exceed 500 characters.', 'INVALID_REVIEW_REASON');
@@ -72,7 +75,8 @@ export default async function handler(req, res) {
 
     let rows;
     try {
-      rows = await supabaseRest(targetType === 'donation_message' ? 'rpc/review_moderation_report' : 'rpc/review_artwork_report', {
+      rows = await supabaseRest(targetType === 'profile_content' ? 'rpc/review_profile_content_report'
+        : targetType === 'donation_message' ? 'rpc/review_moderation_report' : 'rpc/review_artwork_report', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
         body: {
@@ -99,7 +103,8 @@ export default async function handler(req, res) {
         id: report.report_id,
         status: report.report_status,
         updated_at: report.report_updated_at,
-        ...(targetType === 'donation_message'
+        ...(targetType === 'profile_content' ? { target_type: targetType, profile_hidden: report.profile_hidden === true }
+          : targetType === 'donation_message'
           ? { target_type: targetType, message_hidden: report.target_hidden === true }
           : { artwork_hidden: report.artwork_hidden === true })
       }

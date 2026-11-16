@@ -21,6 +21,7 @@ function readPublicConfig() {
     supabaseAnonKey,
     emailVerificationEnabled: process.env.ARTSOUL_PROFILE_EMAIL_ENABLED === 'true',
     reportingEnabled: readReportingConfig().enabled,
+    profileReportingEnabled: readReportingConfig().profileEnabled,
     donations: readDonationConfig(),
     saved: readSavedConfig(),
     externalBaseNftsEnabled: process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED === 'true',

@@ -96,6 +96,12 @@ Phase A exit: A1–A12 accepted, the local and CI baselines are green, productio
 
 Goal: validate the product with real users without changing frozen economics.
 
+November 9 B20 implementation checkpoint: [profile-content notices](../audits/B20_PROFILE_CONTENT_REPORTS_2026-11-09.md)
+now have local intake, versioned review, reversible public masking and private
+owner editing. Focused checks and a complete isolated restore with the migration
+applied twice passed. Production migration/release, real report/review acceptance
+and historical unused-cover retention remain open; Phase B is not complete.
+
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
   The November 9 [independent recovery and Core cutover](../audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md)

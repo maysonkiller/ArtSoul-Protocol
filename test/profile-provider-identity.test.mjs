@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
 import test from 'node:test';
 import handler from '../src/api/routes/profile.js';
-import { setWalletSession, setOAuthState } from '../src/api/backend.js';
-import { createOAuthCallbackHandler, oauthUnlinkHandler } from '../src/api/routes/oauth.js';
+import { setWalletSession, setOAuthState, readOAuthState } from '../src/api/backend.js';
+import { oauthStartHandler, createOAuthCallbackHandler, oauthUnlinkHandler } from '../src/api/routes/oauth.js';
 import { cleanProfile, publicProfile } from '../src/api/profile-fields.js';
 
 function response() {
@@ -36,8 +38,9 @@ test('profile edits cannot forge, erase or overwrite linked provider identity', 
 
   for (const providerValue of ['forged-official-account', null, '']) {
     let written;
-    globalThis.fetch = async (_url, options) => {
-      written = JSON.parse(options.body)[0];
+    globalThis.fetch = async (url, options) => {
+      if (options.method === 'POST') written = JSON.parse(options.body)[0];
+      else assert.match(String(url), /\/public_profile_content\?/);
       return Response.json([written]);
     };
     const result = response();
@@ -84,7 +87,7 @@ test('the public Discord profile URL is derived only from the server-owned numer
   assert.deepEqual(cleanProfile({discord_profile_url: 'https://discord.com/users/999', discord_id: '999', email: 'forged@example.test', email_verified: true}), {});
 });
 
-test('OAuth callback binds provider response to the signed wallet and unlink preserves public links', async t => {
+test('OAuth start and callback bind the signed wallet and unlink preserves public links', async t => {
   const settings = {SESSION_SECRET: 'oauth-test-secret-only', SUPABASE_URL: 'https://database.example', SUPABASE_SERVICE_ROLE_KEY: 'test-only', DISCORD_CLIENT_ID: 'test-id', DISCORD_CLIENT_SECRET: 'test-secret', X_CLIENT_ID: 'test-id', X_CLIENT_SECRET: 'test-secret'};
   const previous = Object.fromEntries(Object.keys(settings).map(key => [key, process.env[key]]));
   const originalFetch = globalThis.fetch;
@@ -101,6 +104,14 @@ test('OAuth callback binds provider response to the signed wallet and unlink pre
   setWalletSession(session, wallet);
   const sessionCookie = session.headers['Set-Cookie'].split(';')[0];
   for (const provider of ['discord', 'twitter']) {
+    const started = response();
+    await oauthStartHandler({method: 'POST', headers: {cookie: sessionCookie, host: 'artsoulprotocol.com', 'x-forwarded-proto': 'https'},
+      body: {provider, wallet_address: 'attacker'}}, started);
+    assert.equal(started.statusCode, 200, 'OAuth start retains its signed-session contract without an unlink-only header');
+    const startState = readOAuthState({headers: {cookie: started.headers['Set-Cookie'].split(';')[0]}});
+    assert.equal(startState.wallet, wallet);
+    assert.equal(startState.provider, provider);
+    assert.equal(new URL(started.body.authorizationUrl).searchParams.get('state'), startState.state);
     const state = response();
     setOAuthState(state, {provider, state: 'nonce', wallet, codeVerifier: 'pkce', redirectUri: `https://artsoulprotocol.com/api/oauth/callback/${provider}`});
     const cookie = `${sessionCookie}; ${state.headers['Set-Cookie'].split(';')[0]}`;
@@ -112,7 +123,7 @@ test('OAuth callback binds provider response to the signed wallet and unlink pre
       if (String(url).includes('/oauth2/token')) return Response.json({access_token: 'mock-access'});
       if (String(url) === 'https://discord.com/api/users/@me') return Response.json({id: '123456', username: 'confirmed', global_name: 'Confirmed artist'});
       if (String(url) === 'https://api.x.com/2/users/me') return Response.json({data: {id: '987654', username: 'confirmed'}});
-      assert.ok(String(url).startsWith('https://database.example/rest/v1/profiles?'));
+      assert.ok(/^https:\/\/database\.example\/rest\/v1\/(profiles|public_profile_content)\?/.test(String(url)));
       if (init.method === 'PATCH') {
         assert.ok(String(url).includes(`wallet_address=eq.${wallet}`));
         row = {...row, ...JSON.parse(init.body)};
@@ -139,12 +150,40 @@ test('OAuth callback binds provider response to the signed wallet and unlink pre
     assert.equal(row.twitter_handle, '@public_link');
     assert.match(result.headers['Set-Cookie'], /Max-Age=0/i);
     const unlinked = response();
-    await oauthUnlinkHandler({method: 'POST', headers: {cookie: sessionCookie}, body: {provider, wallet_address: 'attacker'}}, unlinked);
+    await oauthUnlinkHandler({method: 'POST', headers: {cookie: sessionCookie, 'x-artsoul-wallet': wallet}, body: {provider, wallet_address: 'attacker'}}, unlinked);
     assert.equal(unlinked.statusCode, 200);
     assert.equal(unlinked.body.profile[`${provider}_connected`], false);
     assert.equal(unlinked.body.profile.twitter_handle, '@public_link');
     assert.equal(row[`${provider}_id`], null);
   }
+});
+
+test('OAuth client sends the intended-wallet header only when disconnecting', async () => {
+  const wallet = `0x${'Ab'.repeat(20)}`, requests = [], redirects = [], invalidations = [];
+  const window = {
+    ensureAuthenticated: async () => true,
+    location: {assign: url => redirects.push(url)},
+    ArtSoulDB: {invalidateProfileCache: address => invalidations.push(address)}
+  };
+  vm.runInNewContext(fs.readFileSync('oauth-integration.js', 'utf8'), {
+    window, fetch: async (path, options) => {
+      requests.push({path, options});
+      return Response.json(path === '/api/oauth/start'
+        ? {authorizationUrl: 'https://provider.example/authorize'} : {success: true});
+    }
+  });
+  await window.OAuthIntegration.start('discord', wallet);
+  assert.equal(requests[0].path, '/api/oauth/start');
+  assert.equal(requests[0].options.headers['X-ArtSoul-Wallet'], undefined);
+  assert.equal(requests[0].options.credentials, 'include');
+  assert.deepEqual(redirects, ['https://provider.example/authorize']);
+  await window.OAuthIntegration.disconnect('discord', wallet);
+  assert.equal(requests[1].path, '/api/oauth/unlink');
+  assert.equal(requests[1].options.headers['X-ArtSoul-Wallet'], wallet.toLowerCase());
+  assert.equal(requests[1].options.credentials, 'include');
+  assert.deepEqual(JSON.parse(requests[1].options.body), {provider: 'discord'});
+  assert.deepEqual(invalidations, [wallet]);
+  assert.match(fs.readFileSync('profile.html', 'utf8'), /src="\/oauth-integration\.js\?v=4"/);
 });
 
 test('profile changes require the signed wallet session before any database call', async t => {

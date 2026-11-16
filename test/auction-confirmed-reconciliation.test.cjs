@@ -488,6 +488,7 @@ function publicProjection() {
   const context = vm.createContext({
     Date: time.Date, console: quiet, process: { env: {} },
     allowMethods: () => true,
+    PUBLIC_PROFILE_SOURCE: 'public_profile_content',
     readNftOwnershipConfig: () => null,
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,
@@ -545,16 +546,19 @@ test('fresh exact lookup bypasses the projection TTL, coalesces one second, and 
   assert.equal(refreshed.some(path => path.includes('chain_id=in.')), false, 'no corpus query is issued by fresh detail');
   assert.equal(refreshed.some(path => path.startsWith('v41_public_metrics?')), false);
   assert.equal(refreshed.some(path => path.includes('select=*')), false);
-  for (const path of refreshed.filter(path => !path.startsWith('profiles?'))) {
+  for (const path of refreshed.filter(path => !path.startsWith('public_profile_content?'))) {
     assert.match(path, /chain_id=eq\.84532/);
     assert.match(path, /artwork_id=eq\.28/);
   }
   const callsAfterRefresh = api.calls.length;
   assert.equal((await api.read({ fresh: '1' })).body.data[0].auction_id, '62', 'a query flag cannot invalidate the entire list');
-  assert.equal(api.calls.length, callsAfterRefresh);
+  assert.deepEqual(api.calls.slice(callsAfterRefresh).map(path => path.split('?')[0]), ['public_profile_content'],
+    'a warm feed refreshes moderated identities without rebuilding lifecycle data');
+  const callsAfterFeed = api.calls.length;
   api.time.advance(999);
   await api.read({ ...direct, fresh: '1' });
-  assert.equal(api.calls.length, callsAfterRefresh);
+  assert.deepEqual(api.calls.slice(callsAfterFeed).map(path => path.split('?')[0]), ['public_profile_content'],
+    'the coalesced detail refreshes moderated identities without repeating auction reads');
   api.time.advance(1);
   await api.read({ ...direct, fresh: '1' });
   assert.equal(api.calls.filter(path => path.startsWith('v41_artworks?') && path.includes('artwork_id=eq.28')).length, 3);

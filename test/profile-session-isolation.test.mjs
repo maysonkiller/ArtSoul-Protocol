@@ -23,7 +23,13 @@ test('a profile save cannot follow a different wallet cookie from another tab',a
   const signed=response();setWalletSession(signed,B);
   const cookie=signed.headers['Set-Cookie'].split(';')[0];
   let databaseCalls=0;
-  global.fetch=async(_url,options)=>{databaseCalls++;return Response.json(JSON.parse(options.body));};
+  let stored;
+  global.fetch=async(url,options)=>{
+    databaseCalls++;
+    if(options.method==='POST') stored=JSON.parse(options.body);
+    else assert.match(String(url), /\/public_profile_content\?/);
+    return Response.json(stored);
+  };
   for(const expectedWallet of [A,undefined,'invalid',[B]]){
     const res=response();
     await profile({method:'PUT',headers:{cookie,...(expectedWallet===undefined?{}:{'x-artsoul-wallet':expectedWallet})},body:{bio:'Draft belonging to A'}},res);
@@ -34,7 +40,7 @@ test('a profile save cannot follow a different wallet cookie from another tab',a
   assert.equal(databaseCalls,0,'mismatched drafts must not reach storage');
   const valid=response();await profile({method:'PUT',headers:{cookie,'x-artsoul-wallet':B},body:{bio:'B own draft',wallet_address:A}},valid);
   assert.equal(valid.statusCode,200);assert.equal(valid.body.profile.wallet_address,B);
-  assert.equal(valid.body.profile.bio,'B own draft');assert.equal(databaseCalls,1);
+  assert.equal(valid.body.profile.bio,'B own draft');assert.equal(databaseCalls,2);
 });
 
 test('the browser sends the intended profile wallet independently of session cookies',async()=>{

@@ -42,7 +42,7 @@ test('recipient notifications authenticate, scope, paginate and project safely',
       if (String(input).includes('/artwork_reports?')) {
         const reference = new URL(input);
         assert.equal(reference.searchParams.get('id'), `in.(${REPORT})`);
-        assert.equal(reference.searchParams.get('select'), 'id,chain_id::text,artwork_id::text');
+        assert.equal(reference.searchParams.get('select'), 'id,chain_id::text,artwork_id::text,target_type,profile_wallet');
         assert.equal(reference.searchParams.get('limit'), '20');
         return Response.json([artwork]);
       }

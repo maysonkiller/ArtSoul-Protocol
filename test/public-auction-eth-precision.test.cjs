@@ -38,6 +38,7 @@ function endpoint(name, amount, bidAmounts = [amount]) {
   const context = vm.createContext({
     process: { env: {} }, console: { warn() {}, error() {}, log() {} },
     allowMethods: () => true,
+    PUBLIC_PROFILE_SOURCE: 'public_profile_content',
     readNftOwnershipConfig: () => null,
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,

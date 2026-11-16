@@ -55,8 +55,10 @@ test('public profile exposes exactly the fields used by the public page', async 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.profile.wallet_address, WALLET);
   assert.equal(res.headers['Cache-Control'], 'private, no-store');
-  assert.match(requestedUrl, /profiles\?wallet_address=eq\./);
-  assert.match(requestedUrl, /select=id,created_at,wallet_address,username,bio,avatar_url,twitter_handle,twitter_username,discord_username/);
+  const requested = new URL(requestedUrl);
+  assert.equal(requested.pathname, '/rest/v1/public_profile_content');
+  assert.equal(requested.searchParams.get('wallet_address'), `eq.${WALLET}`);
+  assert.equal(requested.searchParams.get('select'), 'id,created_at,wallet_address,username,bio,avatar_url,twitter_handle,twitter_username,discord_username,twitter_id,discord_id,profile_content_hidden');
   assert.doesNotMatch(requestedUrl, /select=\*/);
   assert.doesNotMatch(requestedUrl, /discord_avatar/);
   assert.equal(res.body.profile.twitter_connected, false);

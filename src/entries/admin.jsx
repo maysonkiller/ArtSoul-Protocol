@@ -20,6 +20,26 @@ function safeExternalUrl(value = '') {
     }
 }
 
+function profilePath(wallet) {
+    const normalized = String(wallet || '').toLowerCase();
+    return /^0x[0-9a-f]{40}$/.test(normalized) ? `/profile?address=${normalized}` : '';
+}
+
+function ProfileReportSnapshot({ report }) {
+    const captured = report.profile_content_snapshot || {};
+    const avatar = safeExternalUrl(captured.avatar_url);
+    return <div className="protocol-admin-report-text">
+        <strong>Profile content captured with this report</strong>
+        {avatar && <p><a href={avatar} target="_blank" rel="noopener noreferrer"><img src={avatar} width="64" height="64" style={{ objectFit: 'cover' }} loading="lazy" referrerPolicy="no-referrer" alt="Captured profile avatar" /></a></p>}
+        <p>Name: {captured.username || 'Not set'}</p>
+        <p>Bio: {captured.bio || 'Not set'}</p>
+        <p>X: {captured.twitter_username || captured.twitter_handle || 'Not set'}{(captured.twitter_username || captured.twitter_handle) && (captured.twitter_connected ? ' · Verified connection' : ' · Self-reported')}</p>
+        <p>Discord: {captured.discord_username || 'Not set'}{captured.discord_username && (captured.discord_connected ? ' · Verified connection' : ' · Self-reported')}</p>
+        {safeExternalUrl(captured.discord_profile_url) && <a href={safeExternalUrl(captured.discord_profile_url)} target="_blank" rel="noopener noreferrer">Captured Discord profile</a>}
+        {(report.profile_content_changed || report.profile_content_available === false) && <p role="status">The current profile differs from this captured content or is unavailable. Dismiss or resolve this report; review a new report before hiding changed content.</p>}
+    </div>;
+}
+
 async function api(path, options = {}) {
     const response = await fetch(`/api/moderation/${path}`, {
         credentials: 'include',
@@ -42,12 +62,14 @@ function groupReports(reports = []) {
     const groups = new Map();
     for (const report of reports) {
         const targetType = report.target_type || 'artwork';
-        const key = `${report.chain_id}:${report.artwork_id}:${targetType}:${targetType === 'donation_message' ? `${report.donation_transaction_hash}:${report.donation_log_index}` : ''}`;
+        const key = targetType === 'profile_content' ? `profile:${String(report.profile_wallet || '').toLowerCase()}:${report.profile_content_hash}`
+            : `${report.chain_id}:${report.artwork_id}:${targetType}:${targetType === 'donation_message' ? `${report.donation_transaction_hash}:${report.donation_log_index}` : ''}`;
         const group = groups.get(key) || {
             key,
             chainId: report.chain_id,
             artworkId: report.artwork_id,
             targetType,
+            profileWallet: report.profile_wallet,
             transactionHash: report.donation_transaction_hash,
             logIndex: report.donation_log_index,
             reports: []
@@ -109,6 +131,7 @@ function DecisionDialog({ decision, onClose, onSubmit, busy }) {
                 <h2 id="reviewDecisionTitle">Record {decision.action} decision</h2>
                 <p>Report {decision.report.id}</p>
                 {decision.report.target_type === 'donation_message' && <p>This decision affects only the donation message. The donation and artwork remain recorded.</p>}
+                {decision.report.target_type === 'profile_content' && <p>This decision affects the reported profile content. Wallet identity, artworks and ownership remain recorded.</p>}
                 <label htmlFor="reviewDecisionReason">Review reason</label>
                 <textarea
                     id="reviewDecisionReason"
@@ -130,10 +153,11 @@ function DecisionDialog({ decision, onClose, onSubmit, busy }) {
 }
 
 function ReportActions({ report, onChoose }) {
+    const staleProfile = report.target_type === 'profile_content' && (report.profile_content_changed || report.profile_content_available === false);
     if (report.status === 'pending_review') {
         return (
             <div className="protocol-admin-card-actions">
-                <button type="button" onClick={() => onChoose(report, 'hide')}>{report.target_type === 'donation_message' ? 'Hide message pending review' : 'Hide pending review'}</button>
+                <button type="button" disabled={staleProfile} onClick={() => onChoose(report, 'hide')}>{report.target_type === 'donation_message' ? 'Hide message pending review' : report.target_type === 'profile_content' ? 'Hide profile content pending review' : 'Hide pending review'}</button>
                 <button type="button" onClick={() => onChoose(report, 'dismiss')}>Dismiss</button>
             </div>
         );
@@ -150,7 +174,7 @@ function ReportActions({ report, onChoose }) {
     if (report.status === 'dismissed' || report.status === 'resolved') {
         return (
             <div className="protocol-admin-card-actions">
-                <button type="button" onClick={() => onChoose(report, 'reopen')}>Reopen report</button>
+                <button type="button" disabled={staleProfile} onClick={() => onChoose(report, 'reopen')}>Reopen report</button>
             </div>
         );
     }
@@ -320,7 +344,9 @@ function ProtocolAdminPage() {
         try {
             const target = queueTargetRef.current;
             result = await api(`review-queue?status=${encodeURIComponent(status)}` + (target
-                ? `&chainId=${encodeURIComponent(target.chain_id)}&artworkId=${encodeURIComponent(target.artwork_id)}&target_type=${encodeURIComponent(target.target_type || 'artwork')}` : ''));
+                ? target.target_type === 'profile_content'
+                    ? `&target_type=profile_content&profile_wallet=${encodeURIComponent(target.profile_wallet)}`
+                    : `&chainId=${encodeURIComponent(target.chain_id)}&artworkId=${encodeURIComponent(target.artwork_id)}&target_type=${encodeURIComponent(target.target_type || 'artwork')}` : ''));
         } catch (error) {
             if (!sessionIsCurrent(epoch, wallet) || request !== queueRequest.current) return false;
             throw error;
@@ -473,13 +499,13 @@ function ProtocolAdminPage() {
             setDecision(null);
             if (!await loadQueue(queueStatusRef.current) || !sessionIsCurrent(epoch, wallet)) return;
             setMessage(
-                decision.action === 'restore' && (result.report?.artwork_hidden || result.report?.message_hidden)
-                    ? `Report resolved. ${result.report?.message_hidden ? 'Message' : 'Artwork'} remains hidden because another actioned report is active.`
+                decision.action === 'restore' && (result.report?.artwork_hidden || result.report?.message_hidden || result.report?.profile_hidden)
+                    ? `Report resolved. ${result.report?.profile_hidden ? 'Profile content' : result.report?.message_hidden ? 'Message' : 'Artwork'} remains hidden because another actioned report is active.`
                     : 'Review decision recorded.'
             );
         } catch (error) {
             if (!sessionIsCurrent(epoch, wallet)) return;
-            if (['REPORT_REVIEW_CONFLICT', 'REPORT_ALREADY_PENDING', 'REPORT_ACTION_NOT_ALLOWED', 'REPORT_TARGET_MISMATCH'].includes(error.code)) {
+            if (['REPORT_REVIEW_CONFLICT', 'REPORT_ALREADY_PENDING', 'REPORT_ACTION_NOT_ALLOWED', 'REPORT_TARGET_MISMATCH', 'PROFILE_CONTENT_CHANGED'].includes(error.code)) {
                 setDecision(null);
                 setMessage(error.message);
                 try { await loadQueue(queueStatusRef.current); }
@@ -529,7 +555,7 @@ function ProtocolAdminPage() {
                     <p className="protocol-admin-kicker">ArtSoul / Workspace</p>
                     <h1>Admin panel</h1>
                     <p className="protocol-admin-description">{ready
-                        ? 'Review reports, manage artwork visibility and inspect records.'
+                        ? 'Review reports, manage public content visibility and inspect records.'
                         : 'Secure moderation tools for verified staff wallets.'}</p>
                     <div className="protocol-admin-session">
                         <span className={`protocol-admin-access-status${ready ? ' is-verified' : ''}`} role="status">{statusLabel}</span>
@@ -596,12 +622,18 @@ function ProtocolAdminPage() {
                         </div>
                     </div>
                     {queueTarget && <p className="protocol-admin-message">
-                        {queueTarget.target_type === 'donation_message' ? 'Donation-message reports' : 'Artwork reports'} for artwork {queueTarget.artwork_id} · Chain {queueTarget.chain_id}.
+                        {queueTarget.target_type === 'profile_content'
+                            ? `Profile-content reports for ${shortWallet(queueTarget.profile_wallet)}.`
+                            : `${queueTarget.target_type === 'donation_message' ? 'Donation-message reports' : 'Artwork reports'} for artwork ${queueTarget.artwork_id} · Chain ${queueTarget.chain_id}.`}
                         {' '}<button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => changeQueueStatus(queueStatus === 'all' ? 'pending_review' : queueStatus, null)}>Show all reports</button>
                     </p>}
                     {groups.length === 0 ? <p className="protocol-admin-empty">No reports in this state.</p> : groups.map(group => (
                         <article key={group.key} className="protocol-admin-group">
                             <header>
+                                {group.targetType === 'profile_content' ? <>
+                                    <div><h3>Profile {shortWallet(group.profileWallet)}</h3><p>{group.reports.length} independent report{group.reports.length === 1 ? '' : 's'} about this content</p></div>
+                                    {profilePath(group.profileWallet) && <a href={profilePath(group.profileWallet)}>Open public profile</a>}
+                                </> : <>
                                 <AdminArtworkPreview artwork={(data.artworks || []).find(item => item.chain_id === Number(group.chainId) && item.artwork_id === String(group.artworkId))} />
                                 <div>
                                     <h3>{group.targetType === 'donation_message' ? 'Donation message for artwork' : 'Artwork'} {group.artworkId}</h3>
@@ -610,6 +642,7 @@ function ProtocolAdminPage() {
                                     {group.targetType === 'donation_message' && <p>Transaction {shortWallet(group.transactionHash)} · Log {group.logIndex}</p>}
                                 </div>
                                 <a href={window.ArtSoulArtworkUrl.artworkPath(`v41:${group.chainId}:${group.artworkId}`)}>Open artwork</a>
+                                </>}
                             </header>
                             <div className="protocol-admin-report-grid">
                                 {group.reports.map(report => (
@@ -619,6 +652,7 @@ function ProtocolAdminPage() {
                                             <span>{new Date(report.created_at).toLocaleString()}</span>
                                         </div>
                                         <p className="protocol-admin-report-text">{report.details}</p>
+                                        {report.target_type === 'profile_content' && <ProfileReportSnapshot report={report} />}
                                         {report.target_type === 'donation_message' && <div className="protocol-admin-report-text">
                                             <strong>Indexed donation message{report.donation_message_hidden ? ' (hidden from public view)' : ''}</strong>
                                             <p>{report.donation_message_available
@@ -652,6 +686,19 @@ function ProtocolAdminPage() {
                                 <span>{item.hidden_reason || 'No reason recorded'}</span>
                                 <button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => {
                                     setSection('queue'); void changeQueueStatus('actioned', item);
+                                }}>Review to restore</button>
+                            </div>
+                        ))}
+                    </div>
+                    <h3>Hidden profile content</h3>
+                    <p>Resolve active reports for the current content to restore the public profile. Wallet identity and artwork ownership are unchanged.</p>
+                    <div className="protocol-admin-ledger">
+                        {!(data.profiles || []).some(item => item.hidden) ? <p>No hidden profile content.</p> : data.profiles.filter(item => item.hidden).map(item => (
+                            <div key={item.profile_wallet}>
+                                <strong>Profile {shortWallet(item.profile_wallet)}</strong>
+                                {profilePath(item.profile_wallet) && <a href={profilePath(item.profile_wallet)}>Open public profile</a>}
+                                <button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => {
+                                    setSection('queue'); void changeQueueStatus('actioned', { target_type: 'profile_content', profile_wallet: item.profile_wallet });
                                 }}>Review to restore</button>
                             </div>
                         ))}

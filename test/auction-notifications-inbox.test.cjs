@@ -72,6 +72,19 @@ test('personal activity and report outcomes share newest-first history without m
   h.unmount();
 });
 
+test('profile-content outcomes open the reported profile and never fabricate an artwork route', async () => {
+  const h = await harness(response);
+  const reports = {items:[{id:'11',target_type:'profile_content',profile_wallet:B,created_at:'2026-11-09T10:00:00Z',read:false,message:'Profile content restored'}]};
+  const html = renderToStaticMarkup(React.createElement(h.scope.History,{activity:{items:[],pendingIds:[]},reports}));
+  assert.match(html,new RegExp('/profile\\?address='+B));
+  assert.match(html,/Report and profile update|Profile content restored/);
+  assert.doesNotMatch(html,/\/artwork\/|undefined/);
+  reports.items[0].profile_wallet = 'javascript:bad()';
+  const invalid = renderToStaticMarkup(React.createElement(h.scope.History,{activity:{items:[],pendingIds:[]},reports}));
+  assert.doesNotMatch(invalid,/href=|javascript:/);
+  h.unmount();
+});
+
 const groupButton = (h, name) => elements(h.render(), n => n.type === 'button' && elements(n.props.children, child => child.type === 'span' && child.props.children === name).length)[0];
 
 test('staff inbox separates personal messages from the review queue without marking either read', async () => {

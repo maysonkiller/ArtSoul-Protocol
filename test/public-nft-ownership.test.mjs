@@ -31,7 +31,7 @@ const fixture = () => ({
     block_number: 10, last_updated_block: 20, transaction_hash: hash(10), indexed_at: '2026-10-01T00:00:00Z' }],
   v41_auctions: [], v41_bids: [], v41_floor_history: [], v41_trust_signals: [], artwork_social_signals: [],
   artwork_moderation_visibility: [], v41_public_metrics: [], v41_auction_endings: [], contract_events: [],
-  profiles: [CREATOR, FIRST, BUYER, OWNER].map((wallet_address, i) => ({ wallet_address, username: `artist${i}`, avatar_url: null })),
+  public_profile_content: [CREATOR, FIRST, BUYER, OWNER].map((wallet_address, i) => ({ wallet_address, username: `artist${i}`, avatar_url: null })),
   v41_settlements: [{ chain_id: 84532, artwork_id: '77', auction_id: '9', token_id: '7', settlement_status: 'completed',
     winner: FIRST, final_price: '2000000000000000000', block_number: 20, log_index: 4, transaction_hash: hash(20) }],
   v41_resale_history: [{ chain_id: 84532, token_id: '7', seller: FIRST, buyer: BUYER,
@@ -187,7 +187,7 @@ test('public NFT consumers use one verified history across cards, filters, saved
     const res = await cardRequest({ owner: OWNER }); assert.equal(res.statusCode, 503);
   });
   await t.test('profile read overlapping recovery fails without a cached success', async () => {
-    afterRead = name => { if (name === 'profiles') marker.state_revision = String(Number(marker.state_revision) + 1); };
+    afterRead = name => { if (name === 'public_profile_content') marker.state_revision = String(Number(marker.state_revision) + 1); };
     const res = await cardRequest({ id: '77' }); assert.equal(res.statusCode, 503);
     assert.equal(res.body.error, 'NFT_OWNERSHIP_UNAVAILABLE'); assert.equal(res.headers['cache-control'], 'private, no-store');
   });
@@ -197,7 +197,7 @@ test('public NFT consumers use one verified history across cards, filters, saved
     await assert.rejects(readVisibleArtworkCards(84532, ['77'], CORE), error => error.code === 'NFT_OWNERSHIP_UNAVAILABLE');
   });
   await t.test('flag changes during the public projection fail closed', async () => {
-    afterRead = name => { if (name === 'profiles') process.env.ARTSOUL_NFT_OWNERSHIP_ENABLED = 'false'; };
+    afterRead = name => { if (name === 'public_profile_content') process.env.ARTSOUL_NFT_OWNERSHIP_ENABLED = 'false'; };
     const res = await cardRequest({ id: '77' }); assert.equal(res.statusCode, 503);
   });
   await t.test('oversized protocol identifiers remain exact from REST to proof request', async () => {
@@ -314,7 +314,7 @@ test('public NFT consumers use one verified history across cards, filters, saved
     const lifecycleRequest = name === 'search' ? 'rpc/read_public_search_cards' : 'v41_artworks';
     assert.equal(calls.filter(call => call.name === lifecycleRequest).length, 2, 'lifecycle inputs must be read again');
   });
-  for (const [name, trigger] of [['direct','profiles'], ['search','artwork_moderation_visibility'], ['provenance','rpc/read_verified_nft_history']]) {
+  for (const [name, trigger] of [['direct','public_profile_content'], ['search','artwork_moderation_visibility'], ['provenance','rpc/read_verified_nft_history']]) {
     await t.test(`${name} discards hydrated results when its final proof sees a new publication`, async () => {
       afterRead = request => { if (request === trigger) { afterRead = null; publishNextBoundary(); } };
       assert.equal((await entrypoints[name]()).current_owner_address, CREATOR);

@@ -1,5 +1,6 @@
 import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
+import { PUBLIC_PROFILE_SOURCE } from '../../profile-fields.js';
 import { allowedArtworkUrl, readArtworkMetadata } from '../../safe-artwork-fetch.js';
 import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
 import { readNftOwnershipConfig, readNftOwnershipBoundary, readNftOwnership, recheckNftOwnership, recheckNftOwnershipBoundary, readWithNftOwnershipRetry } from '../../nft-ownership.js';
@@ -458,7 +459,7 @@ async function publicIdentitiesByAddress(wallets = [], warnings, { includeAvatar
 
   const profileWarnings = [];
   const rows = await queryTable(
-    'profiles',
+    PUBLIC_PROFILE_SOURCE,
     `select=wallet_address,username${includeAvatar ? ',avatar_url' : ''}&wallet_address=in.(${addresses.map(encodeURIComponent).join(',')})&limit=${addresses.length}`,
     profileWarnings
   );
@@ -995,8 +996,34 @@ async function buildProjectionSnapshot() {
   return projectTableData(tableData, warnings, normalizePublicMetrics(publicMetricRows), preload);
 }
 
-// One projection rebuild per instance per TTL window; every request inside the
-// window is served from memory without touching Supabase.
+// Keep lifecycle/metadata reads cached, but never reuse mutable profile content
+// after a moderation decision. Refresh only the public identity projection.
+async function refreshCachedProfileIdentities(snapshotPromise, includeAvatar = false) {
+  const snapshot = await snapshotPromise;
+  const warnings = snapshot.warnings.filter(warning => warning.table !== PUBLIC_PROFILE_SOURCE);
+  const roles = snapshot.cards.map(card => [...new Set([
+    card.creator,
+    ...(includeAvatar ? [card.auction_winner_address, card.current_owner_address,
+      card.status === 'settlement_pending' ? card.current_bidder : null] : [])
+  ].map(address => normalizeText(address).toLowerCase()).filter(address => address && address !== ZERO_ADDRESS))]);
+  const identities = await publicIdentitiesByAddress(roles.flat(), warnings, { includeAvatar });
+  const cards = snapshot.cards.map((card, index) => {
+    const creator = identities?.get(normalizeText(card.creator).toLowerCase());
+    // Drop old identities even if the current public projection is unavailable.
+    // Never use a cached/unmasked name or avatar as a failure fallback.
+    const { ownership_profiles, ...publicCard } = card;
+    return {
+      ...publicCard,
+      creator_name: creator?.username || null,
+      ...(includeAvatar ? {
+        creator_avatar_url: creator?.avatar_url || null,
+        ...(identities ? { ownership_profiles: Object.fromEntries(roles[index].map(address => [address, identities.get(address) ?? null])) } : {})
+      } : {})
+    };
+  });
+  return { ...snapshot, cards, warnings };
+}
+
 const PROJECTION_CACHE_MS = Math.max(1000, Number(process.env.PUBLIC_PROJECTION_CACHE_MS) || 30000);
 let projectionSnapshotPromise = null;
 let projectionSnapshotAt = 0;
@@ -1012,8 +1039,9 @@ function getProjectionSnapshot() {
     promise.catch(() => {
       if (projectionSnapshotPromise === promise) projectionSnapshotPromise = null;
     });
+    return promise;
   }
-  return projectionSnapshotPromise;
+  return refreshCachedProfileIdentities(projectionSnapshotPromise);
 }
 
 function getDirectProjectionSnapshot(lookup, fresh = false) {
@@ -1023,7 +1051,7 @@ function getDirectProjectionSnapshot(lookup, fresh = false) {
   const cached = directProjectionCache.get(key);
   // A receipt-triggered lookup refreshes only one artwork. Coalesce repeated
   // requests for one second; never rebuild the full public corpus on refresh.
-  if (cached && now - cached.createdAt < (fresh ? 1000 : PROJECTION_CACHE_MS)) return cached.promise;
+  if (cached && now - cached.createdAt < (fresh ? 1000 : PROJECTION_CACHE_MS)) return refreshCachedProfileIdentities(cached.promise, true);
 
   const cacheEntry = { createdAt: now, promise: null };
   const promise = buildDirectProjectionSnapshot(lookup).then(snapshot => {
@@ -1150,13 +1178,10 @@ export default async function handler(req, res) {
         }))
       : filteredCards;
 
-    // Direct lookups can differ per viewer (staff see hidden works), so only
-    // list responses are CDN-cacheable.
-    const cacheSeconds = Math.max(1, Math.round(PROJECTION_CACHE_MS / 1000));
+    // CDN/browser caches must not keep names or avatars after content is hidden.
+    // Expensive lifecycle reads retain the bounded server-side snapshot above.
     if (!directLookup || directLookup.chain === CANONICAL_PUBLIC_CHAIN_ID) await recheckNftOwnership(ownership);
-    const cacheControl = isDirectArtworkLookup || ownership
-      ? 'private, no-store'
-      : `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 4}`;
+    const cacheControl = 'private, no-store';
 
     return { cacheControl, body: {
       success: true,

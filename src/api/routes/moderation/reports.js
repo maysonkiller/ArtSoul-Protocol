@@ -1,6 +1,7 @@
 import {
   allowMethods,
   readJson,
+  normalizeWallet,
   requireWallet,
   sendError,
   supabaseRest
@@ -66,10 +67,23 @@ export default async function handler(req, res) {
     const referenceUrl = optionalHttpUrl(body.reference_url);
     const targetType = body.target_type === undefined ? 'artwork' : body.target_type;
     let donationTarget;
-    if (!['artwork', 'donation_message'].includes(targetType)) {
+    let profileWallet;
+    if (!['artwork', 'donation_message', 'profile_content'].includes(targetType)) {
       throw requestError('Choose a valid report target.', 'INVALID_REPORT_TARGET');
     }
-    if (targetType === 'donation_message') {
+    if (targetType === 'profile_content') {
+      if (!reportingConfig.profileEnabled) throw requestError('Profile reporting is not enabled yet.', 'PROFILE_REPORTING_DISABLED', 503);
+      if (typeof req.headers?.['x-artsoul-wallet'] !== 'string' || normalizeWallet(req.headers['x-artsoul-wallet']) !== reporterWallet) {
+        throw requestError('Sign in with your connected wallet before submitting this report.', 'SESSION_WALLET_MISMATCH', 401);
+      }
+      profileWallet = normalizeWallet(body.profile_wallet);
+      if (!profileWallet || /^0x0{40}$/.test(profileWallet) || ['chain_id', 'artwork_id',
+        'donation_contract_address', 'donation_transaction_hash', 'donation_log_index'].some(key => body[key] !== undefined)) {
+        throw requestError('Choose a valid profile report target.', 'INVALID_REPORT_TARGET');
+      }
+    } else if (body.profile_wallet !== undefined) {
+      throw requestError('A profile wallet requires a profile-content target.', 'INVALID_REPORT_TARGET');
+    } else if (targetType === 'donation_message') {
       const config = readDonationConfig();
       if (!config.enabled) throw requestError('Donation-message reporting is not enabled yet.', 'DONATION_REPORTING_DISABLED', 503);
       const transactionHash = String(body.donation_transaction_hash || '').toLowerCase();
@@ -85,10 +99,10 @@ export default async function handler(req, res) {
       throw requestError('Donation identifiers require a donation-message target.', 'INVALID_REPORT_TARGET');
     }
 
-    if (!PUBLIC_ARTWORK_CHAINS.has(chainId)) {
+    if (targetType !== 'profile_content' && !PUBLIC_ARTWORK_CHAINS.has(chainId)) {
       throw requestError('This artwork network cannot be reported through this form.', 'UNSUPPORTED_ARTWORK_CHAIN');
     }
-    if (!artworkId) {
+    if (targetType !== 'profile_content' && !artworkId) {
       throw requestError('Valid artwork_id is required.', 'INVALID_ARTWORK_ID');
     }
     if (!REPORT_CATEGORIES.has(category)) {
@@ -103,12 +117,12 @@ export default async function handler(req, res) {
 
     let rows;
     try {
-      rows = await supabaseRest(donationTarget ? 'rpc/submit_moderation_report' : 'rpc/submit_artwork_report', {
+      rows = await supabaseRest(profileWallet ? 'rpc/submit_profile_content_report'
+        : donationTarget ? 'rpc/submit_moderation_report' : 'rpc/submit_artwork_report', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
         body: {
-          p_chain_id: chainId,
-          p_artwork_id: artworkId,
+          ...(profileWallet ? { p_profile_wallet: profileWallet } : { p_chain_id: chainId, p_artwork_id: artworkId }),
           p_reporter_wallet: reporterWallet,
           p_category: category,
           p_details: details,
@@ -120,12 +134,15 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       const detail = String(error?.details?.message || error?.message || '');
+      if (detail.includes('PROFILE_NOT_FOUND')) {
+        throw requestError('This profile is not available for reporting.', 'PROFILE_NOT_FOUND', 404);
+      }
       if (detail.includes('DONATION_MESSAGE_NOT_FOUND')) {
         throw requestError('This donation message is not available for reporting.', 'DONATION_MESSAGE_NOT_FOUND', 404);
       }
       if (detail.includes('INVALID_REPORT_TARGET')) throw requestError('Choose a valid report target.', 'INVALID_REPORT_TARGET');
       if (String(error?.details?.message || error?.message || '').includes('REPORT_DAILY_LIMIT_REACHED')) {
-        throw requestError('This wallet has reached the artwork-report limit for the last 24 hours.', 'REPORT_DAILY_LIMIT_REACHED', 429);
+        throw requestError('This wallet has reached the report limit for the last 24 hours.', 'REPORT_DAILY_LIMIT_REACHED', 429);
       }
       throw error;
     }

@@ -4,7 +4,7 @@ import {
   sendError,
   supabaseRest
 } from '../../backend.js';
-import { PUBLIC_PROFILE_FIELDS, publicProfile } from '../../profile-fields.js';
+import { PUBLIC_PROFILE_SOURCE, PUBLIC_PROFILE_SELECT, publicProfile } from '../../profile-fields.js';
 
 // The exact set the public profile page consumes, and nothing else. This list
 // is a behavioural contract rather than a detail of this route: it is the whole
@@ -16,7 +16,6 @@ import { PUBLIC_PROFILE_FIELDS, publicProfile } from '../../profile-fields.js';
 // silently changes what the product does. Private provider identifiers -
 // twitter_id, discord_id, discord_avatar - stay out as raw fields. The serializer
 // derives a validated Discord profile URL for the requested public social link.
-const PROFILE_SELECT = [...PUBLIC_PROFILE_FIELDS, 'twitter_id', 'discord_id'].join(',');
 
 export default async function publicProfileHandler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
@@ -31,7 +30,7 @@ export default async function publicProfileHandler(req, res) {
     }
 
     const rows = await supabaseRest(
-      `profiles?wallet_address=eq.${encodeURIComponent(wallet)}&select=${PROFILE_SELECT}&limit=1`
+      `${PUBLIC_PROFILE_SOURCE}?wallet_address=eq.${encodeURIComponent(wallet)}&select=${PUBLIC_PROFILE_SELECT}&limit=1`
     );
 
     // Profile edits must be visible immediately after save. The speedup comes

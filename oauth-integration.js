@@ -89,7 +89,7 @@ class OAuthIntegration {
         const response = await fetch('/api/oauth/unlink', {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-ArtSoul-Wallet': walletAddress.toLowerCase() },
             body: JSON.stringify({ provider })
         });
         const result = await this.readResponse(response, `Could not remove the linked ${this.providerLabels[provider]} account.`);

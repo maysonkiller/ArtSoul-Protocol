@@ -1,6 +1,7 @@
-import { allowMethods, requireWallet, sendError, supabaseRest } from '../../backend.js';
+import { allowMethods, normalizeWallet, requireWallet, sendError, supabaseRest } from '../../backend.js';
 import { publicOrigin, readBoundedJson } from '../../launch-services.js';
 import { readAuctionNotificationConfig } from '../../auction-notification-config.js';
+import { readReportingConfig } from '../../reporting-config.js';
 
 const PAGE_SIZE = 20;
 const MESSAGES = Object.freeze({
@@ -11,7 +12,9 @@ const MESSAGES = Object.freeze({
   ARTWORK_HIDDEN: 'One of your artworks has been hidden from public discovery following a moderation review.',
   ARTWORK_RESTORED: 'One of your artworks has been restored to public discovery following a moderation review.',
   DONATION_MESSAGE_HIDDEN: 'A message attached to your donation has been hidden following a moderation review. Your donation remains recorded.',
-  DONATION_MESSAGE_RESTORED: 'A message attached to your donation has been restored following a moderation review.'
+  DONATION_MESSAGE_RESTORED: 'A message attached to your donation has been restored following a moderation review.',
+  PROFILE_CONTENT_HIDDEN: 'Your public profile content has been hidden following a moderation review. Your wallet and artworks remain unchanged.',
+  PROFILE_CONTENT_RESTORED: 'Your public profile content has been restored following a moderation review.'
 });
 const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
 const validReportId = value => typeof value === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
@@ -71,8 +74,21 @@ export default async function handler(req, res) {
       // Only references from this recipient's visible page may be resolved.
       // Complaint identity/content never crosses the response boundary.
       const reportIds = [...new Set(rows.slice(0, PAGE_SIZE).map(row => row.report_id))];
-      const artworks = reportIds.length ? await supabaseRest(`artwork_reports?id=in.(${reportIds.join(',')})&select=id,chain_id::text,artwork_id::text&limit=${PAGE_SIZE}`) : [];
-      if (!Array.isArray(artworks) || artworks.some(row => !reportIds.includes(row.id) || !validProtocolId(row.chain_id) || !validProtocolId(row.artwork_id))) throw new Error('Invalid artwork references');
+      const references = fields => `artwork_reports?id=in.(${reportIds.join(',')})&select=id,chain_id::text,artwork_id::text${fields}&limit=${PAGE_SIZE}`;
+      let artworks = [];
+      if (reportIds.length) {
+        try { artworks = await supabaseRest(references(',target_type,profile_wallet')); }
+        catch (error) {
+          const missingTarget = ['42703', 'PGRST204'].includes(String(error?.details?.code || ''))
+            && /profile_wallet|target_type/.test(String(error?.details?.message || error?.message || ''));
+          if (readReportingConfig().profileEnabled || !missingTarget) throw error;
+          artworks = await supabaseRest(references(''));
+        }
+      }
+      if (!Array.isArray(artworks) || artworks.some(row => !reportIds.includes(row.id) || (row.target_type === 'profile_content'
+        ? !normalizeWallet(row.profile_wallet) || normalizeWallet(row.profile_wallet) !== row.profile_wallet || /^0x0{40}$/.test(row.profile_wallet)
+          || row.chain_id !== null || row.artwork_id !== null
+        : !validProtocolId(row.chain_id) || !validProtocolId(row.artwork_id)))) throw new Error('Invalid report references');
       artworkByReport = new Map(artworks.map(row => [row.id, row]));
       if (reportIds.some(id => !artworkByReport.has(id))) throw new Error('Missing artwork reference');
     } catch {
@@ -80,7 +96,9 @@ export default async function handler(req, res) {
     }
     const items = rows.slice(0, PAGE_SIZE).map(row => ({
       id: row.id, type: row.notification_type, created_at: row.created_at, message: MESSAGES[row.notification_type],
-      chain_id: artworkByReport.get(row.report_id).chain_id, artwork_id: artworkByReport.get(row.report_id).artwork_id,
+      ...(artworkByReport.get(row.report_id).target_type === 'profile_content'
+        ? { target_type: 'profile_content', profile_wallet: artworkByReport.get(row.report_id).profile_wallet }
+        : { chain_id: artworkByReport.get(row.report_id).chain_id, artwork_id: artworkByReport.get(row.report_id).artwork_id }),
       ...(versioned ? {read:row.read_at!==null} : {})
     }));
     return res.status(200).json({ wallet, items, nextCursor: rows.length > PAGE_SIZE ? items.at(-1).id : null });

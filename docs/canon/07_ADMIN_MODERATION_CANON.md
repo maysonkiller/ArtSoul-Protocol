@@ -205,6 +205,25 @@ No role is newly assigned, no factor ceremony changes, and no contract or econom
 changes. Implementation, tests and release evidence are recorded separately in
 `../audits/STABILIZATION_CHECKPOINT.md`.
 
+## November 9 profile-content notice implementation
+
+The existing complaint/review model extends to public profile identity content.
+This is implemented locally, not yet deployed or accepted in production; see
+the [B20 evidence](../audits/B20_PROFILE_CONTENT_REPORTS_2026-11-09.md).
+
+The server captures public content and its hash. An authorized hide applies only
+to identical current content, and independent actioned complaints prevent
+premature restoration. Changed content cannot be hidden or reopened through an
+older snapshot. Profiles, OAuth credentials, wallet identity, ownership and audit
+records are preserved. Authenticated owners retain a private read for editing;
+public identity and search readers use an atomic masked projection, and browser
+roles cannot read raw profiles directly. Pausing intake does not disable masks.
+
+Existing review authority, factors, quota, audit and notification policy remain
+unchanged. Immediate cross-client invalidation is not implemented. Historical
+unused-cover retention remains undecided; this work authorizes no deletion,
+broader customization, new financial parameter or new staff power.
+
 ## Public Repository Boundary
 
 Operational abuse heuristics, private anti-sybil checks, and escalation playbooks should not be published in this repository.
