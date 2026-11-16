@@ -26,7 +26,10 @@ test('compact header keeps copy adjacent to short, missing and long names withou
     assert.match(compact, /@media \(min-width: 769px\)/);
     assert.match(compact, /\.avatar-plaque\s*\{[\s\S]*?width: max-content !important;/);
     assert.match(compact, /\.avatar-dropdown-menu\s*\{[\s\S]*?width: 100% !important;/);
-    assert.match(compact, /\.avatar-info button:disabled\s*\{[\s\S]*?padding-right: 3px;/);
+    assert.match(compact, /\.avatar-info button:disabled:not\(\[data-copy-value\]\)/);
+    assert.match(compact, /\.avatar-info button:disabled\[data-copy-value=""\]/);
+    assert.doesNotMatch(compact, /\.avatar-info button:disabled\s*\{\s*padding-right:/);
+    assert.match(css, /\.avatar-info button\[data-copy-value\]:not\(\[data-copy-value=""\]\)::after/);
 
     const harness = createAvatarHarness();
     const structure = harness.dropdown.getStableStructure();
@@ -51,6 +54,48 @@ test('compact header keeps copy adjacent to short, missing and long names withou
     harness.dropdown.syncHeaderCopyControls(structure, { previewWallet: WALLET, name: 'lys' });
     assert.equal(name.disabled, true);
     assert.equal(address.disabled, true);
+});
+
+test('copying either header identity keeps the full copy-target geometry during a pending clipboard write', async () => {
+    for (const kind of ['name', 'address']) {
+        const harness = createAvatarHarness();
+        const structure = harness.dropdown.getStableStructure();
+        const window = harness.context.window;
+        window.currentWalletAddress = WALLET;
+        const name = structure.dropdown.querySelector('[data-avatar-name]');
+        const address = structure.dropdown.querySelector('[data-avatar-address]');
+        name.textContent = 'Artist';
+        name.hidden = false;
+        address.textContent = '0x1111...1111';
+        address.hidden = false;
+        harness.dropdown.syncHeaderCopyControls(structure, { previewWallet: WALLET, name: 'Artist' });
+        const button = kind === 'name' ? name : address;
+        const expectedValue = kind === 'name' ? 'Artist' : WALLET;
+        const navChildren = structure.navButtons.children.length;
+        let resolveCopy;
+        const writes = [];
+        harness.context.navigator.clipboard = {
+            writeText(value) {
+                writes.push(value);
+                return new Promise(resolve => { resolveCopy = resolve; });
+            }
+        };
+
+        const pending = harness.dropdown.copyHeaderIdentity({
+            currentTarget: button,
+            preventDefault() {},
+            stopPropagation() {}
+        });
+        assert.equal(button.disabled, true, 'a second click must remain blocked');
+        assert.equal(button.dataset.copyValue, expectedValue, 'copy target must not be cleared while disabled');
+        assert.equal(button.dataset.copyKind, kind);
+        assert.equal(structure.navButtons.children.length, navChildren, 'other header actions must not be rebuilt');
+        assert.deepEqual(writes, [expectedValue]);
+        resolveCopy();
+        assert.equal(await pending, true);
+        assert.equal(button.disabled, false);
+        assert.equal(button.dataset.copyValue, expectedValue, 'copy space persists after completion');
+    }
 });
 
 test('single activation copies the full displayed wallet and confirms only after success', async () => {
