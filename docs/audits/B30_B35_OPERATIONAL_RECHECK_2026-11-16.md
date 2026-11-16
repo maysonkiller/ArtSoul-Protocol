@@ -41,17 +41,39 @@ does not measure live RPC-head lag, every Supabase service or load capacity.
 
 ## Provider and cost boundaries
 
-The existing support conversation was re-read. It contains the November 9
-receipt and the AI agent's escalation for human review of managed exporter
-queries/session behavior. No later reply or completed correction appears in
-that thread. A concise follow-up was prepared separately; this check sent no
-message and granted no new project-data access.
+The existing support conversation was re-read. Its latest provider response
+remains the November 9 AI escalation for human review of managed exporter
+queries/session behavior. On November 16, the owner-authorized follow-up was
+sent in the same support case and verified in Gmail Sent. It requests a
+collector-only correction/status without a paid upgrade, global memory change,
+database restart or disabling Spend Cap. A human correction remains unconfirmed;
+no new project-data access was granted.
 
-The connector can verify the organization plan but does not expose current
-Spend Cap, bill estimates, egress or Disk IO budget. The last dashboard cost
-observation remains November 9: existing Pro plan, displayed current/projected
-cost of USD 25, Spend Cap enabled and no displayed usage overage. Those values
-must not be relabeled as today's billing measurements or a zero-cost guarantee.
+The root agent then verified the existing organization's dashboard in the
+browser at approximately `17:42-17:47 UTC` on November 16. The displayed
+billing period was November 2-24, 2026:
+
+| Billing measurement | Displayed value |
+| --- | ---: |
+| Pro plan | USD 25.00 |
+| Compute | USD 4.73 |
+| Compute credits | USD -4.73 |
+| Current costs | USD 25.00 |
+| Projected costs | USD 25.00 |
+| Spend Cap | Enabled |
+
+| Usage measurement | Used | Included allowance |
+| --- | ---: | ---: |
+| Uncached egress | 2.779 GB | 250 GB |
+| Cached egress | 1.412 GB | 250 GB |
+| Storage | 0.115 GB | 100 GB |
+| Image transformations | 33 | 100 |
+
+The existing ArtSoul disk is provisioned at 2 GB; displayed GP3 disk overage
+is zero GB-hours. No billing or infrastructure setting was changed. These are
+current dashboard estimates and cumulative usage, not a final invoice, a
+future zero-overage guarantee or a measurement of remaining Disk IO budget.
+Cached and uncached egress allowances remain separate.
 
 Remaining operational acceptance is a provider-confirmed collector-only fix,
 one bounded post-fix check, and representative IO/egress and billing evidence.
