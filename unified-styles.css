@@ -10336,3 +10336,47 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
         bottom: 20px !important;
     }
 }
+
+/* Owner follow-up: shrink the actual desktop account plaque, not only the
+   copy icon spacing. The dropdown follows the same variable plaque width.
+   Mobile intentionally retains its 44px avatar and separate touch popover. */
+@media (min-width: 769px) {
+    body:is(.classic, .future) .site-header .site-header-actions #navButtons,
+    body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-container {
+        width: max-content !important;
+        min-width: 0 !important;
+        max-width: 184px !important;
+        flex: 0 0 auto !important;
+    }
+    body:is(.classic, .future) .site-header #navButtons .avatar-plaque {
+        grid-template-columns: minmax(0, max-content) 44px;
+        column-gap: 4px;
+        width: max-content !important;
+        max-width: 184px;
+        padding: 2px 4px 2px 8px;
+    }
+    body:is(.classic, .future) .site-header #navButtons .avatar-info {
+        width: max-content !important;
+        max-width: 120px !important;
+    }
+    /* The Guest label has no active copy icon: do not reserve its space. */
+    body:is(.classic, .future) .site-header #navButtons .avatar-info button:disabled {
+        padding-right: 3px;
+    }
+    body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-menu {
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-menu :is(
+        .network-current-row,
+        .avatar-network-option,
+        .avatar-account-action .dropdown-item,
+        .avatar-account-links .dropdown-item
+    ) {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+    }
+}
