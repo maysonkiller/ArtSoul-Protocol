@@ -125,15 +125,51 @@ no new service or paid tier was enabled.
 The released profile form opened and Cancel closed it without a report write.
 Responsive inspection found a missing native-dialog centering class; the
 follow-up reuses the existing `artwork-moderation-dialog` geometry and backdrop.
-Its final browser/release evidence is recorded separately below when verified.
-No actual complaint, moderation decision or participant notification is claimed
-by these read-only and form-opening checks.
+PR #485 released that correction as `40a37be2`; deployment
+`dpl_Amx47MmM9Wy3CycnshWAo9tb2KEV` is READY on the normal domain. Linux/Windows
+CI and build/static checks passed. Chrome verified the live form at 1536×720
+(560×676 dialog) and 390×844 (343.4×685.25 dialog) in Future. Classic at 390×844
+was centered at approximately (15.9,78.6), measured 343.4×686.85, had no
+horizontal overflow, `animation: none` and zero transition duration. Both Cancel
+and focus return worked. The viewport override was reset and Future restored.
+These are responsive-browser checks, not physical-iPhone acceptance.
+
+The owner authorized a clearly labeled TEST report and reversible review cycle
+on the owner-controlled lys profile. During sign-in Rabby exposed lys, and the
+form closed on account change; this alone did not prove whether an earlier
+request had reached the server. After the owner selected the founder wallet,
+submission returned `Report already received`. The read-only server check found
+one pending TEST record at `2026-11-16T11:38:39.216573Z`, category `other`, from
+the founder wallet to lys, reference `33b154ce-33bc-454b-82dd-50a1496c7b69`.
+The receipt verifies deduplication, not a second complaint.
+
+The owner then completed normal staff passkey verification. The protected review
+UI recorded the TEST hide at `11:43:44.013947Z` and restoration at
+`11:44:46.531572Z`. Fresh browser loads showed the neutral avatar/wallet label,
+no biography or social links while hidden; both existing works remained visible
+with wallet-based creator labels. After restoration the original lys avatar,
+name, biography, X link and creator labels returned. No financial action or
+artwork mutation was performed.
+
+Read-only initial/hidden/restored snapshots verified the original content hash,
+exact public masking and restoration, five expected audit events and four
+recipient notices (reporter actioned/resolved; owner hidden/restored). The
+notification email was provider-accepted in one attempt, with no delivery error;
+provider acceptance alone does not prove mailbox receipt. The private record is
+`docs/private/b20-actual-cycle-2026-11-16.json`.
+
+The founder's actual notification panel displayed both report decisions, linked
+to the correct profile, and marked each read when expanded. Native viewing of
+the two owner notices remains the last step in this controlled cycle.
+
+A separate edge fix requires a stored profile ID before offering or retaining
+the report dialog; a bare wallet-only fallback profile has nothing to report.
+Ten rendered UI tests and the production build pass locally. Its release status
+is recorded by the integrating PR; no new dependency was added.
 
 ## Remaining work
 
-- Complete the small native-dialog geometry follow-up verification/release.
-- Verify a designated profile report through authorized review, public masking,
-  restoration and participant notifications using the released application.
+- Verify native viewing of the owner notices to finish the designated cycle.
 - Keep historical unused-cover uploads until the owner selects a retention
   policy. Separate covers/customization remain paused; no deletion schedule or
   broader profile editor is activated by this work.

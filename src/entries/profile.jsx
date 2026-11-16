@@ -1794,7 +1794,7 @@ const { useState, useEffect, useRef } = React;
                                                         <ProfileAdminShortcut walletAddress={connectedWalletAddress} />
                                                     </div>
                                                 )}
-                                                {!isOwnProfile && profileReportingEnabled && profile?.wallet_address && (
+                                                {!isOwnProfile && profileReportingEnabled && profile?.id && profile?.wallet_address && (
                                                     <div className="profile-inline-edit-action"><button type="button" className="btn-secondary" onClick={() => setProfileReportOpen(true)}>Report profile</button></div>
                                                 )}
                                             </div>
@@ -1856,7 +1856,7 @@ const { useState, useEffect, useRef } = React;
                             </div>
                         </div>
 
-                        {profileReportOpen && profileReportingEnabled && profile?.wallet_address && <ProfileContentReport key={profile.wallet_address} profileWallet={profile.wallet_address} onClose={() => setProfileReportOpen(false)} />}
+                        {profileReportOpen && profileReportingEnabled && profile?.id && profile?.wallet_address && <ProfileContentReport key={profile.wallet_address} profileWallet={profile.wallet_address} onClose={() => setProfileReportOpen(false)} />}
                         {editMode && <ProfileEditDialog onCancel={cancelProfileEdit}>
                             <div className="profile-edit-layout">
                                 {renderAvatar(true)}
