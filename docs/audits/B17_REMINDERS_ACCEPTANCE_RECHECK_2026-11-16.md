@@ -1,7 +1,8 @@
 # B17 reminder acceptance recheck — November 16, 2026
 
-Status: implementation regressions pass; the remaining real payment reminder,
-live-extension and physical-device observations are not yet accepted. This is a
+Status: implementation regressions pass and the live payment reminder was
+delivered after the owner-signed ending below. Read acknowledgement,
+live-extension and physical-device observations remain separate. This began as a
 bounded read-only follow-up to
 [the original reminder record](B17_REMINDERS_2026-10-25.md), not a new rollout.
 
@@ -67,3 +68,55 @@ last hour of the real payment window.
 Live-extension observation remains separate: this already expired auction
 cannot exercise a new last-minute extension. No deadline may be backdated and
 no synthetic event may be inserted into production to close that gate.
+
+## Owner-signed ending and persisted payment reminder
+
+This later observation supersedes the earlier absence of a payment reminder;
+phone delivery/read acceptance and settlement are still separate at this point.
+
+The owner signed `endAuction(75)` on November 16. Both independent public RPCs
+verified successful transaction
+`0x39c751169641602b88a7362fe282f821b14f1b9721f1ad8a5a8b82713bf1c331`
+in block `59649437`, timestamp `2026-11-16T17:55:56Z`. Its `AuctionEnded` log
+has auction 75, the existing winner `0x5e31…8383`, a 0.001 test ETH winning bid
+and deadline `2026-11-17T17:55:56Z` (18:55:56 Warsaw), exactly 24 hours later.
+Both fresh contract reads returned SettlementPending for artwork 14, with
+0.01 test ETH still locked. No bid or completed transaction was replayed.
+
+The root browser observation, reported separately from the read-only checks,
+showed the ended notice, Complete Settlement action, exact deadline and an
+unread Payment due soon entry without reloading. The reminder preference was
+temporarily changed through the site's UI from one hour to 24 hours and saved.
+The database snapshot confirms `[1440]`, reminders/lifecycle enabled, revision
+28 and preference update at `17:54:05.423284Z`.
+
+At `17:57:45.132657Z`, a bounded read-only query found:
+
+- The ending source marked `completed` and the auction projection in
+  `settlement_pending`, with the same contract deadline.
+- Exactly one persisted `payment_due` row for auction 75/artwork 14, addressed
+  to the actual winner, created at `17:56:35.256409Z` within the real window.
+- No read marker or dismissal for that row; the total read-marker count was
+  zero. This preserves a before-read observation rather than marking it read
+  as part of verification.
+
+At `17:58:32.064332Z`, the existing read-only canonical reminder function
+resolved that same persisted row to the actual ending transaction and deadline.
+The creator's payment-due candidate count for auction 75 was zero. The stable
+round correlation matches the original AuctionCreated transaction/log, and the
+recipient/type/offset idempotency hash was independently recomputed and matched.
+These checks establish the current winner identity and persisted delivery;
+they do not establish physical-phone viewing or read acknowledgement.
+
+Private evidence, excluded from Git:
+
+- `docs/private/b17-payment-reminder-end75-before-read-2026-11-16.json`
+- `docs/private/b17-end75-dual-rpc-2026-11-16.json`
+- `docs/private/b17-payment-reminder-end75-canonical-2026-11-16.json`
+
+All database verification used READ ONLY transactions and a five-second local
+statement timeout. No materialization, read acknowledgement, preference write,
+signature or transaction was performed by this evidence check. Physical-device
+viewing/read state, the owner's ordinary settlement, any separate credit
+withdrawal and restoration of the original one-hour preference are not yet
+recorded as completed here. Live-extension acceptance remains separate.
