@@ -1560,10 +1560,16 @@
                 const isAddress = attribute === 'data-avatar-address' || nameIsAddress;
                 const value = validWallet ? (isAddress ? wallet : name) : '';
                 const enabled = value && (isAddress || value.length <= 256) && !control.hidden;
-                if (control.dataset.copyValue !== value || control.dataset.walletAddress !== wallet || control.dataset.copyRevision !== revision) {
+                // A hidden address row may become visible for the same wallet.
+                // Restore its copy target without interrupting an in-flight copy
+                // when the identity and visibility have not changed.
+                const visibility = control.hidden ? 'hidden' : 'visible';
+                if (control.dataset.copyValue !== value || control.dataset.walletAddress !== wallet ||
+                    control.dataset.copyRevision !== revision || control.dataset.copyVisibility !== visibility) {
                     control.dataset.copyValue = value;
                     control.dataset.walletAddress = wallet;
                     control.dataset.copyRevision = revision;
+                    control.dataset.copyVisibility = visibility;
                     control.dataset.copyState = '';
                     control.disabled = !enabled;
                     changed = true;
