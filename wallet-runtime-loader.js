@@ -46,7 +46,7 @@ async function waitForWalletRuntimeBoot() {
 function loadWalletRuntime() {
     if (!runtimePromise) {
         runtimePromise = waitForDocumentReady()
-            .then(() => import('./appkit-init.js?v=55'))
+            .then(() => import('./appkit-init.js?v=56'))
             .then(async module => {
                 await waitForWalletRuntimeBoot();
                 runtimeReady = true;

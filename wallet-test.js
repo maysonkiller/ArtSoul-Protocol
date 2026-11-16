@@ -740,7 +740,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=55');
+    await import('/appkit-init.js?v=56');
     await window.__artsoulAppKitBootPromise;
     modal = window.web3Modal || null;
     diagnosticLifecycleReader = () => window.getArtSoulWalletLifecycle?.() ?? null;
@@ -816,6 +816,7 @@ const A1_AUTH_DIAGNOSTIC_STEPS = new Set([
     'SIWE signature requested',
     'core wallet method routed',
     'core wallet approval handoff',
+    'SIWE auth operation failed',
     'SIWE signature failed',
     'SIWE signature verified',
     'SIWE session already valid'

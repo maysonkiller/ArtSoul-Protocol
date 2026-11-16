@@ -202,6 +202,11 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   confirmation; retry succeeded. The [mobile follow-up](../audits/B18_MOBILE_PROFILE_AUTH_2026-11-16.md)
   keeps that incident and separately unconfirmed voice behavior open. No completed
   wallet transaction is repeated for this release.
+  After PR #491, the owner repeatedly reproduced `AUTH_UNAVAILABLE` when
+  returning before MetaMask finishes; waiting in MetaMask succeeds. The
+  [early-return investigation](../audits/B18_EARLY_WALLET_RETURN_2026-11-16.md)
+  separates this unresolved operation failure from the confirmed delayed-wallet
+  handoff and incorrect HTTP 401 fallback defects. Physical acceptance stays open.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.

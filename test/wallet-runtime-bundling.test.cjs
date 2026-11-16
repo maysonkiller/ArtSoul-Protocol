@@ -60,7 +60,7 @@ test('shared pages load AppKit through a deferred runtime boundary', () => {
     }
 
     const loader = read('wallet-runtime-loader.js');
-    assert.match(loader, /import\('\.\/appkit-init\.js\?v=55'\)/,
+    assert.match(loader, /import\('\.\/appkit-init\.js\?v=56'\)/,
         'the boundary must keep AppKit as a Vite dynamic import');
     assert.match(loader, /DOMContentLoaded/,
         'wallet initialization must start only after the page entry can mount');
