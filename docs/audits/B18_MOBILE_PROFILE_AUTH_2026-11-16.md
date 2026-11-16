@@ -12,9 +12,12 @@ were not supplied; speech recognition was not confirmed separately.
 
 One issue remains: the first attempt to open profile editing displayed a red
 error after a MetaMask confirmation and an early return to the browser. A second
-attempt succeeded. The exact error and whether the first confirmation approved
-connection or signed SIWE are not yet known. Do not infer that returning early
-caused the error, or count the first-attempt authentication path as accepted.
+attempt succeeded. The subsequent screenshots show the exact generic Notice
+"Authentication was not completed" followed by the profile's inline "Verify
+your wallet to edit your profile." This proves the authentication catch path,
+followed by duplicate feedback in its caller. It does not reveal the underlying
+provider/backend error or prove that returning early caused it. Do not count
+the first-attempt authentication path as accepted.
 
 ## Investigation boundary
 
@@ -28,7 +31,7 @@ weakened. A passing delayed-response simulation would establish local behavior,
 not reproduce the owner's mobile MetaMask incident. No automatic retry should
 request a second signature or treat a failed signature as success.
 
-The exact first-attempt error remains needed for incident attribution. Physical
+The underlying provider/backend error remains needed for incident attribution. Physical
 device confirmation of the first attempt remains open; repeated successful
 sign-in is not equivalent evidence.
 
@@ -53,8 +56,32 @@ four new cases that execute the current `supabase-auth.js`,
   it.
 
 Wallet transport, backend replies and browser events are controlled test inputs.
-This is not a real iOS relay test. The production implementation is unchanged;
-the evidence does not justify speculative transport delays or signature retries.
+This is not a real iOS relay test. That first regression slice did not change
+the implementation; it does not justify speculative transport delays or
+signature retries.
+
+## Feedback correction implemented
+
+Profile now consumes a scoped, fixed-message failure result from the existing
+shared authentication operation. A failed Edit attempt presents one inline
+message instead of the generic Notice followed by another error. A recognized
+wallet cancellation uses neutral status feedback; an expired request,
+verification failure or unavailable connection has an actionable message.
+Provider/backend response bodies are not displayed. Existing callers retain
+boolean results and at most one legacy alert per shared sign-in attempt.
+Saving retains the draft and no longer adds a second authentication alert.
+
+The runtime loader and wallet diagnostic both use wrapper revision 55. There
+are no new dependencies, automatic signature retries, transport delays or
+changes to nonce, account-match, private-profile or server verification rules.
+The current request/account guards still prevent a late result opening the
+wrong profile.
+
+Validation: 111 focused authentication, profile, mobile-resume and runtime-loader
+tests passed across six files. Syntax checks, the production build and an
+independent review passed. This verifies the feedback correction and controlled
+pending/rejection behavior; the original physical-device failure remains
+unattributed and its first-attempt acceptance stays open.
 
 ## Related release completed
 

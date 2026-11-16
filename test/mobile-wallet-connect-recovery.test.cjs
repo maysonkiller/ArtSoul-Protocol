@@ -31,10 +31,10 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
         assert.match(read(page), /wallet-runtime-loader\.js/, `${page} must load the standard wallet flow`);
     }
-    assert.match(read('wallet-runtime-loader.js'), /appkit-init\.js\?v=54/, 'the loader must import the pinned appkit entry');
+    assert.match(read('wallet-runtime-loader.js'), /appkit-init\.js\?v=55/, 'the loader must import the pinned appkit entry');
     assert.match(appKit, /wallet-core-connect\.js\?v=20/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=20/);
-    assert.match(walletTest, /appkit-init\.js\?v=54/);
+    assert.match(walletTest, /appkit-init\.js\?v=55/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {

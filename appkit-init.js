@@ -3440,19 +3440,33 @@ window.resetWalletConnection = async () => {
 // AUTHENTICATION
 // ============================================
 
-/**
- * Lazy authentication - only authenticate when needed
- * Prevents disconnect issues from immediate signature requests
- */
-window.ensureAuthenticated = async () => {
-    if (authenticationPromise) return authenticationPromise;
+// Public feedback uses fixed messages, never provider or backend response bodies.
+function classifyAuthenticationFailure(error) {
+    const code = String(getWalletErrorCode(error) || error?.message || '');
+    if (isUserRejectedError(error) || code === 'ACTION_REJECTED') {
+        return { code: 'AUTH_CANCELED', message: 'Sign-in was canceled. You can try again when you are ready.' };
+    }
+    if (code === 'INVALID_OR_EXPIRED_NONCE') {
+        return { code: 'AUTH_EXPIRED', message: 'The sign-in request expired. Try again and approve a new wallet signature.' };
+    }
+    if (['INVALID_SIGNATURE', 'INVALID_SIWE_MESSAGE', 'NONCE_NOT_IN_MESSAGE', 'INVALID_AUTH_PAYLOAD'].includes(code) || error?.status === 401) {
+        return { code: 'AUTH_VERIFICATION_FAILED', message: 'Your wallet signature could not be verified. Check the selected account and try again.' };
+    }
+    if (['4900', '4901', 'NETWORK_ERROR', 'TIMEOUT', 'CORE_SIGN_CLIENT_UNAVAILABLE'].includes(code) || error?.status >= 500 || error?.name === 'TypeError') {
+        return { code: 'AUTH_UNAVAILABLE', message: 'Wallet sign-in is temporarily unavailable. Check your connection and try again.' };
+    }
+    return { code: 'AUTH_FAILED', message: 'Sign-in could not be completed. Check the request in your wallet, then try again.' };
+}
 
-    authenticationPromise = (async () => {
+// Keep one authentication request and boolean results for existing callers.
+// A scoped presenter can replace the legacy alert without changing sign-in.
+window.ensureAuthenticated = async ({ onError } = {}) => {
+    if (!authenticationPromise) authenticationPromise = (async () => {
         let walletAddress = window.getCurrentWalletAddress?.();
         const connectedDuringThisRequest = !walletAddress;
         if (!walletAddress) {
             walletAddress = await window.safeConnectWallet?.();
-            if (!walletAddress) return false;
+            if (!walletAddress) return { authenticated: false };
         }
 
         // Finish the external-browser connection before starting another
@@ -3466,7 +3480,7 @@ window.ensureAuthenticated = async () => {
             walletDebugLog('SIWE deferred after external mobile wallet connect', {
                 address: maskWalletAddress(walletAddress)
             });
-            return false;
+            return { authenticated: false };
         }
 
         if (window.SupabaseAuth) {
@@ -3478,7 +3492,7 @@ window.ensureAuthenticated = async () => {
             if (isAuth) {
                 console.log('Already authenticated for active wallet');
                 walletDebugLog('SIWE session already valid', { address: walletAddress.toLowerCase() });
-                return true;
+                return { authenticated: true };
             }
         }
 
@@ -3497,20 +3511,29 @@ window.ensureAuthenticated = async () => {
             console.log('Authenticated:', authResult.user.id);
             setCoreAuthLifecycleState('authenticated');
             walletDebugLog('SIWE signature verified', { address: maskWalletAddress(walletAddress) });
-            return true;
+            return { authenticated: true };
         } catch (error) {
-            console.error('Authentication failed:', error);
+            const failure = classifyAuthenticationFailure(error);
+            console.error('Authentication failed:', failure.code);
             setCoreAuthLifecycleState('connected');
-            walletDebugLog('SIWE signature failed', { message: error?.message || String(error) });
-            alert('Authentication was not completed. You are connected and can browse, but protected actions need a wallet signature.');
-            return false;
+            walletDebugLog('SIWE signature failed', { code: failure.code, message: failure.message });
+            return { authenticated: false, failure };
         }
     })();
 
+    const operation = authenticationPromise;
     try {
-        return await authenticationPromise;
+        const result = await operation;
+        if (result.failure) {
+            if (typeof onError === 'function') onError({ ...result.failure });
+            else if (!result.legacyAlertShown) {
+                result.legacyAlertShown = true;
+                alert('Authentication was not completed. You are connected and can browse, but protected actions need a wallet signature.');
+            }
+        }
+        return result.authenticated;
     } finally {
-        authenticationPromise = null;
+        if (authenticationPromise === operation) authenticationPromise = null;
     }
 };
 

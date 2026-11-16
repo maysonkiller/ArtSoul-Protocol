@@ -743,7 +743,7 @@ test('core chain inference cannot bypass explicit Base Sepolia confirmation', ()
 
 test('SIWE is chain-tolerant while the shared write guard remains Base Sepolia-only', () => {
     const authentication = appKit.match(/window\.ensureAuthenticated = async[\s\S]*?\n\};/)?.[0] || '';
-    assert.match(authentication, /if \(authenticationPromise\) return authenticationPromise/);
+    assert.match(authentication, /if \(!authenticationPromise\) authenticationPromise =/);
     assert.doesNotMatch(authentication, /coreSessionNeedsBaseSepoliaConfirmation/);
     assert.doesNotMatch(authentication, /ensureArtSoulWriteNetwork/);
     assert.doesNotMatch(authentication, /wallet_switchEthereumChain/);

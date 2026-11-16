@@ -12,7 +12,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 const elements = (node, predicate) => Array.isArray(node) ? node.flatMap(child => elements(child, predicate))
     : React.isValidElement(node) ? [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)] : [];
-let compiledReport, compiledAdmin, compiledProfileReportControls;
+let compiledReport, compiledAdmin, compiledProfileReportControls, compiledProfileEditFeedback;
 test.before(async () => {
     const { transformWithOxc } = await import('vite');
     const compile = async (text, name) => (await transformWithOxc(text.replace(/^import .*;\r?$/gm, '').replace(/^export /gm, ''), name, { jsx: { runtime: 'classic' } })).code;
@@ -23,6 +23,9 @@ test.before(async () => {
     const dialogStart = profileSource.indexOf('{profileReportOpen && profileReportingEnabled');
     const dialog = profileSource.slice(dialogStart, profileSource.indexOf('\n', dialogStart));
     compiledProfileReportControls = await compile(`function ProfileReportControls({ profile, isOwnProfile = false, profileReportingEnabled = true, profileReportOpen = false, setProfileReportOpen }) { return <>${button}${dialog}</>; }`, 'profile-report-controls-fixture.jsx');
+    const feedbackStart = profileSource.indexOf('{profileEditError && <p');
+    const feedback = profileSource.slice(feedbackStart, profileSource.indexOf('\n', feedbackStart));
+    compiledProfileEditFeedback = await compile(`function ProfileEditFeedback({ profileEditError, profileEditErrorIsNotice }) { return <>${feedback}</>; }`, 'profile-edit-feedback-fixture.jsx');
 });
 
 test('profile report controls render only for a stored profile, including an already-open dialog', () => {
@@ -126,7 +129,7 @@ function editorHarness(fetchPage) {
         profileEditRef: { current: 0 }, profileRequestRef: { current: 1 }, profileEditRequestRef: { current: null }, profileEditWalletRef: { current: '' },
         getActiveWalletAddress: () => state.wallet, window: { ensureAuthenticated: async () => true, SupabaseAuth: { getAuthenticatedWallet: () => state.session } },
         fetch: async (url, options) => { state.calls.push({ url, options }); return fetchPage ? fetchPage() : Response.json({ success: true, profile: { wallet_address: A, username: 'Original artist', bio: 'Original biography', avatar_url: 'https://example.com/avatar.png' } }); },
-        setProfileEditLoading: value => { state.loading = value; }, setProfileEditError: value => { state.error = value; }, setProfileDraft: value => { state.draft = value; }, setEditMode: value => { state.open = value; } };
+        setProfileEditLoading: value => { state.loading = value; }, setProfileEditError: value => { state.error = value; }, setProfileEditErrorIsNotice: value => { state.notice = value; }, setProfileDraft: value => { state.draft = value; }, setEditMode: value => { state.open = value; } };
     const handlers = profileSource.slice(profileSource.indexOf('async function startProfileEdit('), profileSource.indexOf('async function handleAvatarUpload('));
     vm.runInNewContext(handlers + '\nthis.open = startProfileEdit; this.cancel = cancelProfileEdit;', scope);
     return { state, scope };
@@ -173,12 +176,12 @@ test('private editing closes immediately on a same-wallet sign-out or connected-
     }
 });
 
-function mobileProfileAuthHarness({ deferAuthentication = false } = {}) {
+function mobileProfileAuthHarness({ deferAuthentication = false, verificationFailure = null } = {}) {
     const auth = fs.readFileSync('supabase-auth.js', 'utf8');
     const app = fs.readFileSync('appkit-init.js', 'utf8');
     const listeners = new Map(), storage = new Map();
     const state = { wallet: A, signatures: 0, verifies: 0, privateReads: 0, alerts: 0, restarts: 0, open: false, error: '' };
-    const response = data => ({ ok: true, status: 200, text: async () => JSON.stringify(data), json: async () => data });
+    const response = (data, status = 200) => ({ ok: status < 400, status, text: async () => JSON.stringify(data), json: async () => data });
     const provider = { request: async ({ method }) => {
         if (method === 'eth_accounts') return [state.wallet];
         if (method === 'eth_chainId') return '0x2105';
@@ -197,7 +200,7 @@ function mobileProfileAuthHarness({ deferAuthentication = false } = {}) {
         fetch: async url => {
             if (url.endsWith('/session')) return response({ authenticated: false });
             if (url.includes('/nonce?')) return response({ nonce: 'fixture-nonce' });
-            if (url.endsWith('/verify')) { state.verifies++; return response({ wallet: A }); }
+            if (url.endsWith('/verify')) { state.verifies++; return verificationFailure ? response({ error: verificationFailure.code }, verificationFailure.status) : response({ wallet: A }); }
             if (url.endsWith('/logout')) return response({ success: true });
             if (url === '/api/profile') { state.privateReads++; return response({ success: true, profile: { id: 'stored-profile', wallet_address: A, username: 'Artist' } }); }
             throw new Error(`Unexpected auth request: ${url}`);
@@ -209,17 +212,22 @@ function mobileProfileAuthHarness({ deferAuthentication = false } = {}) {
         getWalletDebugSnapshot: () => ({}), walletResumeWaiters: new Set(), scheduleWalletReconciliation() {},
         profile: { id: 'stored-profile', wallet_address: A }, isOwnProfile: true,
         profileEditRef: { current: 0 }, profileRequestRef: { current: 1 }, profileEditRequestRef: { current: null }, profileEditWalletRef: { current: '' },
-        setProfileEditLoading: value => { state.loading = value; }, setProfileEditError: value => { state.error = value; },
+        setProfileEditLoading: value => { state.loading = value; }, setProfileEditError: value => { state.error = value; }, setProfileEditErrorIsNotice: value => { state.notice = value; },
         setProfileDraft: value => { state.draft = value; }, setEditMode: value => { state.open = value; }, useEffect: fn => fn() };
     vm.createContext(scope);
     vm.runInContext(auth, scope);
+    for (const name of ['getWalletErrorCode', 'isUserRejectedError', 'classifyAuthenticationFailure']) {
+        vm.runInContext(app.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n\\}`))[0], scope);
+    }
     vm.runInContext(`let authenticationPromise = null, deferMobileAuthenticationThisTurn = ${deferAuthentication};\n`
         + app.match(/window\.ensureAuthenticated = async[\s\S]*?\n\};/)[0], scope);
     vm.runInContext(app.match(/async function processWalletResume[\s\S]*?\n\}/)[0], scope);
     const marker = profileSource.indexOf('const cancelChangedWalletEdit =');
     vm.runInContext(profileSource.slice(profileSource.lastIndexOf('useEffect(() => {', marker), profileSource.indexOf('}, []);', marker) + 7), scope);
     vm.runInContext(profileSource.slice(profileSource.indexOf('async function startProfileEdit('), profileSource.indexOf('async function handleAvatarUpload(')), scope);
-    return { state, scope, open: () => scope.startProfileEdit() };
+    vm.runInContext(compiledProfileEditFeedback + '\nthis.Feedback = ProfileEditFeedback;', scope);
+    return { state, scope, open: () => scope.startProfileEdit(),
+        feedback: () => { scope.React = React; return renderToStaticMarkup(scope.Feedback({ profileEditError: state.error, profileEditErrorIsNotice: state.notice })); } };
 }
 
 test('profile editing waits for a mobile signature across early browser resume', async () => {
@@ -241,10 +249,42 @@ test('a rejected mobile signature permits a fresh edit retry without opening pri
     const h = mobileProfileAuthHarness(), first = h.open(); await tick();
     h.state.rejectSignature(Object.assign(new Error('User rejected the request'), { code: 4001 })); await first;
     assert.equal(h.state.privateReads, 0); assert.equal(h.state.open, false); assert.equal(h.state.loading, false);
-    assert.match(h.state.error, /Verify your wallet/);
+    assert.match(h.state.error, /Sign-in was canceled/);
+    assert.equal(h.state.alerts, 0); assert.equal(h.state.notice, true);
+    assert.match(h.feedback(), /role="status"/); assert.doesNotMatch(h.feedback(), /is-error|role="alert"/);
     const retry = h.open(); await tick(); assert.equal(h.state.signatures, 2);
     h.state.resolveSignature('0xsynthetic-signature'); await retry;
     assert.equal(h.state.verifies, 1); assert.equal(h.state.privateReads, 1); assert.equal(h.state.open, true);
+});
+
+test('profile sign-in presents one safe inline failure and never retries a signature automatically', async () => {
+    for (const scenario of [
+        { error: Object.assign(new Error('private RPC response'), { code: 4900 }), message: /temporarily unavailable/ },
+        { error: new Error('signature=private-signature; token=private-token; RPC_BODY'), message: /could not be completed/ },
+        { verificationFailure: { code: 'INVALID_OR_EXPIRED_NONCE', status: 401 }, message: /request expired/ },
+        { verificationFailure: { code: 'INVALID_SIGNATURE', status: 401 }, message: /could not be verified/ }
+    ]) {
+        const h = mobileProfileAuthHarness(scenario), pending = h.open(); await tick();
+        if (scenario.error) h.state.rejectSignature(scenario.error); else h.state.resolveSignature('0xsynthetic-signature');
+        await pending;
+        assert.equal(h.state.signatures, 1); assert.equal(h.state.privateReads, 0); assert.equal(h.state.open, false);
+        assert.equal(h.state.alerts, 0); assert.equal(h.state.loading, false); assert.equal(h.state.notice, false);
+        assert.match(h.state.error, scenario.message); assert.match(h.feedback(), /role="alert"/);
+        assert.doesNotMatch(h.feedback(), /private-signature|private-token|RPC_BODY|private RPC response/);
+    }
+});
+
+test('shared authentication preserves boolean legacy results and alerts once while delivering scoped inline failures', async () => {
+    const h = mobileProfileAuthHarness();
+    const legacy = h.scope.window.ensureAuthenticated(), profile = h.open(), duplicateLegacy = h.scope.window.ensureAuthenticated();
+    await tick(); assert.equal(h.state.signatures, 1);
+    h.state.rejectSignature(new Error('private RPC response'));
+    assert.equal(await legacy, false); assert.equal(await duplicateLegacy, false); await profile;
+    assert.equal(h.state.alerts, 1); assert.match(h.state.error, /could not be completed/);
+    assert.equal(h.state.privateReads, 0);
+    const retry = h.scope.window.ensureAuthenticated(); await tick(); assert.equal(h.state.signatures, 2);
+    h.state.resolveSignature('0xsynthetic-signature');
+    assert.equal(await retry, true); assert.equal(h.state.alerts, 1);
 });
 
 test('a real account change while the mobile signature is pending prevents a late editor opening', async () => {
