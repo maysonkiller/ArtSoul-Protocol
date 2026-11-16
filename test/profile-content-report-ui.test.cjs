@@ -173,6 +173,98 @@ test('private editing closes immediately on a same-wallet sign-out or connected-
     }
 });
 
+function mobileProfileAuthHarness({ deferAuthentication = false } = {}) {
+    const auth = fs.readFileSync('supabase-auth.js', 'utf8');
+    const app = fs.readFileSync('appkit-init.js', 'utf8');
+    const listeners = new Map(), storage = new Map();
+    const state = { wallet: A, signatures: 0, verifies: 0, privateReads: 0, alerts: 0, restarts: 0, open: false, error: '' };
+    const response = data => ({ ok: true, status: 200, text: async () => JSON.stringify(data), json: async () => data });
+    const provider = { request: async ({ method }) => {
+        if (method === 'eth_accounts') return [state.wallet];
+        if (method === 'eth_chainId') return '0x2105';
+        if (method === 'personal_sign') {
+            state.signatures++;
+            return new Promise((resolve, reject) => { state.resolveSignature = resolve; state.rejectSignature = reject; });
+        }
+        throw new Error(`Unexpected provider method: ${method}`);
+    } };
+    const window = { location: { host: 'example.test', origin: 'https://example.test' }, getCurrentWalletAddress: () => state.wallet,
+        addEventListener(name, fn) { const handlers = listeners.get(name) || []; handlers.push(fn); listeners.set(name, handlers); },
+        removeEventListener() {}, dispatchEvent(event) { for (const handler of listeners.get(event.type) || []) handler(event); } };
+    const scope = { window, document: { visibilityState: 'visible' }, TextEncoder, AbortController,
+        CustomEvent: class { constructor(type) { this.type = type; } },
+        localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
+        fetch: async url => {
+            if (url.endsWith('/session')) return response({ authenticated: false });
+            if (url.includes('/nonce?')) return response({ nonce: 'fixture-nonce' });
+            if (url.endsWith('/verify')) { state.verifies++; return response({ wallet: A }); }
+            if (url.endsWith('/logout')) return response({ success: true });
+            if (url === '/api/profile') { state.privateReads++; return response({ success: true, profile: { id: 'stored-profile', wallet_address: A, username: 'Artist' } }); }
+            throw new Error(`Unexpected auth request: ${url}`);
+        }, console: { log() {}, warn() {}, error() {} }, alert: () => { state.alerts++; },
+        isMobileDevice: () => true, isInjectedWalletBrowser: () => false,
+        walletDebugLog() {}, maskWalletAddress: value => value, getProviderForWallet: async () => provider, setCoreAuthLifecycleState() {},
+        isWalletExplicitlyDisconnected: () => false, isCoreSessionActive: () => true, isCoreConnectInFlight: () => false,
+        restartWalletConnectTransport: async () => { state.restarts++; }, recheckDeferredCoreDisconnect: async () => {},
+        getWalletDebugSnapshot: () => ({}), walletResumeWaiters: new Set(), scheduleWalletReconciliation() {},
+        profile: { id: 'stored-profile', wallet_address: A }, isOwnProfile: true,
+        profileEditRef: { current: 0 }, profileRequestRef: { current: 1 }, profileEditRequestRef: { current: null }, profileEditWalletRef: { current: '' },
+        setProfileEditLoading: value => { state.loading = value; }, setProfileEditError: value => { state.error = value; },
+        setProfileDraft: value => { state.draft = value; }, setEditMode: value => { state.open = value; }, useEffect: fn => fn() };
+    vm.createContext(scope);
+    vm.runInContext(auth, scope);
+    vm.runInContext(`let authenticationPromise = null, deferMobileAuthenticationThisTurn = ${deferAuthentication};\n`
+        + app.match(/window\.ensureAuthenticated = async[\s\S]*?\n\};/)[0], scope);
+    vm.runInContext(app.match(/async function processWalletResume[\s\S]*?\n\}/)[0], scope);
+    const marker = profileSource.indexOf('const cancelChangedWalletEdit =');
+    vm.runInContext(profileSource.slice(profileSource.lastIndexOf('useEffect(() => {', marker), profileSource.indexOf('}, []);', marker) + 7), scope);
+    vm.runInContext(profileSource.slice(profileSource.indexOf('async function startProfileEdit('), profileSource.indexOf('async function handleAvatarUpload(')), scope);
+    return { state, scope, open: () => scope.startProfileEdit() };
+}
+
+test('profile editing waits for a mobile signature across early browser resume', async () => {
+    const h = mobileProfileAuthHarness(), pending = h.open(); await tick();
+    assert.equal(h.state.signatures, 1);
+    h.scope.document.visibilityState = 'hidden';
+    h.scope.document.visibilityState = 'visible';
+    await h.scope.processWalletResume('pageshow + visibility return + window focus');
+    assert.equal(h.state.restarts, 1);
+    assert.equal(h.state.loading, true); assert.equal(h.state.error, ''); assert.equal(h.state.alerts, 0);
+    assert.equal(h.state.verifies, 0); assert.equal(h.state.privateReads, 0); assert.equal(h.state.open, false);
+    await h.open(); assert.equal(h.state.signatures, 1, 'repeated Edit cannot request a second pending signature');
+    h.state.resolveSignature('0xsynthetic-signature'); await pending;
+    assert.equal(h.state.verifies, 1); assert.equal(h.state.privateReads, 1); assert.equal(h.state.open, true);
+    assert.equal(h.state.error, ''); assert.equal(h.state.alerts, 0);
+});
+
+test('a rejected mobile signature permits a fresh edit retry without opening private content early', async () => {
+    const h = mobileProfileAuthHarness(), first = h.open(); await tick();
+    h.state.rejectSignature(Object.assign(new Error('User rejected the request'), { code: 4001 })); await first;
+    assert.equal(h.state.privateReads, 0); assert.equal(h.state.open, false); assert.equal(h.state.loading, false);
+    assert.match(h.state.error, /Verify your wallet/);
+    const retry = h.open(); await tick(); assert.equal(h.state.signatures, 2);
+    h.state.resolveSignature('0xsynthetic-signature'); await retry;
+    assert.equal(h.state.verifies, 1); assert.equal(h.state.privateReads, 1); assert.equal(h.state.open, true);
+});
+
+test('a real account change while the mobile signature is pending prevents a late editor opening', async () => {
+    const h = mobileProfileAuthHarness(), pending = h.open(); await tick();
+    h.state.wallet = B; h.scope.window.dispatchEvent({ type: 'artsoul:wallet-state-changed' });
+    h.state.resolveSignature('0xsynthetic-signature'); await pending;
+    assert.equal(h.state.privateReads, 0); assert.equal(h.state.open, false); assert.equal(h.state.draft, null);
+    assert.equal(h.scope.window.SupabaseAuth.getAuthenticatedWallet(), '');
+});
+
+test('same-turn mobile pairing deferral shows verification feedback without requesting a signature', async () => {
+    const h = mobileProfileAuthHarness({ deferAuthentication: true });
+    await h.open();
+    assert.equal(h.state.signatures, 0); assert.equal(h.state.privateReads, 0); assert.equal(h.state.alerts, 0);
+    assert.match(h.state.error, /Verify your wallet/);
+    const retry = h.open(); await tick(); assert.equal(h.state.signatures, 1);
+    h.state.resolveSignature('0xsynthetic-signature'); await retry;
+    assert.equal(h.state.privateReads, 1); assert.equal(h.state.open, true); assert.equal(h.state.error, '');
+});
+
 test('profile review groups keep wallets and captured revisions separate and render untrusted snapshots safely', () => {
     const scope = { React, URL }; vm.runInNewContext(compiledAdmin + '\nthis.group = groupReports; this.Snapshot = ProfileReportSnapshot; this.Actions = ReportActions;', scope);
     const report = { id: 'r1', target_type: 'profile_content', profile_wallet: B, profile_content_hash: 'one', status: 'pending_review', profile_content_snapshot: { username: '<script>unsafe()</script>', bio: '<img src=x>', avatar_url: 'javascript:bad()', discord_profile_url: 'javascript:bad()' } };

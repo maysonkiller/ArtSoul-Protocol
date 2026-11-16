@@ -192,7 +192,10 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   is READY in production deployment `dpl_ArKDP1GHY96YmMt57EBEfgrV7tT4`.
   The November 9 [native wallet acceptance](../audits/B18_WALLET_STATE_FRESHNESS_2026-11-09.md#native-production-acceptance)
   passed Phantom connection, Disconnect, reload remaining guest and Rabby
-  connection. Latest native iPhone composition remains open; no completed
+  connection. On November 16 the owner reported satisfactory iPhone layout
+  overall, but a first-attempt profile authentication error after a MetaMask
+  confirmation; retry succeeded. The [mobile follow-up](../audits/B18_MOBILE_PROFILE_AUTH_2026-11-16.md)
+  keeps that incident and separately unconfirmed voice behavior open. No completed
   wallet transaction is repeated for this release.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
