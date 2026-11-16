@@ -9,8 +9,8 @@ const searchResult = { category: 'all', groups: {
 }};
 
 function harness({speech = false, execute = async () => JSON.stringify(searchResult)} = {}) {
-  const nodes = new Map(), calls = [], sessions = [], spoken = [], storage = new Map();
-  let prompts = 0;
+  const nodes = new Map(), calls = [], sessions = [], spoken = [], utterances = [], storage = new Map();
+  let prompts = 0, cancelled = 0;
   const events = () => ({listeners: new Map(),
     addEventListener(type, fn) { if (!this.listeners.has(type)) this.listeners.set(type, []); this.listeners.get(type).push(fn); },
     fire(type, extra = {}) { for (const fn of this.listeners.get(type) || []) fn({preventDefault() {}, stopPropagation() {}, ...extra}); }
@@ -43,7 +43,7 @@ function harness({speech = false, execute = async () => JSON.stringify(searchRes
   const window = {...events(), setTimeout: fn => fn(),
     localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)},
     confirm: () => {prompts++; return true;},
-    speechSynthesis: {cancel() {}, speak: value => spoken.push(value.text)},
+    speechSynthesis: {cancel() {cancelled++;}, speak(value) {utterances.push(value); spoken.push(value.text);}},
     ArtSoulWebMCP: {browserDependencies: () => ({}), createTools: () => ['search_catalog', 'buy_resale_listing', 'get_my_activity', 'add_to_saved', 'remove_from_saved'].map(name => ({name,
       execute: args => {calls.push({name, args}); return execute(args);}
     }))}
@@ -51,8 +51,9 @@ function harness({speech = false, execute = async () => JSON.stringify(searchRes
   if (speech) window.SpeechRecognition = Recognition;
   new Function('window', 'document', 'navigator', 'SpeechSynthesisUtterance', source)(window, document, {language: 'en'}, function(text) {this.text = text;});
   const get = selector => nodes.get(selector);
-  return {get, document, window, calls, sessions, spoken, en, ru, storage,
+  return {get, document, window, calls, sessions, spoken, utterances, en, ru, storage,
     prompts: () => prompts,
+    cancelled: () => cancelled,
     open: () => get('.artsoul-voice-button').fire('click'),
     submit(value) {get('input').value = value; get('form').fire('submit');},
     connect(address) {window.artsoulSettledWalletState = {isConnected: Boolean(address), address}; window.fire('artsoul:wallet-state-changed');}
@@ -78,6 +79,153 @@ test('opening, typing, examples and language selection never start the microphon
   h.ru.fire('click'); assert.equal(h.get('h2').textContent, 'Команды ArtSoul');
   h.submit('помощь'); await flush();
   assert.equal(h.calls.length, 0); assert.equal(h.sessions.length, 0); assert.equal(h.prompts(), 0);
+});
+
+test('typed answers stay silent and manual audio reads the safe summary without rerunning a tool', async () => {
+  const h = harness({execute: async () => JSON.stringify({
+    created: {count: 2}, owned: {count: 3}, resale_listings: {count: 1},
+    needs_attention: [{artwork_id: '31', tool: 'unknown', why: 'Private account detail visible on screen only'}]
+  })});
+  h.open();
+  const replay = h.get('.artsoul-voice-replay');
+  assert.equal(replay.hidden, true);
+  h.submit('my activity'); await flush();
+  assert.match(h.get('.artsoul-voice-answer').textContent, /Private account detail/);
+  assert.equal(h.spoken.length, 0);
+  assert.equal(replay.hidden, false); assert.equal(replay.disabled, false);
+  replay.fire('click');
+  assert.deepEqual(h.spoken, ['You created 2, own 3, and have 1 listings. 1 available actions.']);
+  assert.equal(h.calls.length, 1); assert.equal(h.prompts(), 0); assert.equal(h.sessions.length, 0);
+  assert.equal(replay.textContent, 'Listen to answer');
+  assert.equal(replay.attrs['aria-pressed'], 'false');
+  h.utterances[0].onstart();
+  assert.equal(replay.textContent, 'Stop audio'); assert.equal(replay.attrs['aria-pressed'], 'true');
+  const cancelled = h.cancelled();
+  replay.fire('click');
+  assert.equal(h.cancelled(), cancelled + 1);
+  assert.equal(h.utterances[0].onstart, null); assert.equal(h.utterances[0].onend, null); assert.equal(h.utterances[0].onerror, null);
+  assert.equal(replay.textContent, 'Listen to answer'); assert.equal(h.spoken.length, 1);
+  replay.fire('click');
+  assert.equal(h.spoken.length, 2); assert.equal(h.calls.length, 1);
+});
+
+test('listening to a completed wallet action never submits it again or reads the transaction hash', async () => {
+  const hash = '0x' + 'ab'.repeat(32);
+  const h = harness({execute: async () => JSON.stringify({submitted: true, transaction_hash: hash, url: '/artwork/31'})});
+  h.open(); h.submit('buy artwork 31'); await flush();
+  h.get('.artsoul-voice-replay').fire('click'); h.utterances[0].onend();
+  h.get('.artsoul-voice-replay').fire('click');
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.get('input').value, '');
+  assert.deepEqual(h.spoken, [
+    'Done. The wallet approved it and the transaction was sent.',
+    'Done. The wallet approved it and the transaction was sent.'
+  ]);
+  assert.doesNotMatch(h.spoken.join(' '), new RegExp(hash));
+});
+
+test('microphone answers attempt native speech in the selected language and retain manual playback', async () => {
+  const h = harness({speech: true}); h.open(); h.ru.fire('click');
+  h.get('.artsoul-voice-mic').fire('click'); await flush();
+  h.sessions[0].onresult({results: [[{transcript: 'помощь', confidence: 1}]]}); await flush();
+  assert.equal(h.spoken.length, 1);
+  assert.match(h.spoken[0], /открой галерею/);
+  assert.equal(h.utterances[0].lang, 'ru-RU');
+  const replay = h.get('.artsoul-voice-replay');
+  assert.equal(replay.textContent, 'Прослушать ответ');
+  h.utterances[0].onstart();
+  assert.equal(replay.textContent, 'Остановить звук');
+  h.utterances[0].onend();
+  assert.equal(replay.textContent, 'Прослушать ответ');
+  assert.equal(replay.attrs['aria-pressed'], 'false');
+  assert.equal(h.get('.artsoul-voice-audio-status').hidden, true);
+  replay.fire('click');
+  assert.deepEqual(h.spoken, [h.spoken[0], h.spoken[0]]);
+  assert.equal(h.sessions.length, 1); assert.equal(h.calls.length, 0);
+});
+
+test('silent native speech rejection remains retryable and stale audio callbacks cannot change a newer answer', async () => {
+  const h = harness(); h.open(); h.submit('help'); await flush();
+  const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
+  replay.fire('click');
+  const old = h.utterances[0], stale = [old.onstart, old.onend, old.onerror];
+  // Some native engines reject an unactivated start without any callback.
+  assert.equal(replay.textContent, 'Listen to answer'); assert.equal(replay.disabled, false);
+  replay.fire('click');
+  assert.equal(h.utterances.length, 2);
+  assert.equal(old.onstart, null); assert.equal(old.onend, null); assert.equal(old.onerror, null);
+  const current = h.utterances[1]; current.onstart();
+  for (const callback of stale) callback({error: 'not-allowed'});
+  assert.equal(replay.textContent, 'Stop audio'); assert.equal(status.hidden, true);
+  current.onerror({error: 'not-allowed'});
+  assert.equal(replay.textContent, 'Listen to answer'); assert.equal(replay.disabled, false);
+  assert.equal(status.hidden, false); assert.match(status.textContent, /answer is available as text/);
+  assert.match(h.get('.artsoul-voice-answer').textContent, /open gallery/);
+  replay.fire('click');
+  assert.equal(status.hidden, true); assert.equal(h.utterances.length, 3);
+  assert.equal(h.calls.length, 0);
+});
+
+test('unavailable or throwing speech synthesis preserves a usable text composer', async () => {
+  for (const failure of ['missing', 'throwing']) {
+    const h = harness(); h.open();
+    if (failure === 'missing') delete h.window.speechSynthesis;
+    else h.window.speechSynthesis.speak = () => {throw Error('Native speech unavailable');};
+    h.submit('help'); await flush();
+    const replay = h.get('.artsoul-voice-replay');
+    assert.equal(replay.hidden, false, failure);
+    if (failure === 'missing') assert.equal(replay.disabled, true);
+    else replay.fire('click');
+    assert.equal(h.get('.artsoul-voice-audio-status').hidden, false, failure);
+    assert.match(h.get('.artsoul-voice-answer').textContent, /open gallery/, failure);
+    assert.equal(h.get('input').disabled, false, failure);
+    h.submit('search moon'); await flush();
+    assert.equal(h.calls.length, 1, failure);
+  }
+});
+
+test('closing or hiding the page cancels audio and ignores callbacks already queued by the engine', async () => {
+  for (const change of ['close', 'hidden']) {
+    const h = harness(); h.open(); h.submit('help'); await flush();
+    const replay = h.get('.artsoul-voice-replay'); replay.fire('click');
+    const utterance = h.utterances[0], late = [utterance.onstart, utterance.onend, utterance.onerror];
+    utterance.onstart(); const cancelled = h.cancelled();
+    if (change === 'close') h.get('.artsoul-voice-close').fire('click');
+    else {h.document.visibilityState = 'hidden'; h.document.fire('visibilitychange');}
+    assert.equal(h.cancelled(), cancelled + 1, change);
+    assert.equal(utterance.onstart, null, change); assert.equal(utterance.onend, null, change); assert.equal(utterance.onerror, null, change);
+    for (const callback of late) callback({error: 'interrupted'});
+    assert.equal(replay.attrs['aria-pressed'], 'false', change);
+    assert.equal(h.get('.artsoul-voice-audio-status').hidden, true, change);
+    replay.fire('click'); assert.equal(h.spoken.length, 1, change);
+  }
+});
+
+test('account, authentication, language and page lifecycle changes make the previous answer unavailable to playback', async () => {
+  for (const change of ['wallet', 'disconnect', 'auth', 'language', 'pagehide']) {
+    const h = harness({execute: async () => JSON.stringify({created: {count: 73}})});
+    h.connect('0x' + 'a'.repeat(40)); h.open(); h.submit('my activity'); await flush();
+    const replay = h.get('.artsoul-voice-replay'); replay.fire('click');
+    const utterance = h.utterances[0], late = [utterance.onstart, utterance.onend, utterance.onerror];
+    utterance.onstart();
+    if (change === 'wallet') h.connect('0x' + 'b'.repeat(40));
+    if (change === 'disconnect') h.connect(null);
+    if (change === 'auth') h.window.fire('artsoul:auth-state-changed');
+    if (change === 'language') h.ru.fire('click');
+    if (change === 'pagehide') h.window.fire('pagehide');
+    assert.equal(utterance.onstart, null, change); assert.equal(utterance.onend, null, change); assert.equal(utterance.onerror, null, change);
+    for (const callback of late) callback({error: 'interrupted'});
+    assert.equal(replay.attrs['aria-pressed'], 'false', change);
+    assert.doesNotMatch(h.get('.artsoul-voice-answer').textContent, /73/, change);
+    if (change === 'wallet' || change === 'disconnect') {
+      replay.fire('click');
+      assert.equal(h.spoken.at(-1), 'Wallet changed. Enter a new command for this account.', change);
+    } else {
+      assert.equal(replay.hidden, true, change);
+      replay.fire('click'); assert.equal(h.spoken.length, 1, change);
+    }
+    assert.equal(h.calls.length, 1, change);
+  }
 });
 
 test('search results are safe text links and clear on another request or account change', async () => {

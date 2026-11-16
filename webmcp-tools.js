@@ -847,6 +847,34 @@
             }
         };
 
+        const pages = Object.freeze({
+            home: { url: '/', title: 'Home' },
+            gallery: { url: '/gallery#discover', title: 'Explore' },
+            profile: { url: '/profile', title: 'Profile' },
+            create: { url: '/upload', title: 'Create' },
+            guide: { url: '/docs-protocol', title: 'How it works' }
+        });
+        const openPage = {
+            name: 'open_page',
+            description: 'Open Home, Explore, Profile, Create or How it works on ArtSoul. Navigation only; ' +
+                'does not connect a wallet, upload, sign or submit anything. Arbitrary URLs are not accepted.',
+            inputSchema: {
+                type: 'object', additionalProperties: false,
+                properties: { page: { type: 'string', enum: Object.keys(pages) } },
+                required: ['page']
+            },
+            execute: async input => {
+                if (!input || typeof input !== 'object' || Array.isArray(input) ||
+                    !Object.hasOwn(input, 'page') || Object.keys(input).some(key => key !== 'page') ||
+                    typeof input.page !== 'string' || !Object.hasOwn(pages, input.page)) {
+                    return JSON.stringify({ opened: false, reason: 'Choose Home, Explore, Profile, Create or How it works.' });
+                }
+                const page = input.page, destination = pages[page];
+                openPath(destination.url);
+                return JSON.stringify({ opened: true, page, url: destination.url, title: destination.title });
+            }
+        };
+
         /**
          * Navigation as a declared tool. Without it an agent that has just
          * described a work has no way to put it in front of the person except by
@@ -1639,6 +1667,7 @@
             getArtworkProvenance,
             explainSettlement,
             getMyActivity,
+            openPage,
             openArtwork,
             prepareBid,
             placeBid,

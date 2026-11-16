@@ -82,6 +82,7 @@ test('the ArtSoul tools are registered when the browser supports WebMCP', async 
     'get_artwork_provenance',
     'explain_settlement',
     'get_my_activity',
+    'open_page',
     'open_artwork',
     'prepare_bid',
     'place_bid',
@@ -717,6 +718,40 @@ test('get_artwork answers the whole public record of one work', async () => {
   assert.deepEqual(answer.community_signals, { likes: 4, would_buy: 2, watching: 7 });
   // Discovery signals must never arrive dressed as money.
   assert.equal('value' in answer.community_signals, false);
+});
+
+test('open_page navigates only to declared pages without provider or wallet work', async () => {
+  const opened = [];
+  const unexpected = () => assert.fail('page navigation must not access data or the wallet');
+  const tools = toolsFrom(load(), {
+    openPath: path => opened.push(path), fetchJson: unexpected,
+    loadWalletRuntime: unexpected, readWalletAddress: unexpected,
+    readContracts: unexpected, confirmAction: unexpected
+  });
+  const tool = tools.get('open_page');
+  const expected = [
+    ['home', '/', 'Home'], ['gallery', '/gallery#discover', 'Explore'],
+    ['profile', '/profile', 'Profile'], ['create', '/upload', 'Create'],
+    ['guide', '/docs-protocol', 'How it works']
+  ];
+  assert.deepEqual(tool.inputSchema.properties.page.enum, expected.map(([page]) => page));
+  assert.equal(tool.inputSchema.additionalProperties, false);
+  for (const [page, url, title] of expected) {
+    assert.deepEqual(JSON.parse(await tool.execute({ page })), { opened: true, page, url, title });
+  }
+  assert.deepEqual(opened, expected.map(([, url]) => url));
+});
+
+test('open_page rejects unknown destinations, arbitrary URLs and inherited properties', async () => {
+  const tool = toolsFrom(load(), { openPath: () => assert.fail('invalid page must not navigate') }).get('open_page');
+  for (const input of [null, undefined, {}, [], 'home', { page: ['home'] }, { page: 1 },
+    { page: 'Home' }, { page: ' gallery' }, { page: 'admin' }, { page: '/gallery' },
+    { page: 'https://example.test/' }, { page: '//example.test/' }, { page: 'javascript:alert(1)' },
+    { page: '__proto__' }, { page: 'constructor' }, { page: 'toString' },
+    Object.create({ page: 'home' }), { page: 'home', url: 'https://example.test/' },
+    JSON.parse('{"page":"home","__proto__":{"page":"guide"}}')]) {
+    assert.equal(JSON.parse(await tool.execute(input)).opened, false);
+  }
 });
 
 test('open_artwork navigates, and refuses a work that does not exist', async () => {
