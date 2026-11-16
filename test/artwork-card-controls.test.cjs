@@ -302,8 +302,12 @@ test('DOM cards render two isolated overlay buttons and keep only one media play
     const { api, mediaElements } = loadDomCardRuntime();
     const videoCard = api.createCardElement({ id: 'video', file_type: 'video', file_url: 'video.mp4' });
     const audioCard = api.createCardElement({ id: 'audio', file_type: 'audio', file_url: 'audio.mp3' });
-    const videoControls = videoCard.children[0].children[2];
-    const audioControls = audioCard.children[0].children[0].children[2];
+    const findClass = (root, name) => (root?.className || '').split(/\s+/).includes(name)
+        ? root : (root?.children || []).map(child => findClass(child, name)).find(Boolean);
+    const videoControls = findClass(videoCard, 'artsoul-card-media-controls');
+    const audioControls = findClass(audioCard, 'artsoul-card-media-controls');
+    assert.ok(videoControls);
+    assert.ok(audioControls);
 
     assert.equal(videoControls.children.length, 2);
     assert.equal(audioControls.children.length, 2);
@@ -330,7 +334,9 @@ test('cards omit unsafe media and remove themselves when media loading fails', (
     assert.equal(api.createCardElement({ id: 'missing', title: 'Missing' }), null);
 
     const card = api.createCardElement({ id: 'image', title: 'Image', file_url: 'image.jpg' });
-    card.children[0].children[0].onerror();
+    const image = card.children[0].children[0].children[0];
+    assert.equal(image.tagName, 'IMG');
+    image.onerror();
     assert.equal(card.removed, true);
 });
 
