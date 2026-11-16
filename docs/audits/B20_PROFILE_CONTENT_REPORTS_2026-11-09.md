@@ -1,8 +1,9 @@
 # Profile-content reports and reversible public masking
 
-Status: production migration, deployment and intake activation completed November
-16. Real report/review acceptance remains pending. This does not close
-Phase B or the separate native-wallet acceptance queue.
+Status: production migration, deployment, intake activation and the owner-authorized
+report/review/mask/restore/participant-notification cycle accepted November 16.
+The live cycle exposed and verified a separate notification read-state correction
+linked below. This bounded B20 acceptance does not close the remaining Phase B gates.
 
 ## Implemented scope
 
@@ -159,17 +160,30 @@ provider acceptance alone does not prove mailbox receipt. The private record is
 `docs/private/b20-actual-cycle-2026-11-16.json`.
 
 The founder's actual notification panel displayed both report decisions, linked
-to the correct profile, and marked each read when expanded. Native viewing of
-the two owner notices remains the last step in this controlled cycle.
+to the correct profile, and marked each read when expanded. The owner then
+selected lys and completed normal sign-in. Both owner notices were visible and
+linked correctly, but their initial read mutations returned HTTP 409. The
+[bounded read-state correction](B20_PROFILE_NOTIFICATION_READ_STATE_2026-11-16.md)
+added the omitted profile types to the existing summary/read/remove allowlists.
+After its verified live application, both actual owner clicks returned HTTP 200,
+the panel displayed `Read`, and the unread badge decreased from four to two.
+All four cycle notices were independently confirmed read and not dismissed.
+This completes the designated participant-notification acceptance without
+impersonating a session or marking notices through privileged database writes.
+
+The exact-reference search in the connected Gmail mailbox returned no result;
+mailbox receipt is not claimed and this is not evidence of delivery failure.
+The existing mail-worker acceptance is unchanged; provider acceptance for this
+report remains separately recorded.
 
 A separate edge fix requires a stored profile ID before offering or retaining
 the report dialog; a bare wallet-only fallback profile has nothing to report.
-Ten rendered UI tests and the production build pass locally. Its release status
-is recorded by the integrating PR; no new dependency was added.
+Ten rendered UI tests and the production build pass locally. PR #487 merged as
+`23d36f3a` after Linux/Windows/static and deployment checks passed; no new
+dependency was added.
 
 ## Remaining work
 
-- Verify native viewing of the owner notices to finish the designated cycle.
 - Keep historical unused-cover uploads until the owner selects a retention
   policy. Separate covers/customization remain paused; no deletion schedule or
   broader profile editor is activated by this work.

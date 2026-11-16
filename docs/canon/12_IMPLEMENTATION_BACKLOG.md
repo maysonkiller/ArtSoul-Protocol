@@ -100,8 +100,14 @@ November 16 B20 release checkpoint: [profile-content notices](../audits/B20_PROF
 have deployed intake, versioned review, reversible public masking and private
 owner editing (PR #484). CI, fresh full-data restoration, live migration and
 production reader/access checks passed; intake is enabled under the existing
-quota and staff policy. Native-dialog geometry follow-up, real report/review
-acceptance and historical unused-cover retention remain open; Phase B is not complete.
+quota and staff policy. PR #485 corrected native-dialog centering; production
+desktop/mobile geometry and static Classic feedback passed. The owner-authorized
+lys TEST cycle passed actual staff review, public masking, exact restoration and
+both participants' notification viewing/read state. The live cycle exposed an
+omitted profile-notice allowlist; the [bounded correction](../audits/B20_PROFILE_NOTIFICATION_READ_STATE_2026-11-16.md)
+passed isolated PostgreSQL regressions, preserved live data/permissions and fixed
+both owner reads. Historical unused-cover files are preserved pending a
+retention decision; no cleanup is required to accept reporting. Phase B is not complete.
 
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
@@ -259,6 +265,12 @@ still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
   the characterization baseline. Topology, retirement authority, pause/deadline,
   rounding/treasury and governance choices remain explicit; no replacement
   Solidity, deployment or new financial parameters are approved by this proposal.
+  The [executable accounting model](../audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md)
+  checks 1,024 abstract states and 28,672 transitions plus replays for scoped
+  issuance, full refunds, failed-payment credits and per-deployment solvency.
+  Its six local tests pass; validated settlement/eligibility are input facts,
+  not payment or EVM proofs. No replacement contract or unresolved policy is
+  selected by this bounded preparation.
 - [ ] **C2 — Core rework.** Implement the frozen economics, deterministic lazy/creator/keeper finalization, default handling, and the Bible §3.1 refund obligations with bounded batches and withdrawable-credit fallback. No unbounded bidder loop.
 - [ ] **C3 — ArtworkNFT rework.** Implement the canonical 5.5% royalty, marketplace whitelist, provenance, and migration-safe interfaces.
 - [ ] **C4 — ArtSoulGenesis.** Build the dedicated soulbound contract and audited grant path. The numeric grant cadence is tunable operational policy, not canon or an immutable roadmap value. Grants require published categories, durable grant records, an audit log, and multisig-authorized administration.
