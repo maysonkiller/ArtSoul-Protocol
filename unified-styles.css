@@ -10330,4 +10330,9 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
     body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
         bottom: 56px !important;
     }
+    /* Override the earlier 175px-specific label rule: the type remains below
+       the playback row rather than colliding with the raised controls. */
+    body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-media-controls) :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+        bottom: 20px !important;
+    }
 }
