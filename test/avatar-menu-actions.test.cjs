@@ -22,6 +22,11 @@ test('compact header keeps copy adjacent to short, missing and long names withou
     const rules = css.slice(css.lastIndexOf('/* Owner layout review 2026-11-16:'));
     assert.match(rules, /\.avatar-info button\s*\{[\s\S]*?width: fit-content;[\s\S]*?max-width: 100%;/);
     assert.match(rules, /\.avatar-info:has\(\[data-avatar-address\]\[hidden\]\)[\s\S]*?justify-content: center;/);
+    const compact = rules.slice(rules.indexOf('/* Owner follow-up: shrink the actual desktop account plaque'));
+    assert.match(compact, /@media \(min-width: 769px\)/);
+    assert.match(compact, /\.avatar-plaque\s*\{[\s\S]*?width: max-content !important;/);
+    assert.match(compact, /\.avatar-dropdown-menu\s*\{[\s\S]*?width: 100% !important;/);
+    assert.match(compact, /\.avatar-info button:disabled\s*\{[\s\S]*?padding-right: 3px;/);
 
     const harness = createAvatarHarness();
     const structure = harness.dropdown.getStableStructure();
