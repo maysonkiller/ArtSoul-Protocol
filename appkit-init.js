@@ -683,14 +683,14 @@ async function getProviderForWallet(walletAddress) {
 }
 
 // Wallet methods that open an approval sheet in the wallet app. On the
-// external-mobile core path the wallet must be foregrounded for the user to see
+// external-mobile core path the user needs a way to open the wallet to see
 // and approve them; without a deep-link handoff the request sits on the relay
 // and the tab looks frozen ("nothing happens"). This is why a like/SIWE
 // personal_sign used to hang while placing a bid worked: a bid first switches
 // network, and only the network-switch path foregrounded the wallet. Route
-// every approval-requiring method through the same handoff so a signature that
-// needs no network switch (like, would-buy, watching, Edit Profile) reaches the
-// wallet too. Read-only methods (eth_accounts, eth_chainId) never handoff.
+// every approval-requiring method through the same explicit Open action so
+// signatures needing no switch (like, would-buy, watching, Edit Profile) reach
+// the wallet too. Read-only methods (eth_accounts, eth_chainId) never handoff.
 const CORE_WALLET_APPROVAL_METHODS = new Set([
     'personal_sign',
     'eth_sign',
@@ -1852,8 +1852,7 @@ function openCoreWalletForApproval(provider, method) {
 
 // ---------------------------------------------------------------------------
 // Mobile wallet approval prompt
-// While an external-mobile core approval request is in flight, the tab is
-// deep-linked to the wallet and back, which can feel like nothing happened.
+// An external-mobile core approval request can remain pending in the relay.
 // This non-blocking, static hint tells the user what to do and gives a one-tap
 // way to re-open the wallet. Mobile-only, NO animation (canon), theme colors via
 // var(--c-*) only. It never cancels the request; Hide dismisses only the hint.
@@ -1965,27 +1964,16 @@ function hideWalletApprovalPrompt() {
     walletDebugLog('wallet approval prompt hidden', {});
 }
 
-// Shared approval handoff for every core wallet method that pops a wallet sheet
-// (network switch/add AND signatures/transactions). Dispatches the request over
-// the relay and, if the tab is still foreground after a short grace period,
-// deep-links into the wallet AND shows the waiting hint so the user actually
-// sees the prompt. A fast approval settles before the grace period, so no hint
-// flashes.
+// Shared approval hint for network switches/additions and signatures/transactions.
+// Only the user's Open action deep-links to the wallet. An automatic timer can
+// leave iOS's native app-opening confirmation over an already completed request;
+// that browser-owned dialog cannot be dismissed by this page. Fast approvals
+// settle before the grace period, so no in-page hint flashes.
 async function requestCoreNetworkMethod(provider, request) {
     let settled = false;
     let promptShown = false;
-    let visitedWallet = document.visibilityState === 'hidden';
-    const rememberBackground = () => {
-        if (document.visibilityState === 'hidden') visitedWallet = true;
-    };
-    document.addEventListener('visibilitychange', rememberBackground);
     const handoffTimer = setTimeout(() => {
         if (settled) return;
-        // A timer paused in the background must not send the user away again
-        // when they return. The waiting hint retains its explicit Open action.
-        if (document.visibilityState === 'visible' && !visitedWallet) {
-            openCoreWalletForApproval(provider, request.method);
-        }
         promptShown = showWalletApprovalPrompt(provider, request.method) || promptShown;
     }, 350);
 
@@ -1994,7 +1982,6 @@ async function requestCoreNetworkMethod(provider, request) {
     } finally {
         settled = true;
         clearTimeout(handoffTimer);
-        document.removeEventListener('visibilitychange', rememberBackground);
         if (promptShown) hideWalletApprovalPrompt();
     }
 }

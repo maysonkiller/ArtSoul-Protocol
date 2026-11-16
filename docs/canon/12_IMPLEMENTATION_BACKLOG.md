@@ -206,7 +206,12 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   returning before MetaMask finishes; waiting in MetaMask succeeds. The
   [early-return investigation](../audits/B18_EARLY_WALLET_RETURN_2026-11-16.md)
   separates this unresolved operation failure from the confirmed delayed-wallet
-  handoff and incorrect HTTP 401 fallback defects. Physical acceptance stays open.
+  handoff and incorrect HTTP 401 fallback defects. After PR #492, the owner
+  confirmed the iPhone editor opened on the early-return test. Authentication
+  acceptance is recorded. The owner identified the remaining window as the
+  browser's native app-opening confirmation. The follow-up removes timed
+  navigation and keeps the existing explicit Open Wallet action. It does not
+  bypass browser confirmation or repeat accepted signatures.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.

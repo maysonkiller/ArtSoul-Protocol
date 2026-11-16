@@ -2,6 +2,49 @@
 
 Date: November 16, 2026
 
+## Owner acceptance after PR #492
+
+The owner repeated the requested early-return test on the iPhone after production
+deployment `dpl_5UaKVTs5UrYQtmgqYSEfPp6ByZnv` (merge
+`c84746d1b1715b8af7aa195d557e6a80c686c285`). The editor opened successfully.
+This is physical-device acceptance of the previously failing sign-in scenario;
+the earlier failure's exact provider/backend cause was not captured.
+
+The owner also reported an Open MetaMask window remaining until manually closed.
+They then identified the white browser confirmation asking to open this page in
+the MetaMask app, with Cancel and Open actions. It is neither ArtSoul's dark
+Waiting for your wallet hint nor the SDK connection dialog. Do not ask for
+another signature merely to repeat the accepted authentication result.
+
+## Native app-opening confirmation follow-up
+
+`openCoreWalletForApproval` navigates to the wallet's peer-advertised URL. A
+350ms timer invoked that navigation automatically while a wallet request was
+pending. The browser can keep its native confirmation visible even if the
+request meanwhile completes and the profile editor opens. Website DOM cleanup
+cannot dismiss that browser-owned dialog.
+
+The timer now only shows the existing non-blocking, themed waiting hint. Its
+explicit Open MetaMask button remains the handoff to the wallet and reuses the
+same pending request. Fast responses never show the hint; response/rejection
+removes it. This applies consistently to core signatures, transactions and
+network requests. Initial wallet connection and SDK session behavior are
+unchanged. Runtime imports advance to revision 57.
+
+The intentional UX tradeoff is one explicit Open action when an already connected
+mobile wallet needs attention, instead of an unsolicited timer navigation. A
+browser may still ask for confirmation after that deliberate click; no website
+code attempts to bypass or dismiss the browser's protection. See Apple's
+[custom URL scheme documentation](https://developer.apple.com/documentation/xcode/defining-a-custom-url-scheme-for-your-app)
+for the system-controlled app-launch mechanism. Attribution of the exact native
+dialog comes from the owner's description, not desktop emulation.
+
+Validation: 131 focused wallet, authentication, profile and runtime-loading tests
+pass. The handoff tests execute the real URL-opening function and verify zero
+timer-driven app launches, one launch from an explicit Open action, no duplicate
+wallet request and hint cleanup after success or rejection. The production build
+and independent review pass. These tests do not emulate iOS's native dialog.
+
 ## Current evidence
 
 After PR #491, the owner reproduced the profile sign-in failure repeatedly on
@@ -50,9 +93,9 @@ Also correct the demonstrated delayed handoff: a wallet-opening timer suspended
 while the browser is hidden must not automatically reopen the wallet when the
 user returns. The explicit Open Wallet action and the pending request remain.
 
-Physical iPhone acceptance stays open until the early-return scenario succeeds
-or a fresh support reference identifies its remaining failure. A desktop
-session opening the editor is not substitute evidence.
+At that investigation stage, physical iPhone acceptance still required either a
+successful early-return check or a fresh support reference identifying the
+remaining failure. A desktop editor opening was not substitute evidence.
 
 ## Implemented changes
 
@@ -79,4 +122,4 @@ account changes, hidden-page handoff, fallback routing and diagnostic redaction.
 Production build checks pass for all 11 HTML routes. Independent code review
 found and corrected a diagnostic getter-snapshot issue. No SDK upgrade, new
 dependency, remote telemetry, nonce-lifetime change or relay-recovery change was
-introduced. Physical acceptance remains distinct from these local checks.
+introduced. The subsequent owner acceptance is recorded above.

@@ -31,10 +31,10 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
         assert.match(read(page), /wallet-runtime-loader\.js/, `${page} must load the standard wallet flow`);
     }
-    assert.match(read('wallet-runtime-loader.js'), /appkit-init\.js\?v=56/, 'the loader must import the pinned appkit entry');
+    assert.match(read('wallet-runtime-loader.js'), /appkit-init\.js\?v=57/, 'the loader must import the pinned appkit entry');
     assert.match(appKit, /wallet-core-connect\.js\?v=20/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=20/);
-    assert.match(walletTest, /appkit-init\.js\?v=56/);
+    assert.match(walletTest, /appkit-init\.js\?v=57/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
@@ -484,11 +484,11 @@ test('mobile external metadata carries NO redirect: the user returns to the SAME
     assert.match(appKit, /redirect:\s*\{\s*\n\s*universal: appReturnUrl/);
 });
 
-test('core signatures and transactions foreground the wallet like a network switch', () => {
+test('core signatures and transactions offer the same explicit wallet handoff as network requests', () => {
     // A like/would-buy/watching/Edit-Profile action signs SIWE with no network
     // switch. On the external-mobile core path that request must reach the
-    // wallet the same way a switch does — through the deep-link handoff — or it
-    // hangs on the relay and the tab looks frozen ("nothing happens").
+    // wallet the same way a switch does. The shared pending hint offers an
+    // explicit Open action without an unsolicited native-browser prompt.
     const approvalSet = appKit.match(/const CORE_WALLET_APPROVAL_METHODS = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
     assert.ok(approvalSet, 'CORE_WALLET_APPROVAL_METHODS must exist');
     for (const method of ['personal_sign', 'eth_signtypeddata_v4', 'eth_sendtransaction', 'wallet_switchethereumchain']) {
@@ -512,13 +512,14 @@ test('a non-blocking waiting hint shows while a mobile approval is in flight', (
     assert.match(appKit, /function hideWalletApprovalPrompt\(\)/);
     // Mobile-only: never renders on desktop / injected in-app browsers.
     assert.match(appKit, /if \(!isMobileDevice\(\) \|\| isInjectedWalletBrowser\(\)\) return false;/);
-    // requestCoreNetworkMethod shows on the same grace timer as the handoff and
-    // always hides in the finally, but only if it actually showed (balanced).
+    // The grace timer shows the in-page hint without opening a native browser
+    // dialog. Finally hides it only if it actually showed (balanced).
     const handoff = appKit.match(/async function requestCoreNetworkMethod\(provider, request\) \{[\s\S]*?\n\}/)?.[0] || '';
     assert.ok(handoff, 'requestCoreNetworkMethod must exist');
     assert.match(handoff, /promptShown = showWalletApprovalPrompt\(provider, request\.method\) \|\| promptShown;/);
     assert.match(handoff, /if \(promptShown\) hideWalletApprovalPrompt\(\);/);
-    // The Open button re-triggers the wallet handoff.
+    assert.doesNotMatch(handoff, /openCoreWalletForApproval|location\.assign/);
+    // Only the explicit Open button triggers the wallet handoff.
     assert.match(appKit, /walletApprovalReopenHandler = \(\) => openCoreWalletForApproval\(provider, method\);/);
     // Canon: colors via theme variables, and no animation on the mobile hint.
     const promptBuilder = appKit.match(/function buildWalletApprovalPrompt\(\) \{[\s\S]*?\n\}/)?.[0] || '';
