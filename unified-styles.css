@@ -9525,7 +9525,10 @@ body:is(.classic, .future) .site-header #navButtons .avatar-button:focus-visible
     outline: 1px solid var(--c-accent);
     outline-offset: -1px;
 }
-body:is(.classic, .future) .site-header #navButtons .avatar-info button:not(:disabled)::after {
+/* Keep the copy glyph in its reserved slot during the native disabled
+   phase of the clipboard operation. Its presence follows the copy value,
+   not the temporary disabled state. */
+body:is(.classic, .future) .site-header #navButtons .avatar-info button[data-copy-value]:not([data-copy-value=""])::after {
     content: '';
     position: absolute;
     right: 4px;
@@ -10359,8 +10362,11 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
         width: max-content !important;
         max-width: 120px !important;
     }
-    /* The Guest label has no active copy icon: do not reserve its space. */
-    body:is(.classic, .future) .site-header #navButtons .avatar-info button:disabled {
+    /* Only guest/unresolved labels without a copy target omit icon space.
+       Clipboard calls temporarily disable real copy buttons: don't shrink
+       their content width or move the neighbouring header action icons. */
+    body:is(.classic, .future) .site-header #navButtons .avatar-info button:disabled:not([data-copy-value]),
+    body:is(.classic, .future) .site-header #navButtons .avatar-info button:disabled[data-copy-value=""] {
         padding-right: 3px;
     }
     body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-menu {
