@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import test from 'node:test';
 import { allowMethods, normalizeWallet, sendError, supabaseRest } from '../src/api/backend.js';
-import { PUBLIC_PROFILE_FIELDS, publicProfile } from '../src/api/profile-fields.js';
+import { PUBLIC_PROFILE_SOURCE, PUBLIC_PROFILE_SELECT, publicProfile } from '../src/api/profile-fields.js';
 import { readVisibleArtworkCards } from '../src/api/routes/public/artworks.js';
 import { readWithNftOwnershipResponse } from '../src/api/nft-ownership.js';
 
@@ -13,8 +13,8 @@ const env={SUPABASE_URL:'https://search.example.test',SUPABASE_SERVICE_ROLE_KEY:
 const source=fs.readFileSync('src/api/routes/public/search.js','utf8').replace(/^import .*;\r?$/gm,'')
   .replace('export default async function searchHandler','return async function searchHandler');
 function handler(hydrate){return new Function('createHash','allowMethods','normalizeWallet','sendError','supabaseRest',
-  'PUBLIC_PROFILE_FIELDS','publicProfile','readVisibleArtworkCards','readWithNftOwnershipResponse',source)(createHash,allowMethods,normalizeWallet,sendError,supabaseRest,
-    PUBLIC_PROFILE_FIELDS,publicProfile,hydrate,readWithNftOwnershipResponse);}
+  'PUBLIC_PROFILE_SOURCE','PUBLIC_PROFILE_SELECT','publicProfile','readVisibleArtworkCards','readWithNftOwnershipResponse',source)(createHash,allowMethods,normalizeWallet,sendError,supabaseRest,
+    PUBLIC_PROFILE_SOURCE,PUBLIC_PROFILE_SELECT,publicProfile,hydrate,readWithNftOwnershipResponse);}
 function response(){return{statusCode:200,headers:{},body:null,setHeader(k,v){this.headers[k]=v;},status(v){this.statusCode=v;return this;},json(v){this.body=v;return this;},end(){}};}
 const json=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
 function card(id,extra={}){return{artwork_id:id,chain_id:84532,title:'Public title',status:'auction',auction_end_time:'2099-01-01T00:00:00Z',...extra};}
@@ -48,7 +48,7 @@ test('global search API bounds queries, groups and public data',async t=>{
         const body=JSON.parse(options.body);assert.equal(body.p_limit,6);assert.equal(body.p_query,'Art work');assert.equal(body.p_core_address,CORE);
         return json((body.p_category==='artists'?[B,A]:['9','8','7','6','5','4']).map(result_key=>({result_key})));
       }
-      assert.ok(parsed.pathname.endsWith('/profiles'));
+      assert.ok(parsed.pathname.endsWith('/public_profile_content'));
       assert.ok(!parsed.searchParams.get('select').includes('email'));
       return json([{wallet_address:A,username:'Alice',twitter_id:'private-provider-id',discord_id:'12345678',email:'private@example.test',role:'admin'},
         {wallet_address:B,username:'Богдан',avatar_url:'https://media.test/avatar.png'}]);
@@ -107,7 +107,7 @@ test('batch projection uses one lifecycle RPC and public serializer, with final 
   globalThis.fetch=async(url,options)=>{
     const parsed=new URL(url);calls.push(parsed.pathname);
     if(parsed.pathname.endsWith('/rpc/read_public_search_cards')){assert.deepEqual(JSON.parse(options.body),{p_artwork_ids:['2','1'],p_core_address:CORE});return json(data);}
-    if(parsed.pathname.endsWith('/profiles'))return profileFails?new Response('failure',{status:503}):json([{wallet_address:A,username:'Alice'}]);
+    if(parsed.pathname.endsWith('/public_profile_content'))return profileFails?new Response('failure',{status:503}):json([{wallet_address:A,username:'Alice'}]);
     if(parsed.pathname.endsWith('/artwork_moderation_visibility'))return json(hidden);
     if(parsed.pathname.endsWith('/v41_artworks'))return json(existing);
     throw new Error('Unexpected metadata or other fetch: '+parsed.pathname);

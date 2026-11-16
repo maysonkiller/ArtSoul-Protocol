@@ -94,7 +94,7 @@ function restRows(pathname) {
   if (pathname === 'artsoul_staff_roles') {
     return activeRole ? [{ role: activeRole }] : [];
   }
-  if (pathname === 'profiles') {
+  if (pathname === 'profiles' || pathname === 'public_profile_content') {
     return [{
       wallet_address: staffWallet,
       twitter_id: 'x-id',

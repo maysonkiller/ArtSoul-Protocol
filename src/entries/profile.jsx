@@ -1,4 +1,5 @@
 import { ProfileEditDialog } from '../features/profile/profile-edit-dialog.jsx';
+import { ProfileContentReport } from '../features/moderation/profile-content-report.jsx';
 import { ContextHelp } from '../ui/context-help.jsx';
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { decodeAvatar } from '../features/artwork/decoded-image.js';
@@ -142,6 +143,10 @@ const { useState, useEffect, useRef } = React;
             const [theme, setTheme] = useState(() => window.ThemeSync?.getTheme() || 'classic');
             const [profile, setProfile] = useState(null);
             const [profileDraft, setProfileDraft] = useState(null);
+            const [profileEditLoading, setProfileEditLoading] = useState(false);
+            const [profileEditError, setProfileEditError] = useState('');
+            const [profileReportingEnabled, setProfileReportingEnabled] = useState(false);
+            const [profileReportOpen, setProfileReportOpen] = useState(false);
             const [profileLoadError, setProfileLoadError] = useState(null);
             const [editMode, setEditMode] = useState(false);
             const [selectedGallery, setSelectedGallery] = useState('created');
@@ -164,6 +169,8 @@ const { useState, useEffect, useRef } = React;
             const profileSignalRef = useRef({ address: null, chainId: null, initialized: false });
             const profileRequestRef = useRef(0);
             const profileEditRef = useRef(0);
+            const profileEditRequestRef = useRef(null);
+            const profileEditWalletRef = useRef('');
             const loadedProfileAddressRef = useRef(null);
             const loadingProfileAddressRef = useRef(null);
             const artworksRequestRef = useRef(0);
@@ -203,12 +210,32 @@ const { useState, useEffect, useRef } = React;
                 let active = true;
                 Promise.resolve(window.ArtSoulPublicConfig?.load?.())
                     .then(config => {
-                        if (active) setEmailVerificationEnabled(config?.emailVerificationEnabled === true);
+                        if (active) {
+                            setEmailVerificationEnabled(config?.emailVerificationEnabled === true);
+                            setProfileReportingEnabled(config?.profileReportingEnabled === true);
+                        }
                     })
                     .catch(() => {
                         if (active) setEmailVerificationEnabled(false);
                     });
                 return () => { active = false; };
+            }, []);
+
+            useEffect(() => {
+                const cancelChangedWalletEdit = () => {
+                    const owner = profileEditWalletRef.current;
+                    const authenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
+                    if (owner && (owner !== getActiveWalletAddress().toLowerCase() ||
+                        (!profileEditRequestRef.current && owner !== authenticated))) cancelProfileEdit();
+                };
+                window.addEventListener('artsoul:wallet-state-changed', cancelChangedWalletEdit);
+                window.addEventListener('artsoul:auth-state-changed', cancelChangedWalletEdit);
+                return () => {
+                    window.removeEventListener('artsoul:wallet-state-changed', cancelChangedWalletEdit);
+                    window.removeEventListener('artsoul:auth-state-changed', cancelChangedWalletEdit);
+                    profileEditRef.current++;
+                    profileEditRequestRef.current?.abort();
+                };
             }, []);
 
             // Load profile and keep it aligned with late wallet/network state.
@@ -1006,7 +1033,7 @@ const { useState, useEffect, useRef } = React;
                         setIsOwnProfile(isOwn);
                     }
                     if (addressChanged || !profileResult.value) {
-                        setEditMode(Boolean(isOwn === true && !profileResult.value));
+                        setEditMode(false);
                     }
                     setLoading(false);
 
@@ -1203,15 +1230,49 @@ const { useState, useEffect, useRef } = React;
                 return () => window.removeEventListener('hashchange', showEmailConfirmation);
             }, [emailVerificationEnabled, isOwnProfile, walletStateSettled, connectedWalletAddress, profile?.wallet_address]);
 
-            function startProfileEdit() {
-                if (!profile) return;
-                profileEditRef.current++;
-                setProfileDraft({ ...profile });
-                setEditMode(true);
+            async function startProfileEdit() {
+                const wallet = getActiveWalletAddress().toLowerCase();
+                if (!profile || !isOwnProfile || !/^0x[0-9a-f]{40}$/.test(wallet) ||
+                    profile.wallet_address?.toLowerCase() !== wallet || profileEditRequestRef.current) return;
+                const editId = ++profileEditRef.current;
+                const requestId = profileRequestRef.current;
+                const controller = new AbortController();
+                profileEditRequestRef.current = controller;
+                profileEditWalletRef.current = wallet;
+                const current = () => !controller.signal.aborted && editId === profileEditRef.current &&
+                    requestId === profileRequestRef.current && getActiveWalletAddress().toLowerCase() === wallet;
+                setProfileEditLoading(true);
+                setProfileEditError('');
+                try {
+                    if (!await window.ensureAuthenticated?.()) throw new Error('Verify your wallet to edit your profile.');
+                    if (!current()) return;
+                    const sessionMatches = () => String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase() === wallet;
+                    if (!sessionMatches()) throw new Error('Your sign-in wallet changed. Please try again.');
+                    const response = await fetch('/api/profile', { credentials: 'include', cache: 'no-store', signal: controller.signal,
+                        headers: { 'X-ArtSoul-Wallet': wallet } });
+                    const result = await response.json().catch(() => ({}));
+                    if (!current() || !sessionMatches()) return;
+                    if (!response.ok || !result.success) throw new Error(result.message || result.error || 'Your profile could not be opened for editing.');
+                    if (result.profile && result.profile.wallet_address?.toLowerCase() !== wallet) throw new Error('The profile wallet could not be confirmed.');
+                    // Private originals belong only in the editor, never in the public summary.
+                    setProfileDraft(result.profile || { wallet_address: wallet, username: '', bio: '', avatar_url: '' });
+                    setEditMode(true);
+                } catch (error) {
+                    if (current()) setProfileEditError(error.message || 'Your profile could not be opened for editing.');
+                } finally {
+                    if (profileEditRequestRef.current === controller) {
+                        profileEditRequestRef.current = null;
+                        setProfileEditLoading(false);
+                    }
+                }
             }
 
             function cancelProfileEdit() {
                 profileEditRef.current++;
+                profileEditRequestRef.current?.abort();
+                profileEditRequestRef.current = null;
+                profileEditWalletRef.current = '';
+                setProfileEditLoading(false);
                 setProfileDraft(null);
                 setEditMode(false);
             }
@@ -1727,11 +1788,14 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                                 {isOwnProfile && (
                                                     <div className="profile-inline-edit-action">
-                                                        <button onClick={startProfileEdit} className="btn-main">
-                                                            Edit Profile
+                                                        <button onClick={startProfileEdit} className="btn-main" disabled={profileEditLoading}>
+                                                            {profileEditLoading ? 'Opening editor…' : 'Edit Profile'}
                                                         </button>
                                                         <ProfileAdminShortcut walletAddress={connectedWalletAddress} />
                                                     </div>
+                                                )}
+                                                {!isOwnProfile && profileReportingEnabled && profile?.wallet_address && (
+                                                    <div className="profile-inline-edit-action"><button type="button" className="btn-secondary" onClick={() => setProfileReportOpen(true)}>Report profile</button></div>
                                                 )}
                                             </div>
                                             </div>
@@ -1770,6 +1834,8 @@ const { useState, useEffect, useRef } = React;
 
 
 
+                                    {profile?.profile_content_hidden && <p className="profile-oauth-notice mt-4" role="status">Profile content is hidden pending review. Wallet identity and artwork ownership are unchanged.</p>}
+                                    {profileEditError && <p className="profile-oauth-notice is-error mt-4" role="alert">{profileEditError}</p>}
                                     {profileLoadError && (
                                         <div className="profile-oauth-notice is-error mt-4" role="alert">
                                             {profileLoadError}{' '}
@@ -1790,6 +1856,7 @@ const { useState, useEffect, useRef } = React;
                             </div>
                         </div>
 
+                        {profileReportOpen && profileReportingEnabled && profile?.wallet_address && <ProfileContentReport key={profile.wallet_address} profileWallet={profile.wallet_address} onClose={() => setProfileReportOpen(false)} />}
                         {editMode && <ProfileEditDialog onCancel={cancelProfileEdit}>
                             <div className="profile-edit-layout">
                                 {renderAvatar(true)}

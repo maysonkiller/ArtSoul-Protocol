@@ -52,6 +52,22 @@ function harness(response=access()) {
     h.render();return h;
 }
 
+test('profile review actions retain target identity and refresh a changed-content conflict without losing staff access', async () => {
+    const h = harness(); await tick(); h.render();
+    h.actions.setDecision({ action: 'hide', report: { id: 'profile-report', target_type: 'profile_content', profile_wallet: OTHER, updated_at: '2026-11-09T10:00:00Z' } }); h.render();
+    let submitted;
+    h.state.api = async (path, options) => {
+        if (path === 'review-action') { submitted = JSON.parse(options.body); throw Object.assign(new Error('The profile content has changed.'), {code:'PROFILE_CONTENT_CHANGED',status:409}); }
+        return {data:secret()};
+    };
+    await h.actions.submitDecision('Verified impersonation concern');
+    assert.deepEqual(submitted, {report_id:'profile-report',target_type:'profile_content',expected_updated_at:'2026-11-09T10:00:00Z',action:'hide',reason:'Verified impersonation concern'});
+    assert.equal(h.render().accessState,'ready'); assert.equal(h.render().decision,null);
+    assert.match(h.render().message,/profile content has changed/);
+    assert.ok(h.state.calls.at(-1).path.startsWith('review-queue'));
+    h.unmount();
+});
+
 test('setup remains available with queue off and opens only the local verification dialog', async()=>{
     const h=harness(access({enabled:false,access:{role:'admin',stepUpActive:false}}));await tick();
     const view=h.render();assert.equal(view.setupAllowed,true);assert.equal(view.passkeyOpen,true);assert.equal(view.accessState,'setup');

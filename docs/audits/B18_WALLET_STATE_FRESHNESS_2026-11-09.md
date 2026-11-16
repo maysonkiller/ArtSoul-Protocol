@@ -43,8 +43,8 @@ owner confirmed connection in the extension. The website's bounded request
 had already failed. After reload, the website remained a guest, while the
 standard picker marked Phantom CONNECTED. Selecting it displayed "This
 account is already linked" instead of completing the website session.
-This is an observed SDK/application state mismatch, not successful Phantom
-disconnect/reconnect acceptance. Capture:
+This was the SDK/application state mismatch observed before the correction.
+The later native acceptance is recorded below. Capture:
 `output/b18-phantom-late-linked-2026-11-09.png`.
 
 Extension internals were not read or operated after the browser policy rejected
@@ -76,7 +76,30 @@ Seven new explicit-retry scenarios cover the late approval with and without
 reload, cancellation, rejected/no-op cleanup, duplicate/newer intent and a timed
 out teardown. The explicit-disconnect/mobile recovery/lifecycle runs pass 87
 tests. The production build and its 11-route/shared-avatar and Tailwind checks
-pass. Full-suite and deployment evidence is recorded below when available.
+pass.
 
-Release and native Phantom acceptance remain to be recorded after the complete
-fix passes review. This evidence does not declare Phase B or public beta closed.
+[PR #483](https://github.com/maysonkiller/ArtSoul-Protocol/pull/483) merged to
+main at `8f409d143444cc5067abd914c0621219eea6915b`.
+[CI run 42698582419](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/42698582419)
+passed: Linux 4,254 tests with 2 skips; Windows 3,554 tests with 35 skips;
+55 Hardhat tests and the production build checks passed. Production deployment
+`dpl_9n2m4pA6HUkoMjUDtACYRbjQjhTp` is READY at
+[the verified deployment](https://artsoul-hxze4921a-maysonkiller-be9112b5.vercel.app).
+
+## Native production acceptance
+
+On production artwork 14 with `walletdebug=1`, explicit Phantom selection and
+the owner's extension confirmation connected
+`0x974a5ace66095d2ac7e7f3e2e66b481efc7df06e`. Disconnect changed the page to
+ArtSoul Guest, and a reload retained the guest state.
+
+The reopened picker showed Phantom as installed without a CONNECTED marker.
+Selecting installed Rabby then produced a native accessibility state showing
+Rabby connected at `0x5e3167636c5eb7fe143a3c9f40ea2bf1d6888383`, with Ethereum
+Mainnet as the wallet-selected network. The existing artwork's highest-bidder
+action remained disabled. No additional transaction or signature was made
+during this acceptance check.
+
+Native Phantom disconnect followed by another wallet: **PASS**. iPhone
+composition remains **UNVERIFIED**. This evidence does not declare Phase B or
+public beta closed.

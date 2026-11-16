@@ -8,7 +8,7 @@ import {
   setOAuthState,
   supabaseRest
 } from '../backend.js';
-import { publicProfile } from '../profile-fields.js';
+import { publicProfile, PUBLIC_PROFILE_SOURCE, PUBLIC_PROFILE_SELECT } from '../profile-fields.js';
 
 const PROVIDERS = new Set(['discord', 'twitter']);
 
@@ -282,10 +282,14 @@ export function createOAuthCallbackHandler(provider) {
 }
 
 export async function oauthUnlinkHandler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (!allowMethods(req, res, ['POST'])) return;
 
   try {
     const wallet = requireWallet(req);
+    if (typeof req.headers?.['x-artsoul-wallet'] !== 'string' || req.headers['x-artsoul-wallet'].toLowerCase() !== wallet) {
+      return res.status(401).json({ error: 'SESSION_WALLET_MISMATCH', message: 'Verify the wallet for this profile before removing a linked account.' });
+    }
     const body = await readJson(req);
     const provider = String(body.provider || '').toLowerCase();
     if (!PROVIDERS.has(provider)) {
@@ -295,12 +299,13 @@ export async function oauthUnlinkHandler(req, res) {
     const updates = provider === 'discord'
       ? { discord_id: null, discord_username: null }
       : { twitter_id: null, twitter_username: null };
-    const rows = await supabaseRest(`profiles?wallet_address=eq.${encodeURIComponent(wallet)}`, {
+    await supabaseRest(`profiles?wallet_address=eq.${encodeURIComponent(wallet)}`, {
       method: 'PATCH',
-      headers: { Prefer: 'return=representation' },
+      headers: { Prefer: 'return=minimal' },
       body: { ...updates, updated_at: new Date().toISOString() }
     });
-    res.status(200).json({ success: true, profile: publicProfile(rows?.[0] || { wallet_address: wallet, ...updates }) });
+    const rows = await supabaseRest(`${PUBLIC_PROFILE_SOURCE}?wallet_address=eq.${encodeURIComponent(wallet)}&select=${PUBLIC_PROFILE_SELECT}&limit=1`);
+    res.status(200).json({ success: true, profile: publicProfile(rows?.[0]) });
   } catch (error) {
     const status = error.statusCode || 500;
     res.status(status).json({

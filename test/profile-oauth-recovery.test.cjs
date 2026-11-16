@@ -9,7 +9,7 @@ const load = source.slice(source.indexOf('async function loadProfile('), source.
 const save = source.slice(source.indexOf('async function saveProfile()'), source.indexOf('function handleQuickUpload()'));
 const unlinkStart = source.indexOf('async function handleSocialDisconnect(');
 const unlink = source.slice(unlinkStart, source.indexOf('useEffect(() => {', unlinkStart));
-const editStart = source.indexOf('function startProfileEdit()');
+const editStart = source.indexOf('async function startProfileEdit()');
 const editing = editStart < 0 ? '' : source.slice(editStart, source.indexOf('async function handleAvatarUpload('));
 const avatar = source.slice(source.indexOf('async function handleAvatarUpload('), source.indexOf('async function saveProfile()'));
 const OWNER = '0x1111111111111111111111111111111111111111';
@@ -18,7 +18,7 @@ const stored = (extra = {}) => ({ id: 'profile-row', wallet_address: OWNER, user
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 function harness({ active = '', hint = OWNER, view = '', result = { success: true, provider: 'discord' }, profile = stored() } = {}) {
-  const state = { active, profile, draft: null, notices: [], alerts: [], reads: [], writes: [], timers: [], invalidated: [], authenticated: 0, headerRefreshes: [] };
+  const state = { active, profile, draft: null, notices: [], alerts: [], reads: [], privateReads: [], writes: [], timers: [], invalidated: [], authenticated: 0, headerRefreshes: [] };
   const db = {
     getProfile: async address => { state.reads.push(address); return state.cached; },
     invalidateProfileCache(address) { state.invalidated.push(address); state.cached = state.freshProfile; },
@@ -28,13 +28,24 @@ function harness({ active = '', hint = OWNER, view = '', result = { success: tru
   state.cached = profile;
   state.freshProfile = stored({ discord_connected: true, twitter_connected: true });
   const scope = {
-    console: { error() {}, warn() {} }, FIRST_GALLERY_PAGE: 24,
+    console: { error() {}, warn() {} }, FIRST_GALLERY_PAGE: 24, AbortController,
     window: {
       artsoulWalletStateSettled: false, ArtSoulDB: db, AvatarDropdown: { refresh: async address => state.headerRefreshes.push(address) },
       getCurrentWalletAddress: () => state.active,
+      SupabaseAuth: { getAuthenticatedWallet: () => state.active },
       async ensureAuthenticated() { state.authenticated++; return true; }
     },
+    fetch: async (url, options) => {
+      state.privateReads.push({ url, options });
+      assert.equal(url, '/api/profile');
+      assert.equal(options.credentials, 'include');
+      assert.equal(options.cache, 'no-store');
+      assert.equal(options.headers['X-ArtSoul-Wallet'], state.active.toLowerCase());
+      return { ok: true, json: async () => ({ success: true, profile: state.profile || stored() }) };
+    },
     selectedGallery: 'created', selectedGalleryRef: { current: 'created' }, profile, profileDraft: null, profileEditRef: { current: 0 },
+    profileEditRequestRef: { current: null }, profileEditWalletRef: { current: '' },
+    isOwnProfile: Boolean(active && active === profile?.wallet_address),
     profileRequestRef: { current: 0 }, artworksRequestRef: { current: 0 },
     loadedProfileAddressRef: { current: profile?.wallet_address || null },
     loadingProfileAddressRef: { current: null }, galleryCacheRef: { current: new Map() },
@@ -55,7 +66,9 @@ function harness({ active = '', hint = OWNER, view = '', result = { success: tru
     setOAuthNotice: value => state.notices.push(value), alert: value => state.alerts.push(value),
     setTimeout: fn => state.timers.push(fn),
     setEditMode: value => { state.editing = value; },
-    setIsOwnProfile: value => { state.own = value; },
+    setProfileEditLoading: value => { state.editLoading = value; },
+    setProfileEditError: value => { state.editError = value; },
+    setIsOwnProfile: value => { state.own = value; scope.isOwnProfile = value; },
     setLoading: value => { state.loading = value; },
     setArtworksLoading: value => { state.artworksLoading = value; }, setSelectedGallery() {},
     setDisplayedGallery: value => { state.gallery = value; },
@@ -184,7 +197,7 @@ test('an old unlink response cannot replace a newly selected profile', async () 
 
 test('cancel discards edited fields while retaining the canonical disconnect response', async () => {
   const h = harness({ active: OWNER, profile: stored({ discord_connected: true }) });
-  h.startProfileEdit();
+  await h.startProfileEdit();
   h.scope.setProfileDraft({ ...h.state.draft, username: 'Unsaved name', bio: 'Unsaved biography' });
   await h.handleSocialDisconnect('discord');
   h.cancelProfileEdit();
@@ -197,7 +210,7 @@ test('cancel discards edited fields while retaining the canonical disconnect res
 
 test('a completed avatar upload preserves newer typed draft fields without editing canonical data', async () => {
   const h = harness({ active: OWNER });
-  h.startProfileEdit();
+  await h.startProfileEdit();
   h.db.uploadFile = async () => {
     h.scope.setProfileDraft({ ...h.state.draft, username: 'Typed during upload' });
     return '/uploaded-avatar.png';
@@ -210,7 +223,7 @@ test('a completed avatar upload preserves newer typed draft fields without editi
 
 test('an avatar upload completing after cancel cannot restore the discarded draft', async () => {
   const h = harness({ active: OWNER });
-  h.startProfileEdit();
+  await h.startProfileEdit();
   h.db.uploadFile = async () => { h.cancelProfileEdit(); return '/uploaded-avatar.png'; };
   await h.handleAvatarUpload({ target: { files: [{ name: 'avatar.png', type: 'image/png', size: 1024 }] } });
   assert.equal(h.state.draft, null);
@@ -219,7 +232,7 @@ test('an avatar upload completing after cancel cannot restore the discarded draf
 
 test('an avatar upload remains owned by the edit session when the same wallet unlinks a provider', async () => {
   const h = harness({ active: OWNER });
-  h.startProfileEdit();
+  await h.startProfileEdit();
   let resolveUpload;
   h.db.uploadFile = () => new Promise(resolve => { resolveUpload = resolve; });
   const upload = h.handleAvatarUpload({ target: { files: [{ name: 'avatar.png', type: 'image/png', size: 1024 }] } });
@@ -237,7 +250,7 @@ test('an avatar upload remains owned by the edit session when the same wallet un
 
 test('an avatar upload cannot complete into a different active wallet', async () => {
   const h = harness({ active: OWNER });
-  h.startProfileEdit();
+  await h.startProfileEdit();
   let resolveUpload;
   h.db.uploadFile = () => new Promise(resolve => { resolveUpload = resolve; });
   const upload = h.handleAvatarUpload({ target: { files: [{ name: 'avatar.png', type: 'image/png', size: 1024 }] } });
@@ -264,7 +277,7 @@ test('a failed initial profile read cannot become a new blank editable profile',
 
 test('a failed profile refresh preserves the previously confirmed identity and draft', async () => {
   const h = harness({ active: OWNER });
-  h.startProfileEdit();
+  await h.startProfileEdit();
   h.scope.setProfileDraft({ ...h.state.draft, username: 'Unsaved name' });
   h.db.getProfile = async () => { throw new Error('Network unavailable'); };
   await h.loadProfile(OWNER, { force: true });
@@ -281,7 +294,7 @@ test('unlink during the initial gallery read preserves the draft and settles the
   h.scope.fetchProfileArtworks = (_profile, gallery) => new Promise(resolve => feeds.push({ gallery, resolve }));
   const initial = h.loadProfile(OWNER);
   await tick();
-  h.startProfileEdit();
+  await h.startProfileEdit();
   h.scope.setProfileDraft({ ...h.state.draft, username: 'Unsaved draft' });
   h.scope.selectedGalleryRef.current = 'sold';
   const unlink = h.handleSocialDisconnect('discord');

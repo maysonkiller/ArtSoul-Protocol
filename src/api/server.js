@@ -14,7 +14,7 @@ import session from 'express-session';
 import rateLimit from 'express-rate-limit';
 import { resolveIndexerChainConfigs } from '../indexer/chain-config.js';
 import { validateSiweMessage } from './backend.js';
-import { cleanProfile, publicProfile } from './profile-fields.js';
+import { cleanProfile, publicProfile, PUBLIC_PROFILE_FIELDS, PUBLIC_PROFILE_SOURCE, PUBLIC_PROFILE_SELECT } from './profile-fields.js';
 
 dotenv.config();
 
@@ -328,13 +328,30 @@ function cleanProfilePayload(body = {}) {
     return cleanProfile(body);
 }
 
+app.get('/api/profile', authenticateWallet, async (req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    const wallet = normalizeWalletAddress(req.session.wallet);
+    if (!wallet || typeof req.headers['x-artsoul-wallet'] !== 'string' || req.headers['x-artsoul-wallet'].toLowerCase() !== wallet) {
+        return res.status(401).json({ error: 'SESSION_WALLET_MISMATCH' });
+    }
+    try {
+        const rows = await database.query(
+            `SELECT ${[...PUBLIC_PROFILE_FIELDS, 'twitter_id', 'discord_id'].join(',')} FROM profiles WHERE wallet_address = $1 LIMIT 1`, [wallet]
+        );
+        res.json({ success: true, profile: publicProfile(rows?.[0]) });
+    } catch {
+        res.status(500).json({ error: 'PROFILE_READ_FAILED' });
+    }
+});
+
 app.put('/api/profile', authenticateWallet, async (req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
     try {
         const wallet = normalizeWalletAddress(req.session.wallet);
         const profile = cleanProfilePayload(req.body);
 
-        if (!wallet) {
-            return res.status(401).json({ error: 'UNAUTHENTICATED' });
+        if (!wallet || typeof req.headers['x-artsoul-wallet'] !== 'string' || req.headers['x-artsoul-wallet'].toLowerCase() !== wallet) {
+            return res.status(401).json({ error: 'SESSION_WALLET_MISMATCH' });
         }
 
         if (profile.username) {
@@ -352,15 +369,16 @@ app.put('/api/profile', authenticateWallet, async (req, res) => {
         // Partial edits must preserve omitted fields, including OAuth identity.
         const fields = Object.keys(profile);
         const columns = ['wallet_address', ...fields];
-        const rows = await database.query(
+        await database.query(
             `INSERT INTO profiles (${columns.join(',')}, updated_at)
              VALUES (${columns.map((_, index) => `$${index + 1}`).join(',')}, now())
              ON CONFLICT (wallet_address) DO UPDATE SET
-             ${[...fields.map(field => `${field} = EXCLUDED.${field}`), 'updated_at = now()'].join(',')}
-             RETURNING *`,
+             ${[...fields.map(field => `${field} = EXCLUDED.${field}`), 'updated_at = now()'].join(',')}`,
             [wallet, ...fields.map(field => profile[field])]
         );
 
+        const rows = await database.query(`SELECT ${PUBLIC_PROFILE_SELECT} FROM ${PUBLIC_PROFILE_SOURCE} WHERE wallet_address = $1 LIMIT 1`, [wallet]);
+        if (!rows?.[0]) throw new Error('Saved profile could not be read');
         res.json({ success: true, profile: publicProfile(rows[0]) });
     } catch (error) {
         console.error('[ProfileAPI] Profile upsert failed:', error);

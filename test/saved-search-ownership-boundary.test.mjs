@@ -46,7 +46,7 @@ function fixture() {
       block_number: 20, log_index: 4, transaction_hash: hash(20) })),
     v41_auctions: [], v41_bids: [], v41_floor_history: [], v41_resale_listings: [], v41_resale_history: [],
     v41_trust_signals: [], artwork_social_signals: [], artwork_moderation_visibility: [],
-    profiles: [CREATOR, FIRST, OWNER, NEXT_OWNER, LAST_OWNER].map(wallet_address => ({ wallet_address,
+    public_profile_content: [CREATOR, FIRST, OWNER, NEXT_OWNER, LAST_OWNER].map(wallet_address => ({ wallet_address,
       username: 'Publication 0', twitter_id: 'private-provider-id', email: 'private@example.test' }))
   };
   f.owners = IDS.map(artwork_id => ({ artwork_id, token_id: artwork_id, verified: true,
@@ -60,7 +60,7 @@ function fixture() {
       owner.current_owner_address = f.publications === 1 ? NEXT_OWNER : LAST_OWNER;
       owner.latest_transfer = transfer(owner.current_owner_address, height);
     }
-    for (const profile of f.rows.profiles) profile.username = `Publication ${f.publications}`;
+    for (const profile of f.rows.public_profile_content) profile.username = `Publication ${f.publications}`;
   };
   f.mutateOwner = id => {
     const owner = f.owners.find(row => row.artwork_id === id);
@@ -107,7 +107,7 @@ function fixture() {
       }
       const encoded = JSON.stringify(result);
       if (name === 'rpc/read_verified_nft_cards') await f.afterProof?.(body.p_artwork_ids);
-      if (name === 'profiles' && url.searchParams.get('select')?.includes('twitter_id')) {
+      if (name === 'public_profile_content' && url.searchParams.get('select')?.includes('twitter_id')) {
         f.artistReads++;
         // All other fixture reads resolve immediately. Hold this outer response
         // dependency for a turn so card hydration finishes before publication.

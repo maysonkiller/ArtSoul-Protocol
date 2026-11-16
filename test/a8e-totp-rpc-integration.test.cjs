@@ -72,13 +72,39 @@ test('A8e TOTP persistence uses actual PostgreSQL transactions', {skip:available
     sql(`UPDATE artsoul_staff_totp_factors SET last_consumed_step=last_consumed_step-1 WHERE id='${factor.id}'`);
     return factor;
   }
-  async function holdWrite(query,name,seconds=1) {
-    const finished=parallel(`SET application_name='${name}'; BEGIN; ${query}; SELECT pg_sleep(${seconds}); COMMIT;`);
-    for(let i=0;i<40;i++) {
-      if(sql(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name='${name}' AND wait_event='PgSleep')`)==='t')return {finished};
-      await delay(20);
+  async function completeWhileWriteHeld(query,name,completion,beforeCommit='') {
+    // Keep the transaction open until the competing RPC demonstrably waits for
+    // this writer. A short pg_sleep can finish between Docker polling calls.
+    const writer=run('docker',['exec','-i',container,'psql','-U','postgres','-d','artsoul',
+      '-v','ON_ERROR_STOP=1','-qAt','-f','-'],{timeout:20000});
+    const held=new Promise((resolve,reject)=>{
+      let output='';
+      writer.child.stdout.on('data',chunk=>{
+        output+=chunk;const match=output.match(/^HELD:(\d+)$/m);
+        if(match)resolve(Number(match[1]));
+      });
+      writer.then(()=>reject(Error('Writer exited before acknowledging its lock')),reject);
+    });
+    writer.child.stdin.write(`SET application_name=${q(name)}; BEGIN; ${query}; SELECT 'HELD:' || pg_backend_pid();\n`);
+    let reader,committed=false;
+    try {
+      const writerPid=await held;
+      reader=parallel(`SET application_name=${q(name+'-reader')}; ${completion}`);
+      let settled=false,blocked=false;
+      reader.then(()=>{settled=true;},()=>{settled=true;});
+      for(let i=0;i<40;i++) {
+        blocked=await parallel(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=${q(name+'-reader')}
+          AND ${writerPid}=ANY(pg_blocking_pids(pid)))`)==='t';
+        if(blocked||settled)break;
+        await delay(20);
+      }
+      assert(blocked,'completion must wait for the held write transaction');
+      writer.child.stdin.end(`${beforeCommit}\nCOMMIT;\n`);committed=true;
+      await writer;return await reader;
+    } finally {
+      if(!committed&&!writer.child.stdin.destroyed)writer.child.stdin.end('ROLLBACK;\n');
+      await Promise.allSettled([writer,...(reader?[reader]:[])]);
     }
-    await finished;throw Error('Fixture did not observe the held write lock');
   }
   const auditFailure = event => sql(`CREATE OR REPLACE FUNCTION _a8e_fail_audit() RETURNS trigger LANGUAGE plpgsql AS $f$
     BEGIN IF NEW.event_type='${event}' THEN RAISE EXCEPTION 'FORCED_AUDIT_FAILURE'; END IF; RETURN NEW; END $f$;
@@ -160,14 +186,14 @@ test('A8e TOTP persistence uses actual PostgreSQL transactions', {skip:available
   });
   await t.test('completion sees a factor revocation committed while it waits for the row',async()=>{
     await reset();const factor=active(),attempt=claim(factor),step=match(factor);
-    const {finished}=await holdWrite(`UPDATE artsoul_staff_totp_factors SET revoked_at=clock_timestamp() WHERE id='${factor.id}'`,'a8e-factor-revocation');
-    const result=await parallel(completeSql(factor,attempt,step));await finished;
+    const result=await completeWhileWriteHeld(`UPDATE artsoul_staff_totp_factors SET revoked_at=clock_timestamp() WHERE id='${factor.id}'`,
+      'a8e-factor-revocation',completeSql(factor,attempt,step));
     assert.equal(result,'FACTOR_INELIGIBLE');
   });
   await t.test('role revocation is checked again at completion and serialized with role writes',async()=>{
     await reset();const factor=active(),attempt=claim(factor),step=match(factor);
-    const {finished}=await holdWrite(`UPDATE artsoul_staff_roles SET active=FALSE WHERE wallet_address='${wallet}'`,'a8e-role-revocation');
-    const result=await parallel(completeSql(factor,attempt,step));await finished;
+    const result=await completeWhileWriteHeld(`UPDATE artsoul_staff_roles SET active=FALSE WHERE wallet_address='${wallet}'`,
+      'a8e-role-revocation',completeSql(factor,attempt,step));
     assert.equal(result,'STAFF_INACTIVE');assert.equal(sql(claimSql(factor)),'STAFF_INACTIVE|');
   });
   await t.test('expired reservation cannot authorize a fresh valid code',async()=>{
@@ -198,9 +224,9 @@ test('A8e TOTP persistence uses actual PostgreSQL transactions', {skip:available
   });
   await t.test('completion observes a concurrent revoke and regrant before issuing access',async()=>{
     await reset();const factor=active(),attempt=claim(factor),step=match(factor);
-    const {finished}=await holdWrite(`UPDATE artsoul_staff_roles SET active=FALSE WHERE wallet_address='${wallet}';
-      UPDATE artsoul_staff_roles SET active=TRUE WHERE wallet_address='${wallet}'`,'a8e-role-regrant');
-    assert.equal(await parallel(completeSql(factor,attempt,step)),'ROLE_CHANGED');await finished;
+    const result=await completeWhileWriteHeld(`UPDATE artsoul_staff_roles SET active=FALSE WHERE wallet_address='${wallet}';
+      UPDATE artsoul_staff_roles SET active=TRUE WHERE wallet_address='${wallet}'`,'a8e-role-regrant',completeSql(factor,attempt,step));
+    assert.equal(result,'ROLE_CHANGED');
     assert.equal(sql(`SELECT consumed_at IS NOT NULL FROM artsoul_staff_totp_attempts WHERE id='${attempt}'`),'t');
     assert.equal(sql(`SELECT details->>'result' FROM artsoul_staff_auth_events WHERE event_type='totp_auth_failure' ORDER BY id DESC LIMIT 1`),'ROLE_CHANGED');
   });
@@ -229,9 +255,15 @@ test('A8e TOTP persistence uses actual PostgreSQL transactions', {skip:available
   });
   await t.test('grant expiry is evaluated after waiting for a concurrent grant lock',async()=>{
     await reset();const factor=pending(),attempt=claim(factor,'enrollment'),step=match(factor);
-    sql(`UPDATE artsoul_staff_totp_grants SET expires_at=clock_timestamp()+INTERVAL '1 second' WHERE id='${factor.grantId}'`);
-    const {finished}=await holdWrite(`UPDATE artsoul_staff_totp_grants SET token_hash=token_hash WHERE id='${factor.grantId}'`,'a8e-grant-expiry',2);
-    assert.equal(await parallel(completeSql(factor,attempt,step)),'GRANT_INVALID');await finished;
+    // Expire after the blocked request started, but before releasing its lock;
+    // a timestamp captured before waiting would incorrectly authorize the code.
+    const result=await completeWhileWriteHeld(`UPDATE artsoul_staff_totp_grants SET token_hash=token_hash WHERE id='${factor.grantId}'`,
+      'a8e-grant-expiry',completeSql(factor,attempt,step),`
+      UPDATE artsoul_staff_totp_grants SET expires_at=(SELECT query_start+INTERVAL '1 second' FROM pg_stat_activity
+        WHERE application_name='a8e-grant-expiry-reader') WHERE id='${factor.grantId}';
+      SELECT pg_sleep(GREATEST(0,extract(epoch FROM ((SELECT expires_at FROM artsoul_staff_totp_grants
+        WHERE id='${factor.grantId}')-clock_timestamp()))));`);
+    assert.equal(result,'GRANT_INVALID');
     assert.equal(sql(`SELECT consumed_at IS NULL FROM artsoul_staff_totp_grants WHERE id='${factor.grantId}'`),'t');
   });
   await t.test('factor key rotation or encrypted material change invalidates an in-flight result',async()=>{

@@ -119,13 +119,15 @@ function AuctionMessage({item, state, model, selection}) {
 }
 
 function ReportMessage({item, state, onOpen, selection}) {
+  const profileTarget = item.target_type === 'profile_content';
+  const profileWallet = /^0x[0-9a-f]{40}$/i.test(item.profile_wallet || '') ? item.profile_wallet.toLowerCase() : '';
   return <li className={item.read===false?'notification-unread':'notification-read'}>
     <MessageSelection id={`report:${item.id}`} title={`report update ${item.id}`} selection={selection} />
     <details className="notification-message" onToggle={event=>{if(event.currentTarget.open && item.read===false)onOpen?.(item.id);}}>
-    <summary><strong>Report and artwork update</strong>{typeof item.read==='boolean' && <span className="notification-read-label">{state.pendingId===item.id?'Saving…':item.read?'Read':'Unread'}</span>}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></summary>
-    <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>
+    <summary><strong>{profileTarget ? 'Report and profile update' : 'Report and artwork update'}</strong>{typeof item.read==='boolean' && <span className="notification-read-label">{state.pendingId===item.id?'Saving…':item.read?'Read':'Unread'}</span>}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></summary>
+    {profileTarget ? (profileWallet && <a className="underline" href={`/profile?address=${profileWallet}`}>View profile</a>) : <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>
       Artwork #{item.artwork_id} · {({'84532': 'Base Sepolia', '11155111': 'Ethereum Sepolia (legacy)', '8453': 'Base'})[item.chain_id] || `Chain ${item.chain_id}`}
-    </a>
+    </a>}
     <p>{item.message}</p>
     </details>
   </li>;

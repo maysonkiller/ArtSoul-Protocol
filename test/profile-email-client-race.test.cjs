@@ -167,17 +167,17 @@ test('profile email gate remains disabled without a true public flag and ignores
   for (const config of [undefined, {}, {emailVerificationEnabled: false}, {emailVerificationEnabled: 'true'}, {emailVerificationEnabled: true}]) {
     const changes = [];
     vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: async () => config}},
-      useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value)});
+      useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}});
     await tick();
     assert.deepEqual(changes, [config?.emailVerificationEnabled === true]);
   }
   let release, retire;
   const changes = [];
   vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: () => new Promise(resolve => {release = resolve;})}},
-    useEffect: fn => {retire = fn();}, setEmailVerificationEnabled: value => changes.push(value)});
+    useEffect: fn => {retire = fn();}, setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}});
   retire(); release({emailVerificationEnabled: true}); await tick();
   assert.deepEqual(changes, []);
   vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: async () => {throw new Error('config unavailable');}}},
-    useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value)});
+    useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}});
   await tick(); assert.deepEqual(changes, [false]);
 });

@@ -1,7 +1,7 @@
 // Smoke test for the cached /api/public/artworks projection restored with the
 // egress fix (PR #66). Insurance for the three list/detail behaviors that keep
 // egress low without breaking the UI:
-//   * list responses are CDN-cacheable (s-maxage) and non-empty on a cold cache;
+//   * list responses are non-empty and cannot CDN-cache moderated identities;
 //   * a direct id/artwork lookup is private+no-store and carries fresh bids;
 //   * the moderation table is read with a narrow column select, never select=*.
 const assert = require('node:assert/strict');
@@ -70,6 +70,7 @@ function loadHandler({ missDirectArtworkOnce = false, beforeRead = async () => {
 
   const context = vm.createContext({
     allowMethods: () => true,
+    PUBLIC_PROFILE_SOURCE: 'public_profile_content',
     readNftOwnershipConfig: () => null,
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,
@@ -109,7 +110,7 @@ test('full-feed metadata and identities start before an unrelated slow lifecycle
     readMetadata: async () => {metadataReads++; return {name:'Parallel metadata', image:'https://img.test/a.png'};}});
   const res = fakeRes(), work = handler({query:{}},res);
   await new Promise(resolve => setImmediate(resolve));
-  const earlyMetadata = metadataReads, earlyIdentity = calls.some(path => tableOf(path) === 'profiles');
+  const earlyMetadata = metadataReads, earlyIdentity = calls.some(path => tableOf(path) === 'public_profile_content');
   assert.equal(res.body, null, 'unresolved lifecycle data is not skipped');
   release(); await work;
   assert.equal(earlyMetadata, 1);
@@ -118,7 +119,7 @@ test('full-feed metadata and identities start before an unrelated slow lifecycle
   assert.equal(res.body.public_metrics.auctions_completed, 8);
 });
 
-test('cold-cache list response is CDN-cacheable and non-empty', async () => {
+test('cold-cache list response is non-empty without caching mutable public identities', async () => {
   const { handler, calls } = loadHandler();
   const res = fakeRes();
   await handler({ query: {} }, res);
@@ -126,7 +127,7 @@ test('cold-cache list response is CDN-cacheable and non-empty', async () => {
   assert.equal(res.statusCode, 200);
   assert.ok(res.body.count >= 1, 'list returns at least one card on a cold cache');
   assert.equal(res.body.data[0].id, 'v41:84532:7');
-  assert.match(res.headers['cache-control'], /^public, s-maxage=\d+/, 'list is CDN-cacheable');
+  assert.equal(res.headers['cache-control'], 'private, no-store');
 
   const modCall = calls.find(p => tableOf(p) === 'artwork_moderation_visibility');
   assert.ok(modCall, 'moderation visibility table is queried');

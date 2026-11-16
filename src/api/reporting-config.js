@@ -6,6 +6,7 @@ export function readReportingConfig() {
   return {
     requested,
     enabled: requested && dailyLimitConfigured,
+    profileEnabled: requested && dailyLimitConfigured && process.env.ARTSOUL_PROFILE_REPORTS_ENABLED === 'true',
     dailyLimit: dailyLimitConfigured ? dailyLimit : null
   };
 }

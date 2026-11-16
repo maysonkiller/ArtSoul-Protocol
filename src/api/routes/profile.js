@@ -5,11 +5,11 @@ import {
   sendError,
   supabaseRest
 } from '../backend.js';
-import { cleanProfile, publicProfile } from '../profile-fields.js';
+import { cleanProfile, publicProfile, PUBLIC_PROFILE_FIELDS, PUBLIC_PROFILE_SOURCE, PUBLIC_PROFILE_SELECT } from '../profile-fields.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
-  if (!allowMethods(req, res, ['PUT'])) return;
+  if (!allowMethods(req, res, ['GET', 'PUT'])) return;
 
   try {
     const wallet = requireWallet(req);
@@ -20,6 +20,14 @@ export default async function handler(req, res) {
         error: 'SESSION_WALLET_MISMATCH',
         message: 'Sign in with the wallet for this profile, then save again.'
       });
+    }
+    if (req.method === 'GET') {
+      const rows = await supabaseRest(
+        `profiles?wallet_address=eq.${encodeURIComponent(wallet)}&select=${[...PUBLIC_PROFILE_FIELDS, 'twitter_id', 'discord_id'].join(',')}&limit=1`
+      );
+      // Only the verified owner can read originals for editing. The serializer
+      // still omits emails, roles and raw OAuth provider IDs.
+      return res.status(200).json({ success: true, profile: publicProfile(rows?.[0]) });
     }
     const body = await readJson(req);
     const profile = cleanProfile(body);
@@ -35,13 +43,15 @@ export default async function handler(req, res) {
     }
 
     const now = new Date().toISOString();
-    const rows = await supabaseRest('profiles?on_conflict=wallet_address', {
+    await supabaseRest('profiles?on_conflict=wallet_address', {
       method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: [{ wallet_address: wallet, ...profile, updated_at: now }]
     });
 
-    res.status(200).json({ success: true, profile: publicProfile(rows?.[0] || { wallet_address: wallet, ...profile }) });
+    const rows = await supabaseRest(`${PUBLIC_PROFILE_SOURCE}?wallet_address=eq.${encodeURIComponent(wallet)}&select=${PUBLIC_PROFILE_SELECT}&limit=1`);
+    if (!rows?.[0]) throw new Error('Saved profile could not be read. Please retry.');
+    res.status(200).json({ success: true, profile: publicProfile(rows[0]) });
   } catch (error) {
     sendError(res, error);
   }

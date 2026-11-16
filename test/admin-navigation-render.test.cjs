@@ -88,7 +88,7 @@ test('the ready workspace groups moderation, history and authority controls with
     assert.match(html, /Reports in view/);
     assert.match(html, /Hidden works/);
     assert.match(html, /Delivery records/);
-    assert.match(html, /Review reports, manage artwork visibility and inspect records/);
+    assert.match(html, /Review reports, manage public content visibility and inspect records/);
 });
 
 test('an ineligible guest never sees protected navigation or workspace counters', () => {

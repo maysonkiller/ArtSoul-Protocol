@@ -378,18 +378,39 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
   await t.test('begin rechecks a conflict that commits while waiting for the indexer hash lock', async () => {
     const value=fixture();claimed(value);
     const key=`artsoul-media-hash:${value.chain}:${value.core}:${value.hash}`;
-    const writer=parallel(`BEGIN; SET application_name='submission-conflict-fixture';
+    // An explicit COMMIT keeps the writer alive across slow Docker startup and
+    // proves the submission RPC really waits for this transaction's hash lock.
+    const writer=run('docker',[...args,'-f','-'],{timeout:20000});
+    const held=new Promise((resolve,reject)=>{
+      let output='';
+      writer.child.stdout.on('data',chunk=>{
+        output+=chunk;const match=output.match(/^HELD:(\d+)$/m);
+        if(match)resolve(Number(match[1]));
+      });
+      writer.then(()=>reject(Error('Writer exited before acknowledging its lock')),reject);
+    });
+    writer.child.stdin.write(`BEGIN; SET application_name='submission-conflict-fixture';
       SELECT pg_advisory_xact_lock(hashtextextended(${q(key)},0));
-      UPDATE artwork_media_publications SET claim_status='conflict'; SELECT pg_sleep(1); COMMIT;`);
+      UPDATE artwork_media_publications SET claim_status='conflict'; SELECT 'HELD:' || pg_backend_pid();\n`);
+    let reader,committed=false;
     try {
-      let sleeping=false;
+      const writerPid=await held;
+      reader=parallel(`SET application_name='submission-conflict-reader'; ${asService(begin(value))}`);
+      let settled=false,blocked=false;
+      reader.then(()=>{settled=true;},()=>{settled=true;});
       for(let i=0;i<30;i++) {
-        if(sql("SELECT count(*) FROM pg_stat_activity WHERE application_name='submission-conflict-fixture' AND wait_event='PgSleep';") === '1') {sleeping=true;break;}
+        blocked=await parallel(`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name='submission-conflict-reader'
+          AND ${writerPid}=ANY(pg_blocking_pids(pid)));`)==='t';
+        if(blocked||settled)break;
         await delay(20);
       }
-      assert(sleeping,'conflict transaction holds the shared hash lock');
-      await assert.rejects(parallel(asService(begin(value))),e=>/PUBLICATION_BLOCKED/.test(e.stderr));
-    } finally {await writer;}
+      assert(blocked,'submission must wait for the conflict transaction holding the shared hash lock');
+      writer.child.stdin.end('COMMIT;\n');committed=true;await writer;
+      await assert.rejects(reader,e=>/PUBLICATION_BLOCKED/.test(e.stderr));
+    } finally {
+      if(!committed&&!writer.child.stdin.destroyed)writer.child.stdin.end('ROLLBACK;\n');
+      await Promise.allSettled([writer,...(reader?[reader]:[])]);
+    }
     assert.equal(sql('SELECT submission_started_at IS NULL FROM artwork_media_publications;'),'t');
   });
 

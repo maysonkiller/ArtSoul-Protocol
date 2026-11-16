@@ -1,21 +1,31 @@
-import { allowMethods, sendError, supabaseRest } from '../../backend.js';
+import { allowMethods, normalizeWallet, sendError, supabaseRest } from '../../backend.js';
 import { getModerationAccess, canReadStaffWallets, redactOtherStaffWallets } from '../../moderation-access.js';
 import { requireProtocolAdminEnabled } from '../../protocol-admin-config.js';
 import { readDonationConfig } from '../../donation-config.js';
 import { readAdminArtworkCatalog } from '../../admin-artwork-catalog.js';
+import { readReportingConfig } from '../../reporting-config.js';
 
 const QUEUE_STATUSES = new Set(['pending_review', 'actioned', 'dismissed', 'resolved', 'withdrawn', 'all']);
 const REPORT_FIELDS = 'id,chain_id,artwork_id,reporter_wallet,category,details,reference_url,status,created_at,updated_at,reviewed_by,reviewed_at,decision_reason';
 const TARGET_FIELDS = 'target_type,donation_contract_address,donation_transaction_hash,donation_log_index';
+const PROFILE_FIELDS = 'profile_wallet,profile_content_snapshot,profile_content_hash';
 
 async function readReports(status, target) {
   const path = fields => `artwork_reports?${status === 'all' ? '' : `status=eq.${status}&`}select=${fields}&order=created_at.asc&limit=200`
-    + (target ? `&chain_id=eq.${target.chainId}&artwork_id=eq.${target.artworkId}`
+    + (target?.type === 'profile_content' ? `&target_type=eq.profile_content&profile_wallet=eq.${target.profileWallet}`
+      : target ? `&chain_id=eq.${target.chainId}&artwork_id=eq.${target.artworkId}`
       + (fields.includes('target_type') ? `&target_type=eq.${target.type}` : '') : '');
+  let fields = `${REPORT_FIELDS},${TARGET_FIELDS},${PROFILE_FIELDS}`;
   try {
-    // Read retained donation reports even when new donations are paused.
-    return await supabaseRest(path(`${REPORT_FIELDS},${TARGET_FIELDS}`));
+    // Read retained profile/donation reports even when new intake is paused.
+    return await supabaseRest(path(fields));
   } catch (error) {
+    const missingProfileColumn = ['42703', 'PGRST204'].includes(String(error?.details?.code || ''))
+      && /profile_wallet|profile_content_snapshot|profile_content_hash/.test(String(error?.details?.message || error?.message || ''));
+    if (missingProfileColumn && !readReportingConfig().profileEnabled && target?.type !== 'profile_content') {
+      fields = `${REPORT_FIELDS},${TARGET_FIELDS}`;
+      try { return await supabaseRest(path(fields)); } catch (legacyError) { error = legacyError; }
+    }
     const code = String(error?.details?.code || '');
     const message = String(error?.details?.message || error?.message || '');
     const missingTargetColumn = ['42703', 'PGRST204'].includes(code)
@@ -56,7 +66,12 @@ export default async function handler(req, res) {
     if (!QUEUE_STATUSES.has(requestedStatus)) throw invalidStatus();
     const status = requestedStatus;
     let target = null;
-    if (req.query?.artworkId !== undefined || req.query?.chainId !== undefined) {
+    if (req.query?.target_type === 'profile_content' || req.query?.profile_wallet !== undefined) {
+      const profileWallet = normalizeWallet(req.query?.profile_wallet);
+      if (req.query?.target_type !== 'profile_content' || !profileWallet || /^0x0{40}$/.test(profileWallet)
+        || req.query?.artworkId !== undefined || req.query?.chainId !== undefined) throw invalidStatus();
+      target = { type: 'profile_content', profileWallet };
+    } else if (req.query?.artworkId !== undefined || req.query?.chainId !== undefined) {
       const artworkId = String(req.query.artworkId || '');
       const chainId = String(req.query.chainId || '');
       if (!/^[1-9]\d{0,77}$/.test(artworkId) || BigInt(artworkId) >= 2n ** 256n
@@ -113,6 +128,23 @@ export default async function handler(req, res) {
       } catch (error) { throw databaseError(error); }
     }
 
+    const profileWallets = [...new Set((reports || []).filter(report => report.target_type === 'profile_content').map(report => report.profile_wallet))];
+    let profiles = [];
+    if (profileWallets.length) {
+      try {
+        if (profileWallets.some(wallet => normalizeWallet(wallet) !== wallet || /^0x0{40}$/.test(wallet))) throw new Error('Invalid profile review target');
+        profiles = await supabaseRest(`profile_content_visibility?profile_wallet=in.(${profileWallets.join(',')})&select=profile_wallet,content_hash,hidden&limit=${profileWallets.length}`);
+        if (!Array.isArray(profiles) || profiles.length > profileWallets.length || new Set(profiles.map(row => row.profile_wallet)).size !== profiles.length
+          || profiles.some(row => !profileWallets.includes(row.profile_wallet) || typeof row.hidden !== 'boolean' || !/^[0-9a-f]{64}$/.test(row.content_hash))) throw new Error('Invalid profile review context');
+        const byWallet = new Map(profiles.map(row => [row.profile_wallet, row]));
+        reports = reports.map(report => report.target_type === 'profile_content' ? { ...report,
+          profile_content_available: byWallet.has(report.profile_wallet),
+          profile_content_changed: byWallet.get(report.profile_wallet)?.content_hash !== report.profile_content_hash,
+          profile_content_hidden: byWallet.get(report.profile_wallet)?.hidden === true
+        } : report);
+      } catch (error) { throw databaseError(error); }
+    }
+
     const reportIds = (reports || []).map(report => report.id).filter(Boolean);
     let events = [];
     if (reportIds.length > 0) {
@@ -140,6 +172,7 @@ export default async function handler(req, res) {
       data: {
         status,
         artworks,
+        profiles,
         reports: redactOtherStaffWallets(reports, 'reviewed_by', access, canReadAll),
         // Intake events identify complaint participants, not staff decisions.
         events: events.map(event => event.event_type === 'REPORT_SUBMITTED' ? {...event}

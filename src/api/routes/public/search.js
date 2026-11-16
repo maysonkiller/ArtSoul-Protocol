@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { allowMethods, normalizeWallet, sendError, supabaseRest } from '../../backend.js';
-import { PUBLIC_PROFILE_FIELDS, publicProfile } from '../../profile-fields.js';
+import { PUBLIC_PROFILE_SOURCE, PUBLIC_PROFILE_SELECT, publicProfile } from '../../profile-fields.js';
 import { readVisibleArtworkCards } from './artworks.js';
 import { readWithNftOwnershipResponse } from '../../nft-ownership.js';
 
@@ -65,7 +65,7 @@ export default async function searchHandler(req, res) {
     const artistIds = pages.find(page => page.category === 'artists')?.keys || [];
     const [cards, profiles] = await Promise.all([
       artworkIds.length ? readVisibleArtworkCards(84532, artworkIds, core, responseScope) : [],
-      artistIds.length ? supabaseRest(`profiles?wallet_address=in.(${artistIds.join(',')})&select=${[...PUBLIC_PROFILE_FIELDS, 'twitter_id', 'discord_id'].join(',')}&limit=${artistIds.length}`) : []
+      artistIds.length ? supabaseRest(`${PUBLIC_PROFILE_SOURCE}?wallet_address=in.(${artistIds.join(',')})&select=${PUBLIC_PROFILE_SELECT}&limit=${artistIds.length}`) : []
     ]);
     if (!Array.isArray(profiles) || profiles.some(profile => !artistIds.includes(profile.wallet_address))) throw new Error('Invalid search profiles');
     const byArtwork = new Map(cards.map(card => [card.artwork_id, card]));

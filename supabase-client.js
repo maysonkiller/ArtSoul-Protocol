@@ -511,32 +511,44 @@ async function updateProfile(walletAddress, updates) {
 }
 
 // Artwork Functions
+async function hydrateLegacyPublicProfiles(value) {
+    if (Array.isArray(value)) return Promise.all(value.map(hydrateLegacyPublicProfiles));
+    if (!value || typeof value !== 'object') return value;
+    const result = { ...value };
+    await Promise.all(['creator', 'winner', 'bidder'].map(async role => {
+        const keys = [role, `${role}_address`, `${role}_id`];
+        if (!keys.some(key => Object.hasOwn(value, key))) return;
+        const wallet = keys.map(key => value[key]).find(address =>
+            typeof address === 'string' && /^0x[0-9a-f]{40}$/i.test(address));
+        // Legacy UUIDs are not wallet identities. Never query the raw profiles
+        // table or infer a wallet from an old embedded public-name snapshot.
+        result[role] = wallet ? await getProfile(wallet) : null;
+    }));
+    for (const key of ['artwork', 'auctions', 'bids']) {
+        if (Object.hasOwn(value, key)) result[key] = await hydrateLegacyPublicProfiles(value[key]);
+    }
+    return result;
+}
+
 async function createArtwork(artworkData) {
     disabledLegacyWrite('Legacy artwork creation');
 }
 
 async function getArtworks(filters = {}) {
     if (filters.publicTestnet !== false) {
-        const projectionArtworks = await getPublicProjectionArtworks({
+        return getPublicProjectionArtworks({
             limit: filters.limit || 200,
             chain_id: filters.chain_id,
             view: filters.view,
             creator: filters.creator || filters.creator_id
-        });
-
-        if (projectionArtworks.length > 0) {
-            return projectionArtworks;
-        }
+        }, true);
     }
 
     const supabase = await initSupabase();
 
     let query = supabase
         .from('artworks')
-        .select(`
-            *,
-            creator:profiles!creator_id(*)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
     if (filters.creator_id) {
@@ -554,7 +566,7 @@ async function getArtworks(filters = {}) {
         throw error;
     }
 
-    return data;
+    return hydrateLegacyPublicProfiles(data);
 }
 
 async function getAllArtworks() {
@@ -588,36 +600,18 @@ async function getArtwork(artworkId) {
 
     const supabase = await initSupabase();
 
-    // First try with creator join
-    let { data, error } = await supabase
+    const { data, error } = await supabase
         .from('artworks')
-        .select(`
-            *,
-            creator:profiles!artworks_creator_id_fkey(*),
-            auctions(*)
-        `)
+        .select('*, auctions(*)')
         .eq('id', artworkId)
         .single();
-
-    // If foreign key error, try without creator join
-    if (error && (error.code === 'PGRST200' || error.code === '42P01')) {
-        console.warn('[getArtwork] Foreign key not found, loading without creator');
-        const result = await supabase
-            .from('artworks')
-            .select('*, auctions(*)')
-            .eq('id', artworkId)
-            .single();
-
-        data = result.data;
-        error = result.error;
-    }
 
     if (error) {
         console.error('Error fetching artwork:', error);
         throw error;
     }
 
-    return data;
+    return hydrateLegacyPublicProfiles(data);
 }
 
 async function getArtworksByCreator(creatorId) {
@@ -628,23 +622,15 @@ async function getArtworksByCreator(creatorId) {
         throw new Error('A creator id is required to read a creator\'s artworks');
     }
 
-    const projectionArtworks = await getPublicProjectionArtworks({
-        creator: creatorId,
-        limit: 200
-    });
-
-    if (projectionArtworks.length > 0) {
-        return projectionArtworks;
+    if (typeof creatorId === 'string' && /^0x[0-9a-f]{40}$/i.test(creatorId)) {
+        return getPublicProjectionArtworks({ creator: creatorId, limit: 200 }, true);
     }
 
     const supabase = await initSupabase();
 
     const { data, error } = await supabase
         .from('artworks')
-        .select(`
-            *,
-            creator:profiles!creator_id(*)
-        `)
+        .select('*')
         .eq('creator_id', creatorId)
         .order('created_at', { ascending: false });
 
@@ -653,7 +639,7 @@ async function getArtworksByCreator(creatorId) {
         throw error;
     }
 
-    return data;
+    return hydrateLegacyPublicProfiles(data);
 }
 
 async function getArtworksByOwner(ownerAddress) {
@@ -661,10 +647,7 @@ async function getArtworksByOwner(ownerAddress) {
 
     const { data, error } = await supabase
         .from('artworks')
-        .select(`
-            *,
-            creator:profiles!creator_id(*)
-        `)
+        .select('*')
         .eq('owner_address', ownerAddress)
         .neq('creator_id', ownerAddress)
         .order('created_at', { ascending: false });
@@ -679,7 +662,7 @@ async function getArtworksByOwner(ownerAddress) {
         throw error;
     }
 
-    return data || [];
+    return hydrateLegacyPublicProfiles(data || []);
 }
 
 async function updateArtwork(artworkId, updates) {
@@ -789,10 +772,7 @@ async function getActiveAuctions() {
         .from('auctions')
         .select(`
             *,
-            artwork:artworks(*,
-                creator:profiles!creator_id(*)
-            ),
-            winner:profiles!winner_id(*),
+            artwork:artworks(*),
             bids(count)
         `)
         .eq('status', 'active')
@@ -803,7 +783,7 @@ async function getActiveAuctions() {
         throw error;
     }
 
-    return data;
+    return hydrateLegacyPublicProfiles(data);
 }
 
 function projectionAuctionState(status) {
@@ -847,13 +827,8 @@ async function getAuction(auctionId) {
         .from('auctions')
         .select(`
             *,
-            artwork:artworks(*,
-                creator:profiles!creator_id(*)
-            ),
-            winner:profiles!winner_id(*),
-            bids(*,
-                bidder:profiles!bidder_id(*)
-            )
+            artwork:artworks(*),
+            bids(*)
         `)
         .eq('id', auctionId)
         .single();
@@ -863,7 +838,7 @@ async function getAuction(auctionId) {
         throw error;
     }
 
-    return data;
+    return hydrateLegacyPublicProfiles(data);
 }
 
 async function endAuction(auctionId) {
@@ -880,10 +855,7 @@ async function getAuctionBids(auctionId) {
 
     const { data, error } = await supabase
         .from('bids')
-        .select(`
-            *,
-            bidder:profiles!bidder_id(*)
-        `)
+        .select('*')
         .eq('auction_id', auctionId)
         .order('amount', { ascending: false });
 
@@ -892,7 +864,7 @@ async function getAuctionBids(auctionId) {
         throw error;
     }
 
-    return data;
+    return hydrateLegacyPublicProfiles(data);
 }
 
 async function getUserBid(auctionId, bidderId) {
