@@ -20,6 +20,69 @@ function loadVoice(win = {}) {
 const voice = loadVoice();
 const parse = (text, lang = 'en') => voice.parseCommand(text, lang);
 
+test('page commands navigate to the same five destinations in both languages', () => {
+  for (const [lang, said, page] of [
+    ['en', 'open gallery', 'gallery'], ['en', 'show the explore', 'gallery'],
+    ['en', 'go to the home page', 'home'], ['en', 'open my profile', 'profile'],
+    ['en', 'open create', 'create'], ['en', 'show the upload page', 'create'],
+    ['en', 'open how it works', 'guide'], ['en', 'go to documentation', 'guide'],
+    ['ru', 'открой галерею', 'gallery'], ['ru', 'перейди в галерею', 'gallery'],
+    ['ru', 'открой главную страницу', 'home'], ['ru', 'перейди на главную', 'home'],
+    ['ru', 'открой мой профиль', 'profile'], ['ru', 'перейди в профиль', 'profile'],
+    ['ru', 'открой создание работы', 'create'], ['ru', 'покажи публикацию', 'create'],
+    ['ru', 'открой руководство', 'guide'], ['ru', 'покажи документацию', 'guide'],
+    ['en', '  PLEASE   OPEN GALLERY!  ', 'gallery'], ['en', 'Open gallery, please.', 'gallery'],
+    ['ru', '  ПОЖАЛУЙСТА,   ОТКРОЙ ГАЛЕРЕЮ!  ', 'gallery'], ['ru', 'Открой галерею, пожалуйста.', 'gallery']
+  ]) {
+    const command = parse(said, lang);
+    assert.deepEqual(command, { tool: 'open_page', input: { page } }, said);
+    assert.equal(voice.isWrite(command), false);
+  }
+  assert.deepEqual(parse('my profile'), { tool: 'get_my_activity', input: {} });
+  assert.deepEqual(parse('мой профиль', 'ru'), { tool: 'get_my_activity', input: {} });
+});
+
+test('negated and combined page requests cannot navigate or trigger wallet actions', () => {
+  for (const [lang, statements] of [
+    ['en', ['do not open gallery', 'do not open my profile', 'open gallery and buy artwork 31',
+      'buy artwork 31 and open gallery', 'open gallery and open artwork 31', 'open gallery and open home',
+      '"open gallery"', 'open https://example.test/', 'open admin']],
+    ['ru', ['не открой галерею', 'не открывай мой профиль', 'открой галерею и купи работу 31',
+      'купи работу 31 и открой галерею', 'открой галерею и открой работу 31', 'открой галерею и открой главную',
+      'открой галерею, затем открой работу 31', 'открой галерею; открой работу 31',
+      'открой галерею. открой работу 31', 'не открывай галерею и открой работу 31',
+      '«открой галерею»', 'открой https://example.test/', 'открой админку']]
+  ]) for (const said of statements) {
+    const command = parse(said, lang);
+    assert.equal(voice.isWrite(command), false, said);
+    assert.ok(!['open_page', 'open_artwork'].includes(command?.tool), said);
+  }
+});
+
+test('page names in search terms stay data instead of becoming navigation', () => {
+  for (const [lang, prefix, query] of [
+    ['en', 'search ', 'open gallery'], ['en', 'find ', 'open my profile and buy artwork 31'],
+    ['ru', 'найди ', 'открой галерею'], ['ru', 'поиск ', 'открой мой профиль и купи работу 31']
+  ]) assert.deepEqual(parse(prefix + query, lang), { tool: 'search_catalog', input: { query } });
+});
+
+test('page results give a concise localized acknowledgement without claiming a write', () => {
+  for (const [page, title, ru] of [
+    ['home', 'Home', 'главную'], ['gallery', 'Explore', 'галерею'], ['profile', 'Profile', 'профиль'],
+    ['create', 'Create', 'создание работы'], ['guide', 'How it works', 'руководство']
+  ]) {
+    const result = { opened: true, page, title, url: '/' };
+    assert.deepEqual(voice.describeResult('open_page', result, 'en'), { say: `Opening ${title}.`, show: `Opening ${title}.` });
+    assert.deepEqual(voice.describeResult('open_page', result, 'ru'), { say: `Открываю ${ru}.`, show: `Открываю ${ru}.` });
+  }
+  for (const lang of ['en', 'ru']) {
+    const reply = voice.describeResult('open_page', { opened: false, reason: 'Choose a supported page.' }, lang);
+    assert.equal(reply.show, 'Choose a supported page.');
+    assert.doesNotMatch(reply.say, /Opening|Открываю|submitted|подтвержд[её]н/i);
+    assert.ok(reply.say.length < 100);
+  }
+});
+
 test('resale edit and removal preserve explicit intent in both command languages', () => {
   for (const [lang, phrase, tool, input] of [
     ['en', 'remove artwork 19 from sale', 'cancel_resale_listing', { artwork_id: '19' }],

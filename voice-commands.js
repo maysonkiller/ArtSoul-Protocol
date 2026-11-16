@@ -16,7 +16,8 @@
  * - The browser vendor may process it. Chrome sends the audio to Google to be
  *   transcribed. The person is told that before the microphone first opens.
  * - Text commands remain available without speech recognition. Opening the
- *   panel never starts the microphone. Typed replies are silent.
+ *   panel never starts the microphone. Typed replies are silent unless the
+ *   person presses Listen to answer.
  *
  * What keeps a misheard sentence from costing money:
  *
@@ -71,6 +72,11 @@
      */
     const GRAMMAR = [
         // --- English ---------------------------------------------------------
+        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:the\s+)?(?:gallery|explore)(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'gallery' } })],
+        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:the\s+)?(?:home|homepage|home page)(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'home' } })],
+        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:my\s+|the\s+)?profile(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'profile' } })],
+        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:the\s+)?(?:create|upload|publish)(?:\s+page)?(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'create' } })],
+        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:the\s+)?(?:guide|docs|documentation|how it works)(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'guide' } })],
         ['en', new RegExp(`^(?:please\\s+)?(?:donate\\s+to|open\\s+donate\\s+for)\\s+${EN_WORK}${ID}$`), m => ({ tool: 'prepare_donation', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`^(?:please\\s+)?(?:report|open\\s+report\\s+for)\\s+${EN_WORK}${ID}$`), m => ({ tool: 'prepare_artwork_report', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`^(?:please\\s+)?save\\s+${EN_WORK}${ID}(?:\\s+to\\s+(?:my\\s+)?(?:saved|favou?rites))?$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
@@ -98,6 +104,11 @@
         ['en', /\bauctions?\b/, () => ({ tool: 'find_active_auctions', input: {} })],
 
         // --- Russian ---------------------------------------------------------
+        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи|перейди в)\s+галерею(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'gallery' } })],
+        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи|перейди на)\s+главную(?:\s+страницу)?(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'home' } })],
+        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи|перейди в)\s+(?:мой\s+)?профиль(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'profile' } })],
+        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи)\s+(?:создание|публикацию|загрузку)(?:\s+работы)?(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'create' } })],
+        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи)\s+(?:руководство|документацию|инструкцию)(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'guide' } })],
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:донат\\s+автору|открой\\s+донат\\s+для)\\s+${RU_WORK}${ID}$`), m => ({ tool: 'prepare_donation', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:пожаловаться\\s+на|открой\\s+жалобу\\s+на)\\s+${RU_WORK}${ID}$`), m => ({ tool: 'prepare_artwork_report', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:сохрани|добавь)\\s+${RU_WORK}${ID}\\s+в\\s+избранное$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
@@ -158,11 +169,16 @@
         // Do not fall back to a different action extracted from a malformed or
         // combined donation/report request. Search terms above remain data.
         const reviewIntent = language === 'ru' ? /донат|пожертв|жалоб|пожаловаться/.test(heard) : /\b(?:donat\w*|report\w*|complaint\w*)\b/.test(heard);
+        // A malformed page request must not fall through to an action in its tail.
+        const pageIntent = language === 'ru'
+            ? /(?:открой|открыть|открывай|покажи|перейди в|перейди на)\s+(?:мой\s+)?(?:галерею|главную|профиль|создание|публикацию|загрузку|руководство|документацию|инструкцию)(?![\p{L}\p{N}_])/u.test(heard)
+            : /\b(?:open|show|go to)\s+(?:the\s+|my\s+)?(?:gallery|explore|home|homepage|profile|create|upload|publish|guide|docs|documentation|how it works)\b/.test(heard);
         for (const [ruleLang, pattern, build] of GRAMMAR) {
             if (ruleLang !== language) continue;
             const match = pattern.exec(heard);
             if (!match) continue;
             const command = build(match);
+            if (pageIntent && command.tool !== 'open_page') continue;
             if (reviewIntent && !REVIEW_TOOLS.includes(command.tool)) continue;
             if ([...SAVED_TOOLS, ...REVIEW_TOOLS].includes(command.tool) && (/\?/.test(transcript) || !/^[1-9][0-9]{0,77}$/.test(command.input.artwork_id) || BigInt(command.input.artwork_id) >= 2n ** 256n)) return null;
             if (isWrite(command)) {
@@ -194,8 +210,10 @@
         en: {
             title: 'ArtSoul commands',
             hint: 'Type or speak one command in English or Russian. Wallet actions still need your review and signature.',
-            input: 'Your command', placeholder: 'Search moon, open artwork 31…',
+            input: 'Your command', placeholder: 'Open gallery, search moon…',
             send: 'Send', microphone: 'Use microphone', stop: 'Stop listening',
+            listenReply: 'Listen to answer', stopReply: 'Stop audio',
+            audioUnavailable: 'Audio could not play in this browser. The answer is available as text.',
             close: 'Close commands', examples: 'Examples',
             noSpeech: 'Voice is unavailable in this browser. You can type instead.',
             working: 'Working… If your wallet opens, review the request there. Closing this panel does not cancel a submitted transaction.',
@@ -211,7 +229,7 @@
             unavailable: 'Commands are not available on this page.',
             notice: 'Voice commands use your browser\'s speech recognition. In Chrome, the audio is sent to Google to be transcribed. ArtSoul does not record, store or receive it.\n\nTurn on voice commands?',
             micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
-            help: 'Try: "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
+            help: 'Try: "open gallery", "open home", "open my profile", "open create", "open guide", "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
                 '"prepare artwork titled Moonlight", "donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
                 '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
                 '"change price of artwork 19 to 0.003", "remove artwork 19 from sale", ' +
@@ -226,8 +244,10 @@
         ru: {
             title: 'Команды ArtSoul',
             hint: 'Напишите или произнесите одну команду по-русски или по-английски. Действия с кошельком требуют вашей проверки и подписи.',
-            input: 'Ваша команда', placeholder: 'Найди луна, открой работу 31…',
+            input: 'Ваша команда', placeholder: 'Открой галерею, найди луна…',
             send: 'Отправить', microphone: 'Включить микрофон', stop: 'Остановить запись',
+            listenReply: 'Прослушать ответ', stopReply: 'Остановить звук',
+            audioUnavailable: 'Браузер не смог воспроизвести звук. Ответ доступен текстом.',
             close: 'Закрыть команды', examples: 'Примеры',
             noSpeech: 'Голос недоступен в этом браузере. Можно написать команду.',
             working: 'Выполняется… Если откроется кошелёк, проверьте запрос в нём. Закрытие этого окна не отменяет отправленную транзакцию.',
@@ -243,7 +263,7 @@
             unavailable: 'Команды недоступны на этой странице.',
             notice: 'Голосовые команды используют распознавание речи вашего браузера. В Chrome звук отправляется в Google для распознавания. ArtSoul его не записывает, не хранит и не получает.\n\nВключить голосовые команды?',
             micBlocked: 'Микрофон для этого сайта заблокирован. Разрешите его в настройках браузера.',
-            help: 'Скажите: «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
+            help: 'Скажите: «открой галерею», «открой главную», «открой мой профиль», «открой создание работы», «открой руководство», «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
                 '«подготовь работу с названием Лунный свет», «донат автору работы 31», «пожаловаться на работу 31» (только открывает форму; ничего не отправляет), ' +
                 '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
                 '«измени цену работы 19 на 0,003», «сними работу 19 с продажи», ' +
@@ -383,6 +403,13 @@
                 url: `/artwork/${entry.artwork_id}`, label: `${ru ? 'Открыть работу' : 'View artwork'} #${entry.artwork_id}`
             })) };
         }
+        case 'open_page': {
+            const names = { home: 'главную', gallery: 'галерею', profile: 'профиль', create: 'создание работы', guide: 'руководство' };
+            const text = data.opened
+                ? (ru ? 'Открываю ' + (names[data.page] || 'страницу') + '.' : 'Opening ' + data.title + '.')
+                : (ru ? 'Страница не открыта.' : 'Page was not opened.');
+            return { say: text, show: text };
+        }
         case 'open_artwork': {
             const text = ru ? `Открываю ${data.title}.` : `Opening ${data.title}.`;
             return { say: text, show: text };
@@ -452,6 +479,9 @@
         let busy = false;
         let generation = 0;
         let audioGeneration = 0;
+        let answerToRead = '';
+        let utterance = null;
+        let speaking = false;
         const walletIdentity = () => {
             const state = window.artsoulSettledWalletState;
             return state?.isConnected ? String(state.address || '').toLowerCase() : '';
@@ -490,6 +520,8 @@
             '<p class="artsoul-voice-support"></p>' +
             '<p class="artsoul-voice-heard"></p>' +
             '<p class="artsoul-voice-answer" role="status" aria-live="polite"></p>' +
+            '<div class="artsoul-voice-controls"><button type="button" class="artsoul-voice-replay" aria-pressed="false"></button></div>' +
+            '<p class="artsoul-voice-audio-status" role="status" hidden></p>' +
             '<div class="artsoul-voice-results"></div>' +
             '<details class="artsoul-voice-examples"><summary></summary><p></p></details>';
 
@@ -499,6 +531,8 @@
         const input = panel.querySelector('input');
         const mic = panel.querySelector('.artsoul-voice-mic');
         const send = panel.querySelector('.artsoul-voice-send');
+        const replay = panel.querySelector('.artsoul-voice-replay');
+        const audioStatus = panel.querySelector('.artsoul-voice-audio-status');
         // The global capture guard disables submit buttons before their native
         // form action. This panel already owns the pending-command lock.
         send.dataset.allowRapid = 'true';
@@ -526,9 +560,12 @@
             controls();
         }
 
-        function show(heard, answer, links = []) {
+        function show(heard, answer, links = [], say = answer) {
             heardEl.textContent = heard || '';
             answerEl.textContent = answer || '';
+            answerToRead = say || '';
+            audioStatus.hidden = true;
+            controls();
             resultsEl.replaceChildren();
             for (const item of links) {
                 // Results are untrusted text; links are only canonical public
@@ -554,13 +591,26 @@
             input.disabled = busy || noticePending || Boolean(recognition);
             send.disabled = busy || noticePending || Boolean(recognition) || !input.value.trim();
             mic.disabled = busy || noticePending || typeof Recognition !== 'function';
+            const supportsAudio = typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function';
+            replay.hidden = !answerToRead;
+            replay.disabled = busy || noticePending || Boolean(recognition) || !supportsAudio;
+            replay.textContent = speaking ? TEXT[lang].stopReply : TEXT[lang].listenReply;
+            replay.setAttribute('aria-pressed', String(speaking));
+            if (answerToRead && !supportsAudio) {
+                audioStatus.textContent = TEXT[lang].audioUnavailable;
+                audioStatus.hidden = false;
+            }
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => { el.disabled = busy || noticePending; });
             panel.querySelector('form').setAttribute('aria-busy', String(busy || noticePending));
         }
 
         function silence() {
             audioGeneration++;
+            if (utterance) utterance.onstart = utterance.onend = utterance.onerror = null;
+            utterance = null;
+            speaking = false;
             try { window.speechSynthesis?.cancel(); } catch { /* Text remains available. */ }
+            controls();
         }
 
         function closePanel() {
@@ -574,12 +624,33 @@
         function speak(textToSay) {
             try {
                 if (!window.speechSynthesis || !textToSay || panel.hidden || document.visibilityState === 'hidden') return;
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(textToSay);
-                utterance.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
-                window.speechSynthesis.speak(utterance);
+                silence();
+                audioStatus.hidden = true;
+                const current = new SpeechSynthesisUtterance(textToSay);
+                utterance = current;
+                current.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
+                current.onstart = () => {
+                    if (utterance !== current) return;
+                    speaking = true;
+                    controls();
+                };
+                const finish = failed => {
+                    if (utterance !== current) return;
+                    utterance = null;
+                    speaking = false;
+                    if (failed) {
+                        audioStatus.textContent = TEXT[lang].audioUnavailable;
+                        audioStatus.hidden = false;
+                    }
+                    controls();
+                };
+                current.onend = () => finish(false);
+                current.onerror = () => finish(true);
+                window.speechSynthesis.speak(current);
             } catch {
-                // The panel already shows the answer; silence is not a failure.
+                silence();
+                audioStatus.textContent = TEXT[lang].audioUnavailable;
+                audioStatus.hidden = false;
             }
         }
 
@@ -611,7 +682,7 @@
             const t = TEXT[lang];
             const audio = audioGeneration;
             const reply = (heard, answer, say = answer, links = []) => {
-                show(heard, answer, links);
+                show(heard, answer, links, say);
                 if (spoken && audio === audioGeneration) speak(say);
             };
             if (transcript.length > 300) { reply('', t.tooLong); return; }
@@ -740,6 +811,11 @@
             (input.disabled ? close : input).focus({ preventScroll: true });
         });
         mic.addEventListener('click', start);
+        replay.addEventListener('click', () => {
+            if (replay.disabled || panel.hidden) return;
+            if (speaking) silence();
+            else speak(answerToRead);
+        });
         input.addEventListener('input', controls);
         close.addEventListener('click', closePanel);
         panel.addEventListener('keydown', event => {
