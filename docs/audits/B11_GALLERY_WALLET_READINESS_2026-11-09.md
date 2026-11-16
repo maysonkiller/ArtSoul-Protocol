@@ -117,11 +117,15 @@ Evidence: `docs/private/b11-assistant-list38-receipt-2026-11-09.json`, its
 matching read-only `.mjs` verifier, and
 `output/b11-assistant-list38-confirmed-2026-11-09.png`.
 
-Assistant bid remains pending and requires an eligible funded account different
-from the creator. Existing real Phantom and latest native iPhone
-observations, plus separate provider/cohort gates, remain open. Do not repeat
-the accepted auction creation or listing; this record does not declare Phase B
-or the future public beta complete.
+At this listing checkpoint, assistant bidding and the real Phantom sequence
+were still pending. Later November 9 acceptance supersedes those two gaps:
+assistant bidding on artwork 14 / auction 75 passed without reload at block
+`56674116`, as recorded in [the current Phase B status](../PHASE_B_STATUS_2026-11-02.md);
+Phantom connection, Disconnect, reload remaining guest and Rabby connection
+passed in [native wallet acceptance](B18_WALLET_STATE_FRESHNESS_2026-11-09.md#native-production-acceptance).
+Delayed resale UI convergence below, latest native iPhone composition and
+separate provider/cohort gates remain open. Do not repeat accepted transactions;
+this record does not declare Phase B or the future public beta complete.
 
 ## Signed purchase and delayed resale projection
 

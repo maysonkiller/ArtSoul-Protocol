@@ -158,8 +158,12 @@ Private evidence: `b35-live-check-1794231833298.json`,
 - Denim also changes the elapsed duration of three confirmations. The next
   contract/finality review must evaluate that separately; this operational
   change does not claim three blocks are Ethereum finality.
-- Native iPhone/Phantom acceptance, remaining signed assistant journeys and
-  the final-contract public cohort retain their existing gates.
+- Later November 9 [native wallet acceptance](B18_WALLET_STATE_FRESHNESS_2026-11-09.md#native-production-acceptance)
+  passed Phantom connection, Disconnect, reload remaining guest and Rabby
+  connection. [Current journey evidence](../PHASE_B_STATUS_2026-11-02.md) also
+  accepts assistant bidding and the other completed signed actions; none is
+  replayed. Native iPhone composition, delayed resale UI convergence and the
+  final-contract public cohort retain their existing gates.
 - Spend Cap stays enabled; no paid capacity, API plan, mainnet write or new
   financial parameter was activated.
 
