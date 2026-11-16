@@ -169,8 +169,13 @@ fee, provider or enabled network is selected here.
 
 ## Next two bounded steps
 
-1. **Executable specification, without Solidity:** add a small local state-model
-   fixture/test using the existing Node test tooling. Represent unselected policy
+1. **Executable specification, without Solidity:** the November 16
+   [bounded accounting model](../audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md)
+   now verifies deployment-scoped issuance and disjoint refund/credit obligations
+   with 1,024 states and 28,672 transitions plus replays. It assumes already
+   validated settlement and refund eligibility; pause/deadline and actual payment
+   validation remain outside the model. Extend the existing Node fixture after
+   those choices are recorded. Represent unselected policy
    as explicit input, not a default. Exercise two deployments both using ID 1,
    new deployment activation during an old funded auction, unauthorized/repeated
    mint requests, full/failed/duplicate refunds, reserve accounting with reserves
@@ -187,8 +192,7 @@ fee, provider or enabled network is selected here.
    reproduced hazards, preserve old liabilities and prove initialization and
    atomicity before independent review or any fresh testnet rehearsal.
 
-Documentation follow-up: link this proposal under canonical backlog C1 and the
-rework plan's delivery section in the integrating change. Existing staged release
-documents were intentionally not edited by this slice. Source/hash/reference
-review is the validation for this document; no live RPC, funds, role, storage,
-network, dependency or contract behavior changed.
+This proposal is linked under canonical backlog C1 and the rework plan's delivery
+section. Source/hash/reference review validates the proposal; the linked model
+records its separate executable evidence. No live funds, role, storage, network,
+dependency or contract behavior changed.
