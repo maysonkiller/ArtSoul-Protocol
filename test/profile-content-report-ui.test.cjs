@@ -12,12 +12,34 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 const elements = (node, predicate) => Array.isArray(node) ? node.flatMap(child => elements(child, predicate))
     : React.isValidElement(node) ? [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)] : [];
-let compiledReport, compiledAdmin;
+let compiledReport, compiledAdmin, compiledProfileReportControls;
 test.before(async () => {
     const { transformWithOxc } = await import('vite');
     const compile = async (text, name) => (await transformWithOxc(text.replace(/^import .*;\r?$/gm, '').replace(/^export /gm, ''), name, { jsx: { runtime: 'classic' } })).code;
     compiledReport = await compile(source, 'profile-report-fixture.jsx');
     compiledAdmin = await compile(adminSource.slice(0, adminSource.indexOf('function AccessGate')), 'profile-review-fixture.jsx');
+    const buttonStart = profileSource.indexOf('{!isOwnProfile && profileReportingEnabled');
+    const button = profileSource.slice(buttonStart, profileSource.indexOf(')}', profileSource.indexOf('</button>', buttonStart)) + 2);
+    const dialogStart = profileSource.indexOf('{profileReportOpen && profileReportingEnabled');
+    const dialog = profileSource.slice(dialogStart, profileSource.indexOf('\n', dialogStart));
+    compiledProfileReportControls = await compile(`function ProfileReportControls({ profile, isOwnProfile = false, profileReportingEnabled = true, profileReportOpen = false, setProfileReportOpen }) { return <>${button}${dialog}</>; }`, 'profile-report-controls-fixture.jsx');
+});
+
+test('profile report controls render only for a stored profile, including an already-open dialog', () => {
+    const scope = { React, ProfileContentReport: ({ profileWallet }) => React.createElement('div', { 'data-profile-report': profileWallet }) };
+    vm.runInNewContext(compiledProfileReportControls + '\nthis.Controls = ProfileReportControls;', scope);
+    let open = false;
+    const props = { profile: { id: 'stored-profile', wallet_address: B }, setProfileReportOpen: value => { open = value; } };
+    const view = scope.Controls(props);
+    assert.match(renderToStaticMarkup(view), /Report profile/);
+    assert.doesNotMatch(renderToStaticMarkup(view), /data-profile-report/);
+    elements(view, node => node.type === 'button')[0].props.onClick();
+    assert.equal(open, true);
+    assert.match(renderToStaticMarkup(scope.Controls({ ...props, profileReportOpen: open })), new RegExp(`data-profile-report="${B}"`));
+    for (const profile of [null, { wallet_address: B, username: '', bio: '', avatar_url: '' }]) {
+        const html = renderToStaticMarkup(scope.Controls({ ...props, profile, profileReportOpen: true }));
+        assert.doesNotMatch(html, /Report profile|data-profile-report/, 'missing profiles cannot offer or retain a report dialog');
+    }
 });
 
 function reportHarness({ authenticate, fetchPage, target = B } = {}) {
