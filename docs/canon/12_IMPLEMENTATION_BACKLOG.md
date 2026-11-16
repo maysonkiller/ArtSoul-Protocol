@@ -212,6 +212,9 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   browser's native app-opening confirmation. The follow-up removes timed
   navigation and keeps the existing explicit Open Wallet action. It does not
   bypass browser confirmation or repeat accepted signatures.
+  The November 16 [card network placement correction](../audits/B18_CARD_NETWORK_TITLE_2026-11-16.md)
+  moves network identity beside the title across DOM/React cards and wallet NFT inventories.
+  Focused tests, build and local desktop/320/375 px layout checks pass; this does not close remaining B18 device/voice gates.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.

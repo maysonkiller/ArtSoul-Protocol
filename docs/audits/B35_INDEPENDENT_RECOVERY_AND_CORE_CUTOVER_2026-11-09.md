@@ -162,8 +162,17 @@ Private evidence: `b35-live-check-1794231833298.json`,
   passed Phantom connection, Disconnect, reload remaining guest and Rabby
   connection. [Current journey evidence](../PHASE_B_STATUS_2026-11-02.md) also
   accepts assistant bidding and the other completed signed actions; none is
-  replayed. Native iPhone composition, delayed resale UI convergence and the
-  final-contract public cohort retain their existing gates.
+  replayed. November 16 evidence supersedes the earlier open iPhone layout and
+  complete resale UI gates: the owner reported satisfactory iPhone layout and
+  [accepted early-return profile sign-in after PR #492](B18_EARLY_WALLET_RETURN_2026-11-16.md#owner-acceptance-after-pr-492).
+  The [Music 2 purchase at block 59568267](B12_RESALE_UI_ACCEPTANCE_2026-11-16.md)
+  updated ownership, provenance and purchase controls without reload. Its
+  initial-stale/retry timing and artwork 25's in-place re-auction modal closure
+  were not observed; those limitations do not require replaying accepted
+  transactions. Native speech recognition and the final-contract public cohort
+  retain their existing gates; the informal layout report is not a measured
+  device matrix. These UI outcomes do not close the provider remediation or
+  representative resource gates above.
 - Spend Cap stays enabled; no paid capacity, API plan, mainnet write or new
   financial parameter was activated.
 

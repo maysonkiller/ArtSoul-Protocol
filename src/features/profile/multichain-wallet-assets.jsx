@@ -35,7 +35,7 @@ const BRAND_ICONS = Object.freeze({
 function NetworkBadge({ network }) {
   const info = OPTIONS.find(row => row[0] === network);
   if (!info) return null;
-  return <span className="wallet-chain-chip" data-chain={network} title={info[1]} aria-label={"Network: " + info[1]}>
+  return <span className="wallet-chain-chip" data-chain={network} role="img" title={info[1]} aria-label={"Network: " + info[1]}>
     {BRAND_ICONS[network] ? <img src={BRAND_ICONS[network]} alt="" /> :
       <span className="wallet-chain-glyph" aria-hidden="true">{info[2]}</span>}
     <span>{info[1]}</span>
@@ -47,10 +47,12 @@ function NftCard({ item }) {
       <span className="wallet-asset-placeholder" aria-hidden="true">NFT</span>
       {item.imageUrl && <img src={item.imageUrl} alt="" loading="lazy" decoding="async"
         referrerPolicy="no-referrer" onError={e => { e.currentTarget.hidden = true; }}/>}
-      <div className="wallet-asset-overlay"><NetworkBadge network={item.network}/></div>
     </div>
     <div className="wallet-asset-copy">
-      <h4 title={item.name || item.tokenId}>{item.name || ('NFT #' + item.tokenId)}</h4>
+      <div className="wallet-nft-title-row">
+        <h4 title={item.name || item.tokenId}>{item.name || ('NFT #' + item.tokenId)}</h4>
+        <NetworkBadge network={item.network}/>
+      </div>
       <p className="wallet-asset-collection">{item.collection || 'Unnamed collection'}</p>
       <p className="wallet-asset-brief">{item.tokenType}{item.quantity !== '1' ? ' · ×' + item.quantity : ''}</p>
       <details className="wallet-asset-details"><summary>NFT details</summary>
