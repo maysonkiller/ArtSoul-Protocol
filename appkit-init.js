@@ -1974,9 +1974,16 @@ function hideWalletApprovalPrompt() {
 async function requestCoreNetworkMethod(provider, request) {
     let settled = false;
     let promptShown = false;
+    let visitedWallet = document.visibilityState === 'hidden';
+    const rememberBackground = () => {
+        if (document.visibilityState === 'hidden') visitedWallet = true;
+    };
+    document.addEventListener('visibilitychange', rememberBackground);
     const handoffTimer = setTimeout(() => {
         if (settled) return;
-        if (document.visibilityState === 'visible') {
+        // A timer paused in the background must not send the user away again
+        // when they return. The waiting hint retains its explicit Open action.
+        if (document.visibilityState === 'visible' && !visitedWallet) {
             openCoreWalletForApproval(provider, request.method);
         }
         promptShown = showWalletApprovalPrompt(provider, request.method) || promptShown;
@@ -1987,6 +1994,7 @@ async function requestCoreNetworkMethod(provider, request) {
     } finally {
         settled = true;
         clearTimeout(handoffTimer);
+        document.removeEventListener('visibilitychange', rememberBackground);
         if (promptShown) hideWalletApprovalPrompt();
     }
 }
@@ -3458,10 +3466,36 @@ function classifyAuthenticationFailure(error) {
     return { code: 'AUTH_FAILED', message: 'Sign-in could not be completed. Check the request in your wallet, then try again.' };
 }
 
+function authenticationDiagnosticReference(afterSequence, fallbackStage = '') {
+    try {
+        if (!walletDebugEnabled()) return '';
+        const entry = [...walletDebugEntries].reverse().find(item =>
+            item.sequence > afterSequence && item.step === 'SIWE auth operation failed');
+        if (!entry) return ['provider-selection', 'auth-call', 'auth-result'].includes(fallbackStage) ? fallbackStage : '';
+        const detail = entry?.detail;
+        if (!['validation', 'provider-accounts', 'session-check', 'nonce', 'chain-id', 'signature', 'verify', 'account-check', 'session-store'].includes(detail?.stage)) return '';
+        const parts = [detail.stage];
+        if (['Error', 'TypeError', 'AbortError', 'TimeoutError', 'NetworkError', 'SyntaxError'].includes(detail.name)) parts.push(detail.name);
+        if (['network-fetch', 'property-access', 'other'].includes(detail.kind)) parts.push(detail.kind);
+        if ((Number.isSafeInteger(detail.code) && Math.abs(detail.code) <= 9999999) || [
+            'INVALID_WALLET', 'INVALID_AUTH_PAYLOAD', 'INVALID_SIWE_MESSAGE', 'INVALID_SIGNATURE', 'NONCE_NOT_IN_MESSAGE',
+            'INVALID_OR_EXPIRED_NONCE', 'MISSING_SESSION_SECRET', 'MISSING_SUPABASE_URL', 'MISSING_SERVICE_ROLE_KEY',
+            'SIWE_NONCES_TABLE_MISSING', 'SUPABASE_SERVICE_ROLE_AUTH_FAILED', 'SUPABASE_INSERT_FAILED', 'SUPABASE_UPDATE_FAILED',
+            'SUPABASE_QUERY_FAILED', 'SUPABASE_REQUEST_FAILED', 'INTERNAL_ERROR', 'REQUEST_FAILED', 'METHOD_NOT_ALLOWED',
+            'ACTION_REJECTED', 'NETWORK_ERROR', 'TIMEOUT', 'CORE_SIGN_CLIENT_UNAVAILABLE'
+        ].includes(detail.code)) parts.push(String(detail.code));
+        if (Number.isInteger(detail.status) && detail.status >= 100 && detail.status <= 599) parts.push(String(detail.status));
+        return parts.join('/');
+    } catch {
+        return '';
+    }
+}
+
 // Keep one authentication request and boolean results for existing callers.
 // A scoped presenter can replace the legacy alert without changing sign-in.
 window.ensureAuthenticated = async ({ onError } = {}) => {
     if (!authenticationPromise) authenticationPromise = (async () => {
+        const debugStartSequence = walletDebugSequence;
         let walletAddress = window.getCurrentWalletAddress?.();
         const connectedDuringThisRequest = !walletAddress;
         if (!walletAddress) {
@@ -3496,6 +3530,7 @@ window.ensureAuthenticated = async ({ onError } = {}) => {
             }
         }
 
+        let authStage = 'provider-selection';
         try {
             console.log('Requesting signature for authentication...');
             setCoreAuthLifecycleState('siwe-signing');
@@ -3504,16 +3539,20 @@ window.ensureAuthenticated = async ({ onError } = {}) => {
             const provider = await getProviderForWallet(walletAddress);
             if (!provider) throw new Error('The active wallet account is not available in the connected provider.');
 
+            authStage = 'auth-call';
             const authResult = await window.SupabaseAuth.authenticateWithWallet(
                 walletAddress,
                 provider
             );
+            authStage = 'auth-result';
             console.log('Authenticated:', authResult.user.id);
             setCoreAuthLifecycleState('authenticated');
             walletDebugLog('SIWE signature verified', { address: maskWalletAddress(walletAddress) });
             return { authenticated: true };
         } catch (error) {
             const failure = classifyAuthenticationFailure(error);
+            const reference = authenticationDiagnosticReference(debugStartSequence, authStage);
+            if (reference) failure.message += ` Reference: ${reference}.`;
             console.error('Authentication failed:', failure.code);
             setCoreAuthLifecycleState('connected');
             walletDebugLog('SIWE signature failed', { code: failure.code, message: failure.message });

@@ -19,6 +19,12 @@ followed by duplicate feedback in its caller. It does not reveal the underlying
 provider/backend error or prove that returning early caused it. Do not count
 the first-attempt authentication path as accepted.
 
+After PR #491 was released, the owner repeatedly reproduced the failure by
+returning from MetaMask before completion; waiting in the wallet succeeded.
+The new message is `AUTH_UNAVAILABLE`. The [early-return follow-up](B18_EARLY_WALLET_RETURN_2026-11-16.md)
+records that stronger trigger evidence, bounded server checks and the remaining
+operation-level ambiguity. The first-attempt issue is still open.
+
 ## Investigation boundary
 
 The current client awaits the wallet's `personal_sign` response and server

@@ -70,40 +70,70 @@ async function initSupabase() {
 }
 
 const BACKEND_AUTH_PREFIXES = ['/api/auth', '/auth'];
+const BACKEND_AUTH_ERROR_CODES = new Set([
+    'INVALID_WALLET', 'INVALID_AUTH_PAYLOAD', 'INVALID_SIWE_MESSAGE', 'INVALID_SIGNATURE',
+    'NONCE_NOT_IN_MESSAGE', 'INVALID_OR_EXPIRED_NONCE', 'MISSING_SESSION_SECRET',
+    'MISSING_SUPABASE_URL', 'MISSING_SERVICE_ROLE_KEY', 'SIWE_NONCES_TABLE_MISSING',
+    'SUPABASE_SERVICE_ROLE_AUTH_FAILED', 'SUPABASE_INSERT_FAILED', 'SUPABASE_UPDATE_FAILED',
+    'SUPABASE_QUERY_FAILED', 'SUPABASE_REQUEST_FAILED', 'INTERNAL_ERROR', 'REQUEST_FAILED', 'METHOD_NOT_ALLOWED'
+]);
+const AUTH_DIAGNOSTIC_ERROR_CODES = new Set([
+    ...BACKEND_AUTH_ERROR_CODES,
+    'ACTION_REJECTED', 'NETWORK_ERROR', 'TIMEOUT', 'CORE_SIGN_CLIENT_UNAVAILABLE'
+]);
+
+function logAuthOperationFailure(stage, error) {
+    try {
+        const rawCode = error?.code ?? error?.data?.code ?? error?.cause?.code ?? error?.error?.code;
+        const numericCode = typeof rawCode === 'string' && /^-?\d{1,7}$/.test(rawCode)
+            ? Number(rawCode) : rawCode;
+        const code = Number.isSafeInteger(numericCode) ? numericCode
+            : AUTH_DIAGNOSTIC_ERROR_CODES.has(rawCode) ? rawCode : null;
+        const rawName = error?.name;
+        const rawStatus = error?.status;
+        const name = ['Error', 'TypeError', 'AbortError', 'TimeoutError', 'NetworkError', 'SyntaxError'].includes(rawName)
+            ? rawName : 'Error';
+        const status = Number.isInteger(rawStatus) && rawStatus >= 100 && rawStatus <= 599
+            ? rawStatus : null;
+        let kind = 'other';
+        const message = name === 'TypeError' ? error?.message : null;
+        if (typeof message === 'string') {
+            if (['Load failed', 'Failed to fetch', 'Network request failed'].includes(message)) kind = 'network-fetch';
+            else if (/Cannot read propert|undefined is not an object/.test(message)) kind = 'property-access';
+        }
+        window.ArtSoulWalletDebug?.log('SIWE auth operation failed', { stage, name, code, status, kind });
+    } catch {
+        // Optional diagnostics must never replace the original rejection.
+    }
+}
 
 async function fetchBackendAuth(path, options = {}) {
     let lastError = null;
 
     for (const prefix of BACKEND_AUTH_PREFIXES) {
-        try {
-            const response = await fetch(`${prefix}${path}`, {
-                ...options,
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(options.headers || {})
-                }
-            });
-
-            const shouldTryFallback = response.status === 404 ||
-                (prefix === '/api/auth' && response.status === 401);
-            if (shouldTryFallback) {
-                lastError = new Error('Auth endpoint not found');
-                continue;
+        const response = await fetch(`${prefix}${path}`, {
+            ...options,
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(options.headers || {})
             }
+        });
 
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : {};
-            if (!response.ok) {
-                const error = new Error(data.message || data.error || 'Authentication request failed');
-                error.status = response.status;
-                throw error;
-            }
-            return data;
-        } catch (error) {
-            lastError = error;
-            break;
+        if (response.status === 404) {
+            lastError = new Error('Auth endpoint not found');
+            continue;
         }
+
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : {};
+        if (!response.ok) {
+            const error = new Error(data.message || data.error || 'Authentication request failed');
+            error.status = response.status;
+            if (BACKEND_AUTH_ERROR_CODES.has(data.error)) error.code = data.error;
+            throw error;
+        }
+        return data;
     }
 
     throw lastError || new Error('Authentication backend unavailable');
@@ -171,6 +201,7 @@ function utf8ToHex(value) {
  * Creates a backend SIWE session with wallet address as user ID
  */
 async function authenticateWithWallet(walletAddress, provider) {
+    let stage = 'validation';
     try {
         const normalizedWallet = normalizeWalletAddress(walletAddress);
         const activeProvider = provider || window.ethereum;
@@ -183,6 +214,7 @@ async function authenticateWithWallet(walletAddress, provider) {
             throw new Error('No wallet provider available for authentication');
         }
 
+        stage = 'provider-accounts';
         const providerAccounts = await requestWalletProvider(activeProvider, { method: 'eth_accounts' });
         const providerWallets = (Array.isArray(providerAccounts) ? providerAccounts : [])
             .map(normalizeWalletAddress);
@@ -194,6 +226,7 @@ async function authenticateWithWallet(walletAddress, provider) {
             throw new Error('The selected wallet account changed. Please try the protected action again.');
         }
 
+        stage = 'session-check';
         await invalidateSessionForWalletMismatch(normalizedWallet);
 
         if (authenticatedWallet?.toLowerCase() === normalizedWallet && backendSessionCache) {
@@ -207,15 +240,18 @@ async function authenticateWithWallet(walletAddress, provider) {
             return existingSession;
         }
 
+        stage = 'nonce';
         const { nonce } = await fetchBackendAuth(`/nonce?wallet=${encodeURIComponent(normalizedWallet)}`, {
             method: 'GET'
         });
+        stage = 'chain-id';
         const chainId = await getActiveChainId(activeProvider);
         const message = buildSiweMessage(normalizedWallet, nonce, chainId);
 
         console.log(' Requesting SIWE signature from wallet...');
         let signature;
 
+        stage = 'signature';
         if (activeProvider && activeProvider.request) {
             signature = await requestWalletProvider(activeProvider, {
                 method: 'personal_sign',
@@ -230,6 +266,7 @@ async function authenticateWithWallet(walletAddress, provider) {
             throw new Error('No wallet provider available');
         }
 
+        stage = 'verify';
         const verified = await fetchBackendAuth('/verify', {
             method: 'POST',
             body: JSON.stringify({
@@ -240,6 +277,7 @@ async function authenticateWithWallet(walletAddress, provider) {
             })
         });
 
+        stage = 'account-check';
         const verifiedWallet = normalizeWalletAddress(verified.wallet || normalizedWallet);
         const activeWalletAfterSignature = getActiveWalletAddress();
         if (activeWalletAfterSignature !== verifiedWallet) {
@@ -251,9 +289,10 @@ async function authenticateWithWallet(walletAddress, provider) {
             clearBackendSessionCache();
             throw new Error('The active wallet changed during sign-in. Please try again with the current account.');
         }
+        stage = 'session-store';
         return setBackendSession(verifiedWallet);
     } catch (error) {
-        console.error(' Backend SIWE auth failed:', error);
+        logAuthOperationFailure(stage, error);
         throw error;
     }
 }

@@ -176,11 +176,11 @@ test('private editing closes immediately on a same-wallet sign-out or connected-
     }
 });
 
-function mobileProfileAuthHarness({ deferAuthentication = false, verificationFailure = null } = {}) {
+function mobileProfileAuthHarness({ deferAuthentication = false, verificationFailure = null, verificationError = null, debugEnabled = false } = {}) {
     const auth = fs.readFileSync('supabase-auth.js', 'utf8');
     const app = fs.readFileSync('appkit-init.js', 'utf8');
     const listeners = new Map(), storage = new Map();
-    const state = { wallet: A, signatures: 0, verifies: 0, privateReads: 0, alerts: 0, restarts: 0, open: false, error: '' };
+    const state = { wallet: A, signatures: 0, verifies: 0, privateReads: 0, alerts: 0, restarts: 0, open: false, error: '', debugEnabled, diagnostics: [] };
     const response = (data, status = 200) => ({ ok: status < 400, status, text: async () => JSON.stringify(data), json: async () => data });
     const provider = { request: async ({ method }) => {
         if (method === 'eth_accounts') return [state.wallet];
@@ -200,13 +200,15 @@ function mobileProfileAuthHarness({ deferAuthentication = false, verificationFai
         fetch: async url => {
             if (url.endsWith('/session')) return response({ authenticated: false });
             if (url.includes('/nonce?')) return response({ nonce: 'fixture-nonce' });
-            if (url.endsWith('/verify')) { state.verifies++; return verificationFailure ? response({ error: verificationFailure.code }, verificationFailure.status) : response({ wallet: A }); }
+            if (url.endsWith('/verify')) { state.verifies++; if (verificationError) throw verificationError; return verificationFailure ? response({ error: verificationFailure.code }, verificationFailure.status) : response({ wallet: A }); }
             if (url.endsWith('/logout')) return response({ success: true });
             if (url === '/api/profile') { state.privateReads++; return response({ success: true, profile: { id: 'stored-profile', wallet_address: A, username: 'Artist' } }); }
             throw new Error(`Unexpected auth request: ${url}`);
         }, console: { log() {}, warn() {}, error() {} }, alert: () => { state.alerts++; },
         isMobileDevice: () => true, isInjectedWalletBrowser: () => false,
-        walletDebugLog() {}, maskWalletAddress: value => value, getProviderForWallet: async () => provider, setCoreAuthLifecycleState() {},
+        walletDebugEnabled: () => state.debugEnabled, walletDebugSequence: 0, walletDebugEntries: state.diagnostics,
+        walletDebugLog(step, detail) { if (state.debugEnabled) state.diagnostics.push({ sequence: ++scope.walletDebugSequence, step, detail }); },
+        maskWalletAddress: value => value, getProviderForWallet: async () => provider, setCoreAuthLifecycleState() {},
         isWalletExplicitlyDisconnected: () => false, isCoreSessionActive: () => true, isCoreConnectInFlight: () => false,
         restartWalletConnectTransport: async () => { state.restarts++; }, recheckDeferredCoreDisconnect: async () => {},
         getWalletDebugSnapshot: () => ({}), walletResumeWaiters: new Set(), scheduleWalletReconciliation() {},
@@ -215,8 +217,9 @@ function mobileProfileAuthHarness({ deferAuthentication = false, verificationFai
         setProfileEditLoading: value => { state.loading = value; }, setProfileEditError: value => { state.error = value; }, setProfileEditErrorIsNotice: value => { state.notice = value; },
         setProfileDraft: value => { state.draft = value; }, setEditMode: value => { state.open = value; }, useEffect: fn => fn() };
     vm.createContext(scope);
+    window.ArtSoulWalletDebug = { log: scope.walletDebugLog };
     vm.runInContext(auth, scope);
-    for (const name of ['getWalletErrorCode', 'isUserRejectedError', 'classifyAuthenticationFailure']) {
+    for (const name of ['getWalletErrorCode', 'isUserRejectedError', 'classifyAuthenticationFailure', 'authenticationDiagnosticReference']) {
         vm.runInContext(app.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n\\}`))[0], scope);
     }
     vm.runInContext(`let authenticationPromise = null, deferMobileAuthenticationThisTurn = ${deferAuthentication};\n`
@@ -285,6 +288,63 @@ test('shared authentication preserves boolean legacy results and alerts once whi
     const retry = h.scope.window.ensureAuthenticated(); await tick(); assert.equal(h.state.signatures, 2);
     h.state.resolveSignature('0xsynthetic-signature');
     assert.equal(await retry, true); assert.equal(h.state.alerts, 1);
+});
+
+test('opt-in profile diagnostics distinguish a failed wallet request from failed verification without exposing raw errors', async () => {
+    for (const stage of ['signature', 'verify']) {
+        const h = mobileProfileAuthHarness({ debugEnabled: true, verificationError: stage === 'verify' ? new TypeError('Failed to fetch') : null });
+        const pending = h.open(); await tick();
+        if (stage === 'signature') h.state.rejectSignature(new TypeError('Cannot read properties of undefined (reading "private-provider-value")'));
+        else h.state.resolveSignature('0xsynthetic-signature');
+        await pending;
+        assert.match(h.state.error, new RegExp(`Reference: ${stage}/TypeError/${stage === 'verify' ? 'network-fetch' : 'property-access'}\\.`));
+        assert.equal(h.state.verifies, stage === 'verify' ? 1 : 0);
+        assert.equal(h.state.signatures, 1); assert.equal(h.state.alerts, 0); assert.equal(h.state.privateReads, 0);
+        assert.doesNotMatch(h.state.error, /private-provider-value|Failed to fetch|synthetic-signature/);
+    }
+});
+
+test('profile diagnostic references are opt-in, bounded and never reuse an earlier attempt', async () => {
+    const h = mobileProfileAuthHarness({ debugEnabled: true });
+    h.scope.walletDebugLog('SIWE auth operation failed', { stage: 'verify', name: 'Error', code: 'INVALID_SIGNATURE', status: 401 });
+    h.scope.getProviderForWallet = async () => { throw new TypeError('Unavailable before an auth operation record exists'); };
+    await h.open();
+    assert.match(h.state.error, /Reference: provider-selection\./);
+    assert.doesNotMatch(h.state.error, /INVALID_SIGNATURE|Unavailable before/);
+    const afterSequence = h.scope.walletDebugSequence;
+    h.scope.walletDebugLog('SIWE auth operation failed', { stage: 'signature', name: 'TypeError', code: 4900, status: 503, kind: 'network-fetch' });
+    assert.equal(h.scope.authenticationDiagnosticReference(afterSequence), 'signature/TypeError/network-fetch/4900/503');
+    h.scope.walletDebugLog('SIWE auth operation failed', { stage: 'signature', name: 'private-name', code: 'private-code', status: 'private-status', kind: 'private-kind', message: 'private-message' });
+    assert.equal(h.scope.authenticationDiagnosticReference(afterSequence), 'signature');
+    h.scope.walletDebugLog('SIWE auth operation failed', { stage: 'private-stage', name: 'Error' });
+    assert.equal(h.scope.authenticationDiagnosticReference(afterSequence), '');
+    h.state.debugEnabled = false;
+    h.state.diagnostics.push({ sequence: ++h.scope.walletDebugSequence, step: 'SIWE auth operation failed', detail: { stage: 'verify', name: 'TypeError' } });
+    assert.equal(h.scope.authenticationDiagnosticReference(0), '');
+});
+
+test('wrapper diagnostics identify an unrecorded auth call or malformed result without reusing an old event', async () => {
+    for (const stage of ['auth-call', 'auth-result']) {
+        const h = mobileProfileAuthHarness({ debugEnabled: true });
+        h.scope.walletDebugLog('SIWE auth operation failed', { stage: 'verify', name: 'Error', code: 'INVALID_SIGNATURE', status: 401 });
+        h.scope.window.SupabaseAuth.authenticateWithWallet = stage === 'auth-call'
+            ? async () => { throw new TypeError('private unrecorded failure'); }
+            : async () => null;
+        await h.open();
+        assert.match(h.state.error, new RegExp(`Reference: ${stage}\\.`));
+        assert.doesNotMatch(h.state.error, /INVALID_SIGNATURE|private unrecorded/);
+        assert.equal(h.state.alerts, 0); assert.equal(h.state.privateReads, 0);
+    }
+});
+
+test('an unavailable optional diagnostic reference does not replace the authentication failure', async () => {
+    const h = mobileProfileAuthHarness({ debugEnabled: true });
+    h.scope.walletDebugEnabled = () => { throw new Error('Optional diagnostics unavailable'); };
+    const pending = h.open(); await tick();
+    h.state.rejectSignature(Object.assign(new Error('User rejected'), { code: 4001 }));
+    await pending;
+    assert.equal(h.state.error, 'Sign-in was canceled. You can try again when you are ready.');
+    assert.equal(h.state.notice, true); assert.equal(h.state.alerts, 0); assert.equal(h.state.privateReads, 0);
 });
 
 test('a real account change while the mobile signature is pending prevents a late editor opening', async () => {
