@@ -203,8 +203,9 @@ memory of 16 MB eliminated spilling for both exact queries, but a persistent
 collector-only correction requires the provider. No global memory or paid
 change was made. See [the trace and reproduction](audits/B30_EXPORTER_TEMP_FILES_2026-11-09.md).
 The authorized provider request was submitted successfully with optional
-project-data access disabled. The current billing dashboard shows usage within
-included quotas and Spend Cap enabled; the provider fix is still pending.
+project-data access disabled. The November 9 billing observation showed usage
+within included quotas and Spend Cap enabled; this is not a fresh November 16
+billing verification. The provider fix is still pending.
 
 The next bounded B18 fix improves Classic controls over dark/light media and
 opens contextual Guide links only after the target section is expanded.
@@ -215,7 +216,7 @@ for the 53 focused checks, 450 built-browser assertions and release boundary.
 | Gate | What remains | Boundary |
 | --- | --- | --- |
 | B17 reminder acceptance | Real payment-due delivery/read state, live extension and physical-device observation | The November 9 read-only follow-up retains one real auction-ending/read marker and finds no persisted payment-due reminder. Existing isolated tests cover deadlines and read identity; they do not establish those missing live scenarios. Official broadcasts wait for the designated project publisher. |
-| B20 profile notice handling | Actual profile report/review acceptance; historical unused-cover retention decision; small native-dialog geometry follow-up | [Profile-content reports](audits/B20_PROFILE_CONTENT_REPORTS_2026-11-09.md) are released in PR #484. Fresh full-data restoration, twice-applied migration, Linux/Windows CI, live migration and nine production reader/access checks passed. Intake is enabled under the existing shared quota and staff authority. Form-opening/mobile checks identified the geometry follow-up; no actual complaint/review, immediate cross-client invalidation, upload deletion or broader customization is claimed. |
+| B20 profile notice handling | **Controlled production acceptance passed November 16** | [Profile-content reports](audits/B20_PROFILE_CONTENT_REPORTS_2026-11-09.md) are released in PR #484 with PR #485 dialog geometry and PR #487 stored-profile guard. The owner-authorized lys TEST cycle passed staff passkey review, public masking, original-content restoration and both participants' notification viewing/read state. The cycle exposed omitted profile types in summary/read/remove; the [bounded database correction](audits/B20_PROFILE_NOTIFICATION_READ_STATE_2026-11-16.md) passed isolated regressions and both live owner reads. Historical cover files stay preserved as a separate retention choice, not a reporting gate. Immediate cross-client invalidation, upload deletion and broader customization are not claimed. |
 | B18 device acceptance | Native iPhone review of the latest composition | Real Phantom connection → Disconnect → reload remaining guest → Rabby connection passed on November 9. Browser geometry and synthetic wallet events do not establish iPhone behavior. Android testing was declined. |
 | B11/B12 actual journeys | Complete UI acceptance of delayed resale projection | Artwork 38/token 7 purchase succeeded at block 56637436; command/Buy retired but owner/history stayed stale, with the bounded correction released in PR #482; preview showed the updated owner and six history events, but delayed no-reload convergence was not re-exercised. Artwork 14 default and assistant-created auction 75, plus artwork 38/token 7 initial listing, are accepted without reload. Artwork 25 page re-auction created live auction 74 and appeared in the gallery; in-place modal closure was not observed. Assistant withdrawal is accepted at block 56622288 (0.0609875 ETH to zero), and Gallery's zero-funds check passed after PR #480. Assistant bid for artwork 14 / auction 75 is accepted without reload at block 56674116: .001 ETH bid, .01 ETH deposit, correct activity and highest-bidder controls, command cleared. Prior voice and repricing/removal acceptance remain valid; never replay completed transactions. |
 | B30/B35 operations | Provider exporter correction, representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; recovery, migrations, runtime bytes, bounded health and four populated APIs passed. Combined PostgreSQL/real-Redis recovery passes locally. Hosted cache and NFT-writer activation remain separate; the managed exporter cause is proved but its correction is pending. No new server was purchased. |
@@ -353,6 +354,14 @@ the issued NFT. The pending legitimate auction's escrow and credits stay intact,
 and it settles successfully after the genuine Core regains authority. The full
 suite passes 55 local contract tests. This records a privileged mint-authority
 hazard for the replacement design; no deployed configuration or Solidity changed.
+
+November 16: [replacement boundaries](architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md)
+and the [executable accounting model](audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md)
+are merged in PR #485/#488. Six model tests check 1,024 abstract states and
+28,672 transitions plus replays for scoped issuance, full refunds, failed-payment
+credits and isolated solvency. Linux/Windows/static checks passed. Validated
+settlement and refund eligibility remain inputs; this does not prove replacement
+bytecode or select unresolved governance, pause or financial policy. C1 stays open.
 
 Actual Snapshot A remains at the end of the final public testnet, announced in
 advance and independently stored/verified before any destructive reset. Export
