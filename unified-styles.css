@@ -10282,3 +10282,52 @@ body:is(.classic,.future) .wallet-chain-chip img { object-fit: contain; }
     overflow-wrap: anywhere; font-size: 13px;
   }
 }
+
+/* Owner layout review 2026-11-16: compact account copy and shared card footer. */
+/* A short display name (or shortened address with no name) must not reserve
+   the entire identity column before the copy affordance. Long labels still
+   truncate within the existing plaque width. Clipboard behavior is unchanged. */
+body:is(.classic, .future) .site-header #navButtons .avatar-info button {
+    width: fit-content;
+    max-width: 100%;
+    align-self: flex-start;
+}
+body:is(.classic, .future) .site-header #navButtons .avatar-info:has([data-avatar-address][hidden]) {
+    justify-content: center;
+}
+
+/* The shared DOM and React artwork renderers use the same media-local frame,
+   so Saved always follows the actual preview height, including mobile crops. */
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview .saved-button-overlay {
+    top: auto !important;
+    left: auto !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    z-index: 4;
+}
+/* Bottom row: media kind left, user-controlled playback centered, Saved right.
+   Align the shorter media badge with the centers of the 44px controls. */
+body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+    top: auto !important;
+    bottom: 20px !important;
+    left: 8px !important;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 8px !important;
+    transform: translateX(-50%);
+}
+/* Three 44px targets cannot fit on the same line in a very narrow card.
+   Keep type and Saved aligned below; put playback just above without overlap. */
+@container (max-width: 215px) {
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
+        bottom: 56px !important;
+    }
+}
