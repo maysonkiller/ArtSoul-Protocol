@@ -88,3 +88,31 @@ After the provider changes its collector, repeat one short, bounded counter/log
 window to verify the correction and retain representative IO/egress acceptance
 as a separate gate. Until then, report attribution as complete and remediation
 as pending; do not claim that future warnings or overruns are impossible.
+
+## Read-only follow-up — November 16, 2026
+
+Support acknowledged the request and its AI agent escalated managed
+exporter/session review on November 9. The thread contained no subsequent
+reply or correction confirmation when checked on November 16.
+
+At 11:09:56.959604 UTC, the project reported `ACTIVE_HEALTHY`; a read-only
+database snapshot returned:
+
+| Measurement | Value |
+| --- | ---: |
+| Database size | 427,666,579 bytes (408 MB as reported by PostgreSQL) |
+| `temp_files` | 206,384 |
+| `temp_bytes` | 472,860,999,358 |
+| Connected backends | 23 |
+| Deadlocks / conflicts | 0 / 0 |
+
+The statistics-reset marker remained April 26, 02:16:05.746341 UTC, and server
+startup remained November 2, 00:22:36.181024 UTC. Against the recorded November 9
+snapshot of 194,504 files and 432,231,801,786 bytes, the cumulative increase was
+11,880 files and 40,629,197,572 bytes (37.84 GiB).
+
+This single snapshot does not establish the current spill rate or attribute
+all intervening growth to the exporter. No settings, data or services were
+changed and no support message was sent. Provider remediation, a bounded
+post-correction verification window and representative capacity acceptance
+remain pending.

@@ -96,11 +96,12 @@ Phase A exit: A1–A12 accepted, the local and CI baselines are green, productio
 
 Goal: validate the product with real users without changing frozen economics.
 
-November 9 B20 implementation checkpoint: [profile-content notices](../audits/B20_PROFILE_CONTENT_REPORTS_2026-11-09.md)
-now have local intake, versioned review, reversible public masking and private
-owner editing. Focused checks and a complete isolated restore with the migration
-applied twice passed. Production migration/release, real report/review acceptance
-and historical unused-cover retention remain open; Phase B is not complete.
+November 16 B20 release checkpoint: [profile-content notices](../audits/B20_PROFILE_CONTENT_REPORTS_2026-11-09.md)
+have deployed intake, versioned review, reversible public masking and private
+owner editing (PR #484). CI, fresh full-data restoration, live migration and
+production reader/access checks passed; intake is enabled under the existing
+quota and staff policy. Native-dialog geometry follow-up, real report/review
+acceptance and historical unused-cover retention remain open; Phase B is not complete.
 
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
@@ -183,8 +184,10 @@ and historical unused-cover retention remain open; Phase B is not complete.
   the square 28px guest avatar. Exact-head CI `42681754394` passed Linux,
   Windows and static checks; merge `dfc9f82a36405726bb42ba5b06c6133aa1927d8e`
   is READY in production deployment `dpl_ArKDP1GHY96YmMt57EBEfgrV7tT4`.
-  Latest native iPhone and real Phantom disconnect/reconnect observations
-  remain open; no completed wallet transaction is repeated for this release.
+  The November 9 [native wallet acceptance](../audits/B18_WALLET_STATE_FRESHNESS_2026-11-09.md#native-production-acceptance)
+  passed Phantom connection, Disconnect, reload remaining guest and Rabby
+  connection. Latest native iPhone composition remains open; no completed
+  wallet transaction is repeated for this release.
   The November 9 [profile/network follow-up](../audits/B18_PROFILE_NETWORK_MENU_2026-11-09.md)
   stabilizes late staff actions, removes account hover frames and adds explicit
   choices for configured wallet networks without enabling mainnet writes.
@@ -250,6 +253,12 @@ still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
   leaves the issued token intact. The funded Core auction/escrow is unchanged and
   settles after authority restoration. All 55 local contract tests pass; this is
   a governance/lifecycle hazard to address in C1/C3, not a live exploit or a fix.
+  November 16: [minimal replacement boundaries](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md)
+  propose immutable engine/NFT pairs, deployment-scoped identity, settlement-bound
+  minting, isolated liabilities and bounded refunds. Existing source hashes match
+  the characterization baseline. Topology, retirement authority, pause/deadline,
+  rounding/treasury and governance choices remain explicit; no replacement
+  Solidity, deployment or new financial parameters are approved by this proposal.
 - [ ] **C2 — Core rework.** Implement the frozen economics, deterministic lazy/creator/keeper finalization, default handling, and the Bible §3.1 refund obligations with bounded batches and withdrawable-credit fallback. No unbounded bidder loop.
 - [ ] **C3 — ArtworkNFT rework.** Implement the canonical 5.5% royalty, marketplace whitelist, provenance, and migration-safe interfaces.
 - [ ] **C4 — ArtSoulGenesis.** Build the dedicated soulbound contract and audited grant path. The numeric grant cadence is tunable operational policy, not canon or an immutable roadmap value. Grants require published categories, durable grant records, an audit log, and multisig-authorized administration.

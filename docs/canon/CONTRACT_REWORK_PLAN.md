@@ -253,6 +253,13 @@ and cross-network funding still need their own authorization/accounting decision
 It distinguishes present prototype facts, approved requirements, recommendations
 and undecided policy. It is not architecture sign-off or replacement Solidity.
 
+The November 16 [minimal replacement boundaries](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md)
+narrow this into a proposed immutable engine/NFT pair, deployment-scoped identity,
+settlement-bound mint capability and isolated liabilities with bounded refunds.
+Source hashes still match the characterization baseline. The document separates
+necessary safety invariants from unselected topology, emergency, rounding,
+treasury and governance policies; it is not replacement implementation or sign-off.
+
 1. C1: state/rounding/deadline specification, identity/capability graph, upgrade
    selection, threats and invariants. Approve changed rules before Solidity.
 2. C2/C3/C6: smallest complete publish → auction → settlement → resale → withdrawal

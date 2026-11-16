@@ -89,7 +89,7 @@ export function ProfileContentReport({ profileWallet, onClose }) {
         }
     }
 
-    return createPortal(<dialog ref={dialog} className="report-modal" aria-labelledby="profileReportTitle"
+    return createPortal(<dialog ref={dialog} className="report-modal artwork-moderation-dialog" aria-labelledby="profileReportTitle"
         onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
         <div className="report-modal-header">
             <div><p className="report-modal-eyebrow">Notice and takedown</p><h2 id="profileReportTitle">Report this profile</h2></div>

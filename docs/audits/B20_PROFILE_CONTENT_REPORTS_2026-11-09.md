@@ -1,7 +1,7 @@
 # Profile-content reports and reversible public masking
 
-Status: implemented and verified locally. The production migration, deployment,
-activation and real report/review acceptance are pending. This does not close
+Status: production migration, deployment and intake activation completed November
+16. Real report/review acceptance remains pending. This does not close
 Phase B or the separate native-wallet acceptance queue.
 
 ## Implemented scope
@@ -88,10 +88,50 @@ still found 11 profiles, eight reports and no public projection view. Existing
 advisories (one security-definer view and 17 function search-path warnings) are
 not resolved or declared clean by this bounded change.
 
+## November 16 production release
+
+PR #484 merged as `5d59398c`. Candidate CI passed on Linux (4,305 unit passes,
+two skips) and Windows (3,591 unit passes, 36 skips), plus 55 contract tests on
+each platform and build/static checks. A second independent code review found
+no blocking defect in public-reader coverage or wallet/session binding.
+
+A fresh archive was restored offline before live migration: 115 tables,
+783,661 rows, all 115 COPY digests, 22 sequences and 1,314 security declarations
+matched. The same migration was applied twice with unchanged source data.
+Private evidence: `protocol-2026-11-16/db-restore-1794827841560-208ca87e/evidence.json`.
+The first rehearsal attempt stopped at a local stdout buffer limit; writing the
+150,668,022-byte verification dump directly to a private file fixed that tooling
+limit without weakening parity assertions. Both containers stopped. The source
+archive's existing `realtime.messages_payload_exclusive NOT VALID` constraint
+was retained; no validation or removal is claimed.
+
+The migration above was applied to the Protocol project on November 16.
+The subsequent live read preserved all 11 profiles, eight reports and the
+profile-content checksum; the projection returned 11 profiles with zero masks.
+Both new views use `security_invoker=true`; raw profile reads by anon/authenticated
+and direct anon projection reads are denied while the service view remains
+readable. Security-advisor findings are unchanged after excluding timestamps.
+The pre-existing view and function-path findings remain separate follow-ups.
+
+Initial production deployment `dpl_CstMP61eq7ma83K2SNKkppARGovm` passed public
+profile/search/artwork, unauthenticated private-route and direct anonymous REST
+denial checks before intake activation. `ARTSOUL_PROFILE_REPORTS_ENABLED=true`
+was then set for production and the same commit redeployed as
+`dpl_ExZ3Dh7nCuj6yu36bmV9riaE94G8`. It is READY with the normal-domain aliases.
+The nine checks passed again on `artsoulprotocol.com`, with the public flag true.
+Existing reporting quota, staff factors and notification delivery are reused;
+no new service or paid tier was enabled.
+
+The released profile form opened and Cancel closed it without a report write.
+Responsive inspection found a missing native-dialog centering class; the
+follow-up reuses the existing `artwork-moderation-dialog` geometry and backdrop.
+Its final browser/release evidence is recorded separately below when verified.
+No actual complaint, moderation decision or participant notification is claimed
+by these read-only and form-opening checks.
+
 ## Remaining work
 
-- Complete production migration, release verification and configured intake
-  activation; none is claimed by this local checkpoint.
+- Complete the small native-dialog geometry follow-up verification/release.
 - Verify a designated profile report through authorized review, public masking,
   restoration and participant notifications using the released application.
 - Keep historical unused-cover uploads until the owner selects a retention
