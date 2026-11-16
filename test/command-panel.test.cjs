@@ -8,9 +8,10 @@ const searchResult = { category: 'all', groups: {
   auctions: {items: [], hasMore: false}, artists: {items: [], hasMore: false}
 }};
 
-function harness({speech = false, execute = async () => JSON.stringify(searchResult)} = {}) {
+function harness({speech = false, audio = false, execute = async () => JSON.stringify(searchResult)} = {}) {
   const nodes = new Map(), calls = [], sessions = [], spoken = [], utterances = [], storage = new Map();
-  let prompts = 0, cancelled = 0;
+  const players = [], plays = [], timers = new Map();
+  let prompts = 0, cancelled = 0, timerId = 0;
   const events = () => ({listeners: new Map(),
     addEventListener(type, fn) { if (!this.listeners.has(type)) this.listeners.set(type, []); this.listeners.get(type).push(fn); },
     fire(type, extra = {}) { for (const fn of this.listeners.get(type) || []) fn({preventDefault() {}, stopPropagation() {}, ...extra}); }
@@ -40,18 +41,44 @@ function harness({speech = false, execute = async () => JSON.stringify(searchRes
     start() { this.started = true; }
     abort() { this.aborted = true; this.onend?.(); }
   }
-  const window = {...events(), setTimeout: fn => fn(),
+  class Audio {
+    constructor(src = '') {
+      Object.assign(this, events());
+      this.src = src; this.paused = true; this.currentTime = 0;
+      this.pauseCount = 0; this.loadCount = 0;
+      players.push(this);
+    }
+    play() {
+      this.paused = false;
+      const attempt = {player: this, src: this.src};
+      plays.push(attempt);
+      return new Promise((resolve, reject) => {attempt.resolve = resolve; attempt.reject = reject;});
+    }
+    pause() { this.paused = true; this.pauseCount++; }
+    load() { this.loadCount++; }
+    removeAttribute(name) { if (name === 'src') this.src = ''; }
+    emit(type) {
+      if (type === 'ended') this.paused = true;
+      this['on' + type]?.({type, target: this});
+      this.fire(type, {target: this});
+    }
+  }
+  const window = {...events(),
+    setTimeout: fn => {const id = ++timerId; timers.set(id, fn); return id;},
+    clearTimeout: id => timers.delete(id),
     localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)},
     confirm: () => {prompts++; return true;},
     speechSynthesis: {cancel() {cancelled++;}, speak(value) {utterances.push(value); spoken.push(value.text);}},
-    ArtSoulWebMCP: {browserDependencies: () => ({}), createTools: () => ['search_catalog', 'buy_resale_listing', 'get_my_activity', 'add_to_saved', 'remove_from_saved'].map(name => ({name,
+    ArtSoulWebMCP: {browserDependencies: () => ({}), createTools: () => ['search_catalog', 'buy_resale_listing', 'complete_settlement', 'get_my_activity', 'add_to_saved', 'remove_from_saved'].map(name => ({name,
       execute: args => {calls.push({name, args}); return execute(args);}
     }))}
   };
   if (speech) window.SpeechRecognition = Recognition;
-  new Function('window', 'document', 'navigator', 'SpeechSynthesisUtterance', source)(window, document, {language: 'en'}, function(text) {this.text = text;});
+  if (audio) window.Audio = Audio;
+  new Function('window', 'document', 'navigator', 'SpeechSynthesisUtterance', 'Audio', source)(window, document, {language: 'en'}, function(text) {this.text = text;}, audio ? Audio : undefined);
   const get = selector => nodes.get(selector);
-  return {get, document, window, calls, sessions, spoken, utterances, en, ru, storage,
+  return {get, document, window, calls, sessions, spoken, utterances, en, ru, storage, players, plays,
+    runTimers() {const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn());},
     prompts: () => prompts,
     cancelled: () => cancelled,
     open: () => get('.artsoul-voice-button').fire('click'),
@@ -129,7 +156,8 @@ test('microphone answers attempt native speech in the selected language and reta
   h.get('.artsoul-voice-mic').fire('click'); await flush();
   h.sessions[0].onresult({results: [[{transcript: 'помощь', confidence: 1}]]}); await flush();
   assert.equal(h.spoken.length, 1);
-  assert.match(h.spoken[0], /открой галерею/);
+  assert.match(h.spoken[0], /открыть галерею/);
+  assert.match(h.get('.artsoul-voice-answer').textContent, /открой галерею/, 'full examples remain visible');
   assert.equal(h.utterances[0].lang, 'ru-RU');
   const replay = h.get('.artsoul-voice-replay');
   assert.equal(replay.textContent, 'Прослушать ответ');
@@ -226,6 +254,181 @@ test('account, authentication, language and page lifecycle changes make the prev
     }
     assert.equal(h.calls.length, 1, change);
   }
+});
+
+test('fixed replies play directly from the click without native synthesis or another command', async () => {
+  for (const lang of ['en', 'ru']) {
+    const h = harness({audio: true, speech: true});
+    delete h.window.speechSynthesis;
+    h.open();
+    if (lang === 'ru') h.ru.fire('click');
+    h.submit(lang === 'ru' ? 'поиск' : 'search'); await flush();
+    const replay = h.get('.artsoul-voice-replay');
+    const answer = h.get('.artsoul-voice-answer').textContent;
+    const clip = h.window.ArtSoulVoice.replyClips.find(entry => entry.lang === lang && entry.text === answer);
+    assert.ok(clip, 'the exact answer has a prerecorded clip');
+    assert.equal(h.plays.length, 0, 'typing remains silent');
+    assert.equal(replay.disabled, false, 'a fixed clip does not require native synthesis');
+    replay.fire('click');
+    assert.equal(h.plays.length, 1, 'play is called in the click stack, before any await');
+    assert.equal(h.plays[0].src, clip.url);
+    const player = h.plays[0].player;
+    player.emit('playing'); h.plays[0].resolve(); await flush();
+    assert.equal(replay.attrs['aria-pressed'], 'true');
+    player.emit('ended');
+    assert.equal(replay.attrs['aria-pressed'], 'false');
+    assert.equal(h.get('.artsoul-voice-audio-status').hidden, true);
+    replay.fire('click');
+    assert.equal(h.plays.length, 2);
+    assert.equal(h.players.length, 1, 'replay reuses the media element');
+    assert.equal(h.calls.length, 0); assert.equal(h.sessions.length, 0); assert.equal(h.prompts(), 0);
+    assert.equal(h.spoken.length, 0);
+  }
+});
+
+test('recorded settlement replies preserve submitted versus confirmed state and never repeat payment', async () => {
+  for (const lang of ['en', 'ru']) {
+    const urls = [];
+    for (const confirmed of [false, true]) {
+      const result = {submitted: true, confirmed, transaction_hash: '0x' + 'ab'.repeat(32), url: '/artwork/31'};
+      const h = harness({audio: true, execute: async () => JSON.stringify(result)});
+      h.open(); if (lang === 'ru') h.ru.fire('click');
+      h.submit(lang === 'ru' ? 'оплати работу 31' : 'pay for artwork 31'); await flush();
+      const answer = h.window.ArtSoulVoice.describeResult('complete_settlement', result, lang);
+      const clip = h.window.ArtSoulVoice.replyClips.find(entry => entry.lang === lang && entry.text === answer.say);
+      assert.ok(clip, `${lang}: ${confirmed ? 'confirmed' : 'submitted'} has its own exact clip`);
+      assert.equal(h.plays.length, 0);
+      const replay = h.get('.artsoul-voice-replay'); replay.fire('click');
+      assert.equal(h.plays[0].src, clip.url); urls.push(clip.url);
+      h.plays[0].player.emit('playing'); h.plays[0].resolve(); await flush();
+      h.plays[0].player.emit('ended'); replay.fire('click');
+      assert.equal(h.plays.length, 2); assert.equal(h.plays[1].src, clip.url);
+      assert.deepEqual(h.calls, [{name: 'complete_settlement', args: {artwork_id: '31'}}]);
+      assert.equal(h.get('input').value, ''); assert.equal(h.spoken.length, 0);
+      assert.doesNotMatch(clip.text, /0x/);
+      if (confirmed) assert.match(clip.text, lang === 'ru' ? /подтверждён.*NFT/ : /confirmed.*NFT is yours/);
+      else assert.doesNotMatch(clip.text, lang === 'ru' ? /NFT.*ваш|подтверждён/ : /NFT is yours|Settlement confirmed/);
+      assert.equal(h.get('.artsoul-voice-answer').textContent, answer.show);
+    }
+    assert.notEqual(urls[0], urls[1], 'submission and settlement cannot share a success recording');
+  }
+});
+
+test('fixed audio rejection and media errors leave the answer retryable without automatic retries', async () => {
+  for (const failure of ['rejected', 'media-error']) {
+    const h = harness({audio: true}); h.open(); h.submit('search'); await flush();
+    const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
+    replay.fire('click');
+    const attempt = h.plays[0];
+    if (failure === 'rejected') attempt.reject(Object.assign(Error('Gesture required'), {name: 'NotAllowedError'}));
+    else attempt.player.emit('error');
+    await flush();
+    assert.equal(status.hidden, false, failure);
+    assert.equal(replay.disabled, false, failure); assert.equal(replay.attrs['aria-pressed'], 'false', failure);
+    assert.match(h.get('.artsoul-voice-answer').textContent, /What would you like to find/);
+    assert.equal(h.plays.length, 1, failure); assert.equal(h.spoken.length, 0, failure);
+    replay.fire('click');
+    assert.equal(h.plays.length, 2, 'only a new click retries');
+    assert.equal(status.hidden, true); assert.equal(h.calls.length, 0);
+    h.plays[1].player.emit('playing'); h.plays[1].resolve(); await flush();
+    assert.equal(replay.attrs['aria-pressed'], 'true');
+  }
+});
+
+test('pending fixed playback can be stopped and its start timeout cannot affect a later attempt', async () => {
+  const h = harness({audio: true}); h.open(); h.submit('search'); await flush();
+  const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
+  replay.fire('click');
+  const first = h.plays[0];
+  replay.fire('click');
+  assert.equal(h.plays.length, 1, 'the second click stops pending playback');
+  assert.equal(first.player.paused, true); assert.equal(replay.attrs['aria-pressed'], 'false');
+  first.reject(Object.assign(Error('Stopped'), {name: 'AbortError'})); await flush();
+  h.runTimers();
+  assert.equal(status.hidden, true, 'stopping is not a playback failure');
+  replay.fire('click');
+  assert.equal(h.plays.length, 2);
+  h.runTimers();
+  assert.equal(status.hidden, false, 'a player that never starts reports failure');
+  assert.equal(h.plays[1].player.paused, true);
+  assert.equal(replay.attrs['aria-pressed'], 'false'); assert.equal(replay.disabled, false);
+  replay.fire('click');
+  const current = h.plays[2]; current.player.emit('playing'); current.resolve(); await flush();
+  h.runTimers();
+  assert.equal(status.hidden, true); assert.equal(replay.attrs['aria-pressed'], 'true');
+  assert.equal(h.plays.length, 3); assert.equal(h.calls.length, 0); assert.equal(h.spoken.length, 0);
+});
+
+test('fixed audio cancellation fences pending promises and stale media events across lifecycle changes', async () => {
+  for (const phase of ['pending-resolve', 'pending-reject', 'playing']) {
+    for (const change of ['close', 'hidden', 'pagehide', 'language', 'wallet', 'disconnect', 'auth']) {
+      const label = `${phase}/${change}`;
+      const h = harness({audio: true}); h.connect('0x' + 'a'.repeat(40));
+      h.open(); h.submit('search'); await flush();
+      const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
+      replay.fire('click');
+      const attempt = h.plays[0], player = attempt.player;
+      const stale = ['onplaying', 'onplay', 'onended', 'onerror'].map(name => player[name]).filter(fn => typeof fn === 'function');
+      if (phase === 'playing') {player.emit('playing'); attempt.resolve(); await flush();}
+      const pauses = player.pauseCount, loads = player.loadCount;
+      if (change === 'close') {h.get('.artsoul-voice-close').fire('click'); h.open();}
+      if (change === 'hidden') {
+        h.document.visibilityState = 'hidden'; h.document.fire('visibilitychange');
+        h.document.visibilityState = 'visible'; h.document.fire('visibilitychange');
+      }
+      if (change === 'pagehide') {h.window.fire('pagehide'); h.open();}
+      if (change === 'language') h.ru.fire('click');
+      if (change === 'wallet') h.connect('0x' + 'b'.repeat(40));
+      if (change === 'disconnect') h.connect(null);
+      if (change === 'auth') h.window.fire('artsoul:auth-state-changed');
+      assert.equal(player.paused, true, label);
+      assert.ok(player.pauseCount > pauses, label); assert.ok(player.loadCount > loads, label);
+      const answer = h.get('.artsoul-voice-answer').textContent;
+      const statusBefore = {hidden: status.hidden, text: status.textContent};
+      for (const callback of stale) callback({target: player, error: 'interrupted'});
+      if (phase === 'pending-reject') attempt.reject(Object.assign(Error('Interrupted'), {name: 'AbortError'}));
+      else attempt.resolve();
+      await flush();
+      assert.equal(replay.attrs['aria-pressed'], 'false', label);
+      assert.equal(h.get('.artsoul-voice-answer').textContent, answer, label);
+      assert.deepEqual({hidden: status.hidden, text: status.textContent}, statusBefore, label);
+      assert.equal(h.plays.length, 1, label); assert.equal(h.spoken.length, 0, label); assert.equal(h.calls.length, 0, label);
+    }
+  }
+});
+
+test('a superseded clip cannot stop a newer reply or report its late playback error', async () => {
+  const h = harness({audio: true}); h.open(); h.submit('search'); await flush();
+  const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
+  replay.fire('click');
+  const old = h.plays[0], stale = ['onplaying', 'onplay', 'onended', 'onerror'].map(name => old.player[name]).filter(fn => typeof fn === 'function');
+  h.submit('help'); await flush(); replay.fire('click');
+  const current = h.plays[1];
+  assert.ok(current); assert.notEqual(current.src, old.src);
+  current.player.emit('playing'); current.resolve(); await flush();
+  for (const callback of stale) callback({target: old.player, error: 'interrupted'});
+  old.reject(Object.assign(Error('Interrupted by new reply'), {name: 'AbortError'})); await flush();
+  assert.equal(replay.attrs['aria-pressed'], 'true'); assert.equal(status.hidden, true);
+  assert.equal(h.plays.length, 2); assert.equal(h.players.length, 1); assert.equal(h.spoken.length, 0);
+  current.player.emit('ended');
+  assert.equal(replay.attrs['aria-pressed'], 'false'); assert.equal(h.calls.length, 0);
+});
+
+test('dynamic replies keep exact native speech and disclose an end without a start', async () => {
+  const h = harness({audio: true}); h.open(); h.submit('search moon'); await flush();
+  const answer = h.get('.artsoul-voice-answer').textContent;
+  const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
+  replay.fire('click');
+  assert.equal(h.plays.length, 0, 'a dynamic answer must not use a generic success clip');
+  assert.deepEqual(h.spoken, [answer]);
+  h.utterances[0].onend();
+  assert.equal(status.hidden, false); assert.match(status.textContent, /answer is available as text/);
+  assert.equal(replay.disabled, false); assert.equal(replay.attrs['aria-pressed'], 'false');
+  assert.equal(h.get('.artsoul-voice-answer').textContent, answer);
+  replay.fire('click');
+  assert.equal(h.spoken.length, 2); assert.equal(h.calls.length, 1); assert.equal(h.plays.length, 0);
+  h.utterances[1].onstart(); h.utterances[1].onend();
+  assert.equal(status.hidden, true);
 });
 
 test('search results are safe text links and clear on another request or account change', async () => {

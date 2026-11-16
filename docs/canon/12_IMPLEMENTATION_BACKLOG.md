@@ -124,6 +124,12 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   rejection of a delayed stale refill. NFT writer/ownership flags remain off;
   hosted-cache activation, representative IO/egress and operator/cohort
   coverage remain distinct gates. No additional paid infrastructure was enabled.
+  The [November 16 operational recheck](../audits/B30_B35_OPERATIONAL_RECHECK_2026-11-16.md)
+  confirms a healthy database/indexer and the existing Pro plan; no human support
+  correction or fresh dashboard billing/cap evidence is established by that check.
+  The [reminder recheck](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md)
+  passes 66 tests and preserves the actual payment-due/extension/device gates;
+  previously accepted signed journeys are not replay prerequisites.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
   The November 9 [confirmed purchase fix](../audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
   prevents optional read failures from misreporting confirmed settlement/resale
@@ -202,6 +208,12 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   confirmation; retry succeeded. The [mobile follow-up](../audits/B18_MOBILE_PROFILE_AUTH_2026-11-16.md)
   keeps that incident and separately unconfirmed voice behavior open. No completed
   wallet transaction is repeated for this release.
+  The November 16 [recorded voice prototype](../audits/B18_RECORDED_VOICE_PROTOTYPE_2026-11-16.md)
+  remains local. The founder subsequently prioritized no additional operating
+  charges and reserved API credits for development. Continuous live conversation
+  and user-supplied API keys remain an assessment, not an approved paid rollout
+  or an automatic new Phase B gate. Ordinary audible-response acceptance remains
+  open; no paid public voice endpoint is active.
   After PR #491, the owner repeatedly reproduced `AUTH_UNAVAILABLE` when
   returning before MetaMask finishes; waiting in MetaMask succeeds. The
   [early-return investigation](../audits/B18_EARLY_WALLET_RETURN_2026-11-16.md)

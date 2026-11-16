@@ -10,9 +10,10 @@
  *
  * What it costs and where the audio goes:
  *
- * - Nothing on ArtSoul's side. Speech is recognised by the browser's own
- *   SpeechRecognition and spoken by its own speechSynthesis. There is no server,
- *   no key, no per-minute bill and no audio in any ArtSoul request.
+ * - SpeechRecognition transcribes through the browser. Fixed replies use
+ *   reviewed static recordings; other replies use native speechSynthesis.
+ *   Recording generation is an offline operation, not a user request. Playback
+ *   makes no AI API call and exposes no key or user content to an AI provider.
  * - The browser vendor may process it. Chrome sends the audio to Google to be
  *   transcribed. The person is told that before the microphone first opens.
  * - Text commands remain available without speech recognition. Opening the
@@ -214,6 +215,9 @@
             send: 'Send', microphone: 'Use microphone', stop: 'Stop listening',
             listenReply: 'Listen to answer', stopReply: 'Stop audio',
             audioUnavailable: 'Audio could not play in this browser. The answer is available as text.',
+            audioBlocked: 'Tap Listen to answer to play the audio.',
+            audioNotice: 'AI-generated voice.',
+            helpSpeech: 'You can open the gallery, find artwork, or ask about your activity. The examples below show the available commands. Wallet actions always need your review and signature.',
             close: 'Close commands', examples: 'Examples',
             noSpeech: 'Voice is unavailable in this browser. You can type instead.',
             working: 'Working… If your wallet opens, review the request there. Closing this panel does not cancel a submitted transaction.',
@@ -248,6 +252,9 @@
             send: 'Отправить', microphone: 'Включить микрофон', stop: 'Остановить запись',
             listenReply: 'Прослушать ответ', stopReply: 'Остановить звук',
             audioUnavailable: 'Браузер не смог воспроизвести звук. Ответ доступен текстом.',
+            audioBlocked: 'Нажмите «Прослушать ответ», чтобы включить звук.',
+            audioNotice: 'Голос создан искусственным интеллектом.',
+            helpSpeech: 'Можно открыть галерею, найти работу или узнать о своей активности. Доступные команды показаны в примерах ниже. Действия с кошельком всегда требуют вашей проверки и подписи.',
             close: 'Закрыть команды', examples: 'Примеры',
             noSpeech: 'Голос недоступен в этом браузере. Можно написать команду.',
             working: 'Выполняется… Если откроется кошелёк, проверьте запрос в нём. Закрытие этого окна не отменяет отправленную транзакцию.',
@@ -276,6 +283,16 @@
             error: () => 'Не получилось. Подробности на экране.'
         }
     };
+
+    // Only reviewed, fixed public copy has a prerecorded voice. Exact matching
+    // keeps dynamic amounts and refused/submitted/confirmed states distinct.
+    const replyClips = Object.freeze(['en', 'ru'].flatMap(lang =>
+        ['helpSpeech', 'searchPrompt', 'publicationPrompt', 'tooLong', 'empty', 'unavailable', 'noWallet', 'submitted', 'settled']
+            .map(id => Object.freeze({lang, id, text: TEXT[lang][id], url: `/audio/assistant/v1/${lang}-${id}.wav`}))));
+
+    function getReplyAudio(text, lang) {
+        return replyClips.find(clip => clip.lang === lang && clip.text === text)?.url || '';
+    }
 
     function hoursText(value, lang) {
         const hours = Number(value);
@@ -456,6 +473,8 @@
     window.ArtSoulVoice = Object.freeze({
         parseCommand,
         describeResult,
+        replyClips,
+        getReplyAudio,
         mayRun,
         isWrite,
         WRITE_TOOLS,
@@ -482,6 +501,9 @@
         let answerToRead = '';
         let utterance = null;
         let speaking = false;
+        let clipAudio = null;
+        let clipAttempt = null;
+        let clipTimer = null;
         const walletIdentity = () => {
             const state = window.artsoulSettledWalletState;
             return state?.isConnected ? String(state.address || '').toLowerCase() : '';
@@ -521,6 +543,7 @@
             '<p class="artsoul-voice-heard"></p>' +
             '<p class="artsoul-voice-answer" role="status" aria-live="polite"></p>' +
             '<div class="artsoul-voice-controls"><button type="button" class="artsoul-voice-replay" aria-pressed="false"></button></div>' +
+            '<p class="artsoul-voice-support artsoul-voice-audio-notice" hidden></p>' +
             '<p class="artsoul-voice-audio-status" role="status" hidden></p>' +
             '<div class="artsoul-voice-results"></div>' +
             '<details class="artsoul-voice-examples"><summary></summary><p></p></details>';
@@ -533,6 +556,7 @@
         const send = panel.querySelector('.artsoul-voice-send');
         const replay = panel.querySelector('.artsoul-voice-replay');
         const audioStatus = panel.querySelector('.artsoul-voice-audio-status');
+        const audioNotice = panel.querySelector('.artsoul-voice-audio-notice');
         // The global capture guard disables submit buttons before their native
         // form action. This panel already owns the pending-command lock.
         send.dataset.allowRapid = 'true';
@@ -591,7 +615,10 @@
             input.disabled = busy || noticePending || Boolean(recognition);
             send.disabled = busy || noticePending || Boolean(recognition) || !input.value.trim();
             mic.disabled = busy || noticePending || typeof Recognition !== 'function';
-            const supportsAudio = typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function';
+            const hasClip = Boolean(getReplyAudio(answerToRead, lang)) && typeof window.Audio === 'function';
+            const supportsAudio = hasClip || (typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function');
+            audioNotice.textContent = TEXT[lang].audioNotice;
+            audioNotice.hidden = !hasClip;
             replay.hidden = !answerToRead;
             replay.disabled = busy || noticePending || Boolean(recognition) || !supportsAudio;
             replay.textContent = speaking ? TEXT[lang].stopReply : TEXT[lang].listenReply;
@@ -606,6 +633,17 @@
 
         function silence() {
             audioGeneration++;
+            clipAttempt = null;
+            window.clearTimeout?.(clipTimer);
+            clipTimer = null;
+            if (clipAudio) {
+                clipAudio.onplaying = clipAudio.onended = clipAudio.onerror = null;
+                try {
+                    clipAudio.pause();
+                    clipAudio.removeAttribute('src');
+                    clipAudio.load();
+                } catch { /* Already stopped; text remains available. */ }
+            }
             if (utterance) utterance.onstart = utterance.onend = utterance.onerror = null;
             utterance = null;
             speaking = false;
@@ -623,14 +661,56 @@
 
         function speak(textToSay) {
             try {
-                if (!window.speechSynthesis || !textToSay || panel.hidden || document.visibilityState === 'hidden') return;
+                if (!textToSay || panel.hidden || document.visibilityState === 'hidden') return;
                 silence();
                 audioStatus.hidden = true;
+                const clip = getReplyAudio(textToSay, lang);
+                if (clip && typeof window.Audio === 'function') {
+                    if (!clipAudio) {
+                        clipAudio = new window.Audio();
+                        clipAudio.preload = 'none';
+                    }
+                    const attempt = {};
+                    clipAttempt = attempt;
+                    const finish = error => {
+                        if (clipAttempt !== attempt) return;
+                        clipAttempt = null;
+                        window.clearTimeout?.(clipTimer);
+                        clipTimer = null;
+                        clipAudio.onplaying = clipAudio.onended = clipAudio.onerror = null;
+                        clipAudio.pause();
+                        speaking = false;
+                        if (error) {
+                            audioStatus.textContent = error.name === 'NotAllowedError' ? TEXT[lang].audioBlocked : TEXT[lang].audioUnavailable;
+                            audioStatus.hidden = false;
+                        }
+                        controls();
+                    };
+                    clipAudio.onplaying = () => {
+                        if (clipAttempt !== attempt) return;
+                        window.clearTimeout?.(clipTimer);
+                        clipTimer = null;
+                    };
+                    clipAudio.onended = () => finish();
+                    clipAudio.onerror = () => finish({name: 'MediaError'});
+                    clipAudio.src = clip;
+                    speaking = true;
+                    controls();
+                    clipTimer = window.setTimeout(() => finish({name: 'TimeoutError'}), 15000);
+                    // Keep play() in the trusted click stack. Fetch/canplay awaits
+                    // would lose the iPhone gesture. Automatic replies may be blocked.
+                    const playback = clipAudio.play();
+                    playback?.catch(error => finish(error || {name: 'MediaError'}));
+                    return;
+                }
+                if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') return;
                 const current = new SpeechSynthesisUtterance(textToSay);
+                let started = false;
                 utterance = current;
                 current.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
                 current.onstart = () => {
                     if (utterance !== current) return;
+                    started = true;
                     speaking = true;
                     controls();
                 };
@@ -644,7 +724,7 @@
                     }
                     controls();
                 };
-                current.onend = () => finish(false);
+                current.onend = () => finish(!started);
                 current.onerror = () => finish(true);
                 window.speechSynthesis.speak(current);
             } catch {
@@ -694,7 +774,7 @@
                 return;
             }
             if (command.help) {
-                reply(transcript, t.help);
+                reply(transcript, t.help, t.helpSpeech);
                 return;
             }
             if (command.searchPrompt) { reply(transcript, t.searchPrompt); return; }
