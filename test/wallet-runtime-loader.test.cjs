@@ -19,7 +19,7 @@ function deferred() {
 
 function executeLoader(loadModuleForTest, readyState = 'complete', domContentLoadedEventStart = 0) {
     const transformed = SOURCE.replace(
-        "import('./appkit-init.js?v=56')",
+        "import('./appkit-init.js?v=57')",
         'loadModuleForTest()'
     );
     assert.notEqual(transformed, SOURCE, 'the harness must replace the one production dynamic import');
