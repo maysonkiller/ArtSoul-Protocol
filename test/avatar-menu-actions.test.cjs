@@ -16,6 +16,38 @@ function copyHarness(options = {}) {
     return { harness, button, status, event: { currentTarget: button, preventDefault() {}, stopPropagation() {} } };
 }
 
+test('compact header keeps copy adjacent to short, missing and long names without changing the copied value', () => {
+    const fs = require('node:fs');
+    const css = fs.readFileSync('unified-styles.css', 'utf8');
+    const rules = css.slice(css.lastIndexOf('/* Owner layout review 2026-11-16:'));
+    assert.match(rules, /\.avatar-info button\s*\{[\s\S]*?width: fit-content;[\s\S]*?max-width: 100%;/);
+    assert.match(rules, /\.avatar-info:has\(\[data-avatar-address\]\[hidden\]\)[\s\S]*?justify-content: center;/);
+
+    const harness = createAvatarHarness();
+    const structure = harness.dropdown.getStableStructure();
+    const name = structure.dropdown.querySelector('[data-avatar-name]');
+    const address = structure.dropdown.querySelector('[data-avatar-address]');
+    harness.context.window.currentWalletAddress = WALLET;
+    const short = harness.dropdown.shortWalletAddress(WALLET);
+    for (const [displayName, hasProfileName] of [
+        [short, false], ['lys', true], ['A'.repeat(240), true]
+    ]) {
+        name.hidden = false;
+        name.textContent = displayName;
+        address.hidden = !hasProfileName;
+        harness.dropdown.syncHeaderCopyControls(structure, { previewWallet: WALLET, name: displayName });
+        assert.equal(name.disabled, false);
+        assert.equal(name.dataset.copyValue, hasProfileName ? displayName : WALLET);
+        assert.equal(name.dataset.copyKind, hasProfileName ? 'name' : 'address');
+        assert.equal(address.disabled, !hasProfileName);
+        if (hasProfileName) assert.equal(address.dataset.copyValue, WALLET);
+    }
+    harness.context.window.currentWalletAddress = '';
+    harness.dropdown.syncHeaderCopyControls(structure, { previewWallet: WALLET, name: 'lys' });
+    assert.equal(name.disabled, true);
+    assert.equal(address.disabled, true);
+});
+
 test('single activation copies the full displayed wallet and confirms only after success', async () => {
     const { harness, button, status, event } = copyHarness();
     assert.equal(button.getAttribute('aria-label'), `Copy wallet address: ${WALLET}`);
