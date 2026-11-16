@@ -1735,20 +1735,37 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 provenanceSnapshotRef.current = provenanceState;
             }, [artwork, provenanceState]);
 
-            function startResaleProjectionRefresh(snapshot) {
-                // A receipt retires Buy immediately, while both indexed reads
+            function startReceiptProjectionRefresh(snapshot, auctionReceipt = false, onCaughtUp = () => {}) {
+                // A receipt retires the action immediately, while both indexed reads
                 // may still be old. Retry only this artwork, for a finite window.
                 const delays = [0, 1000, 2000, 4000, 8000, 15000, 30000];
                 const previousBlock = Number(snapshot.resale_updated_block || 0);
-                let cancelled = false, timer = null, attempt = 0, inFlight = false;
+                const auctionEventType = {
+                    auction: 'auction_started', settlement_pending: 'auction_ended',
+                    ended_no_bids: 'auction_ended', defaulted: 'settlement_defaulted',
+                    sold: 'settlement_completed'
+                }[snapshot.status];
+                const walletContext = () => `${String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase()}:${Number(window.getCurrentChainId?.(window.artsoulSettledWalletState) || 0)}`;
+                const initialWalletContext = walletContext();
+                let cancelled = false, timer = null, attempt = 0, inFlight = false, readSequence = null;
                 const stop = () => {
                     cancelled = true;
                     if (timer !== null) clearTimeout(timer);
                     document.removeEventListener('visibilitychange', resume);
+                    window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
+                };
+                const walletChanged = () => {
+                    if (walletContext() === initialWalletContext) return;
+                    if (inFlight && readSequence === artworkLoadSequenceRef.current) artworkLoadSequenceRef.current++;
+                    stop();
                 };
                 const schedule = () => {
                     if (cancelled || inFlight || timer !== null || document.visibilityState !== 'visible') return;
-                    if (attempt >= delays.length) { stop(); return; }
+                    if (attempt >= delays.length) {
+                        setRefreshError('Transaction confirmed. Indexed ownership or history is still catching up. Retry to refresh.');
+                        stop();
+                        return;
+                    }
                     timer = setTimeout(refresh, delays[attempt]);
                 };
                 const resume = () => { if (document.visibilityState === 'visible') schedule(); };
@@ -1757,11 +1774,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     if (cancelled || document.visibilityState !== 'visible') return;
                     attempt++;
                     inFlight = true;
-                    await loadArtwork();
+                    const read = loadArtwork();
+                    readSequence = artworkLoadSequenceRef.current;
+                    await read;
                     inFlight = false;
                     if (cancelled) return;
                     const current = artworkSnapshotRef.current;
-                    if (!current || current.id !== snapshot.id || current.token_id !== snapshot.token_id) {
+                    if (!current || current.id !== snapshot.id || (!auctionReceipt && current.token_id !== snapshot.token_id)) {
                         stop();
                         return;
                     }
@@ -1769,43 +1788,74 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     const history = provenanceSnapshotRef.current;
                     // History can trail the artwork response. A caught-up
                     // listing alone must not end the history refresh.
-                    if (!current.pending_resale_sync && indexedBlock > previousBlock &&
-                        history?.status === 'ready' && history.events.some(event => Number(event.block_number) >= indexedBlock)) {
+                    const caughtUp = auctionReceipt
+                        ? !current.pending_auction_sync && history?.status === 'ready' && history.events.some(event =>
+                            event.type === auctionEventType && String(event.auction_id) === String(snapshot.auction_id))
+                        : !current.pending_resale_sync && indexedBlock > previousBlock &&
+                            history?.status === 'ready' && history.events.some(event => Number(event.block_number) >= indexedBlock);
+                    if (caughtUp) {
                         stop();
+                        onCaughtUp();
                         return;
                     }
                     schedule();
                 };
                 document.addEventListener('visibilitychange', resume);
+                window.addEventListener('artsoul:wallet-state-changed', walletChanged);
                 schedule();
                 return stop;
             }
 
             useEffect(() => {
-                let stopResaleRefresh = () => {};
+                let stopReceiptRefresh = () => {};
+                let receiptTarget = null;
                 const refresh = () => {
                     // Apply the confirmed receipt before waiting for API/profile
                     // reads. The shared bridge preserves ownership and floor.
                     setArtwork(current => current && (window.ArtSoulDB.applyConfirmedAuctionUpdate?.(current) || current));
                     void loadArtwork();
                 };
-                const refreshResale = () => {
+                const retryReceipt = () => {
+                    if (!receiptTarget) { refresh(); return; }
+                    stopReceiptRefresh();
+                    artworkLoadSequenceRef.current++;
+                    setRefreshError('');
+                    const target = receiptTarget;
+                    stopReceiptRefresh = startReceiptProjectionRefresh(target.snapshot, target.auctionReceipt, () => {
+                        if (receiptTarget === target) receiptTarget = null;
+                    });
+                };
+                const refreshReceipt = (auctionReceipt, event) => {
                     const current = artworkSnapshotRef.current;
+                    const detail = event?.detail;
+                    if (detail && (Number(detail.chain_id) !== Number(current?.chain_id) ||
+                        String(detail.artwork_id) !== String(current?.artwork_id))) return;
                     const updated = current && (window.ArtSoulDB.applyConfirmedAuctionUpdate?.(current) || current);
-                    if (!updated?.pending_resale_sync) { refresh(); return; }
+                    if (!updated?.[auctionReceipt ? 'pending_auction_sync' : 'pending_resale_sync']) {
+                        // Storage and duplicate events must not cancel a history-only
+                        // target after the artwork projection has already caught up.
+                        if (!receiptTarget) refresh();
+                        return;
+                    }
                     // Read the current snapshot outside the React updater;
                     // StrictMode may replay state updaters.
                     artworkSnapshotRef.current = updated;
                     setArtwork(updated);
-                    stopResaleRefresh();
-                    stopResaleRefresh = startResaleProjectionRefresh(updated);
+                    receiptTarget = { snapshot: updated, auctionReceipt };
+                    // Retrying invalidates an earlier end-auction read before
+                    // its delayed response can overwrite a settlement receipt.
+                    retryReceipt();
                 };
-                window.addEventListener('artsoul:auction-confirmed', refresh);
+                const refreshAuction = event => refreshReceipt(true, event);
+                const refreshResale = event => refreshReceipt(false, event);
+                window.addEventListener('artsoul:auction-confirmed', refreshAuction);
                 window.addEventListener('artsoul:resale-confirmed', refreshResale);
+                window.addEventListener('artsoul:receipt-retry', retryReceipt);
                 return () => {
-                    window.removeEventListener('artsoul:auction-confirmed', refresh);
+                    window.removeEventListener('artsoul:auction-confirmed', refreshAuction);
                     window.removeEventListener('artsoul:resale-confirmed', refreshResale);
-                    stopResaleRefresh();
+                    window.removeEventListener('artsoul:receipt-retry', retryReceipt);
+                    stopReceiptRefresh();
                     artworkLoadSequenceRef.current++;
                 };
             }, [artworkId]);
@@ -3290,9 +3340,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
                         {(artwork.pending_auction_sync || refreshError) && (
                             <p className="text-sm mb-3" role="status">
-                                {artwork.pending_auction_sync && 'Transaction confirmed. Updating auction data. '}
+                                {artwork.pending_auction_sync && !refreshError && 'Transaction confirmed. Updating auction data. '}
                                 {refreshError}
-                                {refreshError && <button type="button" className="underline ml-2" onClick={() => void loadArtwork()}>Retry</button>}
+                                {refreshError && <button type="button" className="underline ml-2" onClick={() => window.dispatchEvent(new Event('artsoul:receipt-retry'))}>Retry</button>}
                             </p>
                         )}
                         <div className="space-y-3">

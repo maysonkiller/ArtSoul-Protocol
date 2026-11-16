@@ -125,12 +125,31 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   hosted-cache activation, representative IO/egress and operator/cohort
   coverage remain distinct gates. No additional paid infrastructure was enabled.
   The [November 16 operational recheck](../audits/B30_B35_OPERATIONAL_RECHECK_2026-11-16.md)
-  confirms a healthy database/indexer and the existing Pro plan; no human support
-  correction or fresh dashboard billing/cap evidence is established by that check.
+  confirms a healthy database/indexer, fresh displayed current/projected costs
+  of USD 25, enabled Spend Cap and usage within the displayed allowances. The
+  authorized support follow-up was sent; provider correction and representative
+  IO acceptance remain pending. Current readings do not guarantee future costs.
   The [reminder recheck](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md)
-  passes 66 tests and preserves the actual payment-due/extension/device gates;
-  previously accepted signed journeys are not replay prerequisites.
+  passes 66 tests. The owner's new ending of existing auction 75 subsequently
+  opened its real payment window and produced one winner-only payment reminder.
+  The owner confirmed iPhone viewing and independently settled it; NFT 8,
+  zero additional payment, 0.009 test ETH withdrawable credit and restored
+  one-hour preferences are verified. The payment reminder was not marked read,
+  and live-extension acceptance remains open. The stale ownership/history UI
+  observed after settlement now has a [local bounded correction](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#local-receipt-refresh-correction),
+  still under verification and not yet released. Previously accepted signed
+  journeys are not replay prerequisites.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
+  November 16: the auction receipt handler performed one indexed read, then
+  Sold stopped ordinary polling while ownership/history could remain stale.
+  The [local correction](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#local-receipt-refresh-correction)
+  shares seven serial visible-only refresh attempts across auction/resale, waits
+  separately for matching indexed history, cancels replaced receipt/account
+  work and unmount, and exposes explicit Retry after the bounded window. The
+  history-only Retry target and duplicate-event gaps found in review are fixed.
+  Independent review, 101 focused checks and the local build pass. Hosted
+  checks, release and live convergence remain pending; no completed transaction
+  is replayed.
   The November 9 [confirmed purchase fix](../audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
   prevents optional read failures from misreporting confirmed settlement/resale
   transactions and uses the receipt bridge to suppress stale purchase actions.
@@ -208,12 +227,19 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   confirmation; retry succeeded. The [mobile follow-up](../audits/B18_MOBILE_PROFILE_AUTH_2026-11-16.md)
   keeps that incident and separately unconfirmed voice behavior open. No completed
   wallet transaction is repeated for this release.
-  The November 16 [recorded voice prototype](../audits/B18_RECORDED_VOICE_PROTOTYPE_2026-11-16.md)
-  remains local. The founder subsequently prioritized no additional operating
-  charges and reserved API credits for development. Continuous live conversation
-  and user-supplied API keys remain an assessment, not an approved paid rollout
-  or an automatic new Phase B gate. Ordinary audible-response acceptance remains
-  open; no paid public voice endpoint is active.
+  The November 16 [recorded voice release](../audits/B18_RECORDED_VOICE_PROTOTYPE_2026-11-16.md)
+  shipped in PR #496, merge `2ddb7e0fff32af918b6f7ef45dda35d4cb938f0d`.
+  CI `43921630762` passed Linux, Windows, static and contract checks; production
+  is READY. The apex `v14` script and all 18 audio hashes were verified at
+  17:50:25 UTC. Chrome manual playback changed Listen to Stop and back without
+  an error. After an initially silent physical-iPhone report, the owner confirmed
+  sound from the direct WAV and the assistant's Russian help reply on November 16,
+  with the playback button changing on press. No code changed between attempts;
+  the first failure's cause remains unknown in the linked audit. This accepts
+  the fixed help reply, not every dynamic native-voice response or full Phase B.
+  Replays make no model request. API credits remain reserved for development; live
+  conversation and user-supplied keys are optional assessments, not new Phase B
+  exit gates. No paid public voice endpoint is active.
   After PR #491, the owner repeatedly reproduced `AUTH_UNAVAILABLE` when
   returning before MetaMask finishes; waiting in MetaMask succeeds. The
   [early-return investigation](../audits/B18_EARLY_WALLET_RETURN_2026-11-16.md)

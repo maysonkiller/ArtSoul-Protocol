@@ -627,7 +627,7 @@ test('confirmed resale stays visible with blocked browser storage', () => {
 
 test('open artwork applies repricing and cancellation before a slow refresh can finish', () => {
   const source = fs.readFileSync('src/entries/artwork.jsx','utf8');
-  const marker = source.indexOf('let stopResaleRefresh = () => {};');
+  const marker = source.indexOf('let stopReceiptRefresh = () => {};');
   const start = source.lastIndexOf('useEffect(() => {', marker);
   const end = source.indexOf('}, [artworkId]);', marker) + '}, [artworkId]);'.length;
   assert.ok(start >= 0 && end > start, 'the artwork receipt listener is present');
@@ -639,10 +639,12 @@ test('open artwork applies repricing and cancellation before a slow refresh can 
     vm.runInNewContext(source.slice(start, end), {
       window: {ArtSoulDB:db, addEventListener: (name, listener) => listeners.set(name, listener)},
       artworkId: '28', artworkSnapshotRef: {current:displayed},
+      artworkLoadSequenceRef: {current:0}, setRefreshError() {},
       useEffect: effect => effect(),
       setArtwork(update) { displayed = typeof update === 'function' ? update(displayed) : update; },
       loadArtwork() { refreshes++; return new Promise(() => {}); },
-      startResaleProjectionRefresh(updated) {
+      startReceiptProjectionRefresh(updated, auctionReceipt) {
+        assert.equal(auctionReceipt, false);
         assert.equal(updated, displayed, 'the confirmed view is applied before scheduled refresh');
         refreshes++; return () => {};
       }
