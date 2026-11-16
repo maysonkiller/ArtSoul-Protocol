@@ -24,7 +24,7 @@ const RUNTIME = {
   'src/ui/components/artwork-card.js': { version: 32, sha256: '2eb7057e8b689ae7' },
   'contracts-integration.js': { version: 20, sha256: '78c70a2f1e5ce116' },
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
-  'webmcp-tools.js': { version: 21, sha256: 'feef132d5b65047a' },
+  'webmcp-tools.js': { version: 22, sha256: '32e632ca328adb60' },
   'voice-commands.js': { version: 14, sha256: 'a9986f67aec7dce8' },
   'avatar-dropdown.js': { version: 71, sha256: '75cfc571d2a23bc0' },
   'header-prepaint.js': { version: 11, sha256: '8bab0f88fda32e91' },
