@@ -934,11 +934,15 @@
             body.appendChild(sync);
         }
 
-        card.appendChild(createMediaElement(artwork, () => card.remove()));
+        // Keep footer controls anchored to the media, not the variable-height card body.
+        const preview = document.createElement('div');
+        preview.className = 'artsoul-card-preview';
+        preview.appendChild(createMediaElement(artwork, () => card.remove()));
+        const saved = href ? createSavedControl(artwork) : null;
+        if (saved) preview.appendChild(saved);
+        card.appendChild(preview);
         card.appendChild(body);
         if (menu) card.appendChild(menu);
-        const saved = href ? createSavedControl(artwork) : null;
-        if (saved) card.appendChild(saved);
         let link = null;
         const countdown = createCountdownElement(artwork, now => {
             // The clock changes presentation even before an indexer response.
@@ -1171,7 +1175,10 @@
                 }
             } : undefined
         },
-            h(ReactMedia, { artwork, onUnavailable: () => setMediaUnavailable(true) }),
+            h('div', { className: 'artsoul-card-preview' },
+                h(ReactMedia, { artwork, onUnavailable: () => setMediaUnavailable(true) }),
+                href || onOpen ? h(ReactSavedControl, { artwork }) : null
+            ),
             h('div', { className: 'artsoul-card-body' },
                 h('div', { className: 'artsoul-card-title-row' },
                     h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
@@ -1190,7 +1197,6 @@
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
             ),
             href || onOpen ? h(ReactActionMenu, { artwork }) : null,
-            href || onOpen ? h(ReactSavedControl, { artwork }) : null,
             h(ReactCountdown, { artwork, onEnd: refreshAuctionState }),
             href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
                 'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null

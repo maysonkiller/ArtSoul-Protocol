@@ -101,8 +101,11 @@ test('Saved control is outside card metadata and isolates navigation until the f
     const { api, window } = loadDomCardRuntime();
     const artwork = { chain_id: 84532, artwork_id: '34', file_type: 'image', file_url: 'image.png' };
     const card = api.createCardElement(artwork);
-    const save = card.children.find(child => child.className === 'saved-button saved-button-overlay');
+    const preview = card.children.find(child => child.className === 'artsoul-card-preview');
+    assert.ok(preview, 'the preview must own its controls in every card surface');
+    const save = preview.children.find(child => child.className === 'saved-button saved-button-overlay');
     assert.ok(save);
+    assert.match(preview.children[0].className, /artsoul-card-media/);
     assert.equal(save.hidden, true);
     assert.equal(save['aria-pressed'], 'false');
     assert.equal(save.dataset.savedArtwork, '34');
@@ -117,6 +120,35 @@ test('Saved control is outside card metadata and isolates navigation until the f
     assert.equal(api.createSavedControl({ artwork_id: 'pending:1', chain_id: 84532 }), null);
     const detail = api.createSavedControl(artwork, { detail: true });
     assert.equal(detail.className, 'saved-button saved-button-detail');
+});
+
+test('React card also places Saved inside the media preview, independent of card-body height', () => {
+    const { api, window } = loadDomCardRuntime();
+    window.React = {
+        createElement: (type, props, ...children) => ({ type, props, children }),
+        useState: value => [value, () => {}],
+        useEffect() {}
+    };
+    for (const file_type of ['image', 'audio', 'video']) {
+        const card = api.ReactCard({
+            artwork: { artwork_id: '34', chain_id: 84532, file_type, file_url: 'preview.' + file_type },
+            href: '/artwork/34'
+        });
+        const preview = card.children.find(child => child.props?.className === 'artsoul-card-preview');
+        assert.ok(preview, file_type + ' must have a shared media-local preview');
+        assert.equal(preview.children[0].type, api.ReactMedia);
+        assert.equal(preview.children[1].type, api.ReactSavedControl);
+        assert.ok(!card.children.some(child => child.type === api.ReactSavedControl),
+            'Saved must not be positioned relative to the variable card body');
+    }
+});
+
+test('media footer alignment keeps full-size controls on wide cards and a two-row fallback on narrow cards', () => {
+    const section = css.slice(css.lastIndexOf('/* Owner layout review 2026-11-16:'));
+    assert.match(section, /\.artsoul-card-preview[\s\S]*?position: relative;/);
+    assert.match(section, /\.saved-button-overlay\s*\{[\s\S]*?bottom: 8px !important;/);
+    assert.match(section, /\.artsoul-card-media-controls\s*\{[\s\S]*?left: 50% !important;[\s\S]*?translateX\(-50%\)/);
+    assert.match(section, /@container \(max-width: 215px\)[\s\S]*?bottom: 56px !important;/);
 });
 
 test('React card still opens when the card itself receives Enter or Space', () => {
@@ -270,8 +302,12 @@ test('DOM cards render two isolated overlay buttons and keep only one media play
     const { api, mediaElements } = loadDomCardRuntime();
     const videoCard = api.createCardElement({ id: 'video', file_type: 'video', file_url: 'video.mp4' });
     const audioCard = api.createCardElement({ id: 'audio', file_type: 'audio', file_url: 'audio.mp3' });
-    const videoControls = videoCard.children[0].children[2];
-    const audioControls = audioCard.children[0].children[0].children[2];
+    const findClass = (root, name) => (root?.className || '').split(/\s+/).includes(name)
+        ? root : (root?.children || []).map(child => findClass(child, name)).find(Boolean);
+    const videoControls = findClass(videoCard, 'artsoul-card-media-controls');
+    const audioControls = findClass(audioCard, 'artsoul-card-media-controls');
+    assert.ok(videoControls);
+    assert.ok(audioControls);
 
     assert.equal(videoControls.children.length, 2);
     assert.equal(audioControls.children.length, 2);
@@ -298,7 +334,9 @@ test('cards omit unsafe media and remove themselves when media loading fails', (
     assert.equal(api.createCardElement({ id: 'missing', title: 'Missing' }), null);
 
     const card = api.createCardElement({ id: 'image', title: 'Image', file_url: 'image.jpg' });
-    card.children[0].children[0].onerror();
+    const image = card.children[0].children[0].children[0];
+    assert.equal(image.tagName, 'IMG');
+    image.onerror();
     assert.equal(card.removed, true);
 });
 
