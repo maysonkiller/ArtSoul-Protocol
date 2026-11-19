@@ -612,9 +612,12 @@
             }
             structure.menu.style.display = this.isOpen ? 'block' : 'none';
             if (walletProvider !== undefined) this.rememberWalletProvider(walletProvider, window.currentWalletAddress);
-            this.syncAccountWalletProvider(walletProvider === undefined
-                ? this.getRememberedWalletProvider(this.identityWallet || window.currentWalletAddress)
-                : walletProvider);
+            const restoringWallet = this.identityWallet || (
+                this.getNavContainer()?.dataset.avatarRenderKey === 'cached-wallet'
+                    ? window.ArtSoulHeaderPrepaint?.boot.notificationWallet : '');
+            const remembered = this.getRememberedWalletProvider(restoringWallet);
+            this.syncAccountWalletProvider(walletProvider === undefined ? remembered : walletProvider,
+                walletProvider === undefined && !this.walletProviderIdentity ? restoringWallet : '');
             return structure;
         }
 
@@ -1219,7 +1222,8 @@
             this.profile = null;
             if (!nextWallet || previousWallet !== this.identityWallet) {
                 this.walletProviderIdentity = null;
-                this.syncAccountWalletProvider(null);
+                if (!nextWallet || previousWallet) this.saveProviderMark('', '');
+                this.syncAccountWalletProvider(null, nextWallet);
                 const providerSlot = this.getNavContainer()?.querySelector('[data-wallet-provider]');
                 if (providerSlot) providerSlot.innerHTML = '';
             }
@@ -1534,8 +1538,20 @@
         rememberWalletProvider(provider, walletAddress) {
             const wallet = String(walletAddress || '').toLowerCase();
             if (!WALLET_ADDRESS_PATTERN.test(wallet) || wallet !== String(window.currentWalletAddress || '').toLowerCase()) return;
-            // Presentation continuity only, scoped to this document and wallet.
             this.walletProviderIdentity = { wallet, provider };
+            this.saveProviderMark(wallet, provider?.mark);
+        }
+
+        saveProviderMark(wallet, mark) {
+            // Same-tab presentation only. Never persist remote icons or provider handles.
+            const key = 'artsoul_header_provider_mark';
+            try {
+                if (WALLET_ADDRESS_PATTERN.test(wallet) && (mark === 'rabby' || mark === 'metamask')) {
+                    sessionStorage.setItem(key, wallet + ':' + mark);
+                } else {
+                    sessionStorage.removeItem(key);
+                }
+            } catch { /* Session storage is optional. */ }
         }
 
         getRememberedWalletProvider(walletAddress) {
@@ -1545,14 +1561,17 @@
                 ? this.walletProviderIdentity.provider : null;
         }
 
-        syncAccountWalletProvider(walletProvider) {
+        syncAccountWalletProvider(walletProvider, restoringWallet = '') {
             const container = this.getNavContainer();
             const buttonSlot = container?.querySelector('[data-avatar-wallet-provider]');
             if (!buttonSlot) return;
+            const button = container.querySelector('.avatar-button');
+            if (walletProvider || !restoringWallet || restoringWallet !== window.ArtSoulHeaderPrepaint?.boot.notificationWallet) {
+                delete button.dataset.providerPreview;
+            }
             const html = this.renderWalletProvider(walletProvider, true);
             if (buttonSlot.innerHTML !== html) buttonSlot.innerHTML = html;
             buttonSlot.hidden = !html;
-            const button = container.querySelector('.avatar-button');
             const label = walletProvider?.name ? `ArtSoul account menu; connected wallet: ${walletProvider.name}` : 'ArtSoul account menu';
             button?.setAttribute('aria-label', label);
             button?.setAttribute('title', label);
@@ -1986,7 +2005,10 @@
                 networkInfo = await this.getCurrentNetworkInfo({
                     walletAddress,
                     onWalletProvider: identity => {
-                        if (isCurrent()) this.syncAccountWalletProvider(identity);
+                        if (isCurrent()) {
+                            this.rememberWalletProvider(identity, walletAddress);
+                            this.syncAccountWalletProvider(identity);
+                        }
                     }
                 });
             } catch (error) {

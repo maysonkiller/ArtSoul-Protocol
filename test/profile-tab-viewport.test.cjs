@@ -6,7 +6,20 @@ const source = fs.readFileSync('src/entries/profile.jsx', 'utf8');
 const tabs = source.slice(source.indexOf('className="profile-section-tabs'));
 const body = tabs.match(/onClick=\{\(\) => \{([\s\S]*?)\n\s*\}\}/)?.[1];
 assert.ok(body, 'the profile tab click handler is present');
-const click = new Function('gallery', 'selectedGallery', 'setArtworksLoading', 'setSelectedGallery', 'galleryPanelRef', 'window', 'artworksRequestRef', 'setArtworksError = () => {}', body);
+const click = new Function('gallery', 'selectedGallery', 'setArtworksLoading', 'setSelectedGallery', 'galleryPanelRef', 'window', 'artworksRequestRef',
+  'setArtworksError = () => {}', 'profile = {wallet_address:"fixture"}', 'galleryCacheRef = {current:new Map()}',
+  'setMyArtworks', 'setDisplayedGallery', 'setHasSettledArtworks', body);
+
+test('returning to a settled public tab commits only its own cached list on the click, including an empty result', () => {
+  for (const items of [[], [{id:12}]]) {
+    const changes = [];
+    const cache = {current:new Map([['wallet:auction',items],['other:auction',[{id:99}]]])};
+    click({id:'auction'}, 'sold', value => changes.push(['loading',value]), value => changes.push(['tab',value]),
+      {current:null}, {location:{hash:''}}, {current:4}, undefined, {wallet_address:'WALLET'}, cache,
+      value => changes.push(['items',value]), value => changes.push(['gallery',value]), value => changes.push(['settled',value]));
+    assert.deepEqual(changes, [['items',items], ['gallery','auction'], ['settled',true], ['loading',false], ['tab','auction']]);
+  }
+});
 
 for (const top of [220, -120, 1100]) {
   test(`tab replacement reserves the current viewport below gallery top ${top}`, () => {

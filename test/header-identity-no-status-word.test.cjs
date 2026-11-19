@@ -2,29 +2,26 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
+const { paintCachedHeader } = require('./helpers/avatar-dropdown-harness.cjs');
+const wallet = '0x' + 'a'.repeat(40);
+const shortAddress = '0xaaaa...aaaa';
 const prepaint = fs.readFileSync('header-prepaint.js', 'utf8');
 const avatarDropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
 
 test('an account with no picture is named, never given a status word', () => {
-  // A-56. The header read "Connecting..." beside an address it already knew, on
-  // every navigation, for any account without a profile picture. That account's
-  // cached avatar is the neutral image and its cached name is its own shortened
-  // address, so both are already final and there is nothing left to resolve.
-  assert.match(prepaint, /const settledWithoutPicture = identity\s*\n\s*&& identity\.wallet === wallet\s*\n\s*&& identity\.avatarUrl === NEUTRAL_AVATAR_URL;/);
-  assert.match(prepaint, /label: settledWithoutPicture \? identity\.name : shortAddress,/);
+  for (const name of ['Artist', shortAddress]) {
+    const paint = paintCachedHeader({ wallet, name, avatarUrl: '/default-avatar.png' });
+    assert.equal(paint.avatarName(), name);
+    assert.equal(paint.avatarSource(), '/default-avatar.png');
+  }
 });
 
 test('a name still never appears beside an undecoded custom avatar', () => {
-  // The A-46 property this fix had to respect: a real name next to the neutral
-  // placeholder is a half identity. It is allowed only when the neutral image
-  // IS the account's avatar, which is why the guard tests avatarUrl and not
-  // merely the presence of a cached identity.
-  assert.doesNotMatch(prepaint, /label: identity\.name,\s*\n\s*shortAddress,\s*\n\s*imageIdentity: shortAddress,\s*\n\s*uiState: 'resolving'/);
-  // The image half of the resolving branch is untouched: neutral paints
-  // instantly, so the button never blanks while a remote avatar loads.
-  const resolving = prepaint.slice(prepaint.indexOf('const settledWithoutPicture'));
-  assert.match(resolving, /source: NEUTRAL_AVATAR_URL,\s*\n\s*paintSource: neutralAvatar,/);
-  assert.match(resolving, /uiState: 'resolving'/);
+  const paint = paintCachedHeader({ wallet, name: 'Artist', avatarUrl: '/custom-avatar.png' });
+  assert.equal(paint.uiState(), 'resolving');
+  assert.equal(paint.avatarName(), shortAddress);
+  assert.equal(paint.avatarSource(), '/default-avatar.png');
+  assert.equal(paint.avatarSrc(), paint.context.ArtSoulHeaderPrepaint.neutralAvatar);
 });
 
 test('the preview branch still requires a validated preview', () => {

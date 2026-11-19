@@ -835,14 +835,14 @@
             label.textContent = 'AUDIO';
             const avatar = document.createElement('img');
             avatar.className = 'artsoul-card-audio-avatar';
-            avatar.src = '/ARTSOULlogo.png';
+            avatar.src = '/brand/artsoul-audio-cover-384.webp';
             avatar.alt = '';
             avatar.loading = 'lazy';
             avatar.decoding = 'async';
             avatar.dataset.playing = 'false';
             const audio = document.createElement('audio');
             audio.src = url;
-            audio.preload = 'metadata';
+            audio.preload = 'none';
             audio.className = 'artsoul-card-audio-element';
             const controls = document.createElement('div');
             controls.className = 'artsoul-card-media-controls';
@@ -1116,7 +1116,7 @@
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
                 h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
-                h('img', { src: '/ARTSOULlogo.png', alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
+                h('img', { src: '/brand/artsoul-audio-cover-384.webp', alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
                 h('div', { className: 'artsoul-card-media-controls', draggable: false,
                     onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                     onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
@@ -1129,7 +1129,7 @@
                         onClick: toggleMute, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                         onTouchStart: stopCardPropagation, onDragStart: stopCardActivation })
                 ),
-                h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'metadata', muted,
+                h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'none', muted,
                     onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
                     onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
                     onError: onUnavailable || undefined,

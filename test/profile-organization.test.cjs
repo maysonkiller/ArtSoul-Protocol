@@ -147,6 +147,37 @@ test('email shares the provider grid but never mounts for another wallet or an u
   }
 });
 
+test('every favorite has a card or removable placeholder, including media failures and hidden works', async () => {
+  const {transformWithOxc} = await import('vite');
+  const file = fs.readFileSync('src/features/saved/saved-list.jsx', 'utf8');
+  const {code} = await transformWithOxc(file.slice(file.indexOf('function SavedArtwork(')), 'favorite.jsx', {jsx: {runtime: 'classic'}});
+  const mutations = [];
+  let failed = null;
+  const cards = {ReactCard: function Card() {}, detailHref: () => '/artwork/23', isHidden: row => row.hidden,
+    mediaUrl: row => row.url, hasSafeMedia: row => row.url.startsWith('https:')};
+  const scope = {React: {...React, useState: () => [failed, src => { failed = src; }]}, window: {ArtSoulArtworkCard: cards},
+    savedStore: {set: (...args) => mutations.push(args)}};
+  vm.runInNewContext(code + '\nthis.itemView = SavedArtwork;', scope);
+  const identity = {chain_id:84532, core_address:'0x'+'a'.repeat(40), artwork_id:'23'};
+  const view = artwork => scope.itemView({item:{...identity,artwork},pending:false});
+  const valid = {url:'https://example.test/work.png',title:'Saved work'};
+  const card = view(valid);
+  assert.equal(card.type, cards.ReactCard);
+  card.props.onMediaUnavailable();
+  for (const artwork of [valid, {...valid,url:'file:///bad'}]) {
+    const fallback = view(artwork);
+    assert.match(render(fallback), /Preview unavailable/);
+    assert.match(render(fallback), /href="\/artwork\/23"/);
+  }
+  assert.equal(view({...valid,url:valid.url+'?updated'}).type, cards.ReactCard);
+  for (const artwork of [null,{...valid,hidden:true}]) {
+    const fallback = view(artwork);
+    assert.doesNotMatch(render(fallback), /Saved work|href=/);
+    elements(fallback, node => node.type === 'button')[0].props.onClick();
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(mutations)), [[identity,false],[identity,false]]);
+});
+
 test('verified email retains a labelled disconnect action and explicit verified/private status', async () => {
   const actions = [];
   const base = {connection: {verified: true, email: 'artist@example.test'}, editing: false, busy: false, hasToken: false, notice: '', manage: action => actions.push(action)};

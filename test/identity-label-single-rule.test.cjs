@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
+const { paintCachedHeader } = require('./helpers/avatar-dropdown-harness.cjs');
 const avatarDropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
 const supabaseClient = fs.readFileSync('supabase-client.js', 'utf8');
 const headerPrepaint = fs.readFileSync('header-prepaint.js', 'utf8');
@@ -46,8 +47,21 @@ test('ArtSoul Guest survives only where no wallet exists at all', () => {
 });
 
 test('an unnamed connected wallet shows its shortened address only once', () => {
-  assert.match(avatarDropdown, /const nextAddress = address && nextName\.toLowerCase\(\) !== String\(address\)\.toLowerCase\(\)/);
-  assert.match(avatarDropdown, /address: nextAddress,/);
-  assert.match(headerPrepaint, /const displayAddress = shortAddress && label\.toLowerCase\(\) !== shortAddress\.toLowerCase\(\)/);
-  assert.match(headerPrepaint, /writeAddress\(address, displayAddress\)/);
+  const wallet = '0x' + 'a'.repeat(40);
+  const name = '0xaaaa...aaaa';
+  const h = paintCachedHeader({ wallet, name, avatarUrl: '/default-avatar.png' });
+  const address = h.navButtons.querySelector('[data-avatar-address]');
+  function assertSingleLabel() {
+    assert.equal(h.avatarName(), name);
+    assert.equal(address.hidden, true);
+    assert.equal(address.textContent, '');
+    assert.equal(address.getAttribute('aria-hidden'), 'true');
+  }
+  assertSingleLabel();
+  h.context.window.currentWalletAddress = wallet;
+  h.dropdown.updateStableButton({
+    avatarUrl: '/default-avatar.png', name, address: name, stateKey: 'identity:' + wallet,
+    uiState: 'connected', previewWallet: wallet
+  });
+  assertSingleLabel();
 });

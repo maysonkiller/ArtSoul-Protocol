@@ -75,6 +75,16 @@
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
 }
 
+.gallery-empty-state {
+    padding: clamp(1.75rem, 5vw, 4rem) 1rem;
+    text-align: center;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 12px;
+    background: var(--c-surface);
+}
+.gallery-empty-state h2 { color: var(--c-text); font-size: 1.25rem; font-weight: 600; }
+.gallery-empty-state p { max-width: 48ch; margin: 0.5rem auto 0; color: var(--c-text-muted); line-height: 1.5; }
+
 @media (max-width: 640px) {
     .artwork-fallback-facts {
         grid-template-columns: 1fr;
@@ -9568,6 +9578,7 @@ body:is(.classic, .future) .site-header #navButtons .avatar-button:focus-visible
 /* Keep the copy glyph in its reserved slot during the native disabled
    phase of the clipboard operation. Its presence follows the copy value,
    not the temporary disabled state. */
+body:is(.classic, .future) .site-header #navButtons:has([data-avatar-image][data-avatar-identity^="0x"]) .avatar-info button:disabled::after,
 body:is(.classic, .future) .site-header #navButtons .avatar-info button[data-copy-value]:not([data-copy-value=""])::after {
     content: '';
     position: absolute;
@@ -10035,6 +10046,7 @@ body:is(.classic, .future) .site-header .avatar-menu-wallet > .avatar-menu-addre
     min-width: 0;
     width: auto;
 }
+body:is(.classic, .future) .site-header #navButtons .avatar-button[data-provider-preview]::after,
 body:is(.classic, .future) .site-header #navButtons .avatar-button-provider {
     position: absolute;
     left: 28px;
@@ -10049,7 +10061,13 @@ body:is(.classic, .future) .site-header #navButtons .avatar-button-provider {
     box-shadow: 0 0 0 2px var(--c-surface);
     pointer-events: none;
 }
-body:is(.classic, .future) .site-header #navButtons .avatar-button:has(.avatar-button-provider) { position: relative; }
+body:is(.classic, .future) .site-header #navButtons .avatar-button:is([data-provider-preview], :has(.avatar-button-provider)) { position: relative; }
+body:is(.classic, .future) .site-header #navButtons .avatar-button[data-provider-preview]::after {
+    content: '';
+    background: var(--c-surface) var(--wallet-preview-mark) center / 14px 14px no-repeat;
+}
+.avatar-button[data-provider-preview="rabby"] { --wallet-preview-mark: url('/brand/rabby.png'); }
+.avatar-button[data-provider-preview="metamask"] { --wallet-preview-mark: url('/brand/metamask.png'); }
 body:is(.classic, .future) .site-header #navButtons .avatar-button-provider[hidden] { display: none; }
 body:is(.classic, .future) .site-header #navButtons .avatar-button-provider .avatar-identity-mark { width: 14px; height: 14px; flex-basis: 14px; }
 body:is(.classic, .future) .site-header .avatar-dropdown-navigation {
@@ -10362,10 +10380,13 @@ body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, 
     left: 8px !important;
 }
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
-    left: 50% !important;
-    right: auto !important;
+    /* Touch and reduced-motion styles clear transforms during a press. Keep
+       the buttons under the pointer with layout-based centering. */
+    left: 0 !important;
+    right: 0 !important;
     bottom: 8px !important;
-    transform: translateX(-50%);
+    width: max-content;
+    margin-inline: auto;
 }
 /* Three 44px targets cannot fit on the same line in a very narrow card.
    Keep type and Saved aligned below; put playback just above without overlap. */
@@ -10402,11 +10423,10 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
         width: max-content !important;
         max-width: 120px !important;
     }
-    /* Only guest/unresolved labels without a copy target omit icon space.
-       Clipboard calls temporarily disable real copy buttons: don't shrink
-       their content width or move the neighbouring header action icons. */
-    body:is(.classic, .future) .site-header #navButtons .avatar-info button:disabled:not([data-copy-value]),
-    body:is(.classic, .future) .site-header #navButtons .avatar-info button:disabled[data-copy-value=""] {
+    /* Keep the signed-out label compact. Wallet identity rows reserve their
+       copy glyph from first paint, while the buttons are still disabled. */
+    body:is(.classic, .future) .site-header #navButtons:not(:has([data-avatar-image][data-avatar-identity^="0x"])) .avatar-info button:disabled:not([data-copy-value]),
+    body:is(.classic, .future) .site-header #navButtons:not(:has([data-avatar-image][data-avatar-identity^="0x"])) .avatar-info button:disabled[data-copy-value=""] {
         padding-right: 3px;
     }
     body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-menu {

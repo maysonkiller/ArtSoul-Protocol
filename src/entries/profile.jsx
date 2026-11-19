@@ -313,7 +313,7 @@ const { useState, useEffect, useRef } = React;
                 };
             }, []);
 
-            useEffect(() => {
+            React.useLayoutEffect(() => {
                 if (profile && !['saved', 'wallet-nfts'].includes(selectedGallery)) {
                     loadMyArtworks();
                 }
@@ -1581,7 +1581,6 @@ const { useState, useEffect, useRef } = React;
                 }
             }
 
-            const bgClass = isClassic ? 'bg-gray-900 text-gray-100' : 'bg-black text-cyan-100';
             const viewAddress = getViewAddress();
             const editableProfile = profileDraft || profile;
             const discordProfileUrl = getProfileDiscordUrl(profile);
@@ -1611,7 +1610,7 @@ const { useState, useEffect, useRef } = React;
 
             if (profileLoadError && !profile) {
                 return (
-                    <div className={`min-h-screen ${bgClass}`}>
+                    <div className="min-h-screen profile-page">
                         <main className="site-page-container py-12">
                             <section className="profile-connect-state max-w-xl mx-auto p-8 text-center" role="alert">
                                 <h1 className="text-2xl font-semibold mb-3">Profile unavailable</h1>
@@ -1636,7 +1635,7 @@ const { useState, useEffect, useRef } = React;
 
             if (!viewAddress && !connectedWalletAddress && !profile?.wallet_address) {
                 return (
-                    <div className={`min-h-screen ${bgClass}`}>
+                    <div className="min-h-screen profile-page">
                         <main className="site-page-container py-12">
                             <section className="profile-connect-state max-w-xl mx-auto p-8 text-center">
                                 <h1 className="text-2xl font-semibold mb-3">Connect your wallet to view your profile</h1>
@@ -1696,7 +1695,7 @@ const { useState, useEffect, useRef } = React;
             const resolvedProfileName = getProfileDisplayName(profile, profileAddress);
 
             return (
-                <div className={`min-h-screen ${bgClass} transition-all duration-500`}>
+                <div className="min-h-screen profile-page">
                     {/* Main Content */}
                     <main className="site-page-container profile-page-main py-8">
                         {/* Profile Header */}
@@ -2035,7 +2034,14 @@ const { useState, useEffect, useRef } = React;
                                                 // is replaced by an empty list or sign-in prompt.
                                                 const panel = galleryPanelRef.current;
                                                 if (panel) panel.style.minHeight = `max(0px, calc(100dvh - ${panel.getBoundingClientRect().top}px))`;
-                                                setArtworksLoading(!['saved', 'wallet-nfts'].includes(gallery.id));
+                                                const publicGallery = !['saved', 'wallet-nfts'].includes(gallery.id);
+                                                const cached = publicGallery && galleryCacheRef.current.get(`${profile.wallet_address.toLowerCase()}:${gallery.id}`);
+                                                if (cached) {
+                                                    setMyArtworks(cached);
+                                                    setDisplayedGallery(gallery.id);
+                                                    setHasSettledArtworks(true);
+                                                }
+                                                setArtworksLoading(publicGallery && !cached);
                                                 setSelectedGallery(gallery.id);
                                                 const linkedTabs = ['saved', 'wallet-nfts', 'collected'];
                                                 if (linkedTabs.includes(gallery.id) || linkedTabs.includes(window.location.hash.slice(1))) {

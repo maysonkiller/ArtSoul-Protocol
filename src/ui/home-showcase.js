@@ -117,6 +117,7 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
         picture.className = 'home-showcase-media';
         picture.alt = item.title;
         picture.loading = 'eager';
+        if (stage.children.length === 0) picture.fetchPriority = 'high';
         picture.decoding = 'async';
         // Only the visible slide downloads a new image. The others get a URL
         // when first selected; Supabase thumbnails retain the existing bounds.

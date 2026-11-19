@@ -66,6 +66,7 @@ export function createSavedStore({ getWallet, request = fetch, onChange = () => 
     });
   }
   async function load(before = null) {
+    if (owner !== String(getWallet() || '').toLowerCase()) invalidate();
     const listRevision = ++listRequest;
     const listVersion = state.listVersion;
     const knownVersions = new Map(versions);
