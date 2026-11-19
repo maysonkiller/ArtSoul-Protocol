@@ -703,6 +703,7 @@ body.future .artwork-page-compact-action {
     --c-accent-3: var(--accent-classic);
     --c-aura-gold: var(--accent-classic);
     --c-aura-blue: var(--accent-classic);
+    --c-verification-blue: #345e8e;
     --c-back-button-background: var(--c-accent);
     --c-back-button-text: var(--c-bg);
     --c-border: rgba(169, 221, 211, 0.72);
@@ -733,6 +734,7 @@ body.future .artwork-page-compact-action {
     --c-accent-3: var(--accent-future-2);
     --c-aura-gold: #d4af37;
     --c-aura-blue: #3b82f6;
+    --c-verification-blue: #175dc5;
     --c-back-button-background: linear-gradient(135deg, var(--c-accent-2), var(--c-accent));
     --c-back-button-text: #ffffff;
     --c-border: rgba(0, 245, 255, 0.64);
@@ -754,11 +756,10 @@ body.future .artwork-page-compact-action {
     .back-button { transition: none !important; }
 }
 
-/* A-34: a reusable decoration only. No public surface assigns an aura yet.
-   Keep the frame inside its wrapper so cards and contained detail media keep
-   their original dimensions, cropping and pointer/keyboard interactions. */
+/* The edge sits inside the original card or media box. */
 .artsoul-aura-frame {
     position: relative;
+    --artwork-aura-shadow: 0 0 12px color-mix(in srgb, var(--aura-glow, var(--c-accent)) 36%, transparent);
 }
 
 .artsoul-aura-frame::after {
@@ -781,8 +782,9 @@ body.future .artwork-page-compact-action {
         border: 0;
         padding: 2px;
         background: linear-gradient(120deg, var(--c-accent), var(--c-aura-blue));
-        -webkit-mask: linear-gradient(currentColor 0 0) content-box, linear-gradient(currentColor 0 0);
-        mask: linear-gradient(currentColor 0 0) content-box, linear-gradient(currentColor 0 0);
+        /* Both mask layers need full alpha to leave the artwork pixels untouched. */
+        -webkit-mask: linear-gradient(black 0 0) content-box, linear-gradient(black 0 0);
+        mask: linear-gradient(black 0 0) content-box, linear-gradient(black 0 0);
         -webkit-mask-composite: xor;
         mask-composite: exclude;
     }
@@ -790,7 +792,9 @@ body.future .artwork-page-compact-action {
     .future .artsoul-aura-frame--platform::after {
         background: linear-gradient(120deg, var(--c-accent), var(--c-accent-2), var(--c-accent-3), var(--c-accent));
         background-size: 300% 100%;
-        animation: artsoulAuraShimmer 6s linear infinite;
+    }
+    @media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
+        .future .artsoul-aura-frame--platform::after { animation: artsoulAuraShimmer 6s linear infinite; }
     }
 }
 
@@ -816,7 +820,6 @@ body.future .artwork-page-compact-action {
     --artwork-card-radius: 8px;
     border-radius: var(--artwork-card-radius);
     background: var(--c-surface);
-    /* C-14 will bind verified status to the shared presentation-only aura frame. */
     border: 1px solid var(--c-card-border);
     color: var(--c-text);
     text-decoration: none;
@@ -6851,6 +6854,23 @@ body.future .artsoul-voice-button.is-listening {
     background: var(--c-accent);
     color: var(--c-bg);
 }
+.artsoul-voice-chat::before {
+    display: inline-block;
+    content: "";
+    width: .8em;
+    height: .8em;
+    margin-inline-end: .4em;
+    vertical-align: -.04em;
+    border: 1px solid var(--c-accent);
+    border-radius: 50%;
+}
+.artsoul-voice-chat[data-listening="true"]::before { background: var(--c-accent); }
+@media (prefers-reduced-motion: no-preference) {
+    body.future .artsoul-voice-chat[data-listening="true"]::before {
+        animation: artsoulVoiceListening 1.2s ease-in-out infinite;
+        box-shadow: 0 0 .45em var(--c-glow-strong);
+    }
+}
 .artsoul-voice-results { display: grid; gap: 8px; }
 .artsoul-voice-results a {
     display: block;
@@ -7617,7 +7637,6 @@ body:is(.classic, .future) .artwork-page-shell {
 
 body:is(.classic, .future) .artwork-page-layout {
     grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
-    grid-template-areas: "media context" "media people" "media auction" "trust ai" "provenance extra";
     gap: clamp(24px, 3vw, 42px);
     align-items: start;
 }
@@ -7625,7 +7644,9 @@ body:is(.classic, .future) .artwork-page-layout {
 body:is(.classic, .future) .artwork-page-left,
 body:is(.classic, .future) .artwork-page-right {
     position: static;
-    display: contents;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
     height: auto;
     max-height: none;
     gap: 20px;
@@ -7661,7 +7682,7 @@ body:is(.classic, .future) .artwork-page-left .artwork-detail-frame:not(.artwork
     max-height: none;
     border: 1px solid var(--c-border-soft);
     border-radius: 22px;
-    box-shadow: none;
+    box-shadow: var(--artwork-aura-shadow, none);
 }
 
 body:is(.classic, .future) .artwork-page-left .artwork-detail-media-object,
@@ -8318,6 +8339,15 @@ body.future .artsoul-artwork-card:focus-within {
     border-color: var(--c-accent-2);
     box-shadow: 0 4px 16px rgba(var(--c-accent-2-rgb), 0.16);
 }
+
+/* Keep the outer glow on the wrapper so masking the gradient edge cannot clip it. */
+body:is(.classic, .future) .artsoul-artwork-card.artsoul-aura-frame,
+.protocol-frame-example.artsoul-aura-frame {
+    box-shadow: var(--artwork-aura-shadow);
+}
+.future .artsoul-aura-frame--platform { --aura-glow: var(--c-accent-2); }
+.artsoul-aura-frame--genesis { --aura-glow: var(--c-aura-gold); }
+.artsoul-aura-frame--partner { --aura-glow: var(--c-aura-blue); }
 
 /* Contextual guidance uses the existing native-dialog interaction pattern. */
 .context-help-label { display: flex; align-items: center; gap: 6px; min-width: 0; }

@@ -5,7 +5,7 @@ const pages = [
     { id: 'home', title: 'ArtSoul Home', url: '/', text: 'Discover ArtSoul, protocol activity and featured digital art.' },
     { id: 'gallery', title: 'Art Gallery', url: '/gallery', text: 'Explore artwork, auctions, NFTs, the marketplace and collections.' },
     { id: 'publish', title: 'Publish Artwork', url: '/upload', text: 'Upload your art, review AI guidance and prepare an auction with your wallet.' },
-    { id: 'profile', title: 'Your Profile', url: '/profile', text: 'Your artworks, auctions, collected NFTs, activity and private Saved list. Connect your wallet to view your own profile.' },
+    { id: 'profile', title: 'Your Profile', url: '/profile', text: 'Your artworks, auctions, collected NFTs, activity and private favorites. Connect your wallet to view your own profile.' },
     { id: 'documentation', title: 'Protocol Docs', url: '/docs-protocol', text: 'Documentation and help: publishing, bidding, deposits, settlement, fees, wallets, Trust and copyright reports.' }
 ];
 const docs = PROTOCOL_DOC_SECTIONS.map(section => ({ id: section.id, title: section.title, text: section.text, url: '/docs-protocol#' + section.id }));

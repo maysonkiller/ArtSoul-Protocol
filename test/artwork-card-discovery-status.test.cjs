@@ -12,6 +12,22 @@ vm.runInContext(
 
 const { discoveryStatusInfo } = context.window.ArtSoulArtworkCard;
 
+test('expired rounds with evidence of a bid stay distinct from unsold artworks', () => {
+  const zero = '0x' + '0'.repeat(40);
+  const winner = '0x' + '1'.repeat(40);
+  const { cardPreviewInfo, cardSummary } = context.window.ArtSoulArtworkCard;
+  const expired = { status: 'awaiting_end', winner: zero, current_bid: '0', start_price: '0.005', auction_id: '1' };
+  for (const evidence of [{ current_bidder: winner }, { auction_winner_address: winner }, { auction_bid_count: 1 },
+                          { highest_bid: '0.01' }, { winning_bid: '0.01' }]) {
+    const row = { ...expired, ...evidence };
+    assert.equal(cardPreviewInfo(row).label, 'Bidding ended');
+    assert.equal(cardPreviewInfo({ ...row, status: 'settlement_pending' }).label, 'Awaiting payment');
+    assert.notEqual(cardSummary(row).label, 'Starting price');
+  }
+  assert.deepEqual({ ...cardSummary(expired) }, { label: 'Auction', value: 'Ended without bids' });
+  assert.deepEqual({ ...cardSummary({ ...expired, auction_winner_address: winner }) }, { label: 'Bid', value: 'Recorded' });
+});
+
 test('artwork detail uses the shared card status resolver', () => {
   const detail = fs.readFileSync('artwork.html', 'utf8') + fs.readFileSync('src/entries/artwork.jsx', 'utf8');
   assert.match(detail, /ArtSoulArtworkCard\?\.statusInfo\?\.\(auction \? \{/);
@@ -41,7 +57,7 @@ test('cards use one consistent human-readable label per lifecycle state', () => 
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'awaiting_end', current_bid: '1' }) },
-    { key: 'awaiting_settlement', label: 'Awaiting payment' }
+    { key: 'awaiting_close', label: 'Bidding ended' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'settlement_pending', current_bid: '1' }) },

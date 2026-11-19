@@ -392,6 +392,21 @@ body:is(.classic, .future) .protocol-section-body {
 }
 
 body:is(.classic, .future) .protocol-section-body h3 { font-size: 1rem; }
+.protocol-verification-key { display: flex; align-items: center; gap: .5rem; font-weight: 600; }
+.protocol-verification-key svg { flex: none; }
+.protocol-verification-face { fill: var(--c-verification-blue); stroke: var(--c-brand-mark-background); }
+.protocol-verification-key path { stroke: var(--c-brand-mark-background); }
+
+.protocol-frame-legend { margin: 1rem 0; }
+.protocol-frame-legend figcaption { margin-bottom: .65rem; font-weight: 600; }
+.protocol-frame-legend dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 1rem;
+    margin: 0;
+}
+.protocol-frame-example { padding: .7rem .8rem; border-radius: .65rem; font-weight: 600; }
+.protocol-frame-legend dd { margin: .5rem 0 0; line-height: 1.5; }
 body:is(.classic, .future) .protocol-section-body p,
 body:is(.classic, .future) .protocol-section-body li { line-height: 1.75; }
 

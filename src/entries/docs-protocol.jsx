@@ -1,6 +1,7 @@
 import { React, createRoot } from './react-runtime.js';
 import '../../docs-protocol.css';
 import { PROTOCOL_DOC_SECTIONS as sections } from '../content/protocol-docs.js';
+import { auraFrameClassName } from '../ui/components/aura-frame.js';
 
 const { useEffect, useLayoutEffect, useState } = React;
 
@@ -12,6 +13,28 @@ const Chevron = ({ className = '' }) => (
 
 function ProtocolBlock({ block }) {
     if (block.type === 'paragraph') return <p>{block.text}</p>;
+    if (block.type === 'frame-examples') return (
+        <figure className="protocol-frame-legend">
+            <figcaption>{block.caption}</figcaption>
+            <dl>
+                {block.items.map(item => (
+                    <div key={item.kind}>
+                        <dt className={`protocol-frame-example ${auraFrameClassName(item.kind)}`}>{item.name}</dt>
+                        <dd>{item.text}</dd>
+                    </div>
+                ))}
+            </dl>
+        </figure>
+    );
+    if (block.type === 'verification-mark') return (
+        <p className="protocol-verification-key">
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle className="protocol-verification-face" cx="12" cy="12" r="10.5" />
+                <path d="m7.5 12.2 3 3 6-6.3" fill="none" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {block.text}
+        </p>
+    );
     if (block.type === 'formula') return <div className="protocol-formula">{block.text}</div>;
     if (block.type === 'ordered-list') return <ol>{block.items.map((item, index) => <li key={index}>{item}</li>)}</ol>;
     if (block.type === 'table') return (

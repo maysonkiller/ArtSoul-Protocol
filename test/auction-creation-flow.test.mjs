@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { parseUserEthAmount } from '../src/features/auction/eth-amount.js';
-import { inspectAuctionCreation } from '../src/features/auction/auction-creation.js';
+import { formatAuctionOpeningTerms, inspectAuctionCreation } from '../src/features/auction/auction-creation.js';
 
 const CREATOR = '0x1111111111111111111111111111111111111111';
 const OTHER = '0x2222222222222222222222222222222222222222';
@@ -165,9 +165,14 @@ function confirmationHarness(input = {}, { price = '0,001', duration = 24, creat
 
 test('confirmation normalizes a comma once, preserves exact value, and passes a wallet guard', async () => {
     const h = confirmationHarness();
+    const initial = formatAuctionOpeningTerms('0.00001', 48);
+    assert.equal(initial, 'Starting price: 0.00001 test ETH · 48 hours. Your wallet pays only network gas to open the auction.');
+    const edited = formatAuctionOpeningTerms(h.scope.newAuctionPrice, h.scope.newAuctionDuration);
     await h.run();
     assert.equal(h.writes.length, 1);
     assert.deepEqual(h.writes[0].slice(0, 3), ['28', '0.001', 24]);
+    assert.ok(edited.includes(`${h.writes[0][1]} test ETH · ${h.writes[0][2]} hours`));
+    assert.ok(!edited.includes('0.00001'));
     assert.equal(h.writes[0][3].expectedWallet, CREATOR);
     assert.equal(h.writes[0][3].expectedChainId, 84532);
     assert.deepEqual(h.destinations, ['/gallery#auctions']);
@@ -176,6 +181,7 @@ test('confirmation normalizes a comma once, preserves exact value, and passes a 
 
 for (const price of ['', '0', '-1', '0,,001', '0.0000000000000000001']) {
     test(`invalid form input ${JSON.stringify(price)} remains editable and never requests a wallet`, async () => {
+        assert.equal(formatAuctionOpeningTerms(price, 24), '');
         const h = confirmationHarness({}, { price });
         await h.run();
         assert.equal(h.writes.length, 0);

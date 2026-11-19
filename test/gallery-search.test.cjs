@@ -57,7 +57,7 @@ test('gallery search is debounced, global, stable, and Discovery-ranked', () => 
   assert.match(source, /useEffect\(\(\) => \{[\s\S]*loadArtworks\(\);[\s\S]*\}, \[\]\)/);
   assert.match(source, /if \(!globalSearch && window\.ArtSoulDiscovery\?\.filterForGalleryTab\)/);
   assert.match(source, /globalSearch \? 'discovery' : sortBy/);
-  assert.match(source, /loaded artworks for/);
+  assert.ok(source.includes('loaded ${artworkNoun} for'));
   assert.match(source, /Find more art or artists/);
   assert.match(source, /artsoul:open-search/);
   assert.match(source, /categoryLabelForArtwork/);

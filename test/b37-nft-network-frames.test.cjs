@@ -160,7 +160,7 @@ test('all primary NFT pages load one small theme-safe stylesheet and fresh card 
     for (const path of ['index.html', 'gallery.html', 'profile.html', 'artwork.html']) {
         const html = fs.readFileSync(path, 'utf8');
         assert.match(html, /\/nft-network-frames\.css\?v=2/);
-        assert.match(html, /\/src\/ui\/components\/artwork-card\.js\?v=32/);
+        assert.match(html, /\/src\/ui\/components\/artwork-card\.js\?v=\d+"/);
     }
     assert.match(style, /\.wallet-nfts-grid[\s\S]*align-items:\s*stretch/);
     assert.match(style, /\.wallet-nft-image[\s\S]*aspect-ratio:\s*1\s*\/\s*1/);

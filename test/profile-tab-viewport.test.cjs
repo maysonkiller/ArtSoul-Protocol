@@ -8,14 +8,14 @@ const body = tabs.match(/onClick=\{\(\) => \{([\s\S]*?)\n\s*\}\}/)?.[1];
 assert.ok(body, 'the profile tab click handler is present');
 const click = new Function('gallery', 'selectedGallery', 'setArtworksLoading', 'setSelectedGallery', 'galleryPanelRef', 'window', 'artworksRequestRef', 'setArtworksError = () => {}', body);
 
-for (const [top, expected] of [[220, 624], [-120, 964], [1100, 0]]) {
+for (const top of [220, -120, 1100]) {
   test(`tab replacement reserves the current viewport below gallery top ${top}`, () => {
     const changes = [];
     const request = { current: 3 };
     const panel = { style: {}, getBoundingClientRect: () => ({ top }) };
     click({ id: 'auction' }, 'created', value => changes.push(['loading', value]), value => changes.push(['tab', value]), { current: panel }, { innerHeight: 844, location: { hash: '' } }, request);
     assert.equal(request.current, 4, 'the outgoing request retires before the replacement effect');
-    assert.equal(panel.style.minHeight, `${expected}px`);
+    assert.equal(panel.style.minHeight, `max(0px, calc(100dvh - ${top}px))`);
     assert.deepEqual(changes, [['loading', true], ['tab', 'auction']]);
   });
 }
@@ -51,5 +51,8 @@ test('wallet inventory is a separate private tab with a shareable local tab hash
   assert.deepEqual(writes[0], [window.history.state, '', '/profile#wallet-nfts']);
   window.location.hash = '#wallet-nfts';
   click({ id: 'collected' }, 'wallet-nfts', () => {}, () => {}, { current: null }, window, { current: 1 });
-  assert.equal(writes[1][2], '/profile');
+  assert.equal(writes[1][2], '/profile#collected');
+  window.location.hash = '#collected';
+  click({ id: 'created' }, 'collected', () => {}, () => {}, { current: null }, window, { current: 2 });
+  assert.equal(writes[2][2], '/profile');
 });

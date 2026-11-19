@@ -315,10 +315,11 @@ test('a creator starts an auction with a duration the contract reports', async (
   const { calls, contracts } = recorder();
   const prompts = [];
   const answer = await run(tools({ cards: [UNSOLD], contracts, prompts }), 'start_auction',
-    { artwork_id: '31', start_price_eth: '0.005', duration_hours: 36 });
+    { artwork_id: '31', start_price_eth: '0,005', duration_hours: 36 });
   assert.equal(answer.submitted, true);
   assert.deepEqual(calls, [['createAuction', '31', '0.005', 129600]]);
-  assert.match(prompts[0], /0\.005 ETH/);
+  assert.match(prompts[0], /0\.005 test ETH/);
+  assert.match(prompts[0], /only network gas/);
   assert.match(prompts[0], /36 hours/);
 });
 

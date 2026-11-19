@@ -9,13 +9,29 @@ const CREATOR = `0x${'ab'.repeat(20)}`;
 const COLLECTOR = `0x${'cd'.repeat(20)}`;
 const TIMESTAMP = '2026-09-21T12:00:00.000Z';
 
-// Exercise both public endpoints with the integer strings returned by the
-// indexer. Presentation rounding must not alter the API's monetary values.
-function endpoint(name, amount, bidAmounts = [amount]) {
+const numericColumns = new Set(['artwork_id', 'auction_id', 'token_id', 'active_auction_id',
+  'canonical_floor', 'start_price', 'current_bid', 'winning_bid', 'final_price', 'bid_amount',
+  'price', 'floor_price', 'settled_volume_wei']);
+
+// Uncast PostgreSQL NUMERIC values reach JSON.parse as JSON numbers. A
+// PostgREST text cast emits a quoted decimal and preserves all its digits.
+function postgrestProjection(path, rows) {
+  const query = new URLSearchParams(path.split('?')[1]);
+  const columns = query.get('select').split(',');
+  return rows.map(row => Object.fromEntries(columns.flatMap(column => {
+    const [key, cast] = column.split('::');
+    const value = row[key];
+    if (value === undefined) return [];
+    if (!numericColumns.has(key) || value === null) return [[key, value]];
+    return [[key, cast === 'text' ? String(value) : JSON.parse(String(value))]];
+  })));
+}
+
+function endpoint(name, amount, bidAmounts = [amount], configure) {
   const rows = {
     v41_artworks: [{ chain_id: CHAIN, artwork_id: '28', creator: CREATOR,
       metadata_uri: 'https://metadata.example/28.json', minted: true, token_id: '400',
-      canonical_floor: amount, active_auction_id: '', block_number: 100,
+      canonical_floor: amount, active_auction_id: null, block_number: 100,
       transaction_hash: '0xregistration', indexed_at: TIMESTAMP, last_updated_at: TIMESTAMP }],
     v41_auctions: [{ chain_id: CHAIN, auction_id: '63', artwork_id: '28', status: 'settled',
       start_price: amount, end_time: TIMESTAMP, current_bid: amount, current_bidder: COLLECTOR,
@@ -31,6 +47,7 @@ function endpoint(name, amount, bidAmounts = [amount]) {
     v41_public_metrics: [{ chain_id: CHAIN, artists_onboarded: '1', auctions_completed: '1',
       unique_collectors: '1', settled_volume_wei: amount, last_updated_block: '100', updated_at: TIMESTAMP }]
   };
+  configure?.(rows);
   const source = fs.readFileSync(`src/api/routes/public/${name}.js`, 'utf8')
     .replace(/^import[^\n]*\n/gm, '')
     .replace('export default async function handler', 'this.handler = async function handler')
@@ -42,11 +59,12 @@ function endpoint(name, amount, bidAmounts = [amount]) {
     readNftOwnershipConfig: () => null,
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,
+    readPlatformArtworkIds: async () => new Set(),
     readNftHistory: async () => null,
     recheckNftOwnership: async () => null,
     readWithNftOwnershipRetry: operation => operation(),
     sendError: (res, error) => res.status(500).json({ error: error.message }),
-    supabaseRest: async path => rows[path.split('?')[0]] || [],
+    supabaseRest: async path => postgrestProjection(path, rows[path.split('?')[0]] || []),
     validateArtworkId: value => String(value || '').trim() || null,
     getModerationAccess: async () => ({ canModerate: false }),
     readArtworkMetadata: async () => ({ name: 'Exact amount fixture', image: 'https://images.example/28.png' })
@@ -67,6 +85,7 @@ const amounts = [
   ['0', '0'],
   ['1', '0.000000000000000001'],
   ['999999999999', '0.000000999999999999'],
+  ['10000000000000001', '0.010000000000000001'],
   ['123456789012345678', '0.123456789012345678'],
   ['1000000000000000001', '1.000000000000000001'],
   ['123456789012345678901234567890', '123456789012.34567890123456789']
@@ -96,6 +115,51 @@ for (const [wei, eth] of amounts) {
     assert.equal(direct.data[0].bids[0].bid_amount_wei, wei);
   });
 }
+
+test('zero projections retain exact winning bid, floor and token fallbacks on both artwork paths', async () => {
+  const value = '10000000000000001', expectedEth = '0.010000000000000001';
+  const configure = rows => {
+    Object.assign(rows.v41_auctions[0], {current_bid: '0', start_price: '0'});
+    Object.assign(rows.v41_artworks[0], {canonical_floor: '0', token_id: '0'});
+    rows.v41_floor_history[0].floor_price = '0';
+  };
+  const live = await endpoint('auction-live', value, [], configure)({chain_id: CHAIN, auction_id: '63'});
+  assert.equal(live.auction.current_bid, expectedEth);
+  const artworks = endpoint('artworks', value, [], configure);
+  for (const result of [await artworks({chain_id: CHAIN}), await artworks({chain_id: CHAIN, artwork_id: '28'})]) {
+    const card = result.data[0];
+    assert.equal(card.current_bid, expectedEth);
+    assert.equal(card.start_price, '0');
+    assert.equal(card.creator_value, expectedEth);
+    assert.equal(card.floor_price, expectedEth);
+    assert.equal(card.token_id, '400');
+    assert.equal(card.sale_price, expectedEth);
+  }
+});
+
+test('adjacent large protocol IDs survive the live response and identify the latest auction', async () => {
+  const previous = '10000000000000000', latest = '10000000000000001', work = '10000000000000003';
+  const configure = rows => {
+    for (const table of Object.values(rows)) {
+      for (const row of table) if ('artwork_id' in row) row.artwork_id = work;
+    }
+    rows.v41_auctions[0].auction_id = latest;
+    rows.v41_bids[0].auction_id = latest;
+  };
+  const live = await endpoint('auction-live', '1', ['1'], configure)({chain_id: CHAIN, auction_id: latest});
+  for (const entity of [live.auction, live.bids[0]]) {
+    assert.equal(entity.auction_id, latest);
+    assert.equal(entity.artwork_id, work);
+  }
+  const artworks = endpoint('artworks', '1', ['1'], rows => {
+    configure(rows);
+    rows.v41_auctions.unshift({...rows.v41_auctions[0], auction_id: previous, start_price: '5'});
+  });
+  for (const result of [await artworks({chain_id: CHAIN}), await artworks({chain_id: CHAIN, artwork_id: work})]) {
+    assert.equal(result.data[0].auction_id, latest);
+    assert.equal(result.data[0].start_price, '0.000000000000000001');
+  }
+});
 
 test('public bid history preserves the exact absolute and ceiling-rounded percentage increment', async () => {
   // Golden values from the existing rule max(0.01 ETH, ceil(2.5%)). The

@@ -6,7 +6,7 @@ const topics = {
         title: 'Your reactions', label: 'About community reactions',
         paragraphs: [
             'Like shows appreciation. Would Buy expresses interest; it does not place a bid or make a purchase.',
-            'Watching records a discovery signal. It is separate from your private Saved list and does not itself promise a reminder.'
+            'Watching records a discovery signal. It is separate from your private favorites and does not itself promise a reminder.'
         ],
         links: [['Read the guide', '/docs-protocol#trust-community']]
     },

@@ -69,6 +69,10 @@ for (const page of pages) {
         readFile(path.join(dist, page), 'utf8')
     ]);
 
+    if (page === 'collection-builder.html' && !/<div id="app">\s*<main\b[^>]*aria-busy="true"/.test(built)) {
+        throw new Error('The collection editor must show its initial page while the application loads.');
+    }
+
     // Do not replace already painted fallback text when a font arrives late.
     for (const html of [source, built]) {
         for (const [, url] of html.matchAll(/href="(https:\/\/fonts\.googleapis\.com\/[^"]+)"/g)) {

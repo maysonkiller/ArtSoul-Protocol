@@ -54,7 +54,8 @@ test('auction-live returns a new bid that lands after the caller cursor', async 
     if (path.startsWith('v41_auctions')) {
       return [{ auction_id: '42', artwork_id: '7', chain_id: 84532, status: 'active',
         start_price: '1000000000000000000', current_bid: '1500000000000000000',
-        current_bidder: '0xabc', end_time: new Date(Date.now() + 60_000).toISOString() }];
+        current_bidder: '0xabc', original_end_time: '2026-07-09T00:00:00.000Z', last_updated_block: 120,
+        end_time: new Date(Date.now() + 60_000).toISOString() }];
     }
     return [newBid]; // v41_bids
   });
@@ -71,6 +72,8 @@ test('auction-live returns a new bid that lands after the caller cursor', async 
   assert.equal(res.body.bids[0].bidder, '0xabc');
   assert.equal(res.body.bids[0].bid_amount, '1.5'); // wei -> eth conversion
   assert.equal(res.body.auction.status, 'auction'); // active + future end_time
+  assert.equal(res.body.auction.auction_original_end_time, '2026-07-09T00:00:00.000Z');
+  assert.equal(res.body.auction.auction_updated_block, 120);
   assert.equal(res.headers['cache-control'], 'private, no-store');
 
   const bidCall = calls.find(p => p.startsWith('v41_bids'));

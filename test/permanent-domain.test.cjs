@@ -44,9 +44,11 @@ test('public pages publish canonical ArtSoul domain metadata', () => {
   }
 });
 
-test('runtime defaults use the canonical origin and retain a bounded rollback origin', () => {
+test('runtime defaults use the canonical origin and retain a bounded rollback origin', async () => {
   assert.ok(read('appkit-init.js').includes(`: '${canonicalOrigin}';`));
-  assert.ok(read('ipfs-client.js').includes(`external_url: '${canonicalOrigin}/upload'`));
+  const { IPFSClient } = await import('../ipfs-client.js');
+  const creator = '0x' + '3a'.repeat(20);
+  assert.equal(new IPFSClient().createMetadata({creator}).external_url, canonicalOrigin + '/profile?address=' + creator);
 
   for (const file of ['src/api/server.js', 'src/api/routes/oauth.js', '.env.example']) {
     const source = read(file);

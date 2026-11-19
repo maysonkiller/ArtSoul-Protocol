@@ -10,9 +10,10 @@ const SHARED_HEADER_PAGES = [
   'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html'
 ];
 
-function run(pathname, search, storage = {}) {
+function run(pathname, search, storage = {}, runtime = {}) {
   const calls = [];
   const win = {
+    ...runtime,
     location: { pathname, search },
     localStorage: { getItem: (k) => (k in storage ? storage[k] : null) }
   };
@@ -27,6 +28,18 @@ function run(pathname, search, storage = {}) {
 }
 
 const MIXED = '0x6EC8C121043357aC231E36D403EdAbf90AE6989B';
+
+test('a delayed head start leaves reads to the data client and preserves an earlier handoff', () => {
+  for (const path of ['/', '/gallery', '/profile', '/artwork/7']) {
+    const late = run(path, '', { artsoul_wallet: MIXED }, { ArtSoulDB: {} });
+    assert.deepEqual(late.calls, []);
+    assert.equal(late.api, undefined);
+  }
+  const earlier = { take() {} };
+  const repeated = run('/', '', {}, { ArtSoulPrefetch: earlier });
+  assert.deepEqual(repeated.calls, []);
+  assert.equal(repeated.api, earlier);
+});
 
 test('a profile starts its identity and gallery requests from the head', () => {
   // Measured on the apex, iPhone viewport, 6x CPU slowdown: the document is
@@ -227,7 +240,7 @@ test('every shared-header page loads it, and the build ships it', () => {
     // this is not a first-paint concern. It still executes within a few hundred
     // milliseconds, long before the modules that would otherwise issue this
     // request at 3.3 seconds.
-    assert.match(html, /<script src="\/data-prefetch\.js\?v=6" async><\/script>/, `${page} must load the prefetch asynchronously`);
+    assert.match(html, /<script src="\/data-prefetch\.js\?v=7" async><\/script>/, `${page} must load the prefetch asynchronously`);
     assert.ok(
       html.indexOf('data-prefetch.js') > html.indexOf('header-prepaint.js'),
       `${page}: the first paint comes before the data`

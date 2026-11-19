@@ -295,6 +295,9 @@ export async function supabaseRest(path, options = {}) {
     throw err;
   }
 
+  if (options.includeContentRange) {
+    return { data, contentRange: response.headers?.get?.('content-range') ?? null };
+  }
   return data;
 }
 

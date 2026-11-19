@@ -18,6 +18,13 @@ test('projection keeps video playback URL separate from its image poster', () =>
   assert.equal(getPosterUrl(metadata, mediaUrl), metadata.image);
 });
 
+test('the wallet cover leaves the in-app video frame or artwork-specific poster visible', async () => {
+  const { MULTIMEDIA_NFT_COVER } = await import('../src/config/upload-policy.js');
+  const media = 'ipfs://work.mp4';
+  assert.equal(getPosterUrl({image:MULTIMEDIA_NFT_COVER}, media), '');
+  assert.equal(getPosterUrl({image:MULTIMEDIA_NFT_COVER, poster_url:'ipfs://custom.jpg'}, media), 'ipfs://custom.jpg');
+});
+
 test('projection supports explicitly typed extensionless video without choosing its poster', () => {
   const metadata = {
     file_type: 'audio/mpeg',

@@ -1,9 +1,10 @@
 import { React, createRoot } from './react-runtime.js';
 import { Field, LocalDraftNotice, NetworkLabel, PanelTitle, PhaseTable, UtilityList } from './collection-components.jsx';
+import { MintReservationTerms } from './mint-reservation-terms.jsx';
 import { COLLECTION_NETWORKS } from '../config/collection-networks.js';
 import {
-    createDraft, createOriginDraft, createPhase, ELIGIBILITY, loadDraft,
-    MAX_DRAFT_ITEMS, MECHANISMS, parseDraft, reviewConfig, saveDraft, scheduleTimestamp, UNUSED_SUPPLY
+    createAuctionMintDraft, createDraft, createFirstArtworkDraft, createMintReservationDraft, createOriginDraft, createPhase, ELIGIBILITY, loadDraft,
+    MAX_DRAFT_ITEMS, MECHANISMS, parseDraft, reservationPublicMint, reviewConfig, saveDraft, scheduleTimestamp, setsMintPrice, UNUSED_SUPPLY
 } from '../features/collections/launch-config.js';
 import '../features/collections/collections.css';
 import { ExplainedAction } from '../ui/explained-action.jsx';
@@ -14,7 +15,7 @@ const STEPS = ['Collection', 'Phases', 'Review'];
 function initialDraft() {
     try {
         const saved = loadDraft(window.localStorage);
-        return { draft: saved || createDraft(), message: saved ? 'Saved browser draft restored.' : 'Start with your collection. Save when you are ready.' };
+        return { draft: saved || createDraft(), message: saved ? 'Saved browser draft restored.' : '' };
     } catch {
         return { draft: createDraft(), message: 'The saved draft could not be loaded. Existing storage has not been changed; you can import a valid copy or start a new draft.' };
     }
@@ -49,6 +50,15 @@ function Builder() {
     const updatePhase = (index, key, value, group) => setDraft(current => ({ ...current, phases: current.phases.map((phase, i) => i !== index ? phase : {
         ...phase, [group || key]: group ? { ...phase[group], [key]: value } : value
     }) }));
+
+    function changeMechanism(index, mechanism) {
+        setDraft(current => ({ ...current, phases: current.phases.map((phase, i) => {
+            if (i !== index) return phase;
+            const next = { ...phase, mechanism };
+            if (mechanism !== 'mint-reservation') delete next.reservation;
+            return next;
+        }) }));
+    }
 
     function replaceDraft(next, description) {
         setPreviousDraft(draft);
@@ -128,19 +138,28 @@ function Builder() {
             <span className="launch-pill">Local draft · Unpublished</span>
         </div>
         <div className="launch-hero">
-            <div><p className="launch-eyebrow">Collection Launch</p><h1>Shape your collection.</h1><p>Plan the work, the phases, and how collectors can take part. All settings remain editable in this browser.</p></div>
-            <div className="launch-actions"><button type="button" className="launch-primary" onClick={save}>Save draft</button><button type="button" onClick={exportDraft} title="Download a draft file to keep or open on another device">Download draft</button></div>
+            <div><h1>Create a collection</h1><p>Choose how collectors get their first NFT and how the remaining mints are priced.</p></div>
+            <div className="launch-actions"><button type="button" className="launch-primary" onClick={save}>Save draft</button></div>
         </div>
         <LocalDraftNotice />
         <div className="launch-draft-tools">
-            <div className="launch-actions">
-                <button type="button" onClick={() => importInput.current?.click()} title="Open a previously downloaded collection draft">Open draft file</button>
-                <button type="button" onClick={restore} title="Restore the last draft saved in this browser">Load saved draft</button>
-                <button type="button" onClick={() => replaceDraft(createDraft(), 'Blank draft opened.')}>New draft</button>
-                <button type="button" onClick={() => replaceDraft(createOriginDraft(), 'Origin proposal opened. Supply, allocations, pricing and utility are proposals, not approved launch settings.')}>Origin proposal</button>
-                {previousDraft && <button type="button" onClick={() => { setDraft(previousDraft); setPreviousDraft(null); setMessage('Previous working draft restored.'); }}>Undo replacement</button>}
-                <input ref={importInput} type="file" accept="application/json,.json" aria-label="Import collection draft" hidden onChange={importDraft} />
+            <div className="launch-actions" role="group" aria-label="Collection templates">
+                <button type="button" onClick={() => replaceDraft(createFirstArtworkDraft(), 'First artwork draft opened. Its settled price sets the price for each remaining mint.')}>First artwork auction</button>
+                <button type="button" onClick={() => replaceDraft(createAuctionMintDraft(), 'Edition auction draft opened. When all auction units sell, the lowest winning bid sets the public mint price.')}>Edition auction then public mint</button>
+                <button type="button" onClick={() => replaceDraft(createMintReservationDraft(), 'Mint reservation draft opened. Set the price to mint with a place and the public mint price before bidding.')}>Auction mint reservations</button>
             </div>
+            <details className="launch-details">
+                <summary>Manage drafts</summary>
+                <div className="launch-actions">
+                    <button type="button" onClick={() => importInput.current?.click()} title="Open a previously downloaded collection draft">Open draft file</button>
+                    <button type="button" onClick={exportDraft} title="Download a draft file to keep or open on another device">Download draft</button>
+                    <button type="button" onClick={restore} title="Restore the last draft saved in this browser">Load saved draft</button>
+                    <button type="button" onClick={() => replaceDraft(createDraft(), 'Blank draft opened.')}>New draft</button>
+                    <button type="button" onClick={() => replaceDraft(createOriginDraft(), 'Origin proposal opened. Supply, allocations, pricing and utility are proposals, not approved launch settings.')}>Origin proposal</button>
+                    <input ref={importInput} type="file" accept="application/json,.json" aria-label="Import collection draft" hidden onChange={importDraft} />
+                </div>
+            </details>
+            {previousDraft && <button type="button" onClick={() => { setDraft(previousDraft); setPreviousDraft(null); setMessage('Previous working draft restored.'); }}>Undo replacement</button>}
             <p className="launch-banner-status" role="status" aria-live="polite">{message} {dirty ? 'Unsaved changes.' : ''}</p>
         </div>
         <div className="launch-layout">
@@ -159,7 +178,7 @@ function Builder() {
                         <Field label="Description"><textarea value={draft.description} maxLength={20000} onChange={event => update('description', event.target.value)} /></Field>
                         <div className="launch-grid">
                             <Field label="Maximum supply" inputMode="numeric" value={draft.maxSupply} onChange={event => update('maxSupply', event.target.value)} hint="Choose your own draft supply. This does not lock a contract." />
-                            <Field label="Metadata base URI" placeholder="ipfs://… or https://…" value={draft.media.metadataBaseURI} onChange={event => updateGroup('media', 'metadataBaseURI', event.target.value)} hint="A reference only; no metadata is uploaded or fetched here." />
+                            <Field label="Metadata base URI" placeholder="ipfs://CID/" value={draft.media.metadataBaseURI} onChange={event => updateGroup('media', 'metadataBaseURI', event.target.value)} hint={review.tokenOneMetadataURI ? <>Token #1 metadata URI · <bdi>{review.tokenOneMetadataURI}</bdi></> : 'Enter the prefix for numbered metadata files. For a directory, include the final slash.'} />
                         </div>
                         <Field label="Holder rights and licensing"><textarea value={draft.holderRights} maxLength={20000} onChange={event => update('holderRights', event.target.value)} /></Field>
                         <details className="launch-details"><summary>Story, artwork references, and links</summary><div className="launch-stack">
@@ -179,22 +198,28 @@ function Builder() {
                         </div></div>
                         <div className="launch-grid">
                             {phaseInput(phase, index, 'name', 'Phase name', { maxLength: 160 })}
-                            <Field label="Mechanism"><select value={phase.mechanism} onChange={event => updatePhase(index, 'mechanism', event.target.value)}>{!Object.hasOwn(MECHANISMS, phase.mechanism) && <option value={phase.mechanism}>Unsupported imported mechanism</option>}{Object.entries(MECHANISMS).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></Field>
+                            <Field label="Mechanism"><select value={phase.mechanism} onChange={event => changeMechanism(index, event.target.value)}>{!Object.hasOwn(MECHANISMS, phase.mechanism) && <option value={phase.mechanism}>Unsupported imported mechanism</option>}{Object.entries(MECHANISMS).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></Field>
                             {phaseInput(phase, index, 'allocation', 'Allocation', { inputMode: 'numeric' })}
                             {phaseInput(phase, index, 'walletLimit', 'Per-wallet limit', { inputMode: 'numeric' })}
                             {['startAt', 'endAt'].map(key => <Field key={key} label={key === 'startAt' ? 'Starts (UTC)' : 'Ends (UTC)'} type="datetime-local" value={utcInput(phase[key])} onChange={event => updatePhase(index, key, event.target.value ? new Date(`${event.target.value}Z`).toISOString() : '')} />)}
-                            {phaseInput(phase, index, 'priceEth', phase.mechanism === 'uniform-auction' ? 'Auction reserve (ETH)' : 'Price (ETH)', { inputMode: 'decimal', hint: 'Exact decimal ETH, up to 18 places. Use 0 for a free claim.' }, 'pricing')}
+                            {phaseInput(phase, index, 'priceEth', phase.mechanism === 'mint-reservation' ? 'Minimum bid for a place (ETH)' : setsMintPrice(phase) ? 'Auction reserve (ETH)' : 'Price (ETH)', { inputMode: 'decimal', hint: 'Exact decimal ETH, up to 18 places.' }, 'pricing')}
                             <Field label="Or reference a previous auction"><select value={phase.pricing.sourcePhaseId} onChange={event => updatePhase(index, 'sourcePhaseId', event.target.value, 'pricing')}>
                                 <option value="">No price reference</option>
-                                {phase.pricing.sourcePhaseId && !draft.phases.slice(0, index).some(p => p.id === phase.pricing.sourcePhaseId && p.mechanism === 'uniform-auction') && <option value={phase.pricing.sourcePhaseId}>Invalid or missing source — review required</option>}
-                                {draft.phases.slice(0, index).filter(p => p.mechanism === 'uniform-auction').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                {phase.pricing.sourcePhaseId && !draft.phases.slice(0, index).some(p => p.id === phase.pricing.sourcePhaseId && setsMintPrice(p)) && <option value={phase.pricing.sourcePhaseId}>Invalid or missing source — review required</option>}
+                                {draft.phases.slice(0, index).filter(setsMintPrice).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select></Field>
                             <Field label="Eligibility"><select value={phase.eligibility.kind} onChange={event => updatePhase(index, 'kind', event.target.value, 'eligibility')}>{!Object.hasOwn(ELIGIBILITY, phase.eligibility.kind) && <option value={phase.eligibility.kind}>Unsupported imported eligibility</option>}{Object.entries(ELIGIBILITY).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></Field>
                             <Field label="Unused allocation"><select value={phase.unusedSupply} onChange={event => updatePhase(index, 'unusedSupply', event.target.value)}>{!Object.hasOwn(UNUSED_SUPPLY, phase.unusedSupply) && <option value={phase.unusedSupply}>Unsupported imported destination</option>}{Object.entries(UNUSED_SUPPLY).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></Field>
                         </div>
-                        {phase.pricing.sourcePhaseId && <p className="launch-help">Leave the price field empty when referencing an auction. This draft requires pausing if no clearing price is established; no fallback price is assumed.</p>}
+                        {phase.mechanism === 'first-artwork-auction' && <p className="launch-help">Use token #1’s metadata for the opening work. Each bidder funds their full bid. The winning payment sets the price for later mints, and token #1 stays reserved for that buyer. With no sale, later mints stay closed.</p>}
+                        {phase.mechanism === 'mint-reservation' && <MintReservationTerms phase={phase}
+                            publicPriceEth={reservationPublicMint(draft.phases, index)?.pricing.priceEth}
+                            updateReservation={(key, value) => updatePhase(index, key, value, 'reservation')} />}
+                        {phase.pricing.sourcePhaseId && <p className="launch-help">Leave the price field empty when referencing an auction. Minting stays closed until the auction establishes its price.</p>}
                         {phase.eligibility.kind !== 'public' && <div className="launch-stack launch-footer">
-                            <p className="launch-help">Eligibility is a proposal until its proof path is verified. Selecting Genesis does not grant Genesis eligibility or change its allocation rules.</p>
+                            <p className="launch-help">{['merkle', 'wallet-allowlist'].includes(phase.eligibility.kind)
+                                ? 'Joining the allowlist is free. The phase price applies when an eligible wallet mints while supply lasts.'
+                                : 'Eligibility is a proposal until its proof path is verified. Selecting Genesis does not grant Genesis eligibility or change its allocation rules.'}</p>
                             <div className="launch-grid">
                                 {phaseInput(phase, index, 'chainId', 'Eligibility chain ID', { inputMode: 'numeric' }, 'eligibility')}
                                 {phaseInput(phase, index, 'contractAddress', 'Holder contract address', {}, 'eligibility')}
@@ -208,6 +233,7 @@ function Builder() {
                 </>}
                 {step === 2 && <>
                     <PanelTitle title="Review the draft">These are deterministic configuration checks, not an AI review or an approval to launch.</PanelTitle>
+                    {review.tokenOneMetadataURI && <p className="launch-note">Token #1 metadata URI · <bdi>{review.tokenOneMetadataURI}</bdi>. Verify the file before launch.</p>}
                     <PhaseTable config={draft} />
                     <div className="launch-footer"><h3>{review.findings.length ? `${review.findings.length} configuration items to review` : 'Configuration checks passed'}</h3>
                         {review.findings.map((finding, index) => <p className="launch-finding" key={finding.code + ':' + index}><strong>{finding.category}</strong>{finding.message}</p>)}
@@ -238,4 +264,6 @@ function Builder() {
     </main>;
 }
 
-createRoot(document.getElementById('app')).render(<Builder />);
+const root = import.meta.hot?.data.root ?? createRoot(document.getElementById('app'));
+if (import.meta.hot) import.meta.hot.data.root = root;
+root.render(<Builder />);

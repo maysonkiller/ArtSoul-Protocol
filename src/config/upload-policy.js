@@ -1,6 +1,8 @@
 export const MAX_ARTWORK_UPLOAD_MB = 50;
 export const MAX_ARTWORK_UPLOAD_BYTES = MAX_ARTWORK_UPLOAD_MB * 1024 * 1024;
 export const MAX_METADATA_BYTES = 256 * 1024;
+// Static cover for NFT clients that render only an image. The uploaded media stays playable.
+export const MULTIMEDIA_NFT_COVER = 'https://artsoulprotocol.com/ARTSOULlogo-clean.png';
 export const MAX_PROFILE_COVER_BYTES = 5 * 1024 * 1024;
 export const PROFILE_COVER_MIME_EXTENSIONS = Object.freeze({
   'image/jpeg': 'jpg',

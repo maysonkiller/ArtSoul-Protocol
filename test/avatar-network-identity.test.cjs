@@ -143,6 +143,53 @@ test('live WalletConnect peer names are shown, while untrusted remote wallet ima
     assert.doesNotMatch(html, /foreign\.test|brand\/rabby\.png/);
 });
 
+test('two installed extensions use the mark of the exact connected provider', async () => {
+    const metamask = { isMetaMask: true };
+    const other = { isMetaMask: true };
+    const harness = networkHarness({ provider: metamask });
+    const window = harness.context.window;
+    const otherIcon = 'data:image/png;base64,iVBORw0KGgo=';
+    for (const [provider, name, icon] of [[metamask, 'MetaMask', ''], [other, 'Other Wallet', otherIcon]]) {
+        window.dispatchEvent(new harness.context.CustomEvent('eip6963:announceProvider', {
+            detail: { provider, info: { name, icon } }
+        }));
+    }
+    const { network } = await readMenu(harness);
+    harness.dropdown.syncAccountWalletProvider(network.walletProvider);
+    const slot = harness.button().querySelector('[data-avatar-wallet-provider]');
+    assert.match(slot.innerHTML, /src="\/brand\/metamask\.png"/);
+    window.web3Modal.getWalletProvider = async () => other;
+    harness.dropdown.syncAccountWalletProvider((await readMenu(harness)).network.walletProvider);
+    assert.ok(slot.innerHTML.includes(otherIcon));
+    assert.doesNotMatch(slot.innerHTML, /metamask/i);
+    for (const icon of ['https://unrelated.test/icon.png', 'data:text/html,hello']) {
+        assert.equal(harness.dropdown.renderWalletMark({ icon }), '');
+    }
+});
+
+test('a MetaMask mobile session can use the local mark without injected wallet discovery', async () => {
+    const harness = networkHarness({ provider: { session: { peer: { metadata: { name: 'MetaMask Wallet' } } } } });
+    assert.equal((await readMenu(harness)).network.walletProvider.mark, 'metamask');
+});
+
+test('the account shows its connected wallet mark while the chain read is still pending', async () => {
+    const harness = networkHarness({ provider: { session: { peer: { metadata: { name: 'MetaMask' } } } } });
+    const window = harness.context.window;
+    let finishChainRead;
+    let chainReadStarted;
+    const started = new Promise(resolve => { chainReadStarted = resolve; });
+    window.getArtSoulProviderChainId = () => {
+        chainReadStarted();
+        return new Promise(resolve => { finishChainRead = resolve; });
+    };
+    const refresh = harness.dropdown.applyLiveNetworkSection({ walletAddress: WALLET, currentPath: '/', isOwnProfile: false });
+    await started;
+    assert.match(harness.button().querySelector('[data-avatar-wallet-provider]').innerHTML, /metamask\.png/);
+    window.currentWalletAddress = null;
+    finishChainRead(84532);
+    await refresh;
+});
+
 test('a live Rabby WalletConnect peer receives the Rabby mark', async () => {
     const harness = networkHarness({ provider: {
         session: { peer: { metadata: { name: 'Rabby Wallet' } } }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { auraFrameClassName } from '../src/ui/components/aura-frame.js';
+import { auraFrameClassName, projectedArtworkAura } from '../src/ui/components/aura-frame.js';
 
 test('aura presentation is absent unless the caller supplies one supported kind', () => {
     const unsafeClaim = {
@@ -22,4 +22,18 @@ test('the shared aura API supplies exactly one decoration without mutating calle
         assert.deepEqual(classes.slice(1), [`artsoul-aura-frame--${kind}`]);
     }
     assert.equal(claim.owner, 'unverified');
+});
+
+test('only the verified minted projection exposes a named frame to the interface', () => {
+    const nft = { source: 'v41_projection', minted: true, ownership_status: 'verified', chain_id: 84532, aura_kind: 'platform' };
+    assert.deepEqual(projectedArtworkAura(nft), {
+        className: auraFrameClassName('platform'), label: 'ArtSoul platform NFT'
+    });
+    for (const artwork of [null, {}, { metadata: nft }, { ...nft, source: 'wallet' }, { ...nft, source: 'pending_indexer' },
+        { ...nft, minted: 'true' }, { ...nft, minted: false }, { ...nft, ownership_status: 'unavailable' },
+        { ...nft, aura_kind: '__proto__' }, { ...nft, aura_kind: 'genesis' }]) {
+        assert.equal(projectedArtworkAura(artwork), null);
+    }
+    assert.equal(projectedArtworkAura({ ...nft, chain_id: 8453, aura_kind: 'genesis' }).label, 'Genesis aura');
+    assert.equal(projectedArtworkAura({ ...nft, aura_kind: 'partner' }).label, 'Partner collection NFT');
 });

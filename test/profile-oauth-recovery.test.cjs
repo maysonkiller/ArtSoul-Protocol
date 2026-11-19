@@ -30,6 +30,7 @@ function harness({ active = '', hint = OWNER, view = '', result = { success: tru
   const scope = {
     console: { error() {}, warn() {} }, FIRST_GALLERY_PAGE: 24, AbortController,
     window: {
+      location: { hash: '' },
       artsoulWalletStateSettled: false, ArtSoulDB: db, AvatarDropdown: { refresh: async address => state.headerRefreshes.push(address) },
       getCurrentWalletAddress: () => state.active,
       SupabaseAuth: { getAuthenticatedWallet: () => state.active },
@@ -83,6 +84,20 @@ async function flushLegacyTimers(h) {
   for (const timer of h.state.timers.splice(0)) timer();
   await tick();
 }
+
+test('opening the Collected link loads the owned ArtSoul feed on the first profile read', async () => {
+  const h = harness({ active: OWNER, profile: null });
+  h.scope.window.location.hash = '#collected';
+  const requested = [];
+  h.scope.fetchProfileArtworks = async (_profile, gallery) => {
+    requested.push(gallery);
+    return { items: [], corpus: [] };
+  };
+  await h.loadProfile(OWNER, { walletSettled: true });
+  assert.deepEqual(requested, ['collected']);
+  assert.equal(h.state.gallery, 'collected');
+  assert.equal(h.state.authenticated, 0);
+});
 
 for (const provider of ['discord', 'twitter']) {
   test(`${provider} callback preserves the stored public profile while the wallet restores`, async () => {

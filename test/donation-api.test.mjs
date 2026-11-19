@@ -5,7 +5,7 @@ import publicConfigHandler from '../src/api/routes/public/config.js';
 
 const address = `0x${'12'.repeat(20)}`, creator = `0x${'34'.repeat(20)}`, donor = `0x${'56'.repeat(20)}`;
 const hash = `0x${'78'.repeat(32)}`;
-const record = {creator, donor, amount:'500000000000000', anonymous:true, message:'hello',
+const record = {creator, donor, amount:'10000000000000001', anonymous:true, message:'hello',
     transaction_hash:hash, log_index:1, block_number:42, recorded_at:'2026-09-30T00:00:00Z'};
 function response() { return {statusCode:200, headers:{},setHeader(k,v){this.headers[k]=v;},
     status(code){this.statusCode=code;return this;},json(body){this.body=body;return this;},end(){}}; }
@@ -111,7 +111,10 @@ test('largest and newest views keep deterministic ordering and exact deployment 
         assert.equal(url.searchParams.get('contract_address'),`eq.${address}`);
         assert.equal(url.searchParams.get('chain_id'),'eq.84532');
         assert.equal(url.searchParams.get('order'),'amount.desc,block_number.desc,log_index.desc');
+        assert.ok(url.searchParams.get('select').split(',').includes('amount::text'));
     }
+    assert.equal(res.body.donations[0].amount, '10000000000000001');
+    assert.equal(res.body.top.amount, '10000000000000001');
 });
 test('database failures do not become an empty successful support history',async t=>{
     const {res}=await request(t,{failure:true}); assert.ok(res.statusCode>=500); assert.equal(res.body.success,undefined);

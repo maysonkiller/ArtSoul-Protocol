@@ -40,7 +40,7 @@ function projection(overrides = {}) {
 
 const functionNames = [
   'normalizeTimestampMs', 'firstPositiveTimestamp', 'firstDefined', 'parseEthToWei',
-  'formatWeiToEth', 'getAuctionHighestBidWei', 'getAuctionStartingBidWei', 'calculateMinimumBidDetails',
+  'formatWeiToEth', 'getAuctionHighestBidWei', 'settlementPaymentNotice', 'getAuctionStartingBidWei', 'calculateMinimumBidDetails',
   'projectedAuctionFromArtwork', 'mergeProjectedAuction',
   'bidIdentity', 'advanceBidCursor', 'applyLiveAuctionProjection', 'refreshLiveBidActivity',
   'getAuctionActionId', 'isZeroAddress', 'isSameAddress', 'hasProtocolId', 'loadArtwork', 'startReceiptProjectionRefresh'
@@ -499,6 +499,7 @@ for (const { kind, originalStatus, expectedState, patch } of [
     assert.equal(profileReads, readsBeforeReceipt, 'receipt synchronization does not repeat profile hydration');
     if (kind === 'defaulted') {
       const waiting = source.match(/const awaitingPayment = ([^;]+);/)[1];
+      api.mintedArtwork = state.artwork.minted;
       assert.equal(vm.runInContext(waiting, api), false, 'Close Expired Settlement is no longer offered');
     } else {
       vm.runInContext([pageFunction('normalizeAuctionTimestamp'), pageFunction('isAuctionEndActionAvailable')].join('\n'), api);
@@ -551,8 +552,35 @@ test('artwork replaces all auction-round fields when artwork 28 advances from au
   assert.equal(current.highestBidder, ZERO_ADDRESS);
   assert.equal(current.current_bidder, ZERO_ADDRESS);
   assert.equal(current.endTime, 1790000000);
-  assert.equal(current.depositAmount, 0);
+  assert.equal(current.depositAmount, undefined);
   assert.equal(current.status, 'active');
+});
+
+test('winner payment copy uses the actual locked deposit and retains exact wei', () => {
+  const { page: api } = page();
+  const bid = '0.020000000000000001';
+  const live = { ...api.projectedAuctionFromArtwork(projection({status: 'settlement_pending',
+    highest_bid: bid, current_bid: bid, current_bidder: BIDDER})), settlementPending: true };
+  for (const [depositLocked, remaining] of [
+    ['0', bid], ['0.02', '0.000000000000000001'], [bid, '0'], ['0.03', '0']
+  ]) {
+    assert.equal(api.settlementPaymentNotice({...live, depositLocked}),
+      `Payment due after deposit: ${remaining} test ETH. Gas is separate.`);
+  }
+  const locked = {...live, depositLocked: '0.02'};
+  const pending = projection({status: 'settlement_pending', highest_bid: bid, current_bid: bid, current_bidder: BIDDER});
+  assert.equal(api.settlementPaymentNotice(api.mergeProjectedAuction(locked, pending)), api.settlementPaymentNotice(locked));
+  for (const unavailable of [
+    api.projectedAuctionFromArtwork(pending), {...live, depositLocked: null}, {...live, depositLocked: 'bad'},
+    {...live, depositAmount: '0'}, {...locked, settlementPending: false},
+    api.mergeProjectedAuction(locked, {...pending, highest_bid: '0.03', current_bid: '0.03'}),
+    api.mergeProjectedAuction(locked, {...pending, current_bidder: CREATOR}),
+    api.mergeProjectedAuction(locked, {...pending, auction_id: '64'})
+  ]) {
+    assert.match(api.settlementPaymentNotice(unavailable), /Deposit details are unavailable/);
+  }
+  assert.match(source, /\{settlementPaymentNotice\(auction\)\}<\/p>/);
+  assert.doesNotMatch(source, /Complete Settlement & Mint NFT -/);
 });
 
 test('artwork ignores an older auction even if its final bid is larger', () => {
@@ -614,6 +642,23 @@ test('live first-bid polling advances the displayed minimum and prefill beyond t
   await api.refreshLiveBidActivity();
   assert.equal(state.auction.highestBid, '0.001', 'an older indexer response cannot lower the bid');
   assert.equal(api.calculateMinimumBidDetails(state.auction).eth, '0.011');
+});
+
+test('old reads cannot shorten a confirmed extension and a fresh canonical correction can replace it', () => {
+  const { page: api } = page();
+  const old = projection({ auction_end_time: 2000000000, auction_original_end_time: 2000000000, auction_updated_block: 100 });
+  const extended = { ...old, auction_end_time: 2000000600, auction_updated_block: 103 };
+  const current = api.mergeProjectedAuction(api.projectedAuctionFromArtwork(old), extended, true);
+  assert.equal(api.mergeProjectedAuction(current, old), current, 'older cached row');
+  const receipt = { ...current, deadlineReceiptUntil: Date.now() + 60000 };
+  assert.equal(api.mergeProjectedAuction(receipt, old, true), receipt, 'indexer has yet to reach the receipt block');
+  assert.equal(api.mergeProjectedAuction(receipt, { ...old, auction_updated_block: 103 }, true), receipt, 'earlier event in the same block');
+  assert.equal(api.mergeProjectedAuction(receipt, { ...old, status: 'settlement_pending', pending_auction_sync: true }).ended, true,
+    'a later confirmed close applied to an older artwork snapshot still retires bidding');
+  assert.equal(api.mergeProjectedAuction(current, old, true).endTime, old.auction_end_time, 'canonical rollback');
+  const next = api.mergeProjectedAuction(current, { ...old, auction_id: '64' });
+  assert.equal(next.endTime, old.auction_end_time);
+  assert.equal(next.originalEndTime, old.auction_original_end_time);
 });
 
 test('minimum quotes remain valid for unchanged bids and reset with newer bids or auction rounds', () => {

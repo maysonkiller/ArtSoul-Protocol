@@ -33,6 +33,7 @@
 .launch-stack { display: flex; flex-direction: column; gap: 20px; }
 .launch-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .launch-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-size: 12px; font-weight: 500; }
+.launch-field bdi { overflow-wrap: anywhere; }
 .launch-field input, .launch-field textarea, .launch-field select { width: 100%; min-height: 44px; padding: 11px 12px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-bg); color: var(--c-text); font-size: 13px; }
 .launch-field textarea { resize: vertical; min-height: 92px; line-height: 1.5; }
 .launch-field option { background: var(--c-bg); color: var(--c-text); }
@@ -81,6 +82,7 @@
 .launch-banner-status { min-height: 20px; font-size: 12px; line-height: 1.5; color: var(--c-text-muted); }
 .launch-avatar { width: 64px; height: 64px; object-fit: contain; border-radius: 12px; border: 1px solid var(--c-border-soft); }
 .launch-draft-tools { margin: 16px 0 28px; }
+.launch-draft-tools details + button { margin-top: 0.5rem; }
 .launch-draft-tools .launch-actions button { font-size: 12px; min-height: 36px; padding: 7px 12px; }
 .launch-banner-status { margin-top: 12px !important; overflow-wrap: anywhere; }
 .launch-details { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--c-border-soft); }
@@ -220,8 +222,9 @@ body:is(.classic, .future) .launch-page .launch-summary dl,
 body:is(.classic, .future) .launch-page .launch-definition { margin-top: 1rem; }
 body:is(.classic, .future) .launch-page .launch-summary dl div,
 body:is(.classic, .future) .launch-page .launch-definition div { min-width: 0; gap: 0.75rem; padding-block: 0.625rem; font-size: 0.8125rem; }
-body:is(.classic, .future) .launch-page .launch-summary :is(dt, dd),
+body:is(.classic, .future) .launch-page .launch-summary dd,
 body:is(.classic, .future) .launch-page .launch-definition :is(dt, dd) { min-width: 0; overflow-wrap: anywhere; }
+body:is(.classic, .future) .launch-page .launch-summary dt { min-width: min-content; overflow-wrap: normal; }
 body:is(.classic, .future) .launch-page .launch-details > summary {
     min-height: 44px;
     padding-block: 0.625rem;

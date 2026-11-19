@@ -7,6 +7,8 @@ export const MAX_DRAFT_ITEMS = 64;
 export const MECHANISMS = Object.freeze({
     free: 'Free mint', fixed: 'Fixed price', claim: 'Claim', fcfs: 'First come, first served',
     gtd: 'Guaranteed allocation', 'uniform-auction': 'Uniform-price auction',
+    'mint-reservation': 'Auction of mint reservations',
+    'first-artwork-auction': 'First artwork auction',
     burn: 'Burn to mint', craft: 'Craft to mint'
 });
 export const ELIGIBILITY = Object.freeze({
@@ -42,6 +44,15 @@ export function safeUrl(value, allowIpfs = false) {
     } catch { return ''; }
 }
 
+function firstTokenMetadataURI(prefix) {
+    // ERC-721 appends the decimal token ID to the exact prefix, without adding a slash.
+    if (typeof prefix !== 'string' || /[\s\\#]/.test(prefix) || !safeUrl(prefix, true)) return '';
+    const httpsPathOrQuery = /^https:\/\/[^/?]+[/?]/i.test(prefix);
+    const ipfsPath = /^ipfs:\/\/[^/?]+\/[^?]*$/i.test(prefix);
+    if (!httpsPathOrQuery && !ipfsPath) return '';
+    return prefix + '1';
+}
+
 export const assetIdentity = collectionAssetKey;
 
 export function parseEth(value) {
@@ -71,6 +82,64 @@ export function createDraft() {
     };
 }
 
+export function createAuctionMintDraft() {
+    const draft = createDraft();
+    const auction = { ...draft.phases[0], name: 'Edition auction', mechanism: 'uniform-auction' };
+    const mint = createPhase(2);
+    mint.name = 'Public mint';
+    mint.pricing.sourcePhaseId = auction.id;
+    return { ...draft, chainId: 84532, phases: [auction, mint] };
+}
+
+export function createMintReservationDraft() {
+    const draft = createDraft();
+    const auction = draft.phases[0];
+    auction.name = 'Mint reservations';
+    auction.mechanism = 'mint-reservation';
+    auction.reservation = { mintPriceEth: '', redemptionHours: '' };
+    const mint = createPhase(2);
+    mint.name = 'Public mint';
+    return { ...draft, chainId: 84532, phases: [auction, mint] };
+}
+
+export function reservationPublicMint(phases, index) {
+    const mint = phases[index + 1];
+    return mint?.mechanism === 'fixed' && mint.eligibility.kind === 'public' && !mint.pricing.sourcePhaseId ? mint : null;
+}
+
+function decimalEth(wei) {
+    const digits = wei.toString().padStart(19, '0');
+    const fraction = digits.slice(-18).replace(/0+$/, '');
+    return digits.slice(0, -18) + (fraction ? '.' + fraction : '');
+}
+
+// The local reservation contract takes 1/40 of gross creator proceeds.
+// Round once per resolved place. An exact half-wei goes to the creator.
+export function reservationPayout(placeEth, mintEth) {
+    const place = parseEth(placeEth);
+    const mint = parseEth(mintEth);
+    if (place === null || place === 0n || mint === null) return null;
+    const gross = place + mint;
+    const fee = gross / 40n + (gross % 40n > 20n ? 1n : 0n);
+    return { creatorEth: decimalEth(gross - fee), feeEth: decimalEth(fee) };
+}
+
+// The auction's scheduled end is the earliest possible start of the two full windows.
+export function previewMintReservation(phase, placePriceEth = phase.pricing.priceEth) {
+    const place = parseEth(placePriceEth);
+    const mint = parseEth(phase.reservation?.mintPriceEth);
+    let totalEth = null;
+    if (place !== null && place > 0n && mint !== null) {
+        totalEth = decimalEth(place + mint);
+    }
+    const hour = 3_600_000;
+    const resaleEnd = scheduleTimestamp(phase.endAt) + 24 * hour;
+    const hours = phase.reservation?.redemptionHours;
+    const redemptionEnd = positive(hours) ? resaleEnd + Number(hours) * hour : NaN;
+    const utc = time => Number.isFinite(new Date(time).getTime()) ? new Date(time).toISOString() : null;
+    return { totalEth, resaleEndsAt: utc(resaleEnd), redemptionEndsAt: utc(redemptionEnd) };
+}
+
 export function createOriginDraft() {
     const draft = createDraft();
     const phases = [
@@ -90,6 +159,16 @@ export function createOriginDraft() {
         crafting: { enabled: true, inputCount: 10, outputMaxSupply: 300 },
         utilities: [{ id: 'origin-craft', label: 'Craft Forged Origin', enforcement: 'onchain', description: 'Proposed recipe: burn 10 Origin NFTs to mint 1 distinct Forged Origin NFT atomically. Requires deployed and verified contracts.', contractAddress: '' }]
     };
+}
+
+export function createFirstArtworkDraft() {
+    const draft = createAuctionMintDraft();
+    Object.assign(draft.phases[0], { name: 'First artwork', mechanism: 'first-artwork-auction', allocation: 1 });
+    return draft;
+}
+
+export function setsMintPrice(phase) {
+    return phase.mechanism === 'uniform-auction' || phase.mechanism === 'first-artwork-auction';
 }
 
 // Refuse malformed stored data instead of upgrading arbitrary input into a launch.
@@ -113,6 +192,13 @@ export function parseDraft(raw) {
         ...data.utilities.flatMap(u => [u.id, u.label, u.enforcement, u.description, u.contractAddress]),
         ...data.creatorEarnings.recipients.map(r => r.address)];
     if (strings.some(value => typeof value !== 'string' || value.length > 20000)) throw new Error('Malformed draft fields.');
+    for (const phase of data.phases) {
+        if (phase.reservation === undefined) continue;
+        if (!record(phase.reservation) || ['mintPriceEth', 'redemptionHours'].some(key =>
+            phase.reservation[key] !== undefined && (typeof phase.reservation[key] !== 'string' || phase.reservation[key].length > 80))) {
+            throw new Error('Malformed mint reservation draft terms.');
+        }
+    }
     // Incomplete numeric inputs may remain editable strings. Objects, booleans
     // and null cannot be used as implicit quantities or React input values.
     const quantities = [data.chainId, data.maxSupply, data.creatorEarnings.bps, data.support.bps,
@@ -161,7 +247,12 @@ export function reviewLocalContractCapabilities(config) {
             const timestamp = scheduleTimestamp(phase[field]);
             if (!Number.isFinite(timestamp) || timestamp < 0 || timestamp % 1000 !== 0) add('CONTRACT_TIMESTAMP', `${label}: ${field === 'startAt' ? 'start' : 'end'} must be an exact non-negative whole Unix second; the contract cannot preserve fractional seconds.`);
         }
-        if (!['free', 'fixed', 'claim', 'fcfs', 'uniform-auction'].includes(phase.mechanism)) {
+        if (phase.mechanism === 'mint-reservation' || phase.reservation !== undefined) {
+            add('CONTRACT_MINT_RESERVATION', `${label}: the reservation escrow has been tested locally. Publishing and payments require verified launch-failure handling and a reviewed release.`);
+            if (index !== 0 || config.phases.length !== 2 || !reservationPublicMint(config.phases, index)) {
+                add('CONTRACT_RESERVATION_PHASES', 'The local reservation escrow supports an opening auction followed by one fixed-price public mint.');
+            }
+        } else if (!['free', 'fixed', 'claim', 'fcfs', 'uniform-auction', 'first-artwork-auction'].includes(phase.mechanism)) {
             add('CONTRACT_MECHANISM', `${label}: ${Object.hasOwn(MECHANISMS, phase.mechanism) ? MECHANISMS[phase.mechanism] : 'this mechanism'} is not a CollectionLaunch phase. Guaranteed reservation is not implemented; burning and crafting belong to a separate Forge contract.`);
         }
         const eligibility = phase.eligibility.kind;
@@ -169,9 +260,9 @@ export function reviewLocalContractCapabilities(config) {
         if (allowlists.includes(eligibility) && (!/^0x[a-fA-F0-9]{64}$/.test(phase.eligibility.merkleRoot) || /^0x0{64}$/i.test(phase.eligibility.merkleRoot))) add('CONTRACT_MERKLE_ROOT', `${label}: Merkle phases require a non-zero bytes32 root; a wallet list must use the same reviewed proof format.`);
         if (eligibility === 'public' && phase.eligibility.merkleRoot) add('CONTRACT_PUBLIC_ROOT', `${label}: public phases require a zero root. Remove the saved allowlist root explicitly before selecting public access.`);
         if (['public', ...allowlists].includes(eligibility) && phase.eligibility.contractAddress) add('CONTRACT_HOLDER_RULE', `${label}: the saved holder contract has no enforcing field in this phase. Remove it explicitly or keep this draft blocked.`);
-        if (phase.mechanism === 'uniform-auction') {
-            if (!integer(phase.walletLimit) || Number(phase.walletLimit) !== 1) add('CONTRACT_AUCTION_LIMIT', `${label}: uniform auctions accept exactly one funded bid for one NFT per wallet; multi-unit bids are not implemented.`);
-            if (eligibility !== 'public') add('CONTRACT_AUCTION_ELIGIBILITY', `${label}: uniform auctions are public in the local contract; it has no allowlist or holder-proof bid entry.`);
+        if (setsMintPrice(phase)) {
+            if (!integer(phase.walletLimit) || Number(phase.walletLimit) !== 1) add('CONTRACT_AUCTION_LIMIT', `${label}: each wallet can fund one bid for one NFT.`);
+            if (eligibility !== 'public') add('CONTRACT_AUCTION_ELIGIBILITY', `${label}: the opening auction requires public access.`);
             if (phase.pricing.sourcePhaseId) add('CONTRACT_AUCTION_PRICE_SOURCE', `${label}: an auction requires its own positive reserve and cannot reference another auction's price.`);
         }
         if (['free', 'claim'].includes(phase.mechanism) && phase.pricing.sourcePhaseId) add('CONTRACT_FREE_PRICE_SOURCE', `${label}: a free phase cannot reference an auction price that could charge collectors.`);
@@ -194,6 +285,9 @@ export function reviewConfig(config) {
     if (!getCollectionNetwork(config.chainId)?.testnet) add('network', 'TESTNET_REQUIRED', 'Only Base Sepolia and Robinhood Chain testnet drafts are supported. Mainnet writes are disabled.');
     if (!positive(config.maxSupply)) add('supply', 'SUPPLY_INVALID', 'Maximum supply must be a positive safe integer.');
     if (!config.phases.length) add('supply', 'PHASE_REQUIRED', 'Add at least one launch phase.');
+    if (config.phases[0]?.mechanism === 'first-artwork-auction' && config.phases.length < 2) {
+        add('phases', 'FIRST_ARTWORK_MINT_REQUIRED', 'Add a remaining mint phase priced by the first artwork sale.');
+    }
     const total = config.phases.reduce((sum, phase) => sum + (integer(phase.allocation) ? BigInt(phase.allocation) : 0n), 0n);
     if (positive(config.maxSupply) && total > BigInt(config.maxSupply)) add('supply', 'OVERALLOCATED', `Phase allocations total ${total}, above the maximum supply of ${config.maxSupply}.`);
     const seen = new Set();
@@ -203,9 +297,26 @@ export function reviewConfig(config) {
         seen.add(phase.id);
         if (!hasText(phase.name)) add('phases', 'PHASE_NAME', `Phase ${index + 1} needs a name.`);
         if (!Object.hasOwn(MECHANISMS, phase.mechanism)) add('phases', 'MECHANISM_INVALID', `${label}: choose a supported draft mechanism.`);
+        if (phase.mechanism === 'first-artwork-auction' && (index !== 0 || Number(phase.allocation) !== 1 ||
+            Number(phase.walletLimit) !== 1 || phase.unusedSupply !== 'unminted' || phase.eligibility.kind !== 'public')) {
+            add('phases', 'FIRST_ARTWORK_TERMS', `${label}: put one publicly auctioned artwork in the opening phase, allow one bid per wallet and leave an unsold first work unminted.`);
+        }
+        if (index > 0 && config.phases[0].mechanism === 'first-artwork-auction' &&
+            (!['fixed', 'fcfs'].includes(phase.mechanism) || phase.pricing.sourcePhaseId !== config.phases[0].id)) {
+            add('pricing', 'FIRST_ARTWORK_MINT_PRICE', `${label}: use the first artwork's settled price for the remaining mints.`);
+        }
         if (!positive(phase.allocation)) add('supply', 'ALLOCATION_INVALID', `${label}: allocation must be a positive safe integer.`);
         if (!positive(phase.walletLimit) || Number(phase.walletLimit) > Number(phase.allocation)) add('supply', 'WALLET_LIMIT_INVALID', `${label}: wallet limit must be at least 1 and no greater than its allocation.`);
         const start = scheduleTimestamp(phase.startAt), end = scheduleTimestamp(phase.endAt);
+        if (phase.mechanism === 'mint-reservation') {
+            const mint = reservationPublicMint(config.phases, index);
+            if (!mint || !(parseEth(mint.pricing.priceEth) > 0n)) add('pricing', 'RESERVATION_PUBLIC_PRICE', `${label}: follow the reservation auction with a public mint at an explicit fixed price visible before bidding.`);
+            if (phase.pricing.sourcePhaseId || !(parseEth(phase.pricing.priceEth) > 0n)) add('pricing', 'RESERVATION_MINIMUM', `${label}: set the minimum bid for a place in ETH.`);
+            if (parseEth(phase.reservation?.mintPriceEth) === null) add('pricing', 'RESERVATION_MINT_PRICE', `${label}: enter the additional ETH payment to mint one reserved NFT. Enter 0 if no additional payment is due.`);
+            if (!positive(phase.reservation?.redemptionHours) || (Number.isFinite(end) && !previewMintReservation(phase).redemptionEndsAt)) add('schedule', 'RESERVATION_REDEMPTION', `${label}: give holders a full redemption window in whole hours after the 24-hour resale window.`);
+            if (phase.eligibility.kind !== 'public' || Number(phase.walletLimit) !== 1) add('eligibility', 'RESERVATION_BIDDERS', `${label}: use public bidding with one place per wallet. Keep a free allowlist in its own phase.`);
+            if (phase.unusedSupply !== 'unminted') add('supply', 'RESERVATION_INVENTORY', `${label}: keep this allocation separate through redemption. Automatic rollover could consume reserved inventory.`);
+        }
         if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) add('schedule', 'SCHEDULE_INVALID', `${label}: configure a valid start and a later end, with an explicit timezone.`);
         const previous = config.phases[index - 1];
         if (previous && Number.isFinite(start) && start < scheduleTimestamp(previous.endAt)) add('schedule', 'PHASE_OVERLAP', `${label} starts before ${previous.name} ends. This sequential launch cannot overlap allocations.`);
@@ -214,7 +325,7 @@ export function reviewConfig(config) {
         if (phase.unusedSupply === 'public' && !config.phases.slice(index + 1).some(p => p.eligibility.kind === 'public')) add('supply', 'PUBLIC_MISSING', `${label}: there is no later public phase to receive unused supply.`);
         const source = config.phases.findIndex(p => p.id === phase.pricing.sourcePhaseId);
         if (phase.pricing.sourcePhaseId) {
-            if (source < 0 || source >= index || config.phases[source].mechanism !== 'uniform-auction') add('pricing', 'PRICE_SOURCE_INVALID', `${label}: clearing-price source must be an earlier uniform-price auction.`);
+            if (source < 0 || source >= index || !setsMintPrice(config.phases[source])) add('pricing', 'PRICE_SOURCE_INVALID', `${label}: choose an earlier first artwork or uniform-price auction.`);
             if (phase.pricing.priceEth !== '') add('pricing', 'AMBIGUOUS_PRICE', `${label}: choose a fixed price or a clearing-price source, not both.`);
             if (phase.pricing.fallback !== 'pause') add('pricing', 'FALLBACK_REQUIRED', `${label}: stop minting if the source auction cannot establish a price. Alternative economics require review.`);
         } else if (['free', 'claim'].includes(phase.mechanism)) {
@@ -230,7 +341,8 @@ export function reviewConfig(config) {
         if (['merkle', 'wallet-allowlist'].includes(phase.eligibility.kind) && !/^0x[a-fA-F0-9]{64}$/.test(phase.eligibility.merkleRoot)) add('eligibility', 'ALLOWLIST_REQUIRED', `${label}: commit a reviewed allowlist Merkle root before launch.`);
         if (phase.eligibility.kind !== 'public' && !hasText(phase.eligibility.note)) add('eligibility', 'ELIGIBILITY_DETAIL', `${label}: describe the eligibility snapshot, proof source and holder instructions.`);
     });
-    if (!safeUrl(config.media.metadataBaseURI, true)) add('content', 'METADATA_REQUIRED', 'Provide an HTTPS or IPFS metadata base URI and verify its contents before deployment.');
+    const tokenOneMetadataURI = firstTokenMetadataURI(config.media.metadataBaseURI);
+    if (!tokenOneMetadataURI) add('content', 'METADATA_REQUIRED', 'Enter a metadata path such as ipfs://CID/ or https://example.com/tokens/. HTTPS query prefixes are also supported. The collection appends each token number to this prefix.');
     for (const [key, value] of Object.entries({ ...config.links, banner: config.media.bannerUrl, avatar: config.media.avatarUrl })) {
         if (value && !safeUrl(value)) add('content', 'LINK_INVALID', `${key}: use a valid HTTPS URL without embedded credentials.`);
     }
@@ -260,7 +372,7 @@ export function reviewConfig(config) {
     const factors = categories.map(category => ({ category, passed: !findings.some(f => f.category === category) }));
     const contractFindings = reviewLocalContractCapabilities(config);
     return {
-        findings, factors, allocationTotal: total.toString(),
+        findings, factors, tokenOneMetadataURI, allocationTotal: total.toString(),
         reserve: positive(config.maxSupply) ? (BigInt(config.maxSupply) - total).toString() : null,
         // The factor count is transparent deterministic validation, never an AI score.
         passedFactors: factors.filter(f => f.passed).length,

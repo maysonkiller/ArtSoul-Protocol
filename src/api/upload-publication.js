@@ -5,7 +5,7 @@ import { uploadedMediaUrl, verifyUploadedMedia } from './upload-media-identity.j
 import { createRegistrationReaders, verifyArtworkRegistration } from './upload-registration-evidence.js';
 import { consumeServiceQuota } from './launch-services.js';
 import { buildStoragePath, buildMetadataStoragePath, createSignedArtworkUpload } from './routes/upload/file.js';
-import { ARTWORK_MIME_EXTENSIONS, MAX_ARTWORK_UPLOAD_BYTES, MAX_METADATA_BYTES } from '../config/upload-policy.js';
+import { ARTWORK_MIME_EXTENSIONS, MAX_ARTWORK_UPLOAD_BYTES, MAX_METADATA_BYTES, MULTIMEDIA_NFT_COVER } from '../config/upload-policy.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const TRANSACTION_HASH = /^0x[0-9a-f]{64}$/;
@@ -163,6 +163,8 @@ export function validatePublicationMetadata(input, row, media) {
   // alone would let a second, unverified file appear as the published artwork.
   for (const scope of [metadata, metadata.properties]) {
     for (const key of MEDIA_FIELDS) {
+      if (scope === metadata && key === 'image' && scope.image === MULTIMEDIA_NFT_COVER &&
+          /^(audio|video)\//.test(media.contentType)) continue;
       if (Object.hasOwn(scope, key) && scope[key] !== media.mediaUrl) throw fail('PUBLICATION_METADATA_MISMATCH');
     }
     for (const key of ['creator_address', 'creator_wallet']) {

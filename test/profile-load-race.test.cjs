@@ -21,7 +21,7 @@ function harness() {
   const effects = [], cleanups = [], listeners = new Map();
   const state = { items: [], gallery: 'created' };
   const scope = {
-    window: { artsoulWalletStateSettled: true, innerHeight: 844, location: { hash: '' },
+    window: { artsoulWalletStateSettled: true, innerHeight: 844, scrollY: 0, location: { hash: '' },
       addEventListener: (name, listener) => listeners.set(name, listener),
       removeEventListener: (name, listener) => { if (listeners.get(name) === listener) listeners.delete(name); }
     }, console, URLSearchParams,
@@ -274,7 +274,7 @@ test('a response between tab selection and the next load cannot release the new 
   h.commit();
   assert.equal(h.state.loading, true);
   assert.equal(h.state.gallery, 'created');
-  assert.equal(h.scope.galleryPanelRef.current.style.minHeight, '624px');
+  assert.equal(h.scope.galleryPanelRef.current.style.minHeight, 'max(0px, calc(100dvh - 220px))');
   const current = h.loadMyArtworks();
   h.reads[1].resolve({ items: [], corpus: [] });
   await current;
@@ -288,6 +288,18 @@ test('a removed gallery panel is safe when navigating to Saved', () => {
   h.scope.selectedGallery = 'saved';
   assert.doesNotThrow(h.commit);
   h.unmount();
+});
+
+test('switching to Favorites preserves a scrolled viewport after the private panel settles', t => {
+  const h = harness();
+  t.after(h.unmount);
+  assert.match(source, /<section ref=\{galleryPanelRef\} className="profile-collection-panel"/);
+  h.scope.window.scrollY = 400;
+  h.scope.window.location.pathname = '/profile';
+  h.scope.window.history = { replaceState() {} };
+  h.selectGallery({ id: 'saved' });
+  h.commit();
+  assert.equal(h.scope.galleryPanelRef.current.style.minHeight, 'max(0px, calc(100dvh - 220px))');
 });
 
 test('a failed profile refresh releases the pending tab reservation it superseded', async t => {

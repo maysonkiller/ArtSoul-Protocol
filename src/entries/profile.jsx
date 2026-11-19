@@ -9,6 +9,7 @@ import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
 import { WalletNfts, useWalletNftsEnabled } from '../features/profile/wallet-nfts.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
+import { useAuctionExpiry } from '../features/auction/use-auction-expiry.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 
@@ -157,6 +158,8 @@ const { useState, useEffect, useRef } = React;
             // The tab the visible result belongs to. It lags selectedGallery until a
             // fetch commits, so the heading and the list are never out of step.
             const [displayedGallery, setDisplayedGallery] = useState('created');
+            useAuctionExpiry(displayedGallery === 'auction' ? myArtworks : null);
+            const visibleArtworks = displayedGallery === 'auction' ? myArtworks.filter(isLiveAuctionArtwork) : myArtworks;
             const [hasSettledArtworks, setHasSettledArtworks] = useState(false);
             const [loading, setLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
             const [artworksLoading, setArtworksLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
@@ -317,24 +320,23 @@ const { useState, useEffect, useRef } = React;
             }, [selectedGallery]);
 
             useEffect(() => {
-                // Release the temporary viewport reservation after the current
-                // load settles, including an empty result or failed refresh.
-                if (!artworksLoading && galleryPanelRef.current) {
-                    galleryPanelRef.current.style.minHeight = '';
-                }
-            }, [artworksLoading, selectedGallery]);
-
-            useEffect(() => {
-                const showSaved = () => {
+                const showLinkedTab = () => {
+                    if (window.location.hash === '#collected') setSelectedGallery('collected');
                     if (!isOwnProfile) return;
                     if (savedEnabled && window.location.hash === '#saved') setSelectedGallery('saved');
                     if (walletNftsEnabled && window.location.hash === '#wallet-nfts') setSelectedGallery('wallet-nfts');
                 };
-                showSaved();
+                showLinkedTab();
                 if (!isOwnProfile && ['saved', 'wallet-nfts'].includes(selectedGallery)) setSelectedGallery('created');
-                window.addEventListener('hashchange', showSaved);
-                return () => window.removeEventListener('hashchange', showSaved);
+                window.addEventListener('hashchange', showLinkedTab);
+                return () => window.removeEventListener('hashchange', showLinkedTab);
             }, [savedEnabled, walletNftsEnabled, isOwnProfile]);
+
+            useEffect(() => {
+                if (!artworksLoading && window.scrollY === 0 && galleryPanelRef.current) {
+                    galleryPanelRef.current.style.minHeight = '';
+                }
+            }, [artworksLoading, selectedGallery]);
 
             useEffect(() => {
                 if (galleryPanelRef.current) galleryPanelRef.current.style.minHeight = '';
@@ -952,11 +954,12 @@ const { useState, useEffect, useRef } = React;
                 const artworkRequestId = ++artworksRequestRef.current;
                 const previousAddress = loadingProfileAddressRef.current || loadedProfileAddressRef.current;
                 const addressChanged = previousAddress !== normalizedAddress;
-                const requestedGallery = addressChanged ? 'created' : options.gallery || selectedGallery;
+                const initialGallery = window.location.hash === '#collected' ? 'collected' : 'created';
+                const requestedGallery = addressChanged ? initialGallery : options.gallery || selectedGallery;
                 if (addressChanged) {
                     galleryCacheRef.current.clear();
-                    setSelectedGallery('created');
-                    setDisplayedGallery('created');
+                    setSelectedGallery(initialGallery);
+                    setDisplayedGallery(initialGallery);
                     setHasSettledArtworks(false);
                     setMyArtworks([]);
                     setDiscoveryProfile(null);
@@ -2013,11 +2016,11 @@ const { useState, useEffect, useRef } = React;
 
                         {/* Profile customization is paused by the founder. Stored layouts and the editor remain available for a future release. */}
 
-                        <section className="profile-collection-panel" aria-label="Profile artworks">
+                        <section ref={galleryPanelRef} className="profile-collection-panel" aria-label="Profile artworks">
                         {/* Gallery Tabs */}
                         <nav className="profile-sections-nav" aria-label="Profile content">
                             <div className="profile-section-tabs flex flex-wrap gap-3" data-wallet-nfts={walletNftsEnabled && isOwnProfile}>
-                                {[...GALLERY_TYPES, ...(walletNftsEnabled && isOwnProfile ? [WALLET_NFT_TAB] : []), ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Saved', icon: '' }] : [])].map(gallery => (
+                                {[...GALLERY_TYPES, ...(walletNftsEnabled && isOwnProfile ? [WALLET_NFT_TAB] : []), ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Favorites', icon: '' }] : [])].map(gallery => (
                                     <button
                                         key={gallery.id}
                                         type="button"
@@ -2028,14 +2031,15 @@ const { useState, useEffect, useRef } = React;
                                                 // starts its load, so it cannot settle this tab.
                                                 artworksRequestRef.current++;
                                                 setArtworksError(null);
-                                                // Keep the viewport filled while the next tab
-                                                // loads; release it when that tab's result commits.
+                                                // Keep the tabs under the pointer when a long list
+                                                // is replaced by an empty list or sign-in prompt.
                                                 const panel = galleryPanelRef.current;
-                                                if (panel) panel.style.minHeight = `${Math.max(0, window.innerHeight - panel.getBoundingClientRect().top)}px`;
+                                                if (panel) panel.style.minHeight = `max(0px, calc(100dvh - ${panel.getBoundingClientRect().top}px))`;
                                                 setArtworksLoading(!['saved', 'wallet-nfts'].includes(gallery.id));
                                                 setSelectedGallery(gallery.id);
-                                                if (['saved', 'wallet-nfts'].includes(gallery.id) || ['#saved', '#wallet-nfts'].includes(window.location.hash)) {
-                                                    const hash = gallery.id === 'saved' ? '#saved' : gallery.id === 'wallet-nfts' ? '#wallet-nfts' : '';
+                                                const linkedTabs = ['saved', 'wallet-nfts', 'collected'];
+                                                if (linkedTabs.includes(gallery.id) || linkedTabs.includes(window.location.hash.slice(1))) {
+                                                    const hash = linkedTabs.includes(gallery.id) ? '#' + gallery.id : '';
                                                     window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + hash);
                                                 }
                                             }
@@ -2049,8 +2053,8 @@ const { useState, useEffect, useRef } = React;
                         </nav>
 
                         {/* Gallery Content */}
-                        {selectedGallery === 'wallet-nfts' ? (isOwnProfile && walletNftsEnabled && <WalletNfts key={profile.wallet_address} wallet={profile.wallet_address} />) : selectedGallery === 'saved' ? (isOwnProfile && savedEnabled && <SavedList wallet={profile.wallet_address} />) : (
-                        <div ref={galleryPanelRef} className="profile-gallery-panel p-6">
+                        {selectedGallery === 'wallet-nfts' ? (isOwnProfile && walletNftsEnabled && <WalletNfts key={profile.wallet_address} wallet={profile.wallet_address} />) : selectedGallery === 'saved' ? (isOwnProfile && savedEnabled && <SavedList key={profile.wallet_address} wallet={profile.wallet_address} />) : (
+                        <div className="profile-gallery-panel p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="profile-gallery-heading">
                                     <h3 className={`text-xl font-bold ${
@@ -2074,7 +2078,7 @@ const { useState, useEffect, useRef } = React;
                                     <span className={`text-sm ${
                                         isClassic ? 'text-gray-400' : 'text-purple-300'
                                     }`}>
-                                        {myArtworks.length} items
+                                        {visibleArtworks.length} items
                                     </span>
                                 )}
                             </div>
@@ -2109,11 +2113,11 @@ const { useState, useEffect, useRef } = React;
                                             </button>
                                         )}
 
-                                        {myArtworks.map(artwork => (
+                                        {visibleArtworks.map(artwork => (
                                             <ProfileArtworkCard key={artwork.id} artwork={artwork} />
                                         ))}
 
-                                        {!artworksError && myArtworks.length === 0 && (
+                                        {!artworksError && visibleArtworks.length === 0 && (
                                             <div className="profile-empty-state col-span-full p-6 text-center text-sm opacity-70">
                                                 {selectedGallery === 'created' && 'No created artworks yet.'}
                                                 {selectedGallery === 'auction' && 'No auctions to show.'}

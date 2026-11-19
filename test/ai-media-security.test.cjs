@@ -272,7 +272,7 @@ test('invalid model price fields fail closed while decimal comma remains support
 test('historical malformed guidance is unavailable without altering metadata or generating a substitute', async t => {
   environment(t);
   const [, , , { default: publicHandler }] = await modules;
-  let guidance;
+  let metadata;
   let artworkId = 98800;
   const valid = { estimated_value_min_eth: '0,00001', estimated_value_max_eth: '0,0001', suggested_start_price_eth: '0,00002' };
   const fetch = t.mock.method(globalThis, 'fetch', async input => {
@@ -281,23 +281,33 @@ test('historical malformed guidance is unavailable without altering metadata or 
     assert.ok(url.pathname.startsWith('/rest/v1/'), 'stored guidance never calls the model or writes metadata');
     return Response.json(url.pathname.endsWith('/v41_artworks') ? [{
       chain_id: 84532, artwork_id: String(artworkId), creator: '0x1111111111111111111111111111111111111111',
-      metadata_uri: JSON.stringify({ name: 'Historical guidance', ai_value_guidance: guidance }),
+      metadata_uri: JSON.stringify({ name: 'Historical guidance', ...metadata }),
       minted: false, token_id: '', canonical_floor: '0', active_auction_id: '', block_number: 10,
       transaction_hash: '0x' + 'a'.repeat(64), indexed_at: '2026-09-20T00:00:00.000Z'
     }] : []);
   });
-  for (const value of [
-    { ...valid, estimated_value_min_eth: 0.0001, estimated_value_max_eth: 0.00001 },
-    { ...valid, estimated_value_min_eth: null }, { ...valid, suggested_start_price_eth: -1 }, valid
+  for (const [fields, status] of [
+    [{ ai_value_guidance: { ...valid, estimated_value_min_eth: 0.0001, estimated_value_max_eth: 0.00001 } }, 'unavailable'],
+    [{ ai_value_guidance: { ...valid, estimated_value_min_eth: null } }, 'unavailable'],
+    [{ ai_value_guidance: { ...valid, suggested_start_price_eth: -1 } }, 'unavailable'],
+    [{ ai_value_guidance: valid }, 'recorded'],
+    [{ ai_value_guidance: {}, properties: { ai_value_guidance: valid } }, 'recorded'],
+    [{}, 'not_recorded']
   ]) {
-    guidance = value;
+    const earlyNumericTrait = status === 'not_recorded';
+    metadata = { ...fields, attributes: [{ trait_type: 'Creator Value', value: earlyNumericTrait ? 1e-7 : '0.000010000000000001' }] };
     artworkId += 1;
     const response = res();
     await publicHandler({ method: 'GET', headers: {}, query: { chain_id: '84532', artwork_id: String(artworkId) } }, response);
     assert.equal(response.statusCode, 200);
-    const projected = response.body.data[0].ai_guidance;
-    if (value === valid) assert.equal(projected.estimated_value_min_eth, 0.00001);
-    else assert.equal(projected, null);
+    const projected = response.body.data[0];
+    assert.equal(projected.ai_guidance_status, status);
+    assert.equal(projected.published_creator_value, earlyNumericTrait ? '0.0000001' : '0.000010000000000001');
+    if (status === 'recorded') {
+      assert.equal(projected.ai_guidance.estimated_value_min_eth, 0.00001);
+      assert.equal(projected.ai_guidance.confidence, null);
+    }
+    else assert.equal(projected.ai_guidance, null);
   }
   assert.ok(fetch.mock.callCount() > 0);
 });
@@ -327,6 +337,8 @@ test('anonymous public artwork reads preserve provenance while blocking maliciou
   await publicHandler({ method: 'GET', headers: {}, query: { chain_id: '84532', artwork_id: '98701' } }, blocked);
   assert.equal(blocked.statusCode, 200);
   assert.equal(blocked.body.data[0].title, 'Artwork #98701');
+  assert.equal(blocked.body.data[0].ai_guidance_status, 'unavailable');
+  assert.equal(blocked.body.data[0].published_creator_value, null);
   assert.equal(blocked.body.data[0].creator, CREATOR);
   assert.equal(blocked.body.data[0].minted, false);
   assert.equal(externalCalls.length, 0);

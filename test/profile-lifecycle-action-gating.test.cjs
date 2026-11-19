@@ -454,8 +454,8 @@ for (const [handler, method, success] of [
   ['settleAuctionOnce', 'completeSettlement', 'Settlement complete!'],
   ['purchaseResaleOnce', 'buyResale', 'Purchase successful!']
 ]) {
-  async function runPurchase(transactionError = null) {
-    const calls = { alerts: [], transactions: 0, refreshes: 0 };
+  async function runPurchase(transactionError = null, auction = { highestBid: '2' }, approve = true) {
+    const calls = { alerts: [], confirmations: [], transactions: 0, refreshes: 0 };
     const sandbox = vm.createContext({
       window: {
         currentWalletAddress: BIDDER,
@@ -476,10 +476,10 @@ for (const [handler, method, success] of [
       },
       artwork: { blockchain_id: '7', sale_price: '2', current_owner_address: COLLECTOR },
       artworkId: 'v41:84532:7',
-      auction: { highestBid: '2' },
+      auction, WEI_PER_ETH: 10n ** 18n,
       getAuctionActionId: () => '73',
       getAuctionHighestBidder: () => BIDDER,
-      confirmAuctionAction: async () => true,
+      confirmAuctionAction: async message => { calls.confirmations.push(message); return approve; },
       ensureArtworkWriteEnabled: () => true,
       alert: message => calls.alerts.push(message),
       loadArtwork: async () => { calls.refreshes++; return false; },
@@ -490,11 +490,25 @@ for (const [handler, method, success] of [
     vm.runInContext([
       extractFunction(artworkSource, 'isSameAddress'),
       extractFunction(artworkSource, 'getLiveProviderAccount'),
+      ...['firstDefined', 'parseEthToWei', 'formatWeiToEth', 'getAuctionHighestBidWei']
+        .map(name => extractFunction(artworkSource, name)),
+      extractFunction(artworkSource, 'settlementPaymentNotice'),
       extractFunction(artworkSource, handler),
       `exported.run = ${handler};`
     ].join('\n'), sandbox);
     await sandbox.exported.run();
     return calls;
+  }
+
+  if (handler === 'settleAuctionOnce') {
+    test('the winner reviews the remaining payment and can cancel before a transaction', async () => {
+      const calls = await runPurchase(null, {
+        settlementPending: true, highestBid: '0.001', depositLocked: '0.01'
+      }, false);
+      assert.match(calls.confirmations[0], /Payment due after deposit: 0 test ETH\. Gas is separate\./);
+      assert.equal(calls.transactions, 0);
+      assert.equal(calls.refreshes, 0);
+    });
   }
 
   test(`${handler} preserves confirmed success when later RPC and projection reads are unavailable`, async () => {

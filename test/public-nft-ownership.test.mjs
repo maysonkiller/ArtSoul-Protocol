@@ -9,6 +9,7 @@ const address = n => `0x${String(n).repeat(40)}`;
 const CORE = address('a'), NFT = address('b'), CREATOR = address('1'), FIRST = address('2'), BUYER = address('3'), OWNER = address('4');
 const hash = n => `0x${n.toString(16).padStart(64, '0')}`;
 const env = { SUPABASE_URL: 'https://cards.example.test', SUPABASE_SERVICE_ROLE_KEY: 'offline-card-fixture',
+  ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA: '',
   ARTSOUL_NFT_OWNERSHIP_ENABLED: 'true', ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA: CORE,
   ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA: NFT, ARTSOUL_NFT_OWNERSHIP_CORE_CODE_HASH: hash(1),
   ARTSOUL_NFT_OWNERSHIP_NFT_CODE_HASH: hash(2) };
@@ -111,6 +112,101 @@ test('public NFT consumers use one verified history across cards, filters, saved
     assert.equal(card.ownership_status, 'verified'); assert.equal(card.resale_seller, null);
     assert.notEqual(card.status, 'for_sale'); assert.equal(card.sale_price, '0'); assert.equal(card.canonical_floor, '2');
   };
+
+  const designatePlatform = () => {
+    process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA = `${CORE}:${CREATOR}`;
+    rows.v41_artworks[0].log_index = 5;
+    const registration = lifecycle()[0];
+    registration.artwork_id = '77';
+    registration.event_data.metadataURI = rows.v41_artworks[0].metadata_uri;
+    rows.contract_events = [registration];
+  };
+  await t.test('only the designated, registered and minted work receives the platform frame across public readers', async () => {
+    designatePlatform();
+    const cards = [(await cardRequest({})).body.data[0], (await cardRequest({id:'77'})).body.data[0],
+      await readVisibleArtworkCard(84532, '77'), (await readVisibleArtworkCards(84532, ['77'], CORE))[0]];
+    for (const card of cards) assert.equal(card.aura_kind, 'platform');
+    const registrations = calls.filter(call => call.name === 'contract_events');
+    assert.equal(registrations.length, 4);
+    assert.ok(registrations.every(call => call.query.get('contract_address') === `eq.${CORE}` &&
+      call.query.get('transaction_hash') === `in.(${hash(10)})` && call.query.get('select').split(',').includes('artwork_id::text')));
+    const artworkReads = calls.filter(call => call.name === 'v41_artworks' && call.query.get('select').split(',').includes('minted'));
+    assert.ok(artworkReads.length >= 2 && artworkReads.every(call => call.query.get('select').split(',').includes('log_index')));
+    rows.contract_events = [];
+    assert.equal((await cardRequest({})).body.data[0].aura_kind, undefined);
+  });
+  await t.test('reader omits the frame when the registration cannot confirm the projected identity', async () => {
+    designatePlatform();
+    const original = rows.contract_events[0];
+    for (const change of [
+      {chain_id: 11155111}, {contract_address: BUYER}, {log_index: 7}, {transaction_hash: hash(11)},
+      {block_number: 11}, {event_data: {...original.event_data, creator: BUYER}},
+      {event_data: {...original.event_data, creator: [CREATOR]}}, {event_data: {...original.event_data, artworkId: ['77']}},
+      {event_data: {...original.event_data, artworkId: '78'}}, {event_data: {...original.event_data, metadataURI: 'ipfs://different'}}
+    ]) {
+      rows.contract_events = [{...original, ...change}];
+      const card = (await cardRequest({id:'77'})).body.data[0];
+      assert.equal(card.aura_kind, undefined);
+      assertOwner(card);
+    }
+    rows.contract_events = [original, original];
+    assert.equal((await cardRequest({id:'77'})).body.data[0].aura_kind, undefined);
+  });
+  await t.test('historical safe numeric event identifiers match their decimal proof', async () => {
+    designatePlatform();
+    rows.contract_events[0].event_data.artworkId = 77;
+    assert.equal((await cardRequest({id:'77'})).body.data[0].aura_kind, 'platform');
+  });
+  await t.test('unconfigured or unrelated publishers cannot introduce marks or authority reads using artwork metadata', async () => {
+    designatePlatform();
+    const work = rows.v41_artworks[0];
+    work.metadata_uri = 'data:application/json,' + encodeURIComponent(JSON.stringify({aura_kind:'platform', genesis:true, verified:true}));
+    for (const config of ['', `${NFT}:${CREATOR}`, `${CORE}:${BUYER}`, `${CORE}:${address('0')}`]) {
+      process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA = config;
+      assert.equal((await cardRequest({id:'77'})).body.data[0].aura_kind, undefined);
+    }
+    assert.equal(calls.filter(call => call.name === 'contract_events').length, 0);
+  });
+  await t.test('registration-read failure preserves the ordinary card and omits its aura', async () => {
+    designatePlatform();
+    afterRead = name => { if (name === 'contract_events') throw new Error('Fixture transport unavailable'); };
+    const res = await cardRequest({ id: '77' });
+    assert.equal(res.statusCode, 200);
+    assertOwner(res.body.data[0]);
+    assert.equal(res.body.data[0].aura_kind, undefined);
+  });
+  await t.test('an unminted work or unconfirmed ownership cannot earn a frame', async () => {
+    designatePlatform();
+    owners[0].latest_transfer.block_number = 116;
+    assert.equal((await cardRequest({ id: '77' })).body.data[0].aura_kind, undefined);
+    Object.assign(rows.v41_artworks[0], { minted: false, token_id: null });
+    Object.assign(owners[0], { verified: false, token_id: null, first_collector_address: null, current_owner_address: null, latest_transfer: null });
+    assert.equal((await cardRequest({ id: '77' })).body.data[0].aura_kind, undefined);
+    assert.equal(calls.filter(call => call.name === 'contract_events').length, 0);
+  });
+  await t.test('a rewind during the registration read cannot return the old platform frame', async () => {
+    designatePlatform();
+    afterRead = name => { if (name === 'contract_events') marker.state_revision = '1235'; };
+    const res = await cardRequest({ id: '77' });
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.data, undefined);
+  });
+  await t.test('one indexed registration read checks twenty qualifying works together', async () => {
+    designatePlatform();
+    const work = rows.v41_artworks[0], event = rows.contract_events[0];
+    rows.v41_artworks = Array.from({length: 21}, (_, i) => ({...work, artwork_id:String(i+1), token_id:String(i+1), transaction_hash:hash(i+1)}));
+    owners = rows.v41_artworks.map(row => ({...proof(), artwork_id: row.artwork_id, token_id: row.token_id}));
+    rows.contract_events = rows.v41_artworks.map(row => ({...event, artwork_id: row.artwork_id, transaction_hash: row.transaction_hash,
+      event_data:{...event.event_data, artworkId:row.artwork_id}}));
+    const cards = (await cardRequest({})).body.data;
+    assert.equal(cards.length,21);
+    assert.ok(cards.every(row=>row.aura_kind==='platform'));
+    assert.deepEqual(calls.filter(call=>call.name==='contract_events').map(call=>call.query.get('limit')), ['21','2']);
+    rows.contract_events[0].artwork_id = '2';
+    const mixed = (await cardRequest({})).body.data;
+    assert.equal(mixed.find(row => row.artwork_id === '1').aura_kind, undefined);
+    assert.equal(mixed.find(row => row.artwork_id === '2').aura_kind, 'platform');
+  });
 
   for (const size of [1, 20, 200]) await t.test(`a stable ${size}-work feed stays within two ownership proof passes`, async () => {
     rows.v41_artworks = Array.from({ length: size }, (_, i) => ({ ...rows.v41_artworks[0],

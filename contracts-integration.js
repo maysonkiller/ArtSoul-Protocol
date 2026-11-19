@@ -618,6 +618,19 @@ class ArtSoulContracts {
         const tx = await this.coreContract.placeBid(auctionId, bidAmount, { value: deposit });
         console.log('Placing V4.1 deposit bid...', tx.hash);
         const receipt = await this.waitForConfirmedTransaction(tx);
+        if (options.onExtension) {
+            // Only a confirmed log from this bid's Core can move the local clock.
+            for (const log of receipt?.logs || []) {
+                if (!log.address || log.address.toLowerCase() !== tx.to?.toLowerCase()) continue;
+                try {
+                    const event = this.coreContract.interface.parseLog(log);
+                    if (event?.name === 'AuctionExtended' && event.args.auctionId === auctionId) {
+                        options.onExtension(Number(event.args.oldEndTime), Number(event.args.newEndTime), Number(receipt.blockNumber));
+                        break;
+                    }
+                } catch { /* Indexer refresh remains available for unrecognized receipts. */ }
+            }
+        }
         return receipt?.hash || tx.hash;
     }
 
@@ -828,6 +841,7 @@ class ArtSoulContracts {
             creator: auction.creator,
             seller: auction.creator,
             startTime: Number(auction.originalEndTime - auction.duration),
+            originalEndTime: Number(auction.originalEndTime),
             endTime: Number(auction.endTime),
             startingPrice: this.formatEth(auction.startPrice),
             startPrice: this.formatEth(auction.startPrice),

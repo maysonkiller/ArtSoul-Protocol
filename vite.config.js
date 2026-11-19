@@ -196,9 +196,23 @@ function copyLegacyRuntimeAssets() {
     };
 }
 
+// Match the hosted artwork route when serving the site locally.
+function serveArtworkPage(server) {
+    server.middlewares.use((request, _response, next) => {
+        if (request.method === 'GET' || request.method === 'HEAD') {
+            request.url = request.url?.replace(/^\/artwork\/[1-9]\d*\/?(?=\?|$)/, '/artwork.html');
+        }
+        next();
+    });
+}
+
 export default defineConfig({
     appType: 'mpa',
-    plugins: [react(), inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()],
+    plugins: [
+        react(),
+        { name: 'local-artwork-route', configureServer: serveArtworkPage, configurePreviewServer: serveArtworkPage },
+        inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()
+    ],
     build: {
         outDir,
         emptyOutDir: true,

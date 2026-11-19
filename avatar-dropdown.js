@@ -155,6 +155,7 @@
         base: '/brand/base.svg',
         eth: '/brand/eth.png',
         rabby: '/brand/rabby.png',
+        metamask: '/brand/metamask.png',
         ...Object.fromEntries(['arbitrum-one', 'optimism', 'polygon', 'binance-smart-chain',
             'avalanche', 'linea', 'robinhood', 'soneium', 'unichain', 'world',
             'zora'].map(mark => [mark, `/brand/wallet-networks/${mark}.svg`]))
@@ -185,6 +186,17 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[character]);
     const networkBalanceText = (value) => /^(?:\d{1,24}(?:\.\d{1,8})?|…)$/u.test(String(value)) ? String(value) : '…';
+
+    // EIP-6963 announcements describe individual injected providers. Several
+    // extensions can be installed and have the same compatibility flags.
+    const injectedWalletInfo = new WeakMap();
+    window.addEventListener('eip6963:announceProvider', (event) => {
+        const { provider, info } = event.detail || {};
+        if (provider && typeof provider === 'object' && typeof info?.name === 'string') {
+            injectedWalletInfo.set(provider, info);
+        }
+    });
+    if (typeof CustomEvent === 'function') window.dispatchEvent?.(new CustomEvent('eip6963:requestProvider'));
 
     class AvatarDropdown {
         constructor() {
@@ -1383,15 +1395,16 @@
             ).toLowerCase();
             const cachedNetwork = this.getCachedHeaderNetwork(walletAddress);
             let provider = null;
+            let walletProvider = null;
             try {
                 provider = await window.web3Modal?.getWalletProvider?.();
+                walletProvider = this.getWalletProviderIdentity(provider);
+                if (walletProvider) options.onWalletProvider?.(walletProvider);
                 const providerChainId = await window.getArtSoulProviderChainId?.(provider);
                 if (provider) chainId = this.parseChainId(providerChainId);
             } catch (error) {
                 console.warn('Unable to confirm the live wallet network:', error);
             }
-
-            const walletProvider = this.getWalletProviderIdentity(provider);
 
             const baseSepoliaConfirmed = typeof window.isArtSoulBaseSepoliaConfirmed === 'function'
                 ? window.isArtSoulBaseSepoliaConfirmed()
@@ -1479,10 +1492,13 @@
             // selections do not reliably identify the connected wallet brand.
             if (!provider || !window.currentWalletAddress) return null;
             if (provider.isRabby === true) return { name: 'Rabby', mark: 'rabby' };
-            const name = provider.session?.peer?.metadata?.name;
+            const info = injectedWalletInfo.get(provider);
+            const name = info?.name || provider.session?.peer?.metadata?.name;
             if (typeof name !== 'string' || !name.trim()) return null;
             const label = name.trim().slice(0, 80);
-            return { name: label, mark: /^rabby(?: wallet)?$/i.test(label) ? 'rabby' : null };
+            if (/^metamask(?: wallet| mobile)?$/i.test(label)) return { name: label, mark: 'metamask' };
+            if (/^rabby(?: wallet)?$/i.test(label)) return { name: label, mark: 'rabby' };
+            return { name: label, mark: null, icon: info?.icon };
         }
 
         renderIdentityMark(mark) {
@@ -1498,10 +1514,20 @@
             return `<span class="network-balance-value">${networkBalanceText(networkInfo.balance)} ${currency}</span>`;
         }
 
-        renderWalletProvider(walletProvider) {
+        renderWalletMark(walletProvider) {
+            const mark = this.renderIdentityMark(walletProvider?.mark);
+            if (mark) return mark;
+            const icon = walletProvider?.icon;
+            if (typeof icon !== 'string' || icon.length > 131072 ||
+                !/^data:image\/(?:png|webp|jpeg|svg\+xml)(?:;base64|;charset=utf-8)?,/i.test(icon)) return '';
+            return `<img class="avatar-identity-mark" src="${escapeMenuText(icon)}" width="20" height="20" alt="" aria-hidden="true" />`;
+        }
+
+        renderWalletProvider(walletProvider, markOnly = false) {
             if (!walletProvider?.name) return '';
             const label = escapeMenuText(`Connected wallet: ${walletProvider.name}`);
-            const mark = this.renderIdentityMark(walletProvider.mark);
+            const mark = this.renderWalletMark(walletProvider);
+            if (markOnly && !mark) return '';
             return `<span class="avatar-wallet-provider" title="${label}" role="img" aria-label="${label}">${mark || `<span>${escapeMenuText(walletProvider.name)}</span>`}</span>`;
         }
 
@@ -1523,9 +1549,7 @@
             const container = this.getNavContainer();
             const buttonSlot = container?.querySelector('[data-avatar-wallet-provider]');
             if (!buttonSlot) return;
-            // Only a verified local mark is drawn. Other connector names stay
-            // available as a plain-text tooltip, never borrowed branding.
-            const html = this.renderIdentityMark(walletProvider?.mark) ? this.renderWalletProvider(walletProvider) : '';
+            const html = this.renderWalletProvider(walletProvider, true);
             if (buttonSlot.innerHTML !== html) buttonSlot.innerHTML = html;
             buttonSlot.hidden = !html;
             const button = container.querySelector('.avatar-button');
@@ -1954,16 +1978,22 @@
          */
         async applyLiveNetworkSection({ walletAddress, currentPath, isOwnProfile, renderKey }) {
             const generation = this.identityGeneration;
+            const isCurrent = () => (!renderKey || this.pendingRenderKey === renderKey)
+                && generation === this.identityGeneration
+                && String(walletAddress || '').toLowerCase() === String(window.currentWalletAddress || '').toLowerCase();
             let networkInfo = null;
             try {
-                networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
+                networkInfo = await this.getCurrentNetworkInfo({
+                    walletAddress,
+                    onWalletProvider: identity => {
+                        if (isCurrent()) this.syncAccountWalletProvider(identity);
+                    }
+                });
             } catch (error) {
                 console.warn('Unable to read the live wallet network:', error);
                 return;
             }
-            if (renderKey && this.pendingRenderKey !== renderKey) return;
-            if (generation !== this.identityGeneration || String(walletAddress || '').toLowerCase() !== String(window.currentWalletAddress || '').toLowerCase()) return;
-            if (!networkInfo) return;
+            if (!isCurrent() || !networkInfo) return;
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
                 `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`,

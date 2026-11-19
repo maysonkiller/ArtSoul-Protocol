@@ -1,8 +1,10 @@
 import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
 import { PUBLIC_PROFILE_SOURCE } from '../../profile-fields.js';
+import { readPlatformArtworkIds } from '../../platform-artwork-aura.js';
 import { allowedArtworkUrl, readArtworkMetadata } from '../../safe-artwork-fetch.js';
 import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
+import { MULTIMEDIA_NFT_COVER } from '../../../config/upload-policy.js';
 import { readNftOwnershipConfig, readNftOwnershipBoundary, readNftOwnership, recheckNftOwnership, recheckNftOwnershipBoundary, readWithNftOwnershipRetry } from '../../nft-ownership.js';
 
 const PUBLIC_CHAIN_IDS = [84532, 11155111];
@@ -53,9 +55,9 @@ function keyFor(chain, id) {
   return `${chain}:${id}`;
 }
 
-function weiToEth(value) {
-  const text = normalizeText(value);
-  if (!text || text === '0') return '0';
+function weiToEth(...values) {
+  const text = values.map(normalizeText).find(value => value && value !== '0');
+  if (!text) return '0';
 
   try {
     const wei = BigInt(text);
@@ -243,19 +245,26 @@ export function getMediaUrl(metadata = {}, mediaType = getMediaType(metadata)) {
 }
 
 export function getPosterUrl(metadata = {}, mediaUrl = '') {
-  const poster = normalizeText(
-    metadata.image ||
-    metadata.image_url ||
-    metadata.poster_url ||
-    metadata.thumbnail_url ||
-    metadata.properties?.image ||
-    metadata.properties?.poster_url
-  );
-  return poster && poster !== mediaUrl ? poster : '';
+  // The external wallet cover must not replace an available artwork poster or the video's own frame.
+  return [metadata.image, metadata.image_url, metadata.poster_url, metadata.thumbnail_url,
+    metadata.properties?.image, metadata.properties?.poster_url].map(normalizeText)
+    .find(url => url && url !== mediaUrl && url !== MULTIMEDIA_NFT_COVER) || '';
+}
+
+function publishedCreatorValue(metadata) {
+  const value = Array.isArray(metadata.attributes)
+    ? metadata.attributes.find(entry => entry?.trait_type === 'Creator Value')?.value : null;
+  let text = typeof value === 'string' ? value.trim() : '';
+  // Early publications wrote numeric traits, including values expressed as 1e-7.
+  if (typeof value === 'number' && Number.isFinite(value) && value <= Number.MAX_SAFE_INTEGER) {
+    text = value.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 18 });
+    if (Number(text) !== value) return null;
+  }
+  return /^\d{1,60}(?:\.\d{1,18})?$/.test(text) ? text : null;
 }
 
 function getAIValueGuidance(metadata = {}) {
-  const guidance = readAIValuation(metadata.ai_value_guidance || metadata.properties?.ai_value_guidance);
+  const guidance = readAIValuation(metadata.ai_value_guidance) || readAIValuation(metadata.properties?.ai_value_guidance);
   if (!guidance) return null;
 
   const confidence = normalizeText(guidance.confidence).toLowerCase();
@@ -263,7 +272,7 @@ function getAIValueGuidance(metadata = {}) {
     estimated_value_min_eth: guidance.estimated_value_min_eth,
     estimated_value_max_eth: guidance.estimated_value_max_eth,
     suggested_start_price_eth: guidance.suggested_start_price_eth,
-    confidence: ['low', 'medium', 'high'].includes(confidence) ? confidence : 'medium',
+    confidence: ['low', 'medium', 'high'].includes(confidence) ? confidence : null,
     rationale: normalizeText(guidance.rationale).slice(0, 500),
     factors: Array.isArray(guidance.factors)
       ? guidance.factors.map(item => normalizeText(item).slice(0, 120)).filter(Boolean).slice(0, 6)
@@ -336,7 +345,7 @@ function latestAuctionByArtwork(auctions = []) {
   for (const auction of auctions) {
     const key = keyFor(auction.chain_id, auction.artwork_id);
     const current = map.get(key);
-    if (!current || toNumber(auction.auction_id) > toNumber(current.auction_id)) {
+    if (!current || BigInt(auction.auction_id) > BigInt(current.auction_id)) {
       map.set(key, auction);
     }
   }
@@ -517,7 +526,7 @@ function ownershipProjection(artwork, maps) {
   const artworkId = protocolId(artwork.artwork_id);
   const auction = maps.auctions.get(keyFor(chain, artworkId));
   const settlement = maps.settlements.get(keyFor(chain, artworkId));
-  const tokenId = protocolId(artwork.token_id || settlement?.token_id || auction?.token_id);
+  const tokenId = protocolId(artwork.token_id) || protocolId(settlement?.token_id) || protocolId(auction?.token_id);
   let resale = tokenId
     ? maps.resales.get(keyFor(chain, tokenId))
     : null;
@@ -562,10 +571,14 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
   const status = statusFromProjection(artwork, auction, resale);
   const title = normalizeText(metadata.name || metadata.title) || `Artwork #${artworkId}`;
   const description = normalizeText(metadata.description) || 'Protocol-backed ArtSoul testnet artwork.';
-  const canonicalFloor = floor?.floor_price || artwork.canonical_floor || auction?.final_price || 0;
-  const currentBid = auction?.current_bid || auction?.winning_bid || 0;
+  const canonicalFloor = weiToEth(floor?.floor_price, artwork.canonical_floor, auction?.final_price);
+  const currentBid = weiToEth(auction?.current_bid, auction?.winning_bid);
+  const startPrice = weiToEth(auction?.start_price);
   const salePrice = resale?.active ? resale.price : 0;
   const creatorIdentity = maps.publicIdentities?.get(normalizeText(artwork.creator).toLowerCase());
+  const guidance = getAIValueGuidance(metadata);
+  const noGuidanceRecorded = Object.keys(metadata).length > 0 &&
+    metadata.ai_value_guidance == null && metadata.properties?.ai_value_guidance == null;
 
   return {
     id: `v41:${chain}:${artworkId}`,
@@ -574,7 +587,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     network: chain === 11155111 ? 'sepolia' : 'baseSepolia',
     artwork_id: artworkId,
     blockchain_id: artworkId,
-    auction_id: protocolId(auction?.auction_id || artwork.active_auction_id),
+    auction_id: protocolId(auction?.auction_id) || protocolId(artwork.active_auction_id),
     token_id: tokenId,
     title,
     description,
@@ -595,27 +608,32 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     poster_url: posterUrl || null,
     media_type: mediaType,
     file_type: mediaType,
-    ai_guidance: getAIValueGuidance(metadata),
+    ai_guidance: guidance,
+    ai_guidance_status: guidance ? 'recorded' : noGuidanceRecorded ? 'not_recorded' : 'unavailable',
+    published_creator_value: publishedCreatorValue(metadata),
     metadata_uri: artwork.metadata_uri,
     status,
-    current_bid: weiToEth(currentBid),
-    highest_bid: weiToEth(currentBid),
-    creator_value: weiToEth(auction?.start_price || canonicalFloor),
-    start_price: weiToEth(auction?.start_price),
+    current_bid: currentBid,
+    highest_bid: currentBid,
+    creator_value: startPrice === '0' ? canonicalFloor : startPrice,
+    start_price: startPrice,
     sale_price: weiToEth(salePrice),
     resale_seller: addressOrNull(resale?.seller),
     resale_updated_block: Number(resale?.last_updated_block || resale?.block_number || 0),
-    canonical_floor: weiToEth(canonicalFloor),
-    floor_price: weiToEth(canonicalFloor),
+    canonical_floor: canonicalFloor,
+    floor_price: canonicalFloor,
     minted: Boolean(artwork.minted),
     active_auction_id: protocolId(artwork.active_auction_id),
     auction_end_time: auction?.end_time || null,
+    auction_original_end_time: auction?.original_end_time || null,
+    auction_updated_block: toNumber(auction?.last_updated_block),
     settlement_deadline: timestampSeconds(auction?.settlement_deadline),
     current_bidder: auction?.current_bidder || ZERO_ADDRESS,
     winner: auction?.winner || null,
     auction_winner_address: auctionWinnerAddress,
     current_owner_address: currentOwnerAddress,
     ...(ownershipStatus ? { ownership_status: ownershipStatus } : {}),
+    ...(ownershipStatus === 'verified' && maps.platformArtworkIds.has(artworkId) ? { aura_kind: 'platform' } : {}),
     vote_count: signals.like,
     like_count: signals.like,
     would_buy_count: signals.would_buy,
@@ -727,14 +745,16 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
   }
   // Creator names and immutable metadata are independent reads. Starting them
   // together removes one serial network round trip from a cold projection.
-  let [publicIdentities, metadataRows] = await Promise.all([
+  let [publicIdentities, metadataRows, platformArtworkIds] = await Promise.all([
     preload.publicIdentities ?? publicIdentitiesByAddress(tableData.v41_artworks.map(artwork => artwork.creator), warnings),
     preload.metadataRows ?? Promise.all(
       tableData.v41_artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
-    )
+    ),
+    readPlatformArtworkIds(tableData.v41_artworks, ownership)
   ]);
   const maps = {
     ownership,
+    platformArtworkIds,
     publicIdentities,
     includeOwnershipProfiles: preload.includeOwnershipProfiles === true,
     auctions: latestAuctionByArtwork(tableData.v41_auctions),
@@ -776,19 +796,19 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }, initialBounda
   const artworkFilter = `eq.${artworkId}`;
   const v41ArtworksPromise = queryTable(
     'v41_artworks',
-    'select=chain_id,artwork_id::text,creator,metadata_uri,minted,token_id::text,canonical_floor,active_auction_id::text,block_number,last_updated_block,transaction_hash,indexed_at,last_updated_at' +
+    'select=chain_id,artwork_id::text,creator,metadata_uri,minted,token_id::text,canonical_floor::text,active_auction_id::text,block_number,last_updated_block,transaction_hash,log_index,indexed_at,last_updated_at' +
       `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`,
     warnings
   );
   const v41AuctionsPromise = queryTable(
       'v41_auctions',
-      'select=chain_id,auction_id::text,artwork_id::text,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id::text,block_number,last_updated_block' +
+      'select=chain_id,auction_id::text,artwork_id::text,status,start_price::text,original_end_time,end_time,current_bid::text,current_bidder,winner,winning_bid::text,settlement_deadline,final_price::text,token_id::text,block_number,last_updated_block' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=last_updated_block.desc&limit=100`,
       warnings
     );
   const v41BidsPromise = queryTable(
       'v41_bids',
-      'select=chain_id,auction_id::text,artwork_id::text,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at' +
+      'select=chain_id,auction_id::text,artwork_id::text,bidder,bid_amount::text,block_number,log_index,transaction_hash,indexed_at' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=100`,
       warnings
     );
@@ -800,7 +820,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }, initialBounda
     );
   const v41FloorHistoryPromise = queryTable(
       'v41_floor_history',
-      'select=chain_id,artwork_id::text,floor_price,block_number' +
+      'select=chain_id,artwork_id::text,floor_price::text,block_number' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc&limit=1`,
       warnings
     );
@@ -819,7 +839,15 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }, initialBounda
   // Only resale tables depend on token_id. Everything else above begins with
   // the request instead of waiting for the artwork row to return first.
   const v41Artworks = await v41ArtworksPromise;
-  const tokenId = protocolId(v41Artworks[0]?.token_id);
+  let tokenId = protocolId(v41Artworks[0]?.token_id);
+  if (!tokenId && v41Artworks[0]?.minted && !ownershipBoundary) {
+    // An older registration can lack the token ID recorded at settlement.
+    // Match the feed's token selection before looking up this work's resale.
+    const [auctions, settlements] = await Promise.all([v41AuctionsPromise, v41SettlementsPromise]);
+    const key = keyFor(chain, artworkId);
+    tokenId = protocolId(latestCompletedSettlementByArtwork(settlements).get(key)?.token_id) ||
+      protocolId(latestAuctionByArtwork(auctions).get(key)?.token_id);
+  }
   const preload = {
     ownershipBoundary,
     legacyOnly: chain !== CANONICAL_PUBLIC_CHAIN_ID,
@@ -832,7 +860,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }, initialBounda
     tokenId
       ? queryTable(
           'v41_resale_listings',
-          `select=chain_id,token_id::text,active,price,seller,last_updated_block&chain_id=${chainFilter}&token_id=eq.${tokenId}&limit=1`,
+          `select=chain_id,token_id::text,active,price::text,seller,last_updated_block&chain_id=${chainFilter}&token_id=eq.${tokenId}&limit=1`,
           warnings
         )
       : Promise.resolve([]);
@@ -902,7 +930,7 @@ async function buildProjectionSnapshot() {
   const chainFilter = `in.(${PUBLIC_CHAIN_IDS.join(',')})`;
   const artworksPromise = queryTable(
     'v41_artworks',
-    'select=chain_id,artwork_id::text,creator,metadata_uri,minted,token_id::text,canonical_floor,active_auction_id::text,block_number,last_updated_block,transaction_hash,indexed_at,last_updated_at' +
+    'select=chain_id,artwork_id::text,creator,metadata_uri,minted,token_id::text,canonical_floor::text,active_auction_id::text,block_number,last_updated_block,transaction_hash,log_index,indexed_at,last_updated_at' +
       `&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
     warnings
   );
@@ -933,13 +961,13 @@ async function buildProjectionSnapshot() {
     artworksPromise,
     queryTable(
       'v41_auctions',
-      'select=chain_id,auction_id::text,artwork_id::text,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id::text,block_number,last_updated_block' +
+      'select=chain_id,auction_id::text,artwork_id::text,status,start_price::text,original_end_time,end_time,current_bid::text,current_bidder,winner,winning_bid::text,settlement_deadline,final_price::text,token_id::text,block_number,last_updated_block' +
         `&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
       warnings
     ),
     queryTable(
       'v41_bids',
-      `select=chain_id,auction_id::text,artwork_id::text,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at&chain_id=${chainFilter}&limit=1000`,
+      `select=chain_id,auction_id::text,artwork_id::text,bidder,bid_amount::text,block_number,log_index,transaction_hash,indexed_at&chain_id=${chainFilter}&limit=1000`,
       warnings
     ),
     queryTable(
@@ -949,7 +977,7 @@ async function buildProjectionSnapshot() {
     ),
     queryTable(
       'v41_resale_listings',
-      `select=chain_id,token_id::text,active,price,seller,last_updated_block&chain_id=${chainFilter}&limit=200`,
+      `select=chain_id,token_id::text,active,price::text,seller,last_updated_block&chain_id=${chainFilter}&limit=200`,
       warnings
     ),
     queryTable(
@@ -959,7 +987,7 @@ async function buildProjectionSnapshot() {
     ),
     queryTable(
       'v41_floor_history',
-      `select=chain_id,artwork_id::text,floor_price,block_number&chain_id=${chainFilter}&limit=200`,
+      `select=chain_id,artwork_id::text,floor_price::text,block_number&chain_id=${chainFilter}&limit=200`,
       warnings
     ),
     queryTable('v41_trust_signals', `select=chain_id&chain_id=${chainFilter}&limit=1000`, warnings),
@@ -975,7 +1003,7 @@ async function buildProjectionSnapshot() {
     ),
     queryTable(
       'v41_public_metrics',
-      'select=chain_id,artists_onboarded,auctions_completed,unique_collectors,settled_volume_wei,last_updated_block,updated_at' +
+      'select=chain_id,artists_onboarded,auctions_completed,unique_collectors,settled_volume_wei::text,last_updated_block,updated_at' +
         '&chain_id=eq.84532&limit=1',
       warnings
     )

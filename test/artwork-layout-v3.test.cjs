@@ -16,8 +16,9 @@ test('auction keeps one status and exposes each existing state action', () => {
     assert.match(source, /const mintedArtwork =/);
     assert.match(source, /End Expired Auction/);
     assert.match(source, /Create New Auction/);
-    assert.match(source, /With a winning bid, this opens payment for the winner/);
-    assert.match(source, /With no bids, the creator can start a new auction/);
+    assert.match(source, /Anyone can open payment for the winner by confirming the close/);
+    assert.match(source, /This work is back in Discovery/);
+    assert.match(source, /The wallet that confirms pays test network gas/);
     assert.match(source, /Complete Settlement & Mint NFT/);
     assert.match(source, /Buy Now/);
 });
@@ -58,7 +59,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=89/);
+    assert.match(html, /unified-styles\.css\?v=92/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -155,10 +156,9 @@ test('Community owns artwork actions while Ownership keeps only participant iden
     assert.doesNotMatch(styles, /grid-template-rows: auto minmax\(0, 1fr\) 160px/);
 });
 
-test('ISO auction timestamps bypass the legacy helper Unknown result', () => {
-    assert.match(source, /const endTimeMs = normalizeAuctionTimestamp\(endTime\)/);
-    assert.match(source, /String\(formatted\)\.toLowerCase\(\) !== 'unknown'/);
-    assert.match(source, /return 'Syncing end time'/);
+test('the bidding timer accepts projected timestamps and renders an unknown deadline without guessing', () => {
+    assert.match(source, /<AuctionPhaseCountdown deadline=\{normalizeAuctionTimestamp\(auction\.endTime\)\}/);
+    assert.match(source, /if \(!deadline\) return 'Syncing deadline'/);
     assert.match(source, /projection\.auction_end_time,[\s\S]*?projection\.end_time,[\s\S]*?projection\.endTime/);
 });
 

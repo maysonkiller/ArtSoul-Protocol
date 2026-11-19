@@ -21,7 +21,7 @@
     <script src="/header-prepaint.js?v=11"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=89">
+    <link rel="stylesheet" href="/unified-styles.css?v=92">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
     <script src="/storage-image.js?v=3" defer></script>
@@ -31,9 +31,9 @@
     <script src="/modal-system.js?v=2" defer></script>
     <script type="module" src="/supabase-client.js"></script>
     <script type="module" src="/supabase-auth.js?v=2"></script>
-    <script src="/avatar-dropdown.js?v=71" defer></script>
-    <script src="/webmcp-tools.js?v=22" defer></script>
-    <script src="/voice-commands.js?v=14" defer></script>
+    <script src="/avatar-dropdown.js?v=72" defer></script>
+    <script src="/webmcp-tools.js?v=31" defer></script>
+    <script src="/voice-commands.js?v=17" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <script type="module" src="/src/entries/header-notifications.js"></script>
     <script type="module" src="/src/entries/search.js"></script>
@@ -100,7 +100,12 @@
         </div>
     </header>
     <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
-    <div id="app"></div>
+    <div id="app">
+        <main class="launch-page" aria-busy="true">
+            <div class="launch-topline"><a href="/upload">← Create a single artwork</a><span class="launch-pill">Local draft · Unpublished</span></div>
+            <div class="launch-hero"><div><h1>Create a collection</h1><p role="status">Loading collection editor…</p></div></div>
+        </main>
+    </div>
     <script type="module" src="/src/entries/collection-builder.jsx"></script>
 </body>
 </html>

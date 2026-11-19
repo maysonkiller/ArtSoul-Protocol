@@ -14,16 +14,16 @@
  *   reviewed static recordings; other replies use native speechSynthesis.
  *   Recording generation is an offline operation, not a user request. Playback
  *   makes no AI API call and exposes no key or user content to an AI provider.
- * - The browser vendor may process it. Chrome sends the audio to Google to be
- *   transcribed. The person is told that before the microphone first opens.
+ * - The browser may use an online recognition service for each spoken turn.
+ *   The person is told that before the microphone first opens.
  * - Text commands remain available without speech recognition. Opening the
  *   panel never starts the microphone. Typed replies are silent unless the
  *   person presses Listen to answer.
  *
  * What keeps a misheard sentence from costing money:
  *
- * 1. The microphone opens only on a click, for one sentence, and closes when the
- *    tab is hidden. It never listens in the background.
+ * 1. A click starts one sentence or a voice chat. In voice chat the next turn
+ *    begins after playback ends. Hiding the tab ends either mode.
  * 2. What was heard is shown before anything runs.
  * 3. A command that opens the wallet does not run when the recogniser itself
  *    reports low confidence; the person is asked to repeat it.
@@ -37,6 +37,8 @@
     const LANG_KEY = 'artsoul.voice.lang';
     // Older clients could persist consent before an asynchronous dialog resolved.
     const NOTICE_KEY = 'artsoul.voice.notice.v2';
+    const NAVIGATION_KEY = 'artsoul.voice.next-page';
+    const NAVIGATION_TTL = 30000;
     // SpeechRecognition reports 0..1. Below this a wallet command is not run.
     // Some engines report 0 when they do not measure it at all; that is treated
     // as unknown, and the tool gate still applies.
@@ -57,6 +59,10 @@
     const SAVED_TOOLS = ['add_to_saved', 'remove_from_saved'];
     const REVIEW_TOOLS = ['prepare_donation', 'prepare_artwork_report'];
     const DRAFT_TOOL = 'prepare_artwork_registration';
+    // A new tool requires a deliberate Send until its voice-chat effects are reviewed.
+    const CHAT_TOOLS = new Set(['search_catalog', 'find_active_auctions', 'get_auction_state',
+        'get_artwork_provenance', 'get_artwork', 'get_my_activity', 'open_artwork', 'open_page',
+        DRAFT_TOOL, 'revise_publication_draft']);
 
     // Recognisers write numbers as digits: "31", "0.05", and in Russian "0,05".
     const AMOUNT = '(\\d+(?:[.,]\\d{1,18})?)';
@@ -73,11 +79,7 @@
      */
     const GRAMMAR = [
         // --- English ---------------------------------------------------------
-        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:the\s+)?(?:gallery|explore)(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'gallery' } })],
-        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:the\s+)?(?:home|homepage|home page)(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'home' } })],
-        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:my\s+|the\s+)?profile(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'profile' } })],
-        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:the\s+)?(?:create|upload|publish)(?:\s+page)?(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'create' } })],
-        ['en', /^(?:please\s+)?(?:open|show|go to)\s+(?:the\s+)?(?:guide|docs|documentation|how it works)(?:,?\s+please)?$/, () => ({ tool: 'open_page', input: { page: 'guide' } })],
+        ['en', /^let['’]?s create (?:art|(?:an )?artwork)$/, () => ({ tool: 'open_page', input: { page: 'create' } })],
         ['en', new RegExp(`^(?:please\\s+)?(?:donate\\s+to|open\\s+donate\\s+for)\\s+${EN_WORK}${ID}$`), m => ({ tool: 'prepare_donation', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`^(?:please\\s+)?(?:report|open\\s+report\\s+for)\\s+${EN_WORK}${ID}$`), m => ({ tool: 'prepare_artwork_report', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`^(?:please\\s+)?save\\s+${EN_WORK}${ID}(?:\\s+to\\s+(?:my\\s+)?(?:saved|favou?rites))?$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
@@ -105,11 +107,7 @@
         ['en', /\bauctions?\b/, () => ({ tool: 'find_active_auctions', input: {} })],
 
         // --- Russian ---------------------------------------------------------
-        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи|перейди в)\s+галерею(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'gallery' } })],
-        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи|перейди на)\s+главную(?:\s+страницу)?(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'home' } })],
-        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи|перейди в)\s+(?:мой\s+)?профиль(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'profile' } })],
-        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи)\s+(?:создание|публикацию|загрузку)(?:\s+работы)?(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'create' } })],
-        ['ru', /^(?:пожалуйста,?\s+)?(?:открой|открыть|покажи)\s+(?:руководство|документацию|инструкцию)(?:,?\s+пожалуйста)?$/, () => ({ tool: 'open_page', input: { page: 'guide' } })],
+        ['ru', /^давай создадим (?:искусство|работу|произведение)$/, () => ({ tool: 'open_page', input: { page: 'create' } })],
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:донат\\s+автору|открой\\s+донат\\s+для)\\s+${RU_WORK}${ID}$`), m => ({ tool: 'prepare_donation', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:пожаловаться\\s+на|открой\\s+жалобу\\s+на)\\s+${RU_WORK}${ID}$`), m => ({ tool: 'prepare_artwork_report', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:сохрани|добавь)\\s+${RU_WORK}${ID}\\s+в\\s+избранное$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
@@ -136,8 +134,70 @@
         ['ru', /аукцион/, () => ({ tool: 'find_active_auctions', input: {} })],
     ];
 
+    const NAVIGATION_PAGES = [
+        ['nfts', /^(?:nft (?:gallery|catalog)|(?:gallery|catalog) of nfts|(?:галере[яиюе]|каталог) nft|nft (?:в галерее|галерея)|все nft|all nfts)$/u],
+        ['marketplace', /^(?:(?:nft )?(?:marketplace|market|маркетплейс[еа]?|рынок)|(?:маркетплейс[еа]?|рынок) nft|nfts? (?:for sale|на (?:продажу|маркетплейсе)))$/u],
+        ['walletNfts', /^(?:(?:my )?wallet nfts?|nfts? (?:in|from) (?:my |the )?wallet|(?:мои )?nft (?:из|в) (?:моего |моем )?кошельк[ае]|nft (?:моего )?кошелька|(?:мои )?сторонние nft)$/u],
+        ['collected', /^(?:(?:my (?:nft )?|collected (?:artsoul )?)collection|(?:my )?collected(?: (?:artsoul )?nfts?)?|(?:мою|моя|моей) коллекци[яию](?: (?:nft|artsoul))?|мои nft (?:artsoul|в профиле)|my (?:artsoul|profile) nfts?)$/u],
+        ['collections', /^(?:collections|коллекции|коллекциях)$/u],
+        ['auctions', /^(?:auctions|аукционы|аукционам|аукционах)$/u],
+        ['gallery', /^(?:(?:(?:мою|моя) )?галере[яиюе]|(?:my )?(?:gallery|explore)|discovery)$/u],
+        ['home', /^(?:главн(?:ая|ую)(?: страниц[ау])?|домой|home(?: ?page)?)$/u],
+        ['profile', /^(?:(?:(?:мой|моему) )?профил[ьюе]|(?:my )?profile)$/u],
+        ['create', /^(?:создание(?: работы| искусства)?|публикаци[юя](?: работы)?|загрузк[ау](?: работы)?|(?:create|publish|upload)(?: (?:an? )?artwork| page)?)$/u],
+        ['guide', /^(?:руководств[оу]|документаци[юия]|инструкци[июя]|справк[ау]|guide|docs|documentation|how it works)$/u]
+    ];
+
+    function parseNavigationTurn(transcript, lang, pendingNft = false) {
+        if (typeof transcript !== 'string' || transcript.length > 300) return null;
+        const ru = lang === 'ru';
+        const text = transcript.toLowerCase().trim().replace(/ё/g, 'е')
+            .replace(/[?!.]+$/u, '').replace(/\s+/gu, ' ')
+            .replace(/(?:н[ -]?ф[ -]?т|эн[ -]?эф[ -]?ти|н[ -]?эф[ -]?ти|n[ .-]+f[ .-]+t)(?![\p{L}\p{N}_])/gu, 'nft')
+            .replace(/^(?:пожалуйста|please)[ ,]+|[, ]+(?:пожалуйста|please)$/gu, '').trim();
+        const words = pendingNft ? text.replace(/^(?:нет|точнее|лучше|no|actually|rather)[, ]+/u, '') : text;
+        const request = ru
+            ? /^(?:(?:давай(?:те)?|можешь|можете) )?(?:откроем|открой(?:те)?|открыть|покажи(?:те)?|показать|перейди(?:те)?|перейдем|переключись|перейти|(?:я )?хочу (?:открыть|посмотреть|перейти)|(?:я )?хочу(?= (?:в|на) )|можно (?:открыть|посмотреть))[, ]+(?:мне[, ]+)?(?:пожалуйста[, ]+)?/u
+            : /^(?:(?:(?:can|could|would) you|let['’]?s|i (?:want|would like) to) )?(?:open|show(?: me)?|go to|take me to|switch to|browse|view) (?:please )?/u;
+        const prefix = request.exec(words);
+        if (!prefix && !pendingNft) return null;
+        const target = words.slice(prefix?.[0].length || 0)
+            .replace(/^(?:on|to|in|from|в|на|из|к) /u, '')
+            .replace(/^(?:the|a|an) /u, '')
+            .replace(/^(?:вкладк[ауе]|раздел|страниц[ауе]|tab) /u, '')
+            .replace(/ (?:tab|вкладку)$/u, '');
+        const open = page => ({ tool: 'open_page', input: { page } });
+        if (pendingNft && /^(?:нет|отмена|не надо|отмени|no|cancel|never mind|nevermind)$/u.test(text)) {
+            return { message: ru ? 'Хорошо. Что открыть дальше?' : 'Okay. What would you like to open?' };
+        }
+        if (pendingNft && /^(?:да|ага|хочу|yes|yeah|sure)$/u.test(text)) {
+            return { nftPrompt: true, message: ru ? 'Какой раздел или номер работы?' : 'Which section or artwork number?' };
+        }
+        const id = /^(?:(?:nfts?|artwork|work|работ[ауеы]|артворк)\s*)?(?:(?:номер|number|no\.?|№|#)\s*)?([1-9]\d{0,77})$/u.exec(target);
+        if (id && BigInt(id[1]) < 2n ** 256n) return { tool: 'open_artwork', input: { artwork_id: id[1] } };
+
+        if (pendingNft && /^(?:gallery|галере[яюе]|каталог|все|all)$/u.test(target)) return open('nfts');
+        if (pendingNft && /^(?:(?:my )?wallet|(?:мой |моем |моего )?кошел(?:ек|ьк[ае]))$/u.test(target)) return open('walletNfts');
+        if (pendingNft && /^(?:mine|my profile|profile|(?:my )?collection|мои|(?:моем |мой )?профил[ье]|(?:моей |мою )?коллекци[июя])$/u.test(target)) return open('collected');
+        if (/^nfts? (?:в (?:моем )?профиле|in (?:my |the )?profile)$/u.test(target)) return open('collected');
+        if (/^(?:(?:мои |мой |какой-нибудь |любой |my |any )?nfts?)$/u.test(target)) {
+            return { nftPrompt: true, message: ru
+                ? 'Где открыть NFT — в галерее, на маркетплейсе, в вашей коллекции или в кошельке? Можно назвать номер работы ArtSoul.'
+                : 'Where should I open NFTs — the gallery, marketplace, your collection or your wallet? You can also say an ArtSoul artwork number.' };
+        }
+        const page = NAVIGATION_PAGES.find(([, names]) => names.test(target));
+        if (page) return open(page[0]);
+
+        // A compound NFT navigation request must never pass a trailing action to
+        // a different command. Unrelated turns still reach the usual parser.
+        if (prefix && /^(?:мои |мой |my )?(?:nfts?|marketplace|маркетплейс)(?![\p{L}\p{N}_])/u.test(target)) {
+            return { message: ru ? 'Назовите один раздел или номер работы ArtSoul.' : 'Name one section or one ArtSoul artwork number.' };
+        }
+        return null;
+    }
+
     /** A spoken sentence to one tool call, or null when nothing matched. */
-    function parseCommand(transcript, lang) {
+    function parseCommand(transcript, lang, pendingNft = false) {
         const normalized = String(transcript == null ? '' : transcript).replace(/\s+/g, ' ').trim();
         const heard = normalized
             .toLowerCase()
@@ -167,18 +227,25 @@
         if (draft) return { tool: DRAFT_TOOL, input: { title: draft[1] } };
         if (language === 'ru' ? /^(?:подготовь работу|подготовь публикацию)$/i.test(normalized)
             : /^(?:prepare artwork|prepare publication)$/i.test(normalized)) return { publicationPrompt: true };
+        const navigation = parseNavigationTurn(normalized, language, pendingNft);
+        if (navigation) return navigation;
+        // Well-formed NFT navigation was consumed above. Do not extract a
+        // separate tool from a quoted, negated or compound NFT request.
+        if (/(?:nfts?|н[ -]?ф[ -]?т|эн[ -]?эф[ -]?ти|маркетплейс|marketplace)/u.test(heard) &&
+            /(?:откр|покаж|переключ|перей|\b(?:open|show|switch|browse|go to|take me to)\b)/u.test(heard)) return null;
         // Do not fall back to a different action extracted from a malformed or
         // combined donation/report request. Search terms above remain data.
         const reviewIntent = language === 'ru' ? /донат|пожертв|жалоб|пожаловаться/.test(heard) : /\b(?:donat\w*|report\w*|complaint\w*)\b/.test(heard);
         // A malformed page request must not fall through to an action in its tail.
         const pageIntent = language === 'ru'
-            ? /(?:открой|открыть|открывай|покажи|перейди в|перейди на)\s+(?:мой\s+)?(?:галерею|главную|профиль|создание|публикацию|загрузку|руководство|документацию|инструкцию)(?![\p{L}\p{N}_])/u.test(heard)
-            : /\b(?:open|show|go to)\s+(?:the\s+|my\s+)?(?:gallery|explore|home|homepage|profile|create|upload|publish|guide|docs|documentation|how it works)\b/.test(heard);
+            ? /(?:давай создадим|(?:открой|открыть|открывай|покажи|перейди в|перейди на)\s+(?:(?:мой|мою)\s+)?(?:галерею|коллекцию|главную|профиль|создание|публикацию|загрузку|руководство|документацию|инструкцию))(?![\p{L}\p{N}_])/u.test(heard)
+            : /\b(?:let['’]?s create|(?:open|show|go to)\s+(?:the\s+|my\s+)?(?:gallery|explore|(?:nft\s+)?collection|home|homepage|profile|create|upload|publish|guide|docs|documentation|how it works))\b/.test(heard);
         for (const [ruleLang, pattern, build] of GRAMMAR) {
             if (ruleLang !== language) continue;
             const match = pattern.exec(heard);
             if (!match) continue;
             const command = build(match);
+            if (command.tool === 'open_artwork' && (match.index !== 0 || match[0].length !== heard.length)) continue;
             if (pageIntent && command.tool !== 'open_page') continue;
             if (reviewIntent && !REVIEW_TOOLS.includes(command.tool)) continue;
             if ([...SAVED_TOOLS, ...REVIEW_TOOLS].includes(command.tool) && (/\?/.test(transcript) || !/^[1-9][0-9]{0,77}$/.test(command.input.artwork_id) || BigInt(command.input.artwork_id) >= 2n ** 256n)) return null;
@@ -213,6 +280,12 @@
             hint: 'Type or speak one command in English or Russian. Wallet actions still need your review and signature.',
             input: 'Your command', placeholder: 'Open gallery, search moon…',
             send: 'Send', microphone: 'Use microphone', stop: 'Stop listening',
+            conversation: 'Start voice chat', endConversation: 'End voice chat',
+            conversationHint: 'Voice chat continues after each answer and on pages you ask me to open in this tab. Your browser may send each turn to its speech service.',
+            resumeMic: 'Page opened. Tap Start voice chat to continue, or type your next request.',
+            arrival: 'Page opened. Listening for your next request.',
+            navigationWait: 'Navigation is taking longer than expected. Voice chat is paused.',
+            reviewCommand: 'Voice chat paused. Check the command and press Send to review this action.',
             listenReply: 'Listen to answer', stopReply: 'Stop audio',
             audioUnavailable: 'Audio could not play in this browser. The answer is available as text.',
             audioBlocked: 'Tap Listen to answer to play the audio.',
@@ -227,13 +300,15 @@
             tooLong: 'Use one command of up to 300 characters.',
             listening: 'Listening… say one command.',
             notHeard: 'Nothing was heard. Press the microphone and try again.',
-            notUnderstood: heard => `"${heard}" is not a command I know. Open Examples or type "help".`,
+            options: 'You can open the gallery, find artwork, or ask about your activity.',
+            askSearch: 'What would you like to find?', askTitle: 'What is the title?',
+            otherRequest: 'Try “open NFTs”, “search moon”, or “my activity”.',
             unsure: heard => `I am not sure I heard "${heard}" correctly. Please repeat the action.`,
             heard: heard => `Heard: "${heard}"`,
             unavailable: 'Commands are not available on this page.',
-            notice: 'Voice commands use your browser\'s speech recognition. In Chrome, the audio is sent to Google to be transcribed. ArtSoul does not record, store or receive it.\n\nTurn on voice commands?',
+            notice: 'Your browser may send microphone audio to its speech service for transcription. ArtSoul receives no microphone audio.\n\nTurn on the microphone?',
             micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
-            help: 'Try: "open gallery", "open home", "open my profile", "open create", "open guide", "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
+            help: 'Try: "open gallery", "open NFTs", "open home", "open my profile", "open create", "open guide", "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
                 '"prepare artwork titled Moonlight", "donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
                 '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
                 '"change price of artwork 19 to 0.003", "remove artwork 19 from sale", ' +
@@ -250,6 +325,12 @@
             hint: 'Напишите или произнесите одну команду по-русски или по-английски. Действия с кошельком требуют вашей проверки и подписи.',
             input: 'Ваша команда', placeholder: 'Открой галерею, найди луна…',
             send: 'Отправить', microphone: 'Включить микрофон', stop: 'Остановить запись',
+            conversation: 'Начать диалог', endConversation: 'Завершить диалог',
+            conversationHint: 'Диалог продолжается после ответа и на страницах, которые вы просите открыть в этой вкладке. Браузер может отправлять реплики в свой сервис распознавания.',
+            resumeMic: 'Страница открыта. Нажмите «Начать диалог» или введите следующую просьбу.',
+            arrival: 'Страница открыта. Слушаю.',
+            navigationWait: 'Переход затянулся. Диалог приостановлен.',
+            reviewCommand: 'Диалог приостановлен. Проверьте команду и нажмите «Отправить», чтобы перейти к проверке действия.',
             listenReply: 'Прослушать ответ', stopReply: 'Остановить звук',
             audioUnavailable: 'Браузер не смог воспроизвести звук. Ответ доступен текстом.',
             audioBlocked: 'Нажмите «Прослушать ответ», чтобы включить звук.',
@@ -264,13 +345,15 @@
             tooLong: 'Введите одну команду длиной до 300 символов.',
             listening: 'Слушаю… скажите одну команду.',
             notHeard: 'Ничего не услышано. Нажмите микрофон и попробуйте снова.',
-            notUnderstood: heard => `«${heard}» — такой команды нет. Откройте примеры или напишите «помощь».`,
+            options: 'Можно открыть галерею, найти работу или узнать о своей активности.',
+            askSearch: 'Что найти?', askTitle: 'Как назвать работу?',
+            otherRequest: 'Попробуйте «открой NFT», «найди луну» или «моя активность».',
             unsure: heard => `Не уверен, что расслышал «${heard}». Повторите действие, пожалуйста.`,
             heard: heard => `Услышано: «${heard}»`,
             unavailable: 'Команды недоступны на этой странице.',
-            notice: 'Голосовые команды используют распознавание речи вашего браузера. В Chrome звук отправляется в Google для распознавания. ArtSoul его не записывает, не хранит и не получает.\n\nВключить голосовые команды?',
+            notice: 'Браузер может отправлять звук с микрофона в свой сервис распознавания речи. ArtSoul не получает звук с микрофона.\n\nВключить микрофон?',
             micBlocked: 'Микрофон для этого сайта заблокирован. Разрешите его в настройках браузера.',
-            help: 'Скажите: «открой галерею», «открой главную», «открой мой профиль», «открой создание работы», «открой руководство», «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
+            help: 'Скажите: «открой галерею», «открой NFT», «открой главную», «открой мой профиль», «открой создание работы», «открой руководство», «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
                 '«подготовь работу с названием Лунный свет», «донат автору работы 31», «пожаловаться на работу 31» (только открывает форму; ничего не отправляет), ' +
                 '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
                 '«измени цену работы 19 на 0,003», «сними работу 19 с продажи», ' +
@@ -291,6 +374,8 @@
             .map(id => Object.freeze({lang, id, text: TEXT[lang][id], url: `/audio/assistant/v1/${lang}-${id}.wav`}))));
 
     function getReplyAudio(text, lang) {
+        const phrase = ['options', 'askSearch', 'askTitle'].find(id => TEXT[lang]?.[id] === text);
+        if (phrase) return `/audio/assistant/v1/phrases/${lang}-${phrase}.wav`;
         return replyClips.find(clip => clip.lang === lang && clip.text === text)?.url || '';
     }
 
@@ -311,6 +396,11 @@
         const ru = lang === 'ru';
         const data = result || {};
         if (data.error) return { say: t.error(data.error), show: data.error };
+        if (data.opened === false && data.code === 'wallet_required') return { say: t.noWallet, show: t.noWallet };
+        if (data.opened === false && data.code === 'wallet_nfts_unavailable') {
+            const message = ru ? 'Раздел NFT кошелька сейчас недоступен.' : 'Wallet NFTs are currently unavailable.';
+            return { say: message, show: message };
+        }
         if (data.connected === false) return { say: t.noWallet, show: data.reason || t.noWallet };
         if (data.submitted === true) {
             const message = tool === 'complete_settlement' && data.confirmed === true ? t.settled : t.submitted;
@@ -326,6 +416,16 @@
         }
 
         switch (tool) {
+        case 'revise_publication_draft': {
+            const name = (ru ? { title: 'Название', description: 'Описание', duration_hours: 'Часы' }
+                : { title: 'Title', description: 'Description', duration_hours: 'Hours' })[data.field];
+            if (!name || (!data.checked && !data.review_required)) return { say: t.unavailable, show: t.unavailable };
+            const message = data.checked ? (data.pending
+                ? (ru ? 'Предложенное название' : 'Suggested title') : (ru ? 'Название в форме' : 'Title in the form'))
+                : (ru ? 'Проверьте предложение и нажмите Use these details.' : 'Review this suggestion and choose Use these details.');
+            const line = data.checked ? `${message}: ${data.value}` : `${name}: ${data.value}\n${message}`;
+            return { say: line, show: line };
+        }
         case 'prepare_artwork_registration': {
             const message = ru ? 'Черновик готов к проверке на Publish. Нажмите Use these details, чтобы заполнить форму. Ничего не загружено и не отправлено. Затем выберите файл и проверьте остальные поля.' : data.instruction;
             return { say: message, show: message };
@@ -369,10 +469,10 @@
         }
         case 'add_to_saved':
         case 'remove_from_saved': {
-            if (data.updated !== true || typeof data.saved !== 'boolean') return { say: t.error('Saved could not be confirmed.'), show: 'Saved could not be confirmed. Please try again.' };
+            if (data.updated !== true || typeof data.saved !== 'boolean') return { say: t.error('The change to Favorites could not be confirmed.'), show: 'The change to Favorites could not be confirmed. Please try again.' };
             const text = ru
                 ? `Работа ${data.artwork_id} ${data.saved ? 'в избранном' : 'убрана из избранного'}.`
-                : `Artwork ${data.artwork_id} ${data.saved ? 'is in Saved' : 'is removed from Saved'}.`;
+                : `Artwork ${data.artwork_id} ${data.saved ? 'is in Favorites' : 'was removed from Favorites'}.`;
             return { say: text, show: text };
         }
         case 'find_active_auctions': {
@@ -421,7 +521,8 @@
             })) };
         }
         case 'open_page': {
-            const names = { home: 'главную', gallery: 'галерею', profile: 'профиль', create: 'создание работы', guide: 'руководство' };
+            const names = { home: 'главную', gallery: 'галерею', profile: 'профиль', collected: 'вашу коллекцию ArtSoul', create: 'создание работы', guide: 'руководство',
+                nfts: 'галерею NFT', walletNfts: 'NFT кошелька', marketplace: 'маркетплейс', auctions: 'аукционы', collections: 'коллекции' };
             const text = data.opened
                 ? (ru ? 'Открываю ' + (names[data.page] || 'страницу') + '.' : 'Opening ' + data.title + '.')
                 : (ru ? 'Страница не открыта.' : 'Page was not opened.');
@@ -470,8 +571,27 @@
         }
     }
 
+    // Consume on first entry, including a wrong destination or a reload.
+    // The old document only writes this ticket when it actually leaves.
+    function takeNavigation() {
+        try {
+            const saved = window.sessionStorage.getItem(NAVIGATION_KEY);
+            if (!saved) return null;
+            window.sessionStorage.removeItem(NAVIGATION_KEY);
+            const nav = JSON.parse(saved);
+            const age = Date.now() - nav.at;
+            const previous = new URL(document.referrer);
+            if (!Number.isFinite(age) || age < 0 || age >= NAVIGATION_TTL ||
+                window.performance.getEntriesByType('navigation')[0]?.type !== 'navigate' ||
+                nav.to !== window.location.href || previous.origin !== window.location.origin || nav.from !== previous.pathname ||
+                typeof nav.wallet !== 'string' || !/^(?:0x[0-9a-f]{40})?$/.test(nav.wallet)) return null;
+            return nav;
+        } catch { return null; }
+    }
+
     window.ArtSoulVoice = Object.freeze({
         parseCommand,
+        parseNavigationTurn,
         describeResult,
         replyClips,
         getReplyAudio,
@@ -494,6 +614,13 @@
             : readStored(LANG_KEY) === 'en' ? 'en'
                 : (String(navigator.language || '').toLowerCase().startsWith('ru') ? 'ru' : 'en');
         let recognition = null;
+        let handsFree = false;
+        let leavingFor = null;
+        let arrivingFrom = takeNavigation();
+        let pendingDraftField = null;
+        let pendingPrompt = null;
+        let voiceConsent = readStored(NOTICE_KEY) === 'accepted';
+        let nextTurnTimer = null;
         let noticePending = false;
         let busy = false;
         let generation = 0;
@@ -537,6 +664,7 @@
             '<label for="artsoulVoiceInput"></label>' +
             '<input id="artsoulVoiceInput" type="text" maxlength="300" autocomplete="off" aria-describedby="artsoulVoiceHint">' +
             '<div class="artsoul-voice-controls"><button type="button" class="artsoul-voice-mic" aria-pressed="false"></button>' +
+            '<button type="button" class="artsoul-voice-chat" aria-pressed="false"></button>' +
             '<button type="submit" class="artsoul-voice-send"></button></div>' +
             '</form>' +
             '<p class="artsoul-voice-support"></p>' +
@@ -553,6 +681,7 @@
         const resultsEl = panel.querySelector('.artsoul-voice-results');
         const input = panel.querySelector('input');
         const mic = panel.querySelector('.artsoul-voice-mic');
+        const chat = panel.querySelector('.artsoul-voice-chat');
         const send = panel.querySelector('.artsoul-voice-send');
         const replay = panel.querySelector('.artsoul-voice-replay');
         const audioStatus = panel.querySelector('.artsoul-voice-audio-status');
@@ -560,6 +689,7 @@
         // The global capture guard disables submit buttons before their native
         // form action. This panel already owns the pending-command lock.
         send.dataset.allowRapid = 'true';
+        chat.dataset.allowRapid = 'true';
         const close = panel.querySelector('.artsoul-voice-close');
 
         function label() {
@@ -567,7 +697,13 @@
             button.setAttribute('aria-label', t.title);
             panel.setAttribute('lang', lang);
             panel.querySelector('h2').textContent = t.title;
-            panel.querySelector('.artsoul-voice-hint').textContent = t.hint;
+            panel.querySelector('.artsoul-voice-hint').textContent = typeof Recognition === 'function'
+                ? t.hint + ' ' + t.conversationHint : t.hint;
+            if (/^\/upload(?:\.html)?\/?$/.test(window.location?.pathname || '')) {
+                panel.querySelector('.artsoul-voice-hint').textContent += lang === 'ru'
+                    ? ' Для черновика скажите «название», затем продиктуйте его, или скажите «давай на 48 часов».'
+                    : ' For a draft, say “title” and dictate it, or say “choose 48 hours”.';
+            }
             panel.querySelector('label').textContent = t.input;
             input.placeholder = t.placeholder;
             close.setAttribute('aria-label', t.close);
@@ -612,9 +748,16 @@
         }
 
         function controls() {
-            input.disabled = busy || noticePending || Boolean(recognition);
+            input.disabled = busy || noticePending || (Boolean(recognition) && !handsFree);
             send.disabled = busy || noticePending || Boolean(recognition) || !input.value.trim();
             mic.disabled = busy || noticePending || typeof Recognition !== 'function';
+            mic.hidden = handsFree;
+            chat.hidden = typeof Recognition !== 'function';
+            chat.disabled = !handsFree && (busy || noticePending || Boolean(recognition));
+            chat.textContent = handsFree ? TEXT[lang].endConversation : TEXT[lang].conversation;
+            chat.title = TEXT[lang].conversationHint;
+            chat.setAttribute('aria-pressed', String(handsFree));
+            chat.dataset.listening = String(handsFree && Boolean(recognition));
             const hasClip = Boolean(getReplyAudio(answerToRead, lang)) && typeof window.Audio === 'function';
             const supportsAudio = hasClip || (typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function');
             audioNotice.textContent = TEXT[lang].audioNotice;
@@ -633,6 +776,8 @@
 
         function silence() {
             audioGeneration++;
+            window.clearTimeout?.(nextTurnTimer);
+            nextTurnTimer = null;
             clipAttempt = null;
             window.clearTimeout?.(clipTimer);
             clipTimer = null;
@@ -651,12 +796,34 @@
             controls();
         }
 
-        function closePanel() {
+        function stopVoice({ keepDraft = false } = {}) {
+            leavingFor = arrivingFrom = null;
+            if (!keepDraft) {
+                pendingDraftField = null;
+                pendingPrompt = null;
+            }
+            handsFree = false;
             stopListening();
             silence();
+        }
+
+        function closePanel() {
+            stopVoice();
             panel.hidden = true;
             button.setAttribute('aria-expanded', 'false');
             button.focus({ preventScroll: true });
+        }
+
+        function afterPlayback(failed) {
+            if (handsFree && !failed) {
+                const turn = audioGeneration;
+                nextTurnTimer = window.setTimeout(() => {
+                    if (handsFree && turn === audioGeneration) void start({ resume: true });
+                }, 300);
+            } else if (failed) {
+                handsFree = false;
+            }
+            controls();
         }
 
         function speak(textToSay) {
@@ -684,12 +851,14 @@
                             audioStatus.textContent = error.name === 'NotAllowedError' ? TEXT[lang].audioBlocked : TEXT[lang].audioUnavailable;
                             audioStatus.hidden = false;
                         }
-                        controls();
+                        afterPlayback(Boolean(error));
                     };
                     clipAudio.onplaying = () => {
                         if (clipAttempt !== attempt) return;
+                        clipAudio.onplaying = null;
                         window.clearTimeout?.(clipTimer);
-                        clipTimer = null;
+                        // A stalled clip can emit playing and never emit ended.
+                        clipTimer = handsFree ? window.setTimeout(() => finish({name: 'TimeoutError'}), 60000) : null;
                     };
                     clipAudio.onended = () => finish();
                     clipAudio.onerror = () => finish({name: 'MediaError'});
@@ -703,7 +872,10 @@
                     playback?.catch(error => finish(error || {name: 'MediaError'}));
                     return;
                 }
-                if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') return;
+                if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') {
+                    afterPlayback(true);
+                    return;
+                }
                 const current = new SpeechSynthesisUtterance(textToSay);
                 let started = false;
                 utterance = current;
@@ -716,19 +888,28 @@
                 };
                 const finish = failed => {
                     if (utterance !== current) return;
+                    window.clearTimeout?.(clipTimer);
+                    clipTimer = null;
                     utterance = null;
                     speaking = false;
                     if (failed) {
                         audioStatus.textContent = TEXT[lang].audioUnavailable;
                         audioStatus.hidden = false;
                     }
-                    controls();
+                    afterPlayback(failed);
                 };
                 current.onend = () => finish(!started);
                 current.onerror = () => finish(true);
+                // Some mobile engines accept speak() and never deliver an event.
+                // Stop the chat if playback cannot complete; never guess when to listen.
+                if (handsFree) clipTimer = window.setTimeout(() => {
+                    if (utterance !== current) return;
+                    finish(true);
+                    window.speechSynthesis.cancel();
+                }, 60000);
                 window.speechSynthesis.speak(current);
             } catch {
-                silence();
+                stopVoice();
                 audioStatus.textContent = TEXT[lang].audioUnavailable;
                 audioStatus.hidden = false;
             }
@@ -754,6 +935,7 @@
                 }
             }
             setListening(false);
+            if (answerEl.textContent === TEXT[lang].listening) show('', '');
         }
 
         async function handle(transcript, confidence, spoken = false) {
@@ -767,21 +949,58 @@
             };
             if (transcript.length > 300) { reply('', t.tooLong); return; }
             if (!transcript.trim()) { reply('', t.empty); return; }
-            const command = parseCommand(transcript, lang);
+            if (!pendingDraftField && /^(?:stop(?: voice chat)?|end voice chat|no[,]? thanks|that['’]s all|стоп|заверши(?:ть)? диалог|ничего не (?:надо|нужно)|хватит|спасибо[,]? пока|на этом вс[её])[.!]?$/i.test(transcript.trim())) {
+                stopVoice();
+                show(transcript, '', [], '');
+                return;
+            }
+            const previousPrompt = pendingPrompt;
+            pendingPrompt = null;
+            const isValue = previousPrompt === 'search' || previousPrompt === 'title';
+            if (isValue && /^(?:cancel|never mind|отмена|отмени)[.!]?$/i.test(transcript.trim())) {
+                reply(transcript, t.next);
+                return;
+            }
+            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, lang, pendingDraftField);
+            pendingDraftField = draftTurn?.nextField || null;
+            if (draftTurn?.message) {
+                reply(transcript, draftTurn.message, pendingDraftField === 'title' ? t.askTitle : draftTurn.message);
+                return;
+            }
+            let command = draftTurn || parseCommand(transcript, lang, previousPrompt === 'nft');
+            // The answer to a search/title question is data, even when it sounds like a wallet command.
+            if (previousPrompt === 'search' && command?.tool !== 'search_catalog' && !command?.searchPrompt && !command?.help) {
+                command = { tool: 'search_catalog', input: { query: transcript.trim() } };
+            } else if (previousPrompt === 'title' && command?.tool !== DRAFT_TOOL && !command?.publicationPrompt) {
+                command = { tool: DRAFT_TOOL, input: { title: transcript.trim() } };
+            }
             if (!command) {
-                const text = t.notUnderstood(transcript);
-                reply(transcript, text);
+                reply(transcript, t.otherRequest, t.options);
+                return;
+            }
+            if (command.message) {
+                if (command.nftPrompt) pendingPrompt = 'nft';
+                reply(transcript, command.message);
                 return;
             }
             if (command.help) {
                 reply(transcript, t.help, t.helpSpeech);
                 return;
             }
-            if (command.searchPrompt) { reply(transcript, t.searchPrompt); return; }
-            if (command.publicationPrompt) { reply(transcript, t.publicationPrompt); return; }
+            if (command.searchPrompt || command.publicationPrompt) {
+                pendingPrompt = command.searchPrompt ? 'search' : 'title';
+                const hint = command.searchPrompt ? t.searchPrompt : t.publicationPrompt;
+                reply(transcript, hint, handsFree ? (command.searchPrompt ? t.askSearch : t.askTitle) : hint);
+                return;
+            }
             if (!mayRun(command, confidence)) {
                 const text = t.unsure(transcript);
                 reply(transcript, text);
+                return;
+            }
+            if (handsFree && !CHAT_TOOLS.has(command.tool)) {
+                handsFree = false;
+                reply(transcript, t.reviewCommand);
                 return;
             }
             const tool = tools.get(command.tool);
@@ -794,6 +1013,7 @@
             controls();
             const current = generation;
             const currentWallet = walletIdentity();
+            const sourcePage = window.location?.href;
             try {
                 const result = JSON.parse(await tool.execute(command.input));
                 if (current !== generation || currentWallet !== walletIdentity()) return;
@@ -804,6 +1024,28 @@
                     input.placeholder = t.next;
                 }
                 const resultText = describeResult(command.tool, result, lang);
+                if (spoken && handsFree && audio === audioGeneration && result.opened === true && sourcePage &&
+                    (command.tool === 'open_page' || command.tool === 'open_artwork')) {
+                    const from = new URL(sourcePage);
+                    const to = new URL(result.url, from);
+                    // A hash tab keeps this document. It needs no unload ticket
+                    // or successful audio autoplay to accept the next turn.
+                    if (to.origin === from.origin && to.hash && from.pathname === to.pathname && from.search === to.search) {
+                        show(transcript, window.location.href === to.href ? t.arrival : resultText.show, [], '');
+                        afterPlayback(false);
+                        return;
+                    }
+                    if (to.origin === from.origin) {
+                        leavingFor = { from: from.pathname, to: to.href, wallet: currentWallet, at: Date.now() };
+                        show(transcript, resultText.show, [], '');
+                        nextTurnTimer = window.setTimeout(() => {
+                            if (!leavingFor) return;
+                            stopVoice();
+                            show('', t.navigationWait);
+                        }, NAVIGATION_TTL);
+                        return;
+                    }
+                }
                 reply(transcript, resultText.show, resultText.say, resultText.links);
             } catch (error) {
                 if (current !== generation || currentWallet !== walletIdentity()) return;
@@ -818,14 +1060,15 @@
             }
         }
 
-        async function start() {
+        async function start({ resume = false, arrival = false } = {}) {
             if (busy || noticePending || panel.hidden || document.visibilityState === 'hidden' || typeof Recognition !== 'function') return;
+            if (!resume) arrivingFrom = null;
             silence();
             if (recognition) {
                 stopListening();
                 return;
             }
-            if (readStored(NOTICE_KEY) !== 'accepted') {
+            if (!voiceConsent) {
                 const audio = audioGeneration, current = generation, account = walletIdentity();
                 noticePending = true;
                 controls();
@@ -839,11 +1082,23 @@
                     controls();
                 }
                 if (approved !== true || audio !== audioGeneration || current !== generation || account !== walletIdentity() ||
-                    busy || panel.hidden || document.visibilityState === 'hidden') return;
+                    busy || panel.hidden || document.visibilityState === 'hidden') {
+                    handsFree = false;
+                    controls();
+                    return;
+                }
+                voiceConsent = true;
                 writeStored(NOTICE_KEY, 'accepted');
             }
 
-            const session = new Recognition();
+            let session;
+            try {
+                session = new Recognition();
+            } catch {
+                handsFree = false;
+                show('', TEXT[lang].notHeard);
+                return;
+            }
             recognition = session;
             session.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
             session.continuous = false;
@@ -864,23 +1119,27 @@
             session.onerror = event => {
                 if (recognition !== session || panel.hidden) return;
                 answered = true;
+                handsFree = false;
                 stopListening();
                 const code = event && event.error;
-                show('', code === 'not-allowed' || code === 'service-not-allowed' ? TEXT[lang].micBlocked : TEXT[lang].notHeard);
+                show('', code === 'not-allowed' || code === 'service-not-allowed'
+                    ? (arrival ? TEXT[lang].resumeMic : TEXT[lang].micBlocked) : TEXT[lang].notHeard);
             };
             session.onend = () => {
                 if (recognition !== session || panel.hidden) return;
+                handsFree = false;
                 stopListening();
                 if (!answered) show('', TEXT[lang].notHeard);
             };
 
             setListening(true);
-            show('', TEXT[lang].listening);
+            if (!resume) show('', TEXT[lang].listening);
             try {
                 session.start();
             } catch {
+                handsFree = false;
                 stopListening();
-                show('', TEXT[lang].notHeard);
+                show('', arrival ? TEXT[lang].resumeMic : TEXT[lang].notHeard);
             }
         }
 
@@ -891,12 +1150,24 @@
             (input.disabled ? close : input).focus({ preventScroll: true });
         });
         mic.addEventListener('click', start);
+        chat.addEventListener('click', () => {
+            if (handsFree) { stopVoice(); return; }
+            if (chat.disabled || chat.hidden || panel.hidden || document.visibilityState === 'hidden') return;
+            arrivingFrom = null;
+            handsFree = true;
+            void start();
+        });
         replay.addEventListener('click', () => {
             if (replay.disabled || panel.hidden) return;
+            arrivingFrom = null;
+            handsFree = false;
             if (speaking) silence();
             else speak(answerToRead);
         });
-        input.addEventListener('input', controls);
+        input.addEventListener('input', () => {
+            if (handsFree || arrivingFrom) stopVoice({ keepDraft: true });
+            controls();
+        });
         close.addEventListener('click', closePanel);
         panel.addEventListener('keydown', event => {
             if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closePanel(); }
@@ -904,13 +1175,13 @@
         panel.querySelector('form').addEventListener('submit', event => {
             event.preventDefault();
             if (busy || recognition) return;
+            if (handsFree || arrivingFrom) stopVoice({ keepDraft: true });
             void handle(input.value, 1);
         });
         panel.querySelectorAll('.artsoul-voice-lang').forEach(el => {
             el.addEventListener('click', () => {
                 if (busy) return;
-                stopListening();
-                silence();
+                stopVoice();
                 lang = el.dataset.lang === 'ru' ? 'ru' : 'en';
                 writeStored(LANG_KEY, lang);
                 label();
@@ -919,21 +1190,37 @@
         });
         // Never listen in a tab nobody is looking at.
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') { stopListening(); silence(); }
+            if (document.visibilityState === 'hidden') stopVoice();
         });
         function clearAccount() {
             generation++;
-            stopListening();
-            silence();
+            stopVoice();
             input.value = '';
             show('', TEXT[lang].changed);
         }
+        function resumeOnArrival() {
+            if (!arrivingFrom) return;
+            // A connected wallet is hydrated asynchronously on the new page.
+            if (!window.artsoulSettledWalletState && (arrivingFrom.wallet || readStored('artsoul_wallet'))) return;
+            const nav = arrivingFrom;
+            arrivingFrom = null;
+            if (nav.wallet !== walletIdentity() || Date.now() - nav.at >= NAVIGATION_TTL ||
+                !voiceConsent || typeof Recognition !== 'function' || document.visibilityState !== 'visible' || panel.hidden) return;
+            handsFree = true;
+            show('', TEXT[lang].arrival, [], '');
+            void start({ resume: true, arrival: true });
+        }
         window.addEventListener('artsoul:wallet-state-changed', () => {
             const next = walletIdentity();
+            if (arrivingFrom) { wallet = next; resumeOnArrival(); return; }
             if (next !== wallet) { wallet = next; clearAccount(); }
         });
         window.addEventListener('artsoul:auth-state-changed', () => { clearAccount(); show('', ''); });
         window.addEventListener('pagehide', () => {
+            if (leavingFor && Date.now() - leavingFor.at < NAVIGATION_TTL) {
+                try { window.sessionStorage.setItem(NAVIGATION_KEY, JSON.stringify(leavingFor)); }
+                catch { /* Browsing still works when tab storage is unavailable. */ }
+            }
             clearAccount();
             show('', '');
             panel.hidden = true;
@@ -943,6 +1230,12 @@
         label();
         document.body.appendChild(panel);
         if (!launcher) document.body.appendChild(button);
+        if (arrivingFrom && voiceConsent && document.visibilityState === 'visible' && typeof Recognition === 'function') {
+            panel.hidden = false;
+            button.setAttribute('aria-expanded', 'true');
+            show('', TEXT[lang].resumeMic);
+            resumeOnArrival();
+        } else arrivingFrom = null;
     }
 
     // The deferred script runs after the static header. Binding the existing

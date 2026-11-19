@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assetIdentity, createDraft, createOriginDraft, createPhase, DRAFT_KEY, feePreview, loadDraft, MAX_DRAFT_ITEMS, parseDraft, parseEth, reviewConfig, saveDraft, scheduleTimestamp } from '../src/features/collections/launch-config.js';
+import { assetIdentity, createAuctionMintDraft, createDraft, createFirstArtworkDraft, createOriginDraft, createPhase, DRAFT_KEY, feePreview, loadDraft, MAX_DRAFT_ITEMS, parseDraft, parseEth, reviewConfig, saveDraft, scheduleTimestamp } from '../src/features/collections/launch-config.js';
 import { COLLECTION_NETWORKS } from '../src/config/collection-networks.js';
 
 function configured() {
@@ -16,6 +16,24 @@ function memoryStorage() {
     const values = new Map();
     return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
 }
+
+test('metadata review previews the exact ERC-721 token URI and flags ambiguous prefixes in saved drafts', () => {
+    const draft = configured();
+    for (const prefix of ['ipfs://bafyfixture/', 'ipfs://bafyfixture/metadata/token-', 'https://example.com/tokens/', 'https://example.com?token=']) {
+        draft.media.metadataBaseURI = prefix;
+        const review = reviewConfig(draft);
+        assert.equal(review.tokenOneMetadataURI, prefix + '1');
+        assert.ok(!review.findings.some(f => f.code === 'METADATA_REQUIRED'));
+    }
+    for (const prefix of ['ipfs://bafyfixture', 'https://example.com', 'ipfs://bafyfixture/?token=', 'https://example.com/tokens/#id', 'https://example.com/tokens/#', 'https://user@example.com/tokens/', ' https://example.com/tokens/']) {
+        draft.media.metadataBaseURI = prefix;
+        const imported = parseDraft(JSON.stringify(draft));
+        assert.equal(imported.media.metadataBaseURI, prefix);
+        const review = reviewConfig(imported);
+        assert.equal(review.tokenOneMetadataURI, '');
+        assert.ok(review.findings.some(f => f.code === 'METADATA_REQUIRED'), prefix);
+    }
+});
 
 test('malformed recipient entries are rejected before they can crash the builder review', () => {
     const draft = createDraft();
@@ -48,6 +66,51 @@ test('blank generic drafts do not assume Origin supply or enable crafting', () =
     assert.equal(draft.crafting.enabled, false);
     assert.equal(draft.crafting.inputCount, '');
     assert.deepEqual(parseDraft(JSON.stringify(draft)), draft);
+});
+
+test('the edition template links the public mint to its own auction and leaves monetary terms to the creator', () => {
+    const draft = createAuctionMintDraft();
+    const [auction, mint] = draft.phases;
+    assert.equal(draft.chainId, 84532);
+    assert.equal(draft.maxSupply, '');
+    assert.equal(auction.mechanism, 'uniform-auction');
+    assert.equal(auction.walletLimit, 1);
+    assert.equal(mint.mechanism, 'fixed');
+    assert.equal(mint.pricing.sourcePhaseId, auction.id);
+    assert.equal(mint.pricing.fallback, 'pause');
+    for (const phase of draft.phases) {
+        assert.equal(phase.allocation, '');
+        assert.equal(phase.pricing.priceEth, '');
+        assert.equal(phase.startAt, '');
+        assert.equal(phase.endAt, '');
+    }
+    assert.deepEqual(parseDraft(JSON.stringify(draft)), draft);
+    assert.equal(reviewConfig(draft).canPublish, false);
+});
+
+test('any creator can save a first artwork launch with one reserved work and linked remaining mint prices', () => {
+    const draft = configured();
+    draft.chainId = 84532;
+    draft.phases = createFirstArtworkDraft().phases;
+    const [opening, mint] = draft.phases;
+    assert.equal(opening.mechanism, 'first-artwork-auction');
+    assert.equal(opening.allocation, 1);
+    assert.equal(opening.eligibility.kind, 'public');
+    assert.equal(mint.pricing.sourcePhaseId, opening.id);
+    Object.assign(opening, { startAt: '2027-01-01T12:00:00Z', endAt: '2027-01-02T12:00:00Z' });
+    opening.pricing.priceEth = '1';
+    Object.assign(mint, { allocation: 99, startAt: opening.endAt, endAt: '2027-01-03T12:00:00Z' });
+    const reviewed = reviewConfig(parseDraft(JSON.stringify(draft)));
+    assert.deepEqual(reviewed.findings, []);
+    assert.equal(reviewed.contractCompatibility.compatible, true);
+    assert.equal(reviewed.canPublish, false);
+    mint.pricing.sourcePhaseId = '';
+    mint.pricing.priceEth = '10';
+    assert.ok(reviewConfig(draft).findings.some(item => item.code === 'FIRST_ARTWORK_MINT_PRICE'));
+    opening.allocation = 2;
+    assert.ok(reviewConfig(draft).findings.some(item => item.code === 'FIRST_ARTWORK_TERMS'));
+    draft.phases = [opening];
+    assert.ok(reviewConfig(draft).findings.some(item => item.code === 'FIRST_ARTWORK_MINT_REQUIRED'));
 });
 
 test('local persistence round-trips all fields including imported extension data', () => {
