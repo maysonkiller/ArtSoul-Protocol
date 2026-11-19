@@ -1797,10 +1797,20 @@ dialog.artwork-image-lightbox::backdrop { background: var(--c-bg); }
     margin-bottom: 12px;
 }
 
-.artwork-page-card-heading > .artsoul-card-status,
 .artwork-page-card-heading > .text-xs {
     position: absolute;
     right: 0;
+}
+
+.artwork-mobile-auction > .artwork-page-card-heading {
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.artwork-mobile-auction > .artwork-page-card-heading > .artsoul-card-status {
+    margin-inline-start: auto;
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
 
 .artwork-page-card-title {

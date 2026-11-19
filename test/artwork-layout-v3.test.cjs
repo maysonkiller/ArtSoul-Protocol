@@ -23,6 +23,14 @@ test('auction keeps one status and exposes each existing state action', () => {
     assert.match(source, /Buy Now/);
 });
 
+test('the auction heading lets its title and full payment status use the available line width', () => {
+    assert.match(source, /<div className="artwork-page-card-heading">\s*<h3[^>]*>Auction<\/h3>\s*<span className=[^\n]*artsoul-card-status/);
+    assert.match(source, /label: 'Payment window closed'/);
+    const auctionHeading = styles.match(/\.artwork-mobile-auction > \.artwork-page-card-heading\s*\{([^}]*flex-wrap[^}]*)\}/);
+    assert.ok(auctionHeading && /flex-wrap:\s*wrap/.test(auctionHeading[1]));
+    assert.doesNotMatch(styles, /\.artwork-page-card-heading > \.artsoul-card-status[^{]*\{[^}]*position:\s*absolute/);
+});
+
 test('profile identities and live bids are linked, named, timed, and newest first', () => {
     assert.match(source, /href=\{`\/profile\?address=\$\{encodeURIComponent\(address\)\}`\}/);
     assert.match(source, /getProfileDisplayName/);
@@ -59,7 +67,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=92/);
+    assert.match(html, /unified-styles\.css\?v=93/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
