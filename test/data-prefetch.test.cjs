@@ -241,10 +241,16 @@ test('every shared-header page loads it, and the build ships it', () => {
     // milliseconds, long before the modules that would otherwise issue this
     // request at 3.3 seconds.
     assert.match(html, /<script src="\/data-prefetch\.js\?v=7" async><\/script>/, `${page} must load the prefetch asynchronously`);
-    assert.ok(
-      html.indexOf('data-prefetch.js') > html.indexOf('header-prepaint.js'),
-      `${page}: the first paint comes before the data`
-    );
+    const prefetch = html.indexOf('data-prefetch.js');
+    if (page === 'index.html' || page === 'gallery.html') {
+      assert.equal(html.lastIndexOf('data-prefetch.js'), prefetch, `${page}: one projection handoff`);
+      const charset = html.indexOf('<meta charset=');
+      const viewport = html.indexOf('<meta name="viewport"');
+      assert.ok(charset >= 0 && charset < prefetch && prefetch < viewport,
+        `${page}: discover the async request before the build inserts critical CSS after the viewport metadata`);
+    } else {
+      assert.ok(prefetch > html.indexOf('header-prepaint.js'), `${page}: prepaint remains first`);
+    }
   }
   assert.match(fs.readFileSync('vite.config.js', 'utf8'), /'data-prefetch\.js',/);
 });
