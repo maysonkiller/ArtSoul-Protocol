@@ -201,6 +201,17 @@ test('media footer alignment keeps full-size controls on wide cards and a two-ro
     assert.match(section, /@container \(max-width: 215px\)[\s\S]*?bottom: 56px !important;/);
 });
 
+test('decorative disc rotation is limited to Future when the reader allows motion', () => {
+    const touchCss = fs.readFileSync(path.join(root, 'mobile-no-motion.css'), 'utf8');
+    const desktopRule = /@media \(min-width: 769px\) and \(prefers-reduced-motion: no-preference\)\s*\{\s*body\.future \.artsoul-card-audio-avatar\s*\{\s*animation: artsoulAudioAvatarSpin 12s/;
+    const touchRule = /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*:root:not\(#artsoul-motion-enabled\) body\.future \.artsoul-card-audio-avatar\[data-playing="true"\]\s*\{\s*animation: artsoulAudioAvatarSpin 3s/;
+    assert.match(css, desktopRule);
+    assert.match(touchCss, touchRule);
+    for (const sheet of [css, touchCss]) {
+        assert.equal(sheet.match(/animation:\s*artsoulAudioAvatarSpin\b/g)?.length, 1);
+    }
+});
+
 test('React card still opens when the card itself receives Enter or Space', () => {
     const { api, window } = loadDomCardRuntime();
     window.React = {

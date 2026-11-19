@@ -1122,12 +1122,12 @@ body.future .artsoul-artwork-card:focus-visible {
 }
 
 @media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
-    .artsoul-card-audio-avatar {
+    body.future .artsoul-card-audio-avatar {
         animation: artsoulAudioAvatarSpin 12s linear infinite;
         animation-timing-function: linear;
     }
 
-    .artsoul-card-audio-avatar[data-playing="true"] {
+    body.future .artsoul-card-audio-avatar[data-playing="true"] {
         animation-duration: 3s;
     }
 }
