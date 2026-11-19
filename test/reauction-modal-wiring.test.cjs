@@ -33,7 +33,7 @@ test('modal is limited to re-auction lifecycle states and contains required fiel
     const eligibility = between('function canCreateNewAuctionForWallet', 'function v41InteractionKey');
     assert.match(eligibility, /ended_no_bids/);
     assert.match(eligibility, /unsettled/);
-    assert.match(artwork, /New starting price \(ETH\)/);
+    assert.match(artwork, /New starting price \(test ETH\)/);
     assert.match(artwork, /Fresh AI valuation/);
     assert.match(artwork, /\[24, 36, 48\]/);
 });

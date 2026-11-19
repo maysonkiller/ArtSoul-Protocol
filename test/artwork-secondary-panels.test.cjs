@@ -16,6 +16,7 @@ function hooks() {
     const values = [], refs = [], effects = [];
     let si, ri, ei, pending;
     return {
+        useMemo(read) { return read(); },
         useState(initial) { const i = si++; if (!(i in values)) values[i] = typeof initial === 'function' ? initial() : initial;
             return [values[i], value => {values[i] = typeof value === 'function' ? value(values[i]) : value;}]; },
         useRef(initial) { return refs[ri++] ||= {current: initial}; },
@@ -125,6 +126,9 @@ test('Donate tabs support keyboard navigation and history preserves exact messag
     assert.deepEqual(focused, ['#artistSupportHistoryTab']);
     assert.equal(reads.length, 1, 'history never needs wallet signing or a contract call');
     const history = descendants(tree).find(node => node.props?.id === 'artistSupportHistory');
+    const amounts = descendants(history).filter(node => node.type === 'p' && node.props.children.includes(' test ETH'));
+    assert.equal(amounts.length, 2, 'both the largest support and the history row identify the test currency');
+    assert.ok(amounts.every(node => node.props.children.includes('0.000000000000000001')));
     descendants(history).find(node => node.type === 'button' && node.props.children.includes('Report message')).props.onClick();
     assert.deepEqual(reported, [{transaction_hash: donation.transaction_hash, log_index: 3}]);
     press('Home'); tree = h.render(() => render(props));
@@ -134,6 +138,39 @@ test('Donate tabs support keyboard navigation and history preserves exact messag
     assert.ok(descendants(tabs()).filter(node => node.props?.role === 'tab').every(node => node.props.disabled));
     press('End'); tree = h.render(() => render(props));
     assert.equal(reads.length, 1, 'a pending transaction cannot be hidden by a keyboard tab change');
+    h.unmount();
+});
+
+test('the donation form shows only the connected wallet’s last confirmed Base Sepolia balance', async () => {
+    const {transformWithOxc} = await import('vite');
+    const code = support.slice(support.indexOf('const { useEffect')).replace('export function', 'function');
+    const compiled = await transformWithOxc(code, 'support.jsx', {jsx: {runtime: 'classic'}});
+    const h = hooks(), React = {...h, createElement: (type, props, ...children) => ({type, props: {...props, children}})};
+    let cached = {chainId: 84532, baseSepoliaConfirmed: true, balance: '0.0000'};
+    const reads = [];
+    const render = vm.runInNewContext(compiled.code + '\nArtistSupport;', {
+        React, ExplainedAction: 'ExplainedAction', donationIdentityKey: () => 'fixture',
+        donationOperations: {read() {}, subscribe: () => () => {}}, donationMessageState: () => ({valid: true}),
+        window: {AvatarDropdown: {getCachedHeaderNetwork(wallet) { reads.push(wallet); return wallet === 'A' ? cached : null; }}}
+    });
+    const props = {deployment: {enabled: true, chainId: 84532}, artworkId: '28', creator: 'creator', connectedWallet: 'A', walletChainId: 84532};
+    const draw = () => h.render(() => render(props));
+    const balance = () => descendants(draw()).find(node => node.type === 'p' && node.props.children[0] === 'Base Sepolia').props.children.join('');
+    const closed = draw();
+    assert.deepEqual(reads, []);
+    closed.props.children.find(node => node?.type === 'button').props.onClick();
+    assert.match(balance(), /0\.0000 test ETH$/);
+    props.walletChainId = 1;
+    assert.equal(balance(), 'Base Sepolia');
+    assert.deepEqual(reads, ['A']);
+    props.walletChainId = 84532;
+    props.connectedWallet = 'B';
+    assert.equal(balance(), 'Base Sepolia');
+    props.connectedWallet = 'A';
+    for (const info of [{...cached, chainId: 1}, {...cached, baseSepoliaConfirmed: false}, {...cached, balance: '…'}]) {
+        cached = info;
+        assert.equal(balance(), 'Base Sepolia');
+    }
     h.unmount();
 });
 

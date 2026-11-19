@@ -14,7 +14,8 @@ const sections = [
         blocks: [
             {"type":"paragraph","text":"A creator chooses a starting price and an auction duration of 24, 36, or 48 hours. Bids are accepted while the auction is live."},
             {"type":"formula","text":"Minimum next bid = max(current bid + 0.01 ETH, current bid + 2.5%)"},
-            {"type":"paragraph","text":"If the auction ends without bids, no NFT is minted and no floor is created. If it ends with a highest bidder, the 24-hour settlement window begins."}
+            {"type":"paragraph","text":"A bid accepted in the final 10 minutes adds 10 minutes to the current closing time, up to one hour beyond the original closing time. For example, a bid accepted at 17:59 in an auction ending at 18:00 moves the close to 18:10."},
+            {"type":"paragraph","text":"If bidding ends without bids, no NFT is minted and no floor is created. If there is a winning bid, the winner has 24 hours to pay from the transaction that closes the auction."}
         ]
     },
     {
@@ -75,6 +76,29 @@ const sections = [
         ]
     },
     {
+        id: "collection-verification",
+        title: "Collection verification",
+        blocks: [
+            {"type":"verification-mark","text":"Blue check — verified collection origin"},
+            {"type":"paragraph","text":"Any artist or project team can publish an artwork or prepare a collection draft without a blue check or Partner status."},
+            {"type":"paragraph","text":"On a collection cover, the blue check identifies the artist or project whose connection to that collection was reviewed. Each review covers a specific blockchain and collection contract and can be revoked."},
+            {"type":"paragraph","text":"Sales volume plays no part in this review. It carries no Trust weight or fee benefit and makes no claim about ownership, copyright or future value. Permission for a marketplace to transfer an NFT comes from its owner’s wallet."}
+        ]
+    },
+    {
+        id: "nft-frames",
+        title: "NFT frames",
+        blocks: [
+            {"type":"paragraph","text":"A minted NFT can display one frame. When several apply, ArtSoul shows the first confirmed match in this order."},
+            {"type":"frame-examples","caption":"Frame examples","items":[
+                {"kind":"platform","name":"Platform","text":"The artwork was registered by a designated ArtSoul publisher."},
+                {"kind":"genesis","name":"Genesis","text":"The work has a confirmed link to a Genesis grant on Base mainnet."},
+                {"kind":"partner","name":"Partner collection","text":"The work belongs to an approved Partner Collection."}
+            ]},
+            {"type":"paragraph","text":"Works without a confirmed match keep their standard frame. Classic uses static outlines. Future uses a multicolor edge for Platform, gold for Genesis and cyan and blue for Partner. The Platform edge shimmers on desktop. Small screens and reduced motion keep every frame still."}
+        ]
+    },
+    {
         id: "settlement",
         title: "Settlement and Lazy Minting",
         blocks: [
@@ -88,7 +112,7 @@ const sections = [
         title: "Re-Auctioning",
         blocks: [
             {"type":"paragraph","text":"A normal artwork can be offered in a new auction after a no-bid result or failed settlement reaches a re-auctionable contract state."},
-            {"type":"paragraph","text":"The current testnet contract may require the creator to finalize an expired no-bid auction before starting the next auction. The planned mainnet contract removes that extra transaction and automatically returns the artwork to a re-auctionable state."},
+            {"type":"paragraph","text":"When bidding ends without a bid, the work returns to Discovery and stays in the artist's Artworks. Viewing it requires no transaction. On the current Base Sepolia contract, anyone can record the close so the creator can start another auction. The wallet that confirms the close pays network gas."},
             {"type":"paragraph","text":"The three-attempt limit belongs only to the first auction of a Partner Collection. It does not apply to normal user artwork."}
         ]
     },
@@ -117,6 +141,7 @@ const sections = [
 ];
 
 function blockText(block) {
+    if (block.type === 'frame-examples') return [block.caption, ...block.items.map(item => item.name + ' ' + item.text)].join(' ');
     if (block.type === 'table') return [...block.headings, ...block.rows.flat()].join(' ');
     if (block.type === 'faq') return block.items.map(item => item.question + ' ' + item.answer).join(' ');
     if (block.type === 'ordered-list') return block.items.join(' ');

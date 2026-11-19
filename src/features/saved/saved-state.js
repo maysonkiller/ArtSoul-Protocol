@@ -44,7 +44,7 @@ export function createSavedStore({ getWallet, request = fetch, onChange = () => 
       commit(data);
       return true;
     } catch {
-      if (current()) publish({ status: 'error', error: 'Saved could not be updated. Please try again.' });
+      if (current()) publish({ status: 'error', error: 'Favorites could not be updated. Please try again.' });
       return false;
     } finally { controllers.delete(controller); }
   }

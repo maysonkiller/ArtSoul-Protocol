@@ -216,6 +216,7 @@ function loadHandler({ fixtures = FIXTURES, calls = [], tableRead, metadataRead 
     readNftOwnershipConfig: () => null,
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,
+    readPlatformArtworkIds: async () => new Set(),
     recheckNftOwnership: async () => null,
     readWithNftOwnershipRetry: operation => operation(),
     sendError: (res, error) => res.status(500).json({ error: String((error && error.message) || error) }),

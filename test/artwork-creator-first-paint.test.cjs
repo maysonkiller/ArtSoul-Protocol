@@ -17,7 +17,7 @@ test('artwork ownership never paints a third-party identicon while the creator p
 test('the exact projection seeds creator identity before the first content frame', () => {
   const loadArtwork = detail.slice(
     detail.indexOf('async function loadArtwork()'),
-    detail.indexOf('function updateTimeLeft()')
+    detail.indexOf('async function handlePlaceBid()')
   );
   const seed = loadArtwork.indexOf('setCreatorProfile(current =>');
   const release = loadArtwork.indexOf('setLoading(false);');

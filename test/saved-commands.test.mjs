@@ -95,7 +95,7 @@ test('explicit repeated commands keep their desired state and notify shared cont
     for (const control of [card, detail]) {
       assert.equal(control.disabled, false);
       assert.equal(control['aria-pressed'], String(desired));
-      assert.equal(control['aria-label'], desired ? 'Remove from Saved' : 'Save artwork');
+      assert.equal(control['aria-label'], desired ? 'Remove from Favorites' : 'Add to Favorites');
     }
     assert.equal(states.at(-1).saved.get(savedKey(item)), desired);
   }

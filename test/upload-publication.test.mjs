@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
+import { IPFSClient } from '../ipfs-client.js';
 import { createHash } from 'node:crypto';
 import { Interface, keccak256 } from 'ethers';
 import { V41_CORE_ABI } from '../src/indexer/v4-1-event-schema.js';
@@ -10,7 +9,7 @@ import { setWalletSession, getPublicStorageUrl } from '../src/api/backend.js';
 import { buildStoragePath, buildMetadataStoragePath } from '../src/api/routes/upload/file.js';
 import { uploadedMediaUrl } from '../src/api/upload-media-identity.js';
 import { validatePublicationMetadata, recoverPublication } from '../src/api/upload-publication.js';
-import { MAX_METADATA_BYTES, ALLOWED_ARTWORK_MIME_TYPES } from '../src/config/upload-policy.js';
+import { MAX_METADATA_BYTES, ALLOWED_ARTWORK_MIME_TYPES, MULTIMEDIA_NFT_COVER } from '../src/config/upload-policy.js';
 
 const wallet = '0x' + '11'.repeat(20), other = '0x' + '22'.repeat(20), core = '0x' + 'aa'.repeat(20);
 const id = '9dc84ef0-1271-4b28-a576-f14535e709e5';
@@ -43,9 +42,7 @@ async function call(body, owner = wallet, intendedWallet = owner) {
   return res;
 }
 function metadata(row, type = row.declared_content_type) {
-  const context = vm.createContext({window:{},console:{log(){}},btoa:s=>Buffer.from(s).toString('base64')});
-  vm.runInContext(fs.readFileSync('ipfs-client.js','utf8'), context);
-  return JSON.parse(JSON.stringify(context.window.IPFSClient.createMetadata({
+  return JSON.parse(JSON.stringify(new IPFSClient().createMetadata({
     title:'夜 🎨', description:'An original test artwork.', imageUrl:uploadedMediaUrl(wallet,row.media_path),
     mediaType:type, creator:wallet, creatorValue:'0.0001', createdAt:'2026-10-23T00:00:00.000Z',
     aiGuidance:{estimated_value_min_eth:0.0001,estimated_value_max_eth:0.001,explanation:'Preserve the accepted guidance.'}
@@ -621,11 +618,53 @@ test('every consumed media alias and creator alias is bound to the issued origin
   assert.throws(()=>validatePublicationMetadata(altered,state.row,media),e=>e.code==='PUBLICATION_METADATA_MISMATCH');
 });
 
-test('existing metadata builder is accepted for every supported format and ordinary title', () => {
+test('public NFT metadata includes readable media and the original creator profile for each supported format', () => {
   const state=backend();
   for (const type of ALLOWED_ARTWORK_MIME_TYPES) {
     const value=metadata(state.row,type);
-    assert.deepEqual(validatePublicationMetadata(value,state.row,{mediaUrl:uploadedMediaUrl(wallet,state.row.media_path),contentType:type}),value);
+    const media = {mediaUrl:uploadedMediaUrl(wallet,state.row.media_path),contentType:type};
+    assert.deepEqual(validatePublicationMetadata(value,state.row,media),value);
+    assert.equal(value.external_url, 'https://artsoulprotocol.com/profile?address=' + wallet);
+    assert.deepEqual(value.attributes.find(a => a.trait_type === 'Creator Value'), {trait_type:'Creator Value',value:'0.0001'});
+    if (type.startsWith('image/')) {
+      assert.equal(value.image, media.mediaUrl);
+      assert.equal(value.animation_url, undefined);
+    } else {
+      assert.equal(value.animation_url, media.mediaUrl);
+      assert.equal(value.image, MULTIMEDIA_NFT_COVER);
+      for (const field of ['image', 'animation_url']) {
+        const altered={...value, [field]:field === 'image' ? MULTIMEDIA_NFT_COVER + '?x=1' : MULTIMEDIA_NFT_COVER};
+        assert.throws(()=>validatePublicationMetadata(altered,state.row,media),e=>e.code==='PUBLICATION_METADATA_MISMATCH');
+      }
+      delete value.image;
+      assert.deepEqual(validatePublicationMetadata(value,state.row,media),value, 'previously prepared metadata can resume');
+    }
+  }
+});
+
+test('metadata without a MIME or with a legacy media label exposes the matching display fields', () => {
+  const client = new IPFSClient(), url = 'https://storage.example/original';
+  for (const label of [undefined, '', 'image', 'GIF', 'audio', 'MuSiC', 'video']) {
+    const value = client.createMetadata({mediaType:label,imageUrl:url});
+    if (['audio', 'MuSiC', 'video'].includes(label)) {
+      assert.equal(value.image, MULTIMEDIA_NFT_COVER);
+      assert.equal(value.animation_url, url);
+    } else {
+      assert.equal(value.image, url);
+      assert.equal(value.animation_url, undefined);
+    }
+  }
+});
+
+test('failed metadata storage cannot return a synthetic tokenURI even with an old debug preference', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { location:{search:'?debugMockMetadata=1'}, localStorage:{getItem:()=>'true'},
+    ArtSoulDB:{uploadMetadata:async()=>{throw Error('storage unavailable');}} };
+  try {
+    await assert.rejects(new IPFSClient().uploadMetadata({name:'Test'}), /storage unavailable/);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
   }
 });
 

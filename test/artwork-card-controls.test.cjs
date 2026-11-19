@@ -77,6 +77,51 @@ test('both card renderers disclose the confirmed transaction while projection sy
     }
 });
 
+test('both card renderers expose the verified frame on the card and name it on the artwork link', async () => {
+    const { api, window } = loadDomCardRuntime();
+    window.ArtSoulArtworkAura = (await import('../src/ui/components/aura-frame.js')).projectedArtworkAura;
+    window.React = {
+        createElement: (type, props, ...children) => ({ type, props, children }),
+        useState: value => [value, () => {}], useEffect() {}
+    };
+    const nft = { source: 'v41_projection', minted: true, ownership_status: 'verified', chain_id: 84532,
+        artwork_id: '34', file_type: 'audio', file_url: 'track.mp3', aura_kind: 'platform' };
+    const fields = node => node?.props || node || {};
+    for (const render of [artwork => api.createCardElement(artwork), artwork => api.ReactCard({ artwork, href: '/artwork/34' })]) {
+        for (const minted of [true, false]) {
+            const card = render({ ...nft, minted });
+            const link = card.children.find(child => fields(child).className === 'artsoul-card-link');
+            assert.equal(fields(card).className.includes('artsoul-aura-frame--platform'), minted);
+            assert.equal(fields(link)['aria-label'].includes('ArtSoul platform NFT'), minted);
+        }
+    }
+});
+
+test('a profile card hides when its media fails without requiring a gallery callback', () => {
+    const { api, window } = loadDomCardRuntime();
+    const states = [];
+    let cursor;
+    window.React = {
+        createElement: (type, props, ...children) => ({ type, props, children }),
+        useState(initial) {
+            const index = cursor++;
+            if (!(index in states)) states[index] = initial;
+            return [states[index], value => { states[index] = value; }];
+        },
+        useEffect() {}
+    };
+    const render = artwork => {
+        cursor = 0;
+        return api.ReactCard({ artwork, surface: 'profile' });
+    };
+    assert.equal(render({}), null);
+    const artwork = { file_type: 'image', file_url: 'preview.png' };
+    const card = render(artwork);
+    const media = card.children[0].children.find(child => typeof child?.props?.onUnavailable === 'function');
+    media.props.onUnavailable();
+    assert.equal(render(artwork), null);
+});
+
 test('React card leaves nested media and action keyboard activation to the focused control', () => {
     const { api, window } = loadDomCardRuntime();
     window.React = {

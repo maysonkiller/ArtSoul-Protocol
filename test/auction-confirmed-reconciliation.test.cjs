@@ -492,6 +492,7 @@ function publicProjection() {
     readNftOwnershipConfig: () => null,
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,
+    readPlatformArtworkIds: async () => new Set(),
     readNftHistory: async () => null,
     recheckNftOwnership: async () => null,
     readWithNftOwnershipRetry: operation => operation(),

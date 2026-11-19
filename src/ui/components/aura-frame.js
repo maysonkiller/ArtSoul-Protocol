@@ -2,7 +2,6 @@
  * Presentation only. The caller must supply one already-authorized aura kind.
  * This helper never derives eligibility from artwork metadata or profile claims.
  * Use the same class string on a preview or contained detail-media wrapper.
- * Verified assignment and priority are intentionally deferred to C-14.
  */
 export function auraFrameClassName(kind = 'none') {
     switch (kind) {
@@ -13,4 +12,19 @@ export function auraFrameClassName(kind = 'none') {
         default:
             return '';
     }
+}
+
+const labels = {
+    platform: 'ArtSoul platform NFT',
+    genesis: 'Genesis aura',
+    partner: 'Partner collection NFT'
+};
+
+export function projectedArtworkAura(artwork) {
+    if (artwork?.source !== 'v41_projection' || artwork.minted !== true ||
+        artwork.ownership_status !== 'verified') return null;
+    const kind = artwork.aura_kind;
+    if (kind === 'genesis' && Number(artwork.chain_id) !== 8453) return null;
+    const className = auraFrameClassName(kind);
+    return className ? { className, label: labels[kind] } : null;
 }

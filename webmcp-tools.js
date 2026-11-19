@@ -850,13 +850,19 @@
         const pages = Object.freeze({
             home: { url: '/', title: 'Home' },
             gallery: { url: '/gallery#discover', title: 'Explore' },
+            nfts: { url: '/gallery#nft', title: 'NFTs' },
+            marketplace: { url: '/gallery#marketplace', title: 'Marketplace' },
+            auctions: { url: '/gallery#live_auctions', title: 'Auctions' },
+            collections: { url: '/gallery#collections', title: 'Collections' },
             profile: { url: '/profile', title: 'Profile' },
+            collected: { url: '/profile#collected', title: 'Collected ArtSoul NFTs' },
+            walletNfts: { url: '/profile#wallet-nfts', title: 'Wallet NFTs' },
             create: { url: '/upload', title: 'Create' },
             guide: { url: '/docs-protocol', title: 'How it works' }
         });
         const openPage = {
             name: 'open_page',
-            description: 'Open Home, Explore, Profile, Create or How it works on ArtSoul. Navigation only; ' +
+            description: 'Open a named ArtSoul page or gallery tab, Collected ArtSoul NFTs, or the available Wallet NFTs tab. Navigation only; ' +
                 'does not connect a wallet, upload, sign or submit anything. Arbitrary URLs are not accepted.',
             inputSchema: {
                 type: 'object', additionalProperties: false,
@@ -867,10 +873,22 @@
                 if (!input || typeof input !== 'object' || Array.isArray(input) ||
                     !Object.hasOwn(input, 'page') || Object.keys(input).some(key => key !== 'page') ||
                     typeof input.page !== 'string' || !Object.hasOwn(pages, input.page)) {
-                    return JSON.stringify({ opened: false, reason: 'Choose Home, Explore, Profile, Create or How it works.' });
+                    return JSON.stringify({ opened: false, reason: 'Choose a supported ArtSoul page or tab.' });
                 }
                 const page = input.page, destination = pages[page];
-                openPath(destination.url);
+                if (typeof deps.openPath !== 'function') {
+                    return JSON.stringify({ opened: false, reason: 'Navigation is unavailable here.' });
+                }
+                try {
+                    if (page === 'walletNfts') {
+                        const enabled = await deps.walletNftsEnabled?.();
+                        if (enabled !== true) return JSON.stringify({ opened: false, reason: 'Wallet NFTs are unavailable.', code: 'wallet_nfts_unavailable' });
+                        if (!text(readWalletAddress())) return JSON.stringify({ opened: false, reason: 'Connect your wallet to view its NFTs.', code: 'wallet_required' });
+                    }
+                    await openPath(destination.url);
+                } catch {
+                    return JSON.stringify({ opened: false, reason: 'Could not open that page.' });
+                }
                 return JSON.stringify({ opened: true, page, url: destination.url, title: destination.title });
             }
         };
@@ -902,7 +920,14 @@
                 }
 
                 const url = `/artwork/${artworkId}`;
-                openPath(url);
+                if (typeof deps.openPath !== 'function') {
+                    return JSON.stringify({ opened: false, reason: 'Navigation is unavailable here.' });
+                }
+                try {
+                    await openPath(url);
+                } catch {
+                    return JSON.stringify({ opened: false, reason: 'Could not open that artwork.' });
+                }
                 return JSON.stringify({
                     opened: true,
                     artwork_id: artworkId,
@@ -1060,6 +1085,20 @@
                     url: '/upload'
                 });
             }
+        };
+
+        const revisePublicationDraft = {
+            name: 'revise_publication_draft',
+            description: 'On Publish, review a suggested title, description or duration. Omit value to check the title. The person applies any edit in the form.',
+            inputSchema: {
+                type: 'object', additionalProperties: false, required: ['field'],
+                properties: {
+                    field: { type: 'string', enum: ['title', 'description', 'duration_hours'] },
+                    value: { type: 'string', maxLength: 1000, description: 'Suggested wording or the hours shown on the form.' }
+                }
+            },
+            execute: async input => JSON.stringify(deps.revisePublicationDraft?.(input) ??
+                { prepared: false, reason: 'Open Publish to review artwork details.' })
         };
 
 
@@ -1543,7 +1582,7 @@
                 const artworkId = requireArtworkId(args);
                 if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
                 const url = artworkUrl(artworkId);
-                const price = text(args.start_price_eth);
+                const price = text(args.start_price_eth).replace(',', '.');
                 const priceWei = parseEthWei(price);
                 if (!priceWei || priceWei <= 0n) {
                     return JSON.stringify({ submitted: false, url, reason: 'start_price_eth must be a positive amount in ETH.' });
@@ -1585,8 +1624,8 @@
 
                 return withWalletAction(async () => {
                     const refusal = await authorizeWalletAction(
-                        `start an auction for "${titleOf(card)}" (artwork ${artworkId}) at a starting price of ${price} ETH, ` +
-                        `running ${seconds / 3600} hours.`,
+                        `start an auction for "${titleOf(card)}" (artwork ${artworkId}) at a starting price of ${price} test ETH, ` +
+                        `running ${seconds / 3600} hours on Base Sepolia. Your wallet pays only network gas to open the auction.`,
                         true
                     );
                     if (refusal) return JSON.stringify({ submitted: false, reason: refusal, url });
@@ -1640,7 +1679,7 @@
         // button. They never authorize a wallet action or infer an artwork ID.
         const savedTools = [['add_to_saved', true], ['remove_from_saved', false]].map(([name, saved]) => ({
             name,
-            description: `${saved ? 'Add' : 'Remove'} one artwork ${saved ? 'to' : 'from'} the connected account's private Saved list. ` +
+            description: `${saved ? 'Add' : 'Remove'} one artwork ${saved ? 'to' : 'from'} the connected account's private favorites list. ` +
                 'Requires an existing signed-in session. Use the exact artwork number, not an auction or token ID. ' +
                 'Repeated requests preserve the requested state; no transaction, Trust change or email subscription.',
             inputSchema: { type: 'object', additionalProperties: false,
@@ -1653,7 +1692,7 @@
                     return JSON.stringify({ updated: false, reason: 'Use one artwork number from its page URL.' });
                 }
                 const update = deps.setSavedArtwork;
-                if (typeof update !== 'function') return JSON.stringify({ updated: false, reason: 'Open Gallery, Profile or an artwork to use Saved.' });
+                if (typeof update !== 'function') return JSON.stringify({ updated: false, reason: 'Open Gallery, Profile or an artwork to update Favorites.' });
                 return JSON.stringify(await update(id, saved));
             }
         }));
@@ -1682,6 +1721,7 @@
             withdrawPendingFunds,
             revokeWalletAccess,
             prepareArtworkRegistration,
+            revisePublicationDraft,
             ...reviewTools,
             ...savedTools
         ];
@@ -1746,9 +1786,10 @@
                 return response.json();
             },
             openPath: (path) => window.location.assign(path),
+            walletNftsEnabled: async () => (await window.ArtSoulPublicConfig?.load?.())?.externalBaseNftsEnabled === true,
             prepareArtworkDraft: async input => {
                 const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
-                const { stageCommandDraft } = await import('/src/features/artwork/command-draft.js?v=1');
+                const { stageCommandDraft } = await import('/src/features/artwork/command-draft.js?v=2');
                 if (wallet !== String(window.getCurrentWalletAddress?.() || '').toLowerCase()) {
                     return { prepared: false, submitted: false, reason: 'Wallet changed. Prepare a new draft for this account.' };
                 }
@@ -1760,12 +1801,13 @@
                     openPath: path => window.location.assign(path)
                 });
             },
+            revisePublicationDraft: input => window.ArtSoulPublicationDraft?.revise?.(input),
             readArtworkActions: async card => {
                 const config = await window.ArtSoulPublicConfig?.load?.();
                 // Docs and the collection builder have no card renderer at
                 // startup. Load the same policy only when a form is requested.
                 if (!window.ArtSoulArtworkUrl) await import('/src/ui/artwork-url.js?v=1');
-                if (!window.ArtSoulArtworkCard) await import('/src/ui/components/artwork-card.js?v=32');
+                if (!window.ArtSoulArtworkCard) await import('/src/ui/components/artwork-card.js?v=38');
                 return window.ArtSoulArtworkCard?.cardActionItems?.(card, config || {}) || [];
             },
             readContracts: () => window.ArtSoulContracts || null,
@@ -1803,7 +1845,7 @@
             searchCatalog: input => window.ArtSoulSearch?.query?.(input) ||
                 { error: 'Open Gallery, Profile or an artwork to search ArtSoul. If it is still loading, try again shortly.' },
             setSavedArtwork: (id, saved) => window.ArtSoulSaved?.setArtwork?.(id, saved) ||
-                { updated: false, reason: 'Open Gallery, Profile or an artwork to use Saved. If it is still loading, try again shortly.' }
+                { updated: false, reason: 'Open Gallery, Profile or an artwork to update Favorites. If it is still loading, try again shortly.' }
         };
     }
 

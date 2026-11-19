@@ -2,30 +2,11 @@
 // Currently using Supabase Storage as file storage.
 // IPFS integration can be added later when needed.
 
-class IPFSClient {
+import { MULTIMEDIA_NFT_COVER } from './src/config/upload-policy.js?v=3';
+
+export class IPFSClient {
     constructor() {
         this.gateway = 'https://ipfs.io/ipfs/';
-    }
-
-    shouldUseMockMetadataFallback() {
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            return params.get('debugMockMetadata') === '1' ||
-                params.get('mockMetadata') === '1' ||
-                window.localStorage?.getItem('artsoul_debug_mock_metadata') === 'true';
-        } catch {
-            return false;
-        }
-    }
-
-    mockMetadataUpload(metadata) {
-        const serialized = JSON.stringify(metadata);
-        const mockHash = 'Qm' + btoa(unescape(encodeURIComponent(serialized))).substring(0, 44);
-        return {
-            ipfsHash: mockHash,
-            url: `ipfs://${mockHash}`,
-            debug_mock: true
-        };
     }
 
     /**
@@ -69,57 +50,55 @@ class IPFSClient {
                 contentType: upload.content_type
             };
         } catch (error) {
-            if (this.shouldUseMockMetadataFallback()) {
-                console.warn('Using debug mock metadata URI because real metadata upload failed:', error.message);
-                return this.mockMetadataUpload(metadata);
-            }
             throw new Error(`Metadata upload failed: ${error.message}`);
         }
     }
 
     /**
-     * Create NFT-style metadata in a format the public V4.1 adapter can resolve.
+     * Create public ERC-721 metadata before the registry allocates an artwork ID.
      */
     createMetadata(artworkData) {
-        const mediaType = artworkData.mediaType || artworkData.fileType || '';
-        const isImage = String(mediaType).toLowerCase().startsWith('image/');
+        const mediaType = String(artworkData.mediaType || artworkData.fileType || '').trim() || 'image';
+        const kind = mediaType.toLowerCase().split('/', 1)[0];
         const now = new Date().toISOString();
         const metadata = {
             name: artworkData.title,
             title: artworkData.title,
             description: artworkData.description,
             media_url: artworkData.imageUrl,
-            media_type: mediaType || 'image',
+            media_type: mediaType,
             creator: artworkData.creator,
             created_at: artworkData.createdAt || now,
-            external_url: 'https://artsoulprotocol.com/upload',
             attributes: [
                 {
                     trait_type: 'Creator',
                     value: artworkData.creator
                 },
                 {
-                    trait_type: 'Creator Value',
-                    value: artworkData.creatorValue,
-                    display_type: 'number'
-                },
-                {
                     trait_type: 'Media Type',
-                    value: mediaType || 'unknown'
+                    value: mediaType
                 }
             ],
             properties: {
                 category: 'Art',
                 creator: artworkData.creator,
                 media_url: artworkData.imageUrl,
-                media_type: mediaType || 'image'
+                media_type: mediaType
             }
         };
 
-        if (isImage) {
+        if (/^0x[0-9a-f]{40}$/i.test(artworkData.creator)) {
+            metadata.external_url = `https://artsoulprotocol.com/profile?address=${artworkData.creator.toLowerCase()}`;
+        }
+        // ETH decimals can exceed JSON number precision. Keep the author's exact value as a text trait.
+        if (artworkData.creatorValue != null && String(artworkData.creatorValue).trim() !== '') {
+            metadata.attributes.push({ trait_type: 'Creator Value', value: String(artworkData.creatorValue) });
+        }
+        if (kind === 'image' || kind === 'gif') {
             metadata.image = artworkData.imageUrl;
         } else {
             metadata.animation_url = artworkData.imageUrl;
+            if (kind === 'audio' || kind === 'music' || kind === 'video') metadata.image = MULTIMEDIA_NFT_COVER;
         }
 
         if (artworkData.aiGuidance && typeof artworkData.aiGuidance === 'object') {
@@ -148,6 +127,4 @@ class IPFSClient {
     }
 }
 
-window.IPFSClient = new IPFSClient();
-
-console.log('IPFS Client module loaded (using Supabase Storage)');
+if (typeof window !== 'undefined') window.IPFSClient = new IPFSClient();

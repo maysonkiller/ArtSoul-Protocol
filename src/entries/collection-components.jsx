@@ -1,5 +1,5 @@
 import { React } from './react-runtime.js';
-import { MECHANISMS, parseEth } from '../features/collections/launch-config.js';
+import { MECHANISMS, parseEth, setsMintPrice } from '../features/collections/launch-config.js';
 import { getCollectionNetwork } from '../config/collection-networks.js';
 
 export function Field({ label, hint, children, ...input }) {
@@ -11,7 +11,47 @@ export function PanelTitle({ title, children }) {
 }
 
 export function PhaseTable({ config }) {
-    return <div className="launch-table-wrap"><table className="launch-table"><thead><tr><th>Phase</th><th>Allocation</th><th>Mechanism</th><th>Price</th></tr></thead><tbody>{config.phases.map((phase, index) => <tr key={phase.id + ':' + index}><td>{phase.name}</td><td>{phase.allocation}</td><td>{Object.hasOwn(MECHANISMS, phase.mechanism) ? MECHANISMS[phase.mechanism] : 'Unconfigured'}</td><td>{phase.pricing.sourcePhaseId ? `Clearing price of ${config.phases.find(p => p.id === phase.pricing.sourcePhaseId)?.name || 'missing phase'}` : ['claim', 'free'].includes(phase.mechanism) ? (phase.pricing.priceEth === '' || parseEth(phase.pricing.priceEth) === 0n ? 'Free' : 'Invalid free-claim price') : phase.pricing.priceEth ? `${phase.pricing.priceEth} ETH${phase.mechanism === 'uniform-auction' ? ' reserve' : ''}` : 'Not configured'}</td></tr>)}</tbody></table></div>;
+    const hasPublicAuction = config.phases.some(phase => phase.mechanism === 'uniform-auction' && phase.eligibility.kind === 'public');
+    const hasFirstArtwork = config.phases.some(phase => phase.mechanism === 'first-artwork-auction');
+    const hasAllowlistMint = config.phases.some(phase => ['fixed', 'fcfs', 'free', 'claim'].includes(phase.mechanism) &&
+        ['merkle', 'wallet-allowlist'].includes(phase.eligibility.kind));
+    return <>
+        <div className="launch-table-wrap"><table className="launch-table">
+            <thead><tr><th>Phase</th><th>Allocation</th><th>Mechanism</th><th>Price</th></tr></thead>
+            <tbody>{config.phases.map((phase, index) => {
+                const { priceEth, sourcePhaseId, fallback } = phase.pricing;
+                let price = 'Not configured';
+                if (sourcePhaseId) {
+                    const source = config.phases.slice(0, index).find(p => p.id === sourcePhaseId &&
+                        setsMintPrice(p) && p.eligibility.kind === 'public');
+                    price = 'Price reference needs review';
+                    if (source && fallback === 'pause' && !priceEth && ['fixed', 'fcfs'].includes(phase.mechanism)) {
+                        price = source.mechanism === 'first-artwork-auction'
+                            ? `Settled sale price of ${source.name}. Minting stays closed until it sells.`
+                            : `Lowest winning bid in ${source.name} once it sells out. Otherwise minting stays closed.`;
+                    }
+                } else if (['claim', 'free'].includes(phase.mechanism)) {
+                    price = !priceEth || parseEth(priceEth) === 0n ? 'Free' : 'Invalid free-claim price';
+                } else if (phase.mechanism === 'mint-reservation') {
+                    const minimum = priceEth ? `${priceEth} ETH minimum bid per place` : 'Minimum place bid not set';
+                    const mint = phase.reservation?.mintPriceEth;
+                    price = `${minimum}. ${mint ? `${mint} ETH due at mint.` : 'Holder mint payment not set.'} The creator pays 2.5% on earned place and mint proceeds. Reselling the place carries a 0% fee.`;
+                } else if (priceEth) {
+                    price = `${priceEth} ETH${setsMintPrice(phase) ? ' reserve' : ''}`;
+                }
+                return <tr key={phase.id + ':' + index}>
+                    <td>{phase.name}</td><td>{phase.allocation}</td>
+                    <td>{Object.hasOwn(MECHANISMS, phase.mechanism) ? MECHANISMS[phase.mechanism] : 'Unconfigured'}</td><td>{price}</td>
+                </tr>;
+            })}</tbody>
+        </table></div>
+        {hasPublicAuction && <div className="launch-help">
+            <p>Each wallet funds one bid for one NFT. If all units sell, every winner pays the lowest winning bid. If any units remain, winners pay the reserve.</p>
+            <p>After settlement, winners can claim their NFT and withdraw any excess. Losing bidders can withdraw their full bid.</p>
+        </div>}
+        {hasFirstArtwork && <p className="launch-help">Token #1 is reserved for the first artwork. The highest funded bid becomes the price per remaining NFT when the opening sale settles.</p>}
+        {hasAllowlistMint && <p className="launch-help">Joining the allowlist is free. An eligible wallet can mint at the phase price up to its allowance while units remain.</p>}
+    </>;
 }
 
 export function NetworkLabel({ chainId }) {
@@ -19,7 +59,7 @@ export function NetworkLabel({ chainId }) {
 }
 
 export function LocalDraftNotice() {
-    return <div className="launch-note">Local draft only. Nothing is published, deployed or minted. Saving stores this draft in this browser; export a copy to keep it. No wallet signature is required.</div>;
+    return <p className="launch-note">Your draft stays in this browser. To take a copy with you, choose Download draft under Manage drafts.</p>;
 }
 
 export function UtilityList({ config }) {

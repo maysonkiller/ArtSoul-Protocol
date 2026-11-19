@@ -39,7 +39,7 @@
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
     <script src="/header-prepaint.js?v=11"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
-    <link rel="stylesheet" href="/unified-styles.css?v=89">
+    <link rel="stylesheet" href="/unified-styles.css?v=93">
     <link rel="stylesheet" href="/button-effects.css?v=6">
     <link rel="stylesheet" href="/mobile-responsive.css?v=5">
     <link rel="stylesheet" href="/performance-optimizations.css?v=2">
@@ -54,16 +54,16 @@
     <script src="/src/ui/navigation-manager.js?v=8" defer></script>
     <script src="/modal-system.js?v=2" defer></script>
     <script type="module" src="/src/features/artwork/ai-valuation-client.js?v=4"></script>
-    <script src="/data-prefetch.js?v=6" async></script>
-    <script src="/avatar-dropdown.js?v=71" defer></script>
+    <script src="/data-prefetch.js?v=7" async></script>
+    <script src="/avatar-dropdown.js?v=72" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
-    <script type="module" src="/ipfs-client.js?v=2"></script>
+    <script type="module" src="/ipfs-client.js?v=3"></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <!-- Agent tools (WebMCP). Registers nothing in a browser without the API. -->
-    <script src="/webmcp-tools.js?v=22" defer></script>
+    <script src="/webmcp-tools.js?v=31" defer></script>
     <!-- Voice commands: the same agent tools, spoken. Absent where the browser has no speech recognition. -->
-    <script src="/voice-commands.js?v=14" defer></script>
-    <script type="module" src="/contracts-integration.js?v=20"></script>
+    <script src="/voice-commands.js?v=17" defer></script>
+    <script type="module" src="/contracts-integration.js?v=21"></script>
 
     <!-- AI Integration -->
 
@@ -701,7 +701,7 @@
                     <p id="artTitleError" class="validation-message" style="display: none;"></p>
                 </div>
                 <div>
-                    <label for="artPrice" class="block opacity-70 mb-2 font-medium">Starting Price (ETH)</label>
+                    <label for="artPrice" class="block opacity-70 mb-2 font-medium">Starting Price (test ETH)</label>
                     <input type="text" inputmode="decimal" id="artPrice" class="form-input" aria-describedby="artPriceError" placeholder="0.5" required>
                     <p id="artPriceError" class="validation-message" style="display: none;"></p>
                 </div>
@@ -739,7 +739,8 @@
                 <p id="originalWorkError" class="validation-message" style="display: none;">Confirm that this is your original work before publishing.</p>
             </section>
 
-            <button id="publishBtn" onclick="handleUpload()" class="btn-main w-full" disabled>Publish Artwork</button>
+            <p id="publishAuctionTerms" class="break-words font-semibold" hidden></p>
+            <button id="publishBtn" onclick="handleUpload()" class="btn-main w-full" aria-describedby="publishAuctionTerms publishReadinessHint" disabled>Publish Artwork</button>
             <p id="publishReadinessHint" class="publish-readiness-hint" aria-live="polite">Complete every required step before publishing.</p>
         </div>
     </main>

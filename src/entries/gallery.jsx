@@ -1,5 +1,6 @@
 import { React, createRoot } from './react-runtime.js';
 import { CardGridSkeleton } from './loading-skeletons.jsx';
+import { useAuctionExpiry } from '../features/auction/use-auction-expiry.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
@@ -19,7 +20,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         // Display labels only; contract status and settlement rules are unchanged.
         const GALLERY_STATUS_LABELS = {
             auction: 'Live',
-            awaiting_end: 'Awaiting payment',
+            awaiting_end: 'Bidding ended',
             settlement_pending: 'Awaiting payment',
             defaulted: 'Unsettled',
             defaulted_no_bids: 'No bids',
@@ -36,10 +37,12 @@ const { useState, useEffect, useMemo, useRef } = React;
 
         function GalleryPage() {
             const [theme, setTheme] = useState(() => window.ThemeSync?.getTheme() || 'classic');
-            const [artworkCorpus, setArtworkCorpus] = useState([]);
+            const [artworkCorpus, setArtworkCorpus] = useState(null);
             const [loading, setLoading] = useState(true);
             const [loadError, setLoadError] = useState(false);
+            const [failedMedia, setFailedMedia] = useState(() => new Map());
             const loadSequenceRef = useRef(0);
+            const initialLoad = loading && artworkCorpus === null;
 
             // Filters
             const [activeTab, setActiveTab] = useState(getInitialGalleryTab);
@@ -63,10 +66,25 @@ const { useState, useEffect, useMemo, useRef } = React;
                 maxPrice,
                 searchQuery: debouncedSearchQuery
             }), [activeTab, statusFilter, sortBy, minPrice, maxPrice, debouncedSearchQuery]);
-            const filteredArtworks = useMemo(
+            const auctionClock = useAuctionExpiry(artworkCorpus);
+            const matchedArtworks = useMemo(
                 () => applyPublicGalleryFilters(artworkCorpus, activeFilters),
-                [artworkCorpus, activeFilters]
+                [artworkCorpus, activeFilters, auctionClock]
             );
+            const filteredArtworks = matchedArtworks.filter(artwork =>
+                !failedMedia.has(artwork.id) || failedMedia.get(artwork.id) !== previewUrl(artwork)
+            );
+            const failedPreviewCount = matchedArtworks.length - filteredArtworks.length;
+            const artworkNoun = filteredArtworks.length === 1 ? 'artwork' : 'artworks';
+
+            function previewUrl(artwork) {
+                return window.ArtSoulArtworkCard?.mediaUrl?.(artwork) || artwork.file_url;
+            }
+
+            function hideFailedPreview(artwork) {
+                const url = previewUrl(artwork);
+                setFailedMedia(previous => previous.get(artwork.id) === url ? previous : new Map(previous).set(artwork.id, url));
+            }
 
             function selectGalleryTab(tabId) {
                 setActiveTab(tabId);
@@ -176,11 +194,13 @@ const { useState, useEffect, useMemo, useRef } = React;
             function prepareGalleryArtwork(artwork = {}) {
                 const metadataMissing = artwork.source === 'v41_projection' && !hasSafeMedia(artwork);
                 const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(artwork);
+                const price = parseFloat(window.ArtSoulArtworkCard?.cardSummary?.(artwork)?.value);
                 return {
                     ...artwork,
                     file_url: artwork.file_url || artwork.media_url || '',
                     gallery_metadata_missing: metadataMissing,
                     gallery_status_label: presentationStatus?.label || friendlyStatusLabel(artwork.status),
+                    gallery_price: Number.isFinite(price) ? price : null,
                     gallery_message: metadataMissing
                         ? 'This artwork is on-chain, but its media URL is unavailable.'
                         : ''
@@ -232,6 +252,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     return {
                         title: 'Collections are not live yet',
                         detail: 'Real collection pages will appear after collection data is available.',
+                        verificationGuide: true,
                         cta: false
                     };
                 }
@@ -278,20 +299,22 @@ const { useState, useEffect, useMemo, useRef } = React;
                     result = window.ArtSoulDiscovery.filterForGalleryTab(result, activeTab);
                 }
                 if (statusFilter !== 'all') {
-                    result = result.filter(artwork => normalize(artwork.status) === normalize(statusFilter));
+                    result = statusFilter === 'auction'
+                        ? result.filter(artwork => window.ArtSoulDiscovery?.isLiveAuction?.(artwork))
+                        : result.filter(artwork => normalize(artwork.status) === normalize(statusFilter));
                 }
 
                 if (minPrice !== '') {
                     const min = parseFloat(minPrice);
                     if (Number.isFinite(min)) {
-                        result = result.filter(artwork => toNumber(artwork.creator_value) >= min);
+                        result = result.filter(artwork => artwork.gallery_price !== null && artwork.gallery_price >= min);
                     }
                 }
 
                 if (maxPrice !== '') {
                     const max = parseFloat(maxPrice);
                     if (Number.isFinite(max)) {
-                        result = result.filter(artwork => toNumber(artwork.creator_value) <= max);
+                        result = result.filter(artwork => artwork.gallery_price !== null && artwork.gallery_price <= max);
                     }
                 }
 
@@ -318,16 +341,19 @@ const { useState, useEffect, useMemo, useRef } = React;
                     }
                 }
 
-                if (window.ArtSoulDiscovery?.sortArtworks) {
+                if (!globalSearch && (sortBy === 'price_high' || sortBy === 'price_low')) {
+                    result.sort((a, b) => {
+                        if (a.gallery_price === b.gallery_price) return 0;
+                        if (a.gallery_price === null) return 1;
+                        if (b.gallery_price === null) return -1;
+                        return sortBy === 'price_low' ? a.gallery_price - b.gallery_price : b.gallery_price - a.gallery_price;
+                    });
+                } else if (window.ArtSoulDiscovery?.sortArtworks) {
                     result = window.ArtSoulDiscovery.sortArtworks(result, globalSearch ? 'discovery' : sortBy);
                 } else if (sortBy === 'newest') {
                     result.sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at));
                 } else if (sortBy === 'oldest') {
                     result.sort((a, b) => toTimestamp(a.created_at) - toTimestamp(b.created_at));
-                } else if (sortBy === 'price_high') {
-                    result.sort((a, b) => toNumber(b.creator_value) - toNumber(a.creator_value));
-                } else if (sortBy === 'price_low') {
-                    result.sort((a, b) => toNumber(a.creator_value) - toNumber(b.creator_value));
                 } else if (sortBy === 'ai_value') {
                     result.sort((a, b) =>
                         toNumber(b.system_value ?? b.ai_value) - toNumber(a.system_value ?? a.ai_value)
@@ -534,22 +560,28 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                             {/* Results Count */}
                             <div className="mt-4 text-sm opacity-70" aria-live="polite">
-                                {loading
+                                {initialLoad
                                     ? 'Loading artworks...'
                                     : loadError
                                     ? 'Artwork updates are temporarily unavailable.'
                                     : isSearchPending
                                     ? 'Filtering loaded artworks...'
                                     : isGlobalSearch
-                                    ? `Showing ${filteredArtworks.length} loaded artworks for “${debouncedSearchQuery.trim()}”. Filtering loaded artworks. Use the header search for all art and artist profiles.`
-                                    : `Showing ${filteredArtworks.length} artworks in ${GALLERY_TABS.find(tab => tab.id === activeTab)?.label || 'Discover'}`}
+                                    ? `Showing ${filteredArtworks.length} loaded ${artworkNoun} for “${debouncedSearchQuery.trim()}”. Filtering loaded artworks. Use the header search for all art and artist profiles.`
+                                    : `Showing ${filteredArtworks.length} ${artworkNoun} in ${GALLERY_TABS.find(tab => tab.id === activeTab)?.label || 'Discover'}`}
                             </div>
                         </div>
 
                         {/* Gallery Grid */}
+                        {failedPreviewCount > 0 && (
+                            <div className="home-protocol-section mb-4" role="status">
+                                <p>{failedPreviewCount === 1 ? '1 artwork preview could not load.' : `${failedPreviewCount} artwork previews could not load.`}</p>
+                                <button type="button" className="btn-secondary mt-4" onClick={() => setFailedMedia(new Map())}>Retry previews</button>
+                            </div>
+                        )}
                         {loadError && (
                             <div className="home-protocol-section mb-4" role="status">
-                                <p>{artworkCorpus.length
+                                <p>{artworkCorpus !== null
                                     ? 'Unable to refresh artworks. Showing the last loaded results.'
                                     : 'Artworks are temporarily unavailable. Please retry.'}</p>
                                 <button type="button" className="btn-secondary mt-4" disabled={loading} onClick={loadArtworks}>
@@ -557,9 +589,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </button>
                             </div>
                         )}
-                        {loading && artworkCorpus.length === 0 ? (
+                        {initialLoad ? (
                             <CardGridSkeleton className="gallery-results-grid" />
-                        ) : loadError && filteredArtworks.length === 0 ? null
+                        ) : (loadError || failedPreviewCount > 0) && filteredArtworks.length === 0 ? null
                         : filteredArtworks.length === 0 ? (
                             <div className="text-center py-20 rounded-xl" style={{
                                 background: isClassic ? 'rgba(232, 227, 213, 0.03)' : 'rgba(var(--c-accent-rgb), 0.04)',
@@ -575,6 +607,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 <div className="text-sm opacity-30 mt-2">
                                                 {emptyState.detail}
                                 </div>
+                                            {emptyState.verificationGuide && (
+                                                <a className="inline-block mt-4 underline" href="/docs-protocol#collection-verification">How collection verification works</a>
+                                            )}
                                             {emptyState.cta && (
                                     <button
                                         onClick={() => window.location.href = '/upload'}
@@ -602,6 +637,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                 artwork={artwork}
                                                 minimal={true}
                                                 surface="gallery"
+                                                onMediaUnavailable={hideFailedPreview}
                                                 href={window.ArtSoulArtworkCard.detailHref(artwork)}
                                                 actions={isGlobalSearch ? (
                                                     <span
@@ -673,6 +709,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                         <>
                                                             <video
                                                                 src={artwork.file_url}
+                                                                onError={() => hideFailedPreview(artwork)}
                                                                 className="w-full h-full object-contain"
                                                                 preload="metadata"
                                                                 poster="/ARTSOULlogo-clean.png"
@@ -710,6 +747,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                             />
                                                             <audio
                                                                 src={artwork.file_url}
+                                                                onError={() => hideFailedPreview(artwork)}
                                                                 controls
                                                                 crossOrigin="anonymous"
                                                                 onClick={(e) => e.stopPropagation()}
@@ -732,6 +770,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                     ) : (
                                                         <img
                                                             src={artwork.file_url}
+                                                            onError={() => hideFailedPreview(artwork)}
                                                             alt={window.ArtSoulSecurity?.sanitizeText(artwork.title) || 'Artwork'}
                                                             className="w-full h-full object-contain"
                                                             loading="lazy"

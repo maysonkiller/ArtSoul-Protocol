@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os';
 import { readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -26,7 +27,8 @@ function runUnitTests() {
     const unitTests = collectUnitTestFiles(readdirSync('test'))
         .map(file => join('test', file));
 
-    const result = spawnSync(process.execPath, ['--test', ...unitTests], {
+    const concurrency = Math.min(4, Math.max(1, availableParallelism() - 1));
+    const result = spawnSync(process.execPath, ['--test', `--test-concurrency=${concurrency}`, ...unitTests], {
         stdio: 'inherit'
     });
 

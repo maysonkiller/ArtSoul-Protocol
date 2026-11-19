@@ -20,13 +20,17 @@ function loadVoice(win = {}) {
 const voice = loadVoice();
 const parse = (text, lang = 'en') => voice.parseCommand(text, lang);
 
-test('page commands navigate to the same five destinations in both languages', () => {
+test('page commands navigate to the requested ArtSoul destination in both languages', () => {
   for (const [lang, said, page] of [
     ['en', 'open gallery', 'gallery'], ['en', 'show the explore', 'gallery'],
+    ['en', 'open my gallery', 'gallery'], ['en', 'show my NFT collection', 'collected'],
+    ['en', "let's create artwork", 'create'],
     ['en', 'go to the home page', 'home'], ['en', 'open my profile', 'profile'],
     ['en', 'open create', 'create'], ['en', 'show the upload page', 'create'],
     ['en', 'open how it works', 'guide'], ['en', 'go to documentation', 'guide'],
     ['ru', 'открой галерею', 'gallery'], ['ru', 'перейди в галерею', 'gallery'],
+    ['ru', 'открой мою галерею', 'gallery'], ['ru', 'покажи мою коллекцию', 'collected'],
+    ['ru', 'давай создадим искусство', 'create'],
     ['ru', 'открой главную страницу', 'home'], ['ru', 'перейди на главную', 'home'],
     ['ru', 'открой мой профиль', 'profile'], ['ru', 'перейди в профиль', 'profile'],
     ['ru', 'открой создание работы', 'create'], ['ru', 'покажи публикацию', 'create'],
@@ -69,7 +73,8 @@ test('page names in search terms stay data instead of becoming navigation', () =
 test('page results give a concise localized acknowledgement without claiming a write', () => {
   for (const [page, title, ru] of [
     ['home', 'Home', 'главную'], ['gallery', 'Explore', 'галерею'], ['profile', 'Profile', 'профиль'],
-    ['create', 'Create', 'создание работы'], ['guide', 'How it works', 'руководство']
+    ['create', 'Create', 'создание работы'], ['guide', 'How it works', 'руководство'],
+    ['collected', 'Collected ArtSoul NFTs', 'вашу коллекцию ArtSoul']
   ]) {
     const result = { opened: true, page, title, url: '/' };
     assert.deepEqual(voice.describeResult('open_page', result, 'en'), { say: `Opening ${title}.`, show: `Opening ${title}.` });
@@ -346,19 +351,19 @@ test('voice writes are exactly the agent writes, so neither can grow alone', () 
 test('no audio reaches ArtSoul, and nothing listens without a click', () => {
   // The browser recognises and speaks. This file makes no request of its own.
   assert.doesNotMatch(source, /\bfetch\(|XMLHttpRequest|sendBeacon|WebSocket|MediaRecorder|getUserMedia/);
-  // One sentence per click, never continuous, never on load.
+  // Recognition uses one sentence per turn. Hands-free mode is session-only.
   assert.match(source, /session\.continuous = false;/);
   assert.match(source, /session\.interimResults = false;/);
   assert.match(source, /mic\.addEventListener\('click', start\);/);
-  assert.equal((source.match(/\.start\(\)/g) || []).length, 1, 'the one start() is inside the click handler');
+  assert.equal((source.match(/\.start\(\)/g) || []).length, 1, 'all recognition opens use the same guarded entry');
   // A hidden tab stops listening.
-  assert.match(source, /visibilityState === 'hidden'\) \{ stopListening\(\); silence\(\); \}/);
+  assert.match(source, /visibilityState === 'hidden'\) stopVoice\(\)/);
 });
 
 test('the person is told where the audio goes before the microphone first opens', () => {
-  assert.match(source, /In Chrome, the audio is sent to Google to be transcribed\. ArtSoul does not record, store or receive it\./);
-  assert.match(source, /В Chrome звук отправляется в Google для распознавания\. ArtSoul его не записывает, не хранит и не получает\./);
-  const start = source.slice(source.indexOf('function start()'));
+  assert.match(source, /Your browser may send microphone audio to its speech service for transcription\. ArtSoul receives no microphone audio\./);
+  assert.match(source, /Браузер может отправлять звук с микрофона в свой сервис распознавания речи\. ArtSoul не получает звук с микрофона\./);
+  const start = source.slice(source.indexOf('async function start('));
   assert.ok(start.indexOf('TEXT[lang].notice') < start.indexOf('new Recognition()'), 'notice before recognition');
 });
 

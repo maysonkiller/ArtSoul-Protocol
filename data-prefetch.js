@@ -21,6 +21,10 @@
 (function () {
     'use strict';
 
+    // This script is async. If the data client got here first it already owns
+    // the page's reads; a speculative request would have no consumer.
+    if (window.ArtSoulDB || window.ArtSoulPrefetch) return;
+
     var WALLET = /^0x[a-fA-F0-9]{40}$/;
     var store = new Map();
 

@@ -2,7 +2,8 @@ import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
-import { validateCommandDraft, consumeCommandDraft } from '../features/artwork/command-draft.js';
+import { formatAuctionOpeningTerms } from '../features/auction/auction-creation.js';
+import { validateCommandDraft, consumeCommandDraft, parsePublicationTurn } from '../features/artwork/command-draft.js';
 import { prepareBrowserPublication, checkBrowserPublication, readBrowserPublications } from '../features/artwork/publication-preparation.js';
 import {
     ALLOWED_ARTWORK_MIME_TYPES,
@@ -579,6 +580,12 @@ let selectedFile = null;
             if (!button || !hint) return false;
 
             const attempt = currentPublicationAttempt();
+            const terms = document.getElementById('publishAuctionTerms');
+            if (terms && !uploading) {
+                const summary = attempt ? '' : formatAuctionOpeningTerms(document.getElementById('artPrice').value, selectedAuctionDuration);
+                if (terms.textContent !== summary) terms.textContent = summary;
+                terms.hidden = !summary;
+            }
             if (attempt) {
                 if (!uploading && button.textContent !== 'Check publication') button.textContent = 'Check publication';
                 button.dataset.publicationCheck = 'true';
@@ -1372,11 +1379,8 @@ let selectedFile = null;
                 currentPublishStage = 'metadata_upload';
                 const metadataUpload = await window.IPFSClient.uploadMetadata(metadata);
                 assertCurrent();
-                if (!metadataUpload?.url) {
+                if (!metadataUpload?.url || metadataUpload.debug_mock) {
                     throw new Error('Metadata upload failed before on-chain registration.');
-                }
-                if (metadataUpload.debug_mock) {
-                    console.warn('Debug mock metadata URI enabled for this upload.');
                 }
                 pendingArtwork = {
                     ...pendingArtwork,
@@ -1558,25 +1562,61 @@ let selectedFile = null;
             updatePublishReadiness();
         }
 
-        function showCommandDraft(input, wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase()) {
-            const draft = validateCommandDraft(input);
-            if (commandDraft && JSON.stringify(commandDraft.draft) !== JSON.stringify(draft)) {
+        function showCommandDraft(input, wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase(), reviewedFields) {
+            const draft = validateCommandDraft(input, { partial: Boolean(reviewedFields) });
+            if (!reviewedFields && commandDraft && JSON.stringify(commandDraft.draft) !== JSON.stringify(draft)) {
                 return { prepared: false, submitted: false, reason: 'Review or discard the existing draft first.' };
             }
-            commandDraft = { draft, wallet };
+            commandDraft = { draft, wallet, reviewedFields: reviewedFields || commandDraft?.reviewedFields };
             const panel = document.getElementById('commandDraftPanel');
             panel.hidden = false;
             document.getElementById('commandDraftDetails').textContent = [
-                `Title: ${draft.title}`,
+                draft.title ? `Title: ${draft.title}` : '',
                 draft.description ? `Description: ${draft.description}` : '',
-                draft.start_price_eth ? `Starting price: ${draft.start_price_eth} ETH` : ''
+                draft.start_price_eth ? `Starting price: ${draft.start_price_eth} ETH` : '',
+                draft.duration_hours ? `Auction duration: ${draft.duration_hours} hours` : ''
             ].filter(Boolean).join('\n');
-            document.getElementById('commandDraftStatus').textContent = 'Review these suggestions before adding them to the form. Nothing has been uploaded or sent.';
+            const replacesValue = Object.entries(reviewedFields || {}).some(([key, value]) =>
+                value !== null && value !== '' && value !== draft[key]);
+            document.getElementById('commandDraftStatus').textContent = replacesValue
+                ? 'Applying this draft will replace the displayed fields with these suggestions.'
+                : 'Review these suggestions before adding them to the form. Nothing has been uploaded or sent.';
             document.getElementById('applyCommandDraft').hidden = false;
             document.getElementById('applyCommandDraft').style.display = '';
             document.getElementById('discardCommandDraft').textContent = 'Discard draft';
             panel.scrollIntoView({ block: 'center' });
             return { prepared: true, submitted: false, review_required: true };
+        }
+
+        function revisePublicationDraft(input) {
+            const refused = reason => ({ prepared: false, reason });
+            if (!input || typeof input !== 'object' || Array.isArray(input) ||
+                Object.keys(input).some(key => !['field', 'value'].includes(key)) ||
+                !['title', 'description', 'duration_hours'].includes(input.field)) return refused('Choose title, description or auction duration.');
+            const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
+            if (commandDraft && commandDraft.wallet !== wallet) return refused('The wallet changed. Reopen the draft.');
+            const { field } = input;
+            const liveValue = field === 'duration_hours' ? selectedAuctionDuration :
+                document.getElementById(field === 'title' ? 'artTitle' : 'artDescription').value;
+            if (field === 'title' && !Object.hasOwn(input, 'value')) {
+                const pending = Boolean(commandDraft && Object.hasOwn(commandDraft.draft, 'title'));
+                const value = pending ? commandDraft.draft.title : liveValue;
+                try { return { checked: true, field, pending, value: validateCommandDraft({ title: value }).title }; }
+                catch (error) { return refused(error.message); }
+            }
+            if (typeof input.value !== 'string' || !input.value.trim()) return refused('Enter the new field value.');
+            if (field === 'duration_hours' && !Array.from(document.querySelectorAll('.duration-option'))
+                .some(button => !button.disabled && button.dataset.duration === input.value)) return refused('Choose 24, 36 or 48 hours.');
+            const value = field === 'duration_hours' ? Number(input.value) : input.value;
+            if (field === 'description' && Array.from(value.trim().replace(/\s+/g, ' ')).length < 12) {
+                return refused('Add a description with at least 12 characters.');
+            }
+            const draft = { ...commandDraft?.draft, [field]: value };
+            const reviewedFields = { ...commandDraft?.reviewedFields, [field]: liveValue };
+            try {
+                showCommandDraft(draft, wallet, reviewedFields);
+                return { prepared: true, review_required: true, field, value: commandDraft.draft[field] };
+            } catch (error) { return refused(error.message); }
         }
 
         function discardCommandDraft() {
@@ -1622,8 +1662,20 @@ let selectedFile = null;
             }
             const fields = Object.entries({ title: 'artTitle', description: 'artDescription', start_price_eth: 'artPrice' })
                 .filter(([key]) => commandDraft.draft[key] !== undefined)
-                .map(([key, id]) => ({ field: document.getElementById(id), value: commandDraft.draft[key] }));
-            if (fields.some(({ field, value }) => !field || (field.value.trim() && field.value !== value))) {
+                .map(([key, id]) => ({ key, field: document.getElementById(id), value: commandDraft.draft[key] }));
+            const conflicts = (key, current, proposed) => {
+                if (current === proposed) return false;
+                const captured = commandDraft.reviewedFields;
+                return captured && Object.hasOwn(captured, key) ? captured[key] !== current : Boolean(String(current ?? '').trim());
+            };
+            const duration = commandDraft.draft.duration_hours;
+            if (duration !== undefined && !Array.from(document.querySelectorAll('.duration-option')).some(button =>
+                !button.disabled && Number(button.dataset.duration) === duration)) {
+                status.textContent = 'That duration is unavailable. Choose an option in the form.';
+                return false;
+            }
+            if (fields.some(({ key, field, value }) => !field || conflicts(key, field.value, value)) ||
+                (duration !== undefined && conflicts('duration_hours', selectedAuctionDuration, duration))) {
                 status.textContent = 'Your form already has different details. Nothing was replaced. Keep your edits, or clear those fields before applying the draft.';
                 return false;
             }
@@ -1633,6 +1685,7 @@ let selectedFile = null;
                 field.dispatchEvent(new Event('input', { bubbles: true }));
                 field.dispatchEvent(new Event('change', { bubbles: true }));
             }
+            if (duration !== undefined && duration !== selectedAuctionDuration) selectAuctionDuration(duration);
             commandDraft = null;
             document.getElementById('applyCommandDraft').hidden = true;
             document.getElementById('applyCommandDraft').style.display = 'none';
@@ -1646,7 +1699,7 @@ let selectedFile = null;
             bindDescriptionCounter();
             document.getElementById('applyCommandDraft')?.addEventListener('click', applyCommandDraft);
             document.getElementById('discardCommandDraft')?.addEventListener('click', discardCommandDraft);
-            window.ArtSoulPublicationDraft = Object.freeze({ show: draft => {
+            window.ArtSoulPublicationDraft = Object.freeze({ parseTurn: parsePublicationTurn, revise: revisePublicationDraft, show: draft => {
                 incomingCommandDraft = null;
                 return showCommandDraft(draft);
             } });

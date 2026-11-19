@@ -30,8 +30,9 @@ function paint() {
     if (!item) continue;
     const saved = state.saved.get(key) === true;
     button.setAttribute('aria-pressed', String(saved));
-    button.setAttribute('aria-label', saved ? 'Remove from Saved' : 'Save artwork');
-    button.title = saved ? 'Remove from Saved' : 'Save artwork to your private list';
+    const label = saved ? 'Remove from Favorites' : 'Add to Favorites';
+    button.setAttribute('aria-label', label);
+    button.title = label;
     button.disabled = state.pending.has(key) || operations.has(key);
     button.setAttribute('aria-busy', String(button.disabled));
   }
@@ -64,7 +65,7 @@ function notice(message) {
   }
   region.replaceChildren(document.createTextNode(message + ' '));
   const link = document.createElement('a');
-  link.href = '/profile#saved'; link.textContent = 'View Saved'; region.appendChild(link);
+  link.href = '/profile#saved'; link.textContent = 'View Favorites'; region.appendChild(link);
   clearTimeout(notice.timer);
   notice.timer = setTimeout(() => region.remove(), 6000);
 }
@@ -86,17 +87,17 @@ async function toggle(button) {
   const before = currentSavedWallet();
   button.disabled = true;
   try {
-    if (!await signInForSaved()) { notice('Sign in with your wallet to save artworks.'); return; }
+    if (!await signInForSaved()) { notice('Sign in with your wallet to add artworks to Favorites.'); return; }
     if (before && revision !== walletRevision) return;
     // A cold/auth-expired view cannot guess whether an existing save should be
     // removed. Read the real state after sign-in before deciding the action.
     if (!savedStore.getState().saved.has(key) && !await savedStore.lookup([item])) {
-      notice('Saved is unavailable. Please try again.'); return;
+      notice('Favorites are unavailable. Please try again.'); return;
     }
     const value = savedStore.getState().saved.get(key) !== true;
     const ok = await savedStore.set(item, value);
-    if (ok) notice(value ? 'Artwork saved.' : 'Artwork removed from Saved.');
-    else if (before === currentSavedWallet()) notice('Saved could not be updated. Please try again.');
+    if (ok) notice(value ? 'Artwork added to Favorites.' : 'Artwork removed from Favorites.');
+    else if (before === currentSavedWallet()) notice('Favorites could not be updated. Please try again.');
   } catch { notice('Sign-in was not completed. Please try again.'); }
   finally { if (operations.get(key) === operation) operations.delete(key); paint(); }
 }
@@ -114,7 +115,7 @@ export async function setSavedArtwork(artworkId, value) {
   if (changed()) return failure('Account changed. Repeat the command for the current account.');
   const item = { chain_id: config.chainId, core_address: config.coreAddress, artwork_id: artworkId };
   const key = savedKey(item);
-  if (!config.enabled || !key) return failure('Saved is unavailable. Please try again.');
+  if (!config.enabled || !key) return failure('Favorites are unavailable. Please try again.');
   if (operations.has(key) || savedStore.getState().pending.has(key)) return failure('This artwork is being updated. Wait for it to finish, then repeat the command.');
   const operation = Symbol();
   operations.set(key, operation);
@@ -124,7 +125,7 @@ export async function setSavedArtwork(artworkId, value) {
     if (changed()) return failure('Account or sign-in changed. Repeat the command for the current account.');
     if (!ok) return failure(savedStore.getState().status === 'auth'
       ? 'Sign in with your wallet on the site, then repeat the command.'
-      : 'Saved could not be updated. Please try again.');
+      : 'Favorites could not be updated. Please try again.');
     return { updated: true, artwork_id: artworkId, saved: value, url: '/profile#saved' };
   } finally { if (operations.get(key) === operation) operations.delete(key); paint(); }
 }

@@ -30,7 +30,7 @@ test('Add New is Created-only and tab loading draws no transient card grid', () 
   assert.doesNotMatch(profile, /CardGridSkeleton/);
   assert.match(profile, /displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? null : \(/);
   assert.match(profile, /profile-gallery-loading-note text-sm/);
-  assert.match(profile, /!artworksError && \([\s\S]*myArtworks\.length\} items/);
+  assert.match(profile, /!artworksError && \([\s\S]*visibleArtworks\.length\} items/);
   assert.doesNotMatch(profile, /Creator action|Prepare a new auction|Open publisher/);
 });
 
@@ -42,13 +42,10 @@ test('trust is computed once from the complete creator corpus, independent of ta
   assert.doesNotMatch(profile, /computeTrustProfile\(profileData, artworkData\.items/);
 });
 
-test('profile omits missing and failed media cards', () => {
+test('profile filters missing media and uses the shared card for available previews', () => {
   assert.match(profile, /filter\(artwork => window\.ArtSoulArtworkCard\?\.hasSafeMedia/);
   assert.match(profile, /SharedCard = window\.ArtSoulArtworkCard\?\.ReactCard/);
-  const shared = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
-  const card = shared.slice(shared.indexOf('function ReactCard('));
-  assert.match(card, /if \(!hasSafeMedia\(artwork\) \|\| mediaUnavailable\) return null/);
-  assert.match(card, /h\(ReactMedia, \{ artwork, onUnavailable: \(\) => setMediaUnavailable\(true\) \}\)/);
+  assert.match(profile, /<SharedCard[\s\S]*?surface="profile"/);
 });
 
 test('empty states render only after loading for all four tabs', () => {

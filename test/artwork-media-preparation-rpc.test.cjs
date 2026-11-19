@@ -104,9 +104,9 @@ test('preparation migration uses explicit private privileges and existing upload
 
 test('upload issuance and metadata pinning use real PostgreSQL transactions',
   {skip:docker ? false : 'Docker unavailable; atomic behavior remains unverified'}, async t => {
-  execFileSync('docker', ['run','-d','--name',container,'-e','POSTGRES_PASSWORD=postgres','-e','POSTGRES_DB=artsoul','postgres:17'],
+  execFileSync('docker', ['run','-d','--rm','--name',container,'-e','POSTGRES_PASSWORD=postgres','-e','POSTGRES_DB=artsoul','postgres:17'],
     {stdio:'ignore',timeout:120000});
-  t.after(() => execFileSync('docker', ['rm','-f',container], {stdio:'ignore',timeout:30000}));
+  t.after(() => execFileSync('docker', ['rm','-f','-v',container], {stdio:'ignore',timeout:30000}));
   let ready = false;
   for(let attempt=0;attempt<60;attempt++) {
     try {sql('SELECT 1;'); await delay(300); sql('SELECT 1;'); ready=true; break;} catch {await delay(500);}
@@ -749,9 +749,9 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       assert.equal(uploaded.body.upload_complete,true);assert.equal(uploaded.body.upload,null);
       assert.equal(uploaded.body.media.path,issued.media_path);assert.equal(uploaded.body.media.sha256,digest);
       assert.equal(uploaded.body.can_submit,false);
-      const vm=require('node:vm'), context=vm.createContext({window:{},console:{log(){}},btoa:value=>Buffer.from(value).toString('base64')});
-      vm.runInContext(fs.readFileSync(path.join(__dirname,'../ipfs-client.js'),'utf8'),context);
-      const metadata=JSON.parse(JSON.stringify(context.window.IPFSClient.createMetadata({
+      const { IPFSClient } = await import('../ipfs-client.js');
+      const metadataClient = new IPFSClient();
+      const metadata=JSON.parse(JSON.stringify(metadataClient.createMetadata({
         title:'An artist\'s work 🎨',description:'Exact metadata survives JSONB storage.',creator,
         imageUrl:first.body.upload.public_url,mediaType:'image/png',creatorValue:'0.0001',
         createdAt:'2026-10-23T00:00:00.000Z'})));
@@ -880,7 +880,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       const dependencies={
         storage:{getItem:k=>draftStore.get(k)??null,setItem:(k,v)=>draftStore.set(k,v)},
         locks:{request:(_key,_options,fn)=>fn()},randomUUID:()=>crypto.randomUUID(),
-        createMetadata:input=>context.window.IPFSClient.createMetadata(input),
+        createMetadata:input=>metadataClient.createMetadata(input),
         upload:async({signedUpload})=>objects.set(signedUpload.path,{data:browserBytes,type:'image/png'}),
         request:async(body,owner)=>{
           assert.equal(owner,creator);

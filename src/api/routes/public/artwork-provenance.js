@@ -131,7 +131,7 @@ function buildTimeline({ artwork, auctions, endings, settlements, resaleHistory,
   return events.sort(projectionOrder);
 }
 
-function latestCompletedSettlement(settlements) {
+function firstCompletedSettlement(settlements) {
   return settlements
     .filter(row => normalizeText(row.settlement_status).toLowerCase() === 'completed')
     .sort(projectionOrder)[0] || null;
@@ -166,6 +166,28 @@ function latestResale(resales) {
 async function readRows(path) {
   const rows = await supabaseRest(path);
   return Array.isArray(rows) ? rows : [];
+}
+
+async function historyPage(path) {
+  const ordered = path + '&order=block_number.asc,log_index.asc';
+  const { data: rows, contentRange } = await supabaseRest(ordered + `&limit=${MAX_ROWS_PER_SOURCE + 1}`, {
+    headers: { Prefer: 'count=estimated' }, includeContentRange: true
+  });
+  if (!Array.isArray(rows)) throw new Error('Invalid provenance history page');
+  if (rows.length > MAX_ROWS_PER_SOURCE) return { rows: rows.slice(0, MAX_ROWS_PER_SOURCE), more: true };
+  if (!rows.length) return { rows, more: false };
+
+  // PostgREST counts exactly through db-max-rows. Above the cap it returns
+  // at least the observed cap + 1, even when the planner estimates less.
+  const range = /^0-(\d+)\/(\d+)$/.exec(contentRange || '');
+  if (range && Number(range[1]) === rows.length - 1 && Number(range[2]) >= rows.length) {
+    return { rows, more: Number(range[2]) > rows.length };
+  }
+  // If a proxy removed the count, a one-row probe at this bounded offset
+  // distinguishes an exact fit from an unseen next row.
+  const next = await supabaseRest(ordered + `&offset=${rows.length}&limit=1`);
+  if (!Array.isArray(next)) throw new Error('Invalid provenance history continuation');
+  return { rows, more: next.length > 0 };
 }
 
 export default async function handler(req, res) {
@@ -224,35 +246,32 @@ export default async function handler(req, res) {
       } };
     }
     const tokenId = protocolId(artwork.token_id);
-    const auctionsPromise = readRows(
+    const emptyPage = { rows: [], more: false };
+    const auctionsPromise = historyPage(
       'v41_auctions?select=chain_id,auction_id::text,artwork_id::text,creator,start_price::text,duration,block_number,transaction_hash,log_index,indexed_at' +
-      `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
-      `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
+      `&chain_id=${chainFilter}&artwork_id=${artworkFilter}`
     );
     const endingsPromise = auctionsPromise.then(auctions => {
-      const auctionIds = auctions.map(row => protocolId(row.auction_id)).filter(Boolean);
+      const auctionIds = auctions.rows.map(row => protocolId(row.auction_id)).filter(Boolean);
       return auctionIds.length > 0
-        ? readRows(
+        ? historyPage(
             'v41_auction_endings?select=chain_id,auction_id::text,winner,winning_bid::text,settlement_deadline,block_number,transaction_hash,log_index,indexed_at' +
-            `&chain_id=${chainFilter}&auction_id=in.(${auctionIds.join(',')})` +
-            `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
+            `&chain_id=${chainFilter}&auction_id=in.(${auctionIds.join(',')})`
           )
-        : [];
+        : emptyPage;
     });
     const [auctions, settlements, resaleHistory, listingRows, endings, listingEvents] = await Promise.all([
       auctionsPromise,
-      readRows(
+      historyPage(
         'v41_settlements?select=chain_id,auction_id::text,artwork_id::text,winner,final_price::text,token_id::text,settlement_status,block_number,transaction_hash,log_index,indexed_at' +
-        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
-        `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
+        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}`
       ),
       tokenId
-        ? readRows(
+        ? historyPage(
             'v41_resale_history?select=chain_id,token_id::text,seller,buyer,price::text,block_number,transaction_hash,log_index,indexed_at' +
-            `&chain_id=${chainFilter}&token_id=eq.${tokenId}` +
-            `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
+            `&chain_id=${chainFilter}&token_id=eq.${tokenId}`
           )
-        : [],
+        : emptyPage,
       tokenId
         ? readRows(
             'v41_resale_listings?select=chain_id,token_id::text,seller,price::text,active,block_number,transaction_hash,log_index,indexed_at' +
@@ -261,30 +280,41 @@ export default async function handler(req, res) {
         : [],
       endingsPromise,
       tokenId
-        ? readRows(
+        ? historyPage(
             'contract_events?select=chain_id,event_name,event_data,block_number,transaction_hash,log_index,indexed_at' +
-            `&chain_id=${chainFilter}&event_name=eq.ResaleListed&event_data->>tokenId=eq.${tokenId}` +
-            `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
+            `&chain_id=${chainFilter}&event_name=eq.ResaleListed&event_data->>tokenId=eq.${tokenId}`
           )
-        : []
+        : emptyPage
     ]);
 
-    const completedSettlement = latestCompletedSettlement(settlements);
-    const latestResaleRow = latestResale(resaleHistory);
+    // Long timelines keep their oldest entries. Resolve roles beyond that page
+    // with one indexed row per missing source, only when the work has minted.
+    const visibleSettlement = firstCompletedSettlement(settlements.rows);
+    const [completedSettlement, latestResaleRow] = await Promise.all([
+      artwork.minted && settlements.more && !visibleSettlement
+        ? readRows('v41_settlements?select=winner' +
+            `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&settlement_status=eq.completed` +
+            '&order=block_number.asc,log_index.asc&limit=1').then(rows => rows[0])
+        : visibleSettlement,
+      artwork.minted && resaleHistory.more
+        ? readRows('v41_resale_history?select=buyer' +
+            `&chain_id=${chainFilter}&token_id=eq.${tokenId}&order=block_number.desc,log_index.desc&limit=1`)
+            .then(rows => rows[0])
+        : latestResale(resaleHistory.rows)
+    ]);
     const activeListing = listingRows[0] || null;
     const firstCollectorAddress = addressOrNull(completedSettlement?.winner);
+    const latestBuyer = addressOrNull(latestResaleRow?.buyer);
+    if (artwork.minted && resaleHistory.more && !latestBuyer) {
+      throw Object.assign(new Error('Resale ownership is temporarily unavailable. Please retry.'), {
+        code: 'NFT_OWNERSHIP_UNAVAILABLE', statusCode: 503
+      });
+    }
     const currentOwnerAddress = artwork.minted === true
-      ? (addressOrNull(latestResaleRow?.buyer) || addressOrNull(activeListing?.seller) || firstCollectorAddress)
+      ? (latestBuyer || addressOrNull(activeListing?.seller) || firstCollectorAddress)
       : null;
-    const sourceCounts = {
-      auctions: auctions.length,
-      endings: endings.length,
-      settlements: settlements.length,
-      resales: resaleHistory.length,
-      listings: listingEvents.length
-    };
-    const truncatedSources = Object.entries(sourceCounts)
-      .filter(([, count]) => count >= MAX_ROWS_PER_SOURCE)
+    const truncatedSources = Object.entries({ auctions, endings, settlements, resales: resaleHistory, listings: listingEvents })
+      .filter(([, page]) => page.more)
       .map(([source]) => source);
     if (chainId === 84532) await recheckNftOwnership(ownershipBoundary);
 
@@ -303,11 +333,11 @@ export default async function handler(req, res) {
       },
       events: buildTimeline({
         artwork,
-        auctions,
-        endings,
-        settlements,
-        resaleHistory,
-        listingEvents
+        auctions: auctions.rows,
+        endings: endings.rows,
+        settlements: settlements.rows,
+        resaleHistory: resaleHistory.rows,
+        listingEvents: listingEvents.rows
       }),
       complete: truncatedSources.length === 0,
       truncated_sources: truncatedSources

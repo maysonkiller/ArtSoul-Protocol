@@ -30,14 +30,14 @@ function elements(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)];
 }
 
-test('profile navigation orders public sections, then owner-only Wallet NFTs and Saved behind their flags', async () => {
+test('profile navigation orders public sections, then owner-only Wallet NFTs and Favorites behind their flags', async () => {
   for (const isOwnProfile of [false, true]) {
     for (const savedEnabled of [false, true]) {
       for (const walletNftsEnabled of [false, true]) {
         const view = await fixture(tabs, {isOwnProfile, savedEnabled, walletNftsEnabled, selectedGallery: 'sold', isClassic: true}, types);
         const buttons = elements(view, item => item.type === 'button');
         assert.deepEqual(buttons.map(button => React.Children.toArray(button.props.children).join('').trim()),
-          ['Artworks', 'Auctions', 'Collected', 'Activity', ...(isOwnProfile && walletNftsEnabled ? ['Wallet NFTs'] : []), ...(isOwnProfile && savedEnabled ? ['Saved'] : [])]);
+          ['Artworks', 'Auctions', 'Collected', 'Activity', ...(isOwnProfile && walletNftsEnabled ? ['Wallet NFTs'] : []), ...(isOwnProfile && savedEnabled ? ['Favorites'] : [])]);
         assert.deepEqual(buttons.map(button => button.key), ['created', 'auction', 'collected', 'sold', ...(isOwnProfile && walletNftsEnabled ? ['wallet-nfts'] : []), ...(isOwnProfile && savedEnabled ? ['saved'] : [])]);
         assert.deepEqual(buttons.filter(button => button.props['aria-pressed']).map(button => button.key), ['sold']);
         assert.doesNotMatch(render(view), /Profile Sections/);
@@ -59,6 +59,37 @@ test('profile display and editing defer notifications to the single shared heade
   assert.doesNotMatch(html, /id="profile-notifications"|notification-badge/);
 });
 
+test('Favorites acknowledges a pending wallet request and allows retry after cancellation', async () => {
+  const {transformWithOxc} = await import('vite');
+  const file = fs.readFileSync('src/features/saved/saved-list.jsx', 'utf8');
+  const {code} = await transformWithOxc(file.slice(file.indexOf('export function SavedList')).replace('export ', ''), 'favorites.jsx', {jsx: {runtime: 'classic'}});
+  const owner = '0x' + '1'.repeat(40);
+  const state = {owner, status: 'auth', items: []};
+  let hook, resolve, loads = 0;
+  const hooks = [];
+  const scope = {window: {}, currentSavedWallet: () => owner, savedStore: {getState: () => state, load: () => loads++},
+    signInForSaved: () => new Promise(done => {resolve = done;}),
+    React: {...React, useEffect() {}, useState(initial) {
+      const index = hook++;
+      if (!(index in hooks)) hooks[index] = typeof initial === 'function' ? initial() : initial;
+      return [hooks[index], value => {hooks[index] = value;}];
+    }}};
+  vm.runInNewContext(code + '\nthis.list = SavedList;', scope);
+  const list = () => {hook = 0; return scope.list({wallet: owner});};
+  const signIn = () => elements(list(), node => node.type === 'button' && node.props.children === 'Sign in')[0];
+  const first = signIn().props.onClick();
+  assert.match(render(list()), /Waiting for wallet sign-in/);
+  assert.equal(signIn(), undefined);
+  resolve(false);
+  await first;
+  assert.match(render(list()), /Sign-in was not completed/);
+  assert.equal(loads, 0);
+  const retry = signIn().props.onClick();
+  resolve(true);
+  await retry;
+  assert.equal(loads, 1);
+});
+
 test('Activity names the existing Sales subset without pretending to be a complete ledger', async () => {
   const sales = render(await fixture(heading, {selectedGallery: 'sold', isClassic: true}, types));
   assert.match(sales, />Activity<\/h3>/);
@@ -74,14 +105,14 @@ test('Activity names the existing Sales subset without pretending to be a comple
 });
 
 test('a gallery outage renders one retry, keeps existing cards and never claims an empty collection', async () => {
-  const start = profile.indexOf('<div ref={galleryPanelRef} className="profile-gallery-panel');
+  const start = profile.indexOf('<div className="profile-gallery-panel');
   const markup = profile.slice(start, profile.indexOf('\n                        )}', start));
   for (const isClassic of [false, true]) {
     for (const items of [[], [{id: 'retained'}]]) {
       let retries = 0;
       const view = await fixture(markup, {isClassic, selectedGallery: 'created', displayedGallery: 'created',
         galleryPanelRef: {current: null}, artworksLoading: false, hasSettledArtworks: items.length > 0,
-        artworksError: 'Artworks could not be loaded. Please retry.', myArtworks: items, isOwnProfile: false,
+        artworksError: 'Artworks could not be loaded. Please retry.', visibleArtworks: items, isOwnProfile: false,
         loadMyArtworks: () => {retries++;}, ProfileArtworkCard: ({artwork}) => React.createElement('article', null, artwork.id)}, types);
       const html = render(view);
       assert.match(html, /role="alert"/); assert.match(html, /Retry artworks/);
@@ -94,7 +125,7 @@ test('a gallery outage renders one retry, keeps existing cards and never claims 
   }
   const empty = render(await fixture(markup, {isClassic: true, selectedGallery: 'created', displayedGallery: 'created',
     galleryPanelRef: {current: null}, artworksLoading: false, hasSettledArtworks: true,
-    artworksError: null, myArtworks: [], isOwnProfile: false}, types));
+    artworksError: null, visibleArtworks: [], isOwnProfile: false}, types));
   assert.match(empty, /No created artworks yet/); assert.doesNotMatch(empty, /Retry artworks/);
 });
 

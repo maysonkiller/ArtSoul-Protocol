@@ -5,7 +5,7 @@ import { donationIdentityKey, donationOperations } from './donation-operation.js
 import { ExplainedAction } from '../../ui/explained-action.jsx';
 import './artist-support.css';
 
-const { useEffect, useRef, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 function eth(value) {
     const wei = BigInt(value || 0), whole = wei / 10n ** 18n;
     const fraction = (wei % 10n ** 18n).toString().padStart(18, '0').replace(/0+$/, '');
@@ -18,7 +18,7 @@ function Donor({ donation }) {
     </a>;
 }
 
-export function ArtistSupport({ deployment, artworkId, creator, creatorName, connectedWallet, onReportDonation, initialOpen = false }) {
+export function ArtistSupport({ deployment, artworkId, creator, creatorName, connectedWallet, walletChainId, onReportDonation, initialOpen = false }) {
     const dialog = useRef(null), content = useRef(null), trigger = useRef(null), busyRef = useRef(false), generation = useRef(0);
     const openedFromCard = useRef(false);
     const [open, setOpen] = useState(false), [amount, setAmount] = useState('');
@@ -30,8 +30,13 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
     const [feed, setFeed] = useState(null), [feedError, setFeedError] = useState(false);
     const [list, setList] = useState(false), [sort, setSort] = useState('newest'), [offset, setOffset] = useState(0);
     const [refresh, setRefresh] = useState(0);
-    const [walletBalance, setWalletBalance] = useState('');
     const enabled = deployment?.enabled === true && deployment.chainId === 84532 && Boolean(artworkId && creator);
+    const walletBalance = useMemo(() => {
+        if (!enabled || !open || list || !connectedWallet || walletChainId !== deployment.chainId) return null;
+        const cached = window.AvatarDropdown?.getCachedHeaderNetwork?.(connectedWallet);
+        if (cached?.chainId !== deployment.chainId || !cached.baseSepoliaConfirmed || cached.balance === '…') return null;
+        return cached.balance;
+    }, [enabled, open, list, connectedWallet, walletChainId, deployment?.chainId, refresh]);
     const identity = donationIdentityKey({chainId: deployment?.chainId, deployment: deployment?.address,
         artworkId, creator, wallet: connectedWallet});
     useEffect(() => {
@@ -72,10 +77,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
         return () => abort.abort();
     }, [enabled, open, list, artworkId, creator, deployment?.address, sort, offset, refresh]);
     useEffect(() => {
-        if (open) {
-            setWalletBalance(document.querySelector('[data-network-balance]')?.textContent || '');
-            dialog.current?.showModal();
-        }
+        if (open) dialog.current?.showModal();
         else if (dialog.current?.open) { dialog.current.close(); trigger.current?.focus({ preventScroll: true }); }
     }, [open]);
     useEffect(() => {
@@ -173,7 +175,8 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
             </div>
             <div className="artist-support-content" ref={content}>
             {list && <div id="artistSupportHistory" className="artist-support-history" role="tabpanel" aria-labelledby="artistSupportHistoryTab" tabIndex={0}>
-                {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} ETH</p>}
+                <p>This history shows donations sent through ArtSoul for this artwork. You can find direct transfers in your wallet’s activity.</p>
+                {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} test ETH</p>}
                 {feedError && <p role="status">Support history is unavailable. <button type="button" data-allow-rapid="true" onClick={() => setRefresh(value => value + 1)}>Retry</button></p>}
                 <div className="artist-support-order" role="group" aria-label="Order donation history">
                     <button type="button" data-allow-rapid="true" aria-pressed={sort === 'newest'}
@@ -184,7 +187,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
                 {!feed && !feedError && <p role="status">Loading support…</p>}
                 {feed?.donations?.length === 0 && <p>No support recorded yet.</p>}
                 {feed?.donations?.map(donation => <article key={`${donation.transaction_hash}:${donation.log_index}`}>
-                    <p><Donor donation={donation}/> · {eth(donation.amount)} ETH</p>
+                    <p><Donor donation={donation}/> · {eth(donation.amount)} test ETH</p>
                     {donation.message && <p className="artist-support-message">{donation.message}</p>}
                     {donation.message && onReportDonation && <button type="button" data-allow-rapid="true" className="btn-secondary"
                         onClick={() => onReportDonation({transaction_hash: donation.transaction_hash, log_index: donation.log_index})}>Report message</button>}
@@ -200,8 +203,8 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
             </div>}
             <div id="artistSupportDonate" role="tabpanel" aria-labelledby="artistSupportDonateTab" hidden={list}>
             <p>{creatorName || 'Creator'}</p><p className="artist-support-address">{creator}</p>
-            {walletBalance && <p>Wallet balance: {walletBalance}</p>}
-            <p>100% goes to the creator. This does not buy the artwork or provide protocol benefits.</p>
+            <p>Base Sepolia{walletBalance && ` · Last shown balance: ${walletBalance} test ETH`}</p>
+            <p>ArtSoul’s support contract sends your full donation to this creator in one transaction. You pay network gas separately.</p>
             {receipt ? <div role="status"><p>{checking ? 'Checking transaction…' : busy ? 'Donation sent. Waiting for confirmation…' : receiptReverted
                 ? 'The transaction reverted. No donation was completed. You can review the details and try again.' : confirmationVerified
                 ? 'Donation confirmed. History may take a moment to update.'
@@ -222,7 +225,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
                 <p>You can add a message with any donation greater than zero.</p>
                 <label className="artist-support-check"><input type="checkbox" checked={anonymous} onChange={event => setAnonymous(event.target.checked)} disabled={busy}/> Show me as Anonymous on ArtSoul</label>
                 <p>Your wallet address and message remain public on-chain.</p>
-                <label className="artist-support-check"><input type="checkbox" checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={busy}/> I understand this is voluntary, irreversible and non-refundable.</label>
+                <label className="artist-support-check"><input type="checkbox" checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={busy}/> I understand this gift is voluntary, irreversible and non-refundable. It grants no artwork or protocol benefits.</label>
                 {error && <p role="alert">{error}</p>}
                 <div className="reauction-modal-actions"><button type="button" data-allow-rapid="true" className="btn-secondary" onClick={close} disabled={busy}>Cancel</button>
                     <ExplainedAction type="submit" data-allow-rapid="true" className="btn-main" disabled={busy} contextKey={identity}

@@ -44,7 +44,7 @@ export default async function donationsHandler(req, res) {
         if (!artworks?.length || visibility?.[0]?.hidden === true) {
             return res.status(404).json({ error: 'ARTWORK_UNAVAILABLE' });
         }
-        const fields = 'transaction_hash,log_index,block_number,creator,donor,amount,anonymous,message,recorded_at';
+        const fields = 'transaction_hash,log_index,block_number,creator,donor,amount::text,anonymous,message,recorded_at';
         const base = `artwork_donations?select=${fields}&${scope}&contract_address=eq.${config.address}`;
         const order = 'block_number.desc,log_index.desc';
         const [rows, topRows] = await Promise.all([

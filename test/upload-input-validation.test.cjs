@@ -9,6 +9,10 @@ const withoutImports = source => source.replace(/^import[\s\S]*?;\r?\n/gm, '');
 const policy = read('src/config/upload-policy.js').replace(/^export /gm, '');
 const amounts = read('src/features/auction/eth-amount.js').replace(/^export /gm, '');
 const upload = withoutImports(read('src/entries/upload.js')).replace(/^\s*bindUploadFlow\(\);\s*$/m, '');
+let formatAuctionOpeningTerms;
+test.before(async () => {
+    ({ formatAuctionOpeningTerms } = await import('../src/features/auction/auction-creation.js'));
+});
 
 function client(theme = 'classic') {
     const elements = new Map();
@@ -20,11 +24,27 @@ function client(theme = 'classic') {
         });
         return elements.get(id);
     };
-    const context = vm.createContext({ console, window: { setTimeout() {} },
+    const context = vm.createContext({ console, formatAuctionOpeningTerms, window: { setTimeout() {} },
         document: { documentElement: {classList: {contains: value => value === theme}}, getElementById: element, querySelectorAll: () => [] } });
     vm.runInContext(`${policy}\n${amounts}\n${upload}`, context);
     return { context, element };
 }
+
+test('publish review tracks the entered starting price and duration and clears invalid terms', () => {
+    const { context, element } = client();
+    const terms = element('publishAuctionTerms');
+    element('artPrice').value = '0.00001';
+    context.selectAuctionDuration(24);
+    assert.match(terms.textContent, /0\.00001 test ETH · 24 hours/);
+    element('artPrice').value = '0,001';
+    context.selectAuctionDuration(48);
+    assert.match(terms.textContent, /0\.001 test ETH · 48 hours/);
+    assert.equal(terms.hidden, false);
+    element('artPrice').value = '0,,1';
+    context.updatePublishReadiness();
+    assert.equal(terms.textContent, '');
+    assert.equal(terms.hidden, true);
+});
 
 test('durable pending publication overrides nested rejection, network and revert suggestions',()=>{
     const {context}=client();

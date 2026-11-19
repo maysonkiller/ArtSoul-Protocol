@@ -64,7 +64,7 @@ test('dialog content and padding stay open; only a backdrop click dismisses', ()
 test('guidance preserves signal, ownership and settlement boundaries with real documentation links', () => {
     const reactions = renderToStaticMarkup(harness('reactions').view);
     assert.match(reactions, /does not place a bid or make a purchase/);
-    assert.match(reactions, /separate from your private Saved list/);
+    assert.match(reactions, /separate from your private favorites/);
     assert.match(reactions, /does not itself promise a reminder/);
     const trust = renderToStaticMarkup(harness('trust').view);
     assert.match(trust, /discovery ordering only/);

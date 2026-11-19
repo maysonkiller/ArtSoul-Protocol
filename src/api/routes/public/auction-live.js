@@ -1,8 +1,8 @@
 import { allowMethods, sendError, supabaseRest } from '../../backend.js';
 
 const PUBLIC_CHAIN_IDS = new Set([84532, 11155111]);
-const AUCTION_COLUMNS = 'chain_id,auction_id,artwork_id,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline';
-const BID_COLUMNS = 'chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at';
+const AUCTION_COLUMNS = 'chain_id,auction_id::text,artwork_id::text,status,start_price::text,original_end_time,end_time,last_updated_block,current_bid::text,current_bidder,winner,winning_bid::text,settlement_deadline';
+const BID_COLUMNS = 'chain_id,auction_id::text,artwork_id::text,bidder,bid_amount::text,block_number,log_index,transaction_hash,indexed_at';
 const MAX_BIDS = 100;
 
 function normalizeText(value) {
@@ -95,7 +95,8 @@ export default async function handler(req, res) {
     ]);
 
     const auctionRow = auctionRows?.[0] || null;
-    const currentBid = auctionRow?.current_bid || auctionRow?.winning_bid || 0;
+    const currentBid = weiToEth(auctionRow?.current_bid);
+    const highestBid = currentBid === '0' ? weiToEth(auctionRow?.winning_bid) : currentBid;
     const auction = auctionRow
       ? {
           auction_id: protocolId(auctionRow.auction_id),
@@ -103,9 +104,11 @@ export default async function handler(req, res) {
           chain_id: chainId,
           status: projectionStatus(auctionRow),
           auction_end_time: auctionRow.end_time || null,
+          auction_original_end_time: auctionRow.original_end_time || null,
+          auction_updated_block: toNumber(auctionRow.last_updated_block),
           settlement_deadline: timestampSeconds(auctionRow.settlement_deadline),
-          current_bid: weiToEth(currentBid),
-          highest_bid: weiToEth(currentBid),
+          current_bid: highestBid,
+          highest_bid: highestBid,
           start_price: weiToEth(auctionRow.start_price),
           current_bidder: auctionRow.current_bidder || null,
           winner: auctionRow.winner || null

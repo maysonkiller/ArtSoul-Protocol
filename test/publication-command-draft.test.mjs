@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { stageCommandDraft, consumeCommandDraft, validateCommandDraft } from '../src/features/artwork/command-draft.js';
+import { stageCommandDraft, consumeCommandDraft, validateCommandDraft, parsePublicationTurn } from '../src/features/artwork/command-draft.js';
 
 const wallet = '0x' + 'a'.repeat(40);
 const id = '12345678-1234-1234-1234-123456789012';
@@ -76,12 +76,14 @@ function uploadClient() {
     };
     const script = fs.readFileSync('src/entries/upload.js', 'utf8').replace(/^import[\s\S]*?;\r?\n/gm, '').replace(/^\s*bindUploadFlow\(\);\s*$/m, '');
     const journal = { snapshot: 'unchanged', attempts: [] };
-    const context = vm.createContext({ console, Event, validateCommandDraft, consumeCommandDraft,
-        ALLOWED_ARTWORK_MIME_TYPES: [], document: { getElementById: element },
+    const durations = [24, 36, 48].map(hours => ({ dataset: { duration: String(hours) },
+        setAttribute(key, value) { this[key] = value; } }));
+    const context = vm.createContext({ console, Event, validateCommandDraft, consumeCommandDraft, parsePublicationTurn,
+        ALLOWED_ARTWORK_MIME_TYPES: [], document: { getElementById: element, querySelectorAll: () => durations },
         readBrowserPublications: () => journal.attempts,
         window: { getCurrentWalletAddress: () => wallet, ARTSOUL_CONTRACTS: { baseSepolia: { core: wallet } } } });
     vm.runInContext(script, context);
-    return { context, element, journal, run: source => vm.runInContext(source, context) };
+    return { context, element, journal, durations, run: source => vm.runInContext(source, context) };
 }
 
 test('reviewed application preserves the selected file and only fills blank fields without sending', () => {
@@ -120,6 +122,73 @@ test('existing edits, pending publication, AI and account changes cannot be over
     c.context.window.getCurrentWalletAddress = () => '0x' + 'b'.repeat(40);
     assert.equal(c.context.applyCommandDraft(), false);
     assert.equal(c.element('commandDraftPanel').hidden, true);
+});
+
+test('dictation preserves literal field content and accepts an explicit correction or manual entry', () => {
+    for (const [lang, prompt, correction, cancel, hours] of [
+        ['en', 'title', 'change title to Blue Moon!', "I’ll type it", 'choose 48 hours'],
+        ['ru', 'название', 'измени название на Blue Moon!', 'сам введу', 'давай на 48 часов']
+    ]) {
+        const { nextField } = parsePublicationTurn(prompt, lang);
+        assert.equal(nextField, 'title');
+        assert.deepEqual(parsePublicationTurn('Buy artwork 15', lang, nextField), {
+            tool: 'revise_publication_draft', input: { field: 'title', value: 'Buy artwork 15' }
+        });
+        assert.deepEqual(parsePublicationTurn('Description of the moon', lang, nextField).input,
+            { field: 'title', value: 'Description of the moon' });
+        assert.equal(parsePublicationTurn(correction, lang).input.value, 'Blue Moon!');
+        assert.ok(parsePublicationTurn(cancel, lang, nextField).message);
+        assert.deepEqual(parsePublicationTurn(hours, lang).input, { field: 'duration_hours', value: '48' });
+        assert.equal(parsePublicationTurn('buy artwork 15', lang), null);
+    }
+});
+
+test('reviewed field corrections preserve the selected file and reject concurrent manual edits atomically', () => {
+    const c = uploadClient();
+    c.run('selectedFile = { name: "manual.png" }; updatePublishReadiness = () => {};');
+    const file = c.run('selectedFile');
+    const revise = (field, value) => c.context.revisePublicationDraft(value === undefined ? { field } : { field, value });
+    c.element('artTitle').value = 'Before';
+    assert.equal(revise('title').value, 'Before');
+    assert.equal(revise('description', 'New description').prepared, true);
+    assert.equal(revise('title', 'First suggestion').prepared, true);
+    assert.equal(revise('title', 'Final title').prepared, true);
+    assert.equal(revise('duration_hours', '12').prepared, false);
+    assert.equal(revise('duration_hours', '48').prepared, true);
+    assert.equal(revise('title').pending, true);
+    assert.equal(revise('title').value, 'Final title');
+    assert.equal(c.element('artTitle').value, 'Before');
+    assert.equal(c.run('selectedAuctionDuration'), null);
+    c.element('artTitle').value = 'Typed while reviewing';
+    assert.equal(c.context.applyCommandDraft(), false);
+    assert.equal(c.element('artDescription').value, '');
+    assert.equal(c.run('selectedAuctionDuration'), null);
+    assert.equal(revise('title', 'Final title').prepared, true);
+    assert.equal(c.context.applyCommandDraft(), true);
+    assert.equal(revise('title').pending, false);
+    assert.equal(revise('title').value, 'Final title');
+    assert.equal(c.element('artDescription').value, 'New description');
+    assert.equal(c.run('selectedAuctionDuration'), 48);
+    assert.deepEqual(c.durations.map(button => button['aria-pressed']), ['false', 'false', 'true']);
+    assert.equal(c.run('selectedFile'), file);
+    assert.equal(c.context.applyCommandDraft(), false);
+});
+
+test('invalid or unavailable field edits cannot advance a publication', () => {
+    const c = uploadClient();
+    const revise = (field, value) => c.context.revisePublicationDraft({ field, value });
+    for (const [field, value] of [['title', ' '], ['description', 'short'], ['file', 'path'],
+        ['duration_hours', '048'], ['duration_hours', '48 hours']]) {
+        assert.equal(revise(field, value).prepared, false);
+    }
+    assert.equal(revise('duration_hours', '36').prepared, true);
+    c.durations[1].disabled = true;
+    assert.equal(c.context.applyCommandDraft(), false);
+    assert.equal(c.run('selectedAuctionDuration'), null);
+    assert.equal(revise('duration_hours', '36').prepared, false);
+    c.context.window.getCurrentWalletAddress = () => '0x' + 'b'.repeat(40);
+    assert.equal(revise('title', 'Other account').prepared, false);
+    assert.equal(c.context.applyCommandDraft(), false);
 });
 
 test('a selected file with saved recovery records is not edited by commands', () => {

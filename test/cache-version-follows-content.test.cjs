@@ -18,17 +18,18 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
+  'unified-styles.css': { version: 93, sha256: '7805d95210168d5a' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 8, sha256: '618e006edefcf241' },
-  'src/ui/components/artwork-card.js': { version: 32, sha256: '2eb7057e8b689ae7' },
-  'contracts-integration.js': { version: 20, sha256: '78c70a2f1e5ce116' },
+  'src/ui/components/artwork-card.js': { version: 38, sha256: '70925ed4eb769382' },
+  'contracts-integration.js': { version: 21, sha256: '36189171dbb31867' },
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
-  'webmcp-tools.js': { version: 22, sha256: '32e632ca328adb60' },
-  'voice-commands.js': { version: 14, sha256: 'a9986f67aec7dce8' },
-  'avatar-dropdown.js': { version: 71, sha256: '75cfc571d2a23bc0' },
+  'webmcp-tools.js': { version: 31, sha256: 'fdfc56928ee74ba0' },
+  'voice-commands.js': { version: 17, sha256: '35987565d91c2a22' },
+  'avatar-dropdown.js': { version: 72, sha256: '097e65938d240a73' },
   'header-prepaint.js': { version: 11, sha256: '8bab0f88fda32e91' },
-  'data-prefetch.js': { version: 6, sha256: '339cad21ebc03f47' },
+  'data-prefetch.js': { version: 7, sha256: '4e6178a279896ae9' },
   'base-network.js': { version: 2, sha256: 'bc527f32ea3df5f9' },
   'storage-image.js': { version: 3, sha256: '99078de8e41f962d' }
 };
@@ -47,7 +48,8 @@ function shortHash(file) {
 
 function runtimeVersions(html, file) {
   const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const references = new RegExp(String.raw`\bsrc\s*=\s*(["'])/${escaped}(?:\?([^"']*))?\1`, 'g');
+  const attribute = file.endsWith('.css') ? 'href' : 'src';
+  const references = new RegExp(String.raw`\b${attribute}\s*=\s*(["'])/${escaped}(?:\?([^"']*))?\1`, 'g');
   return [...html.matchAll(references)].map(match => {
     const versions = new URLSearchParams(match[2] || '').getAll('v');
     return versions.length === 1 && /^\d+$/.test(versions[0]) ? Number(versions[0]) : null;

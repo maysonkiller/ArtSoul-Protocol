@@ -1,5 +1,18 @@
+import { parseUserEthAmount } from './eth-amount.js';
+
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const address = value => String(value || '').toLowerCase();
+
+// Both creation forms submit on Base Sepolia and use the same decimal parser.
+export function formatAuctionOpeningTerms(price, hours) {
+    if (![24, 36, 48].includes(hours)) return '';
+    try {
+        const { eth } = parseUserEthAmount(price);
+        return `Starting price: ${eth} test ETH · ${hours} hours. Your wallet pays only network gas to open the auction.`;
+    } catch {
+        return '';
+    }
+}
 
 // A passive provider read: this must not open a signature request or switch chains.
 export async function readAuctionCreationWallet(provider) {

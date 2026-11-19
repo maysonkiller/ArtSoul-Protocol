@@ -97,6 +97,7 @@ test('the ArtSoul tools are registered when the browser supports WebMCP', async 
     'withdraw_pending_funds',
     'revoke_wallet_access',
     'prepare_artwork_registration',
+    'revise_publication_draft',
     'prepare_donation',
     'prepare_artwork_report',
     'add_to_saved',
@@ -731,15 +732,35 @@ test('open_page navigates only to declared pages without provider or wallet work
   const tool = tools.get('open_page');
   const expected = [
     ['home', '/', 'Home'], ['gallery', '/gallery#discover', 'Explore'],
-    ['profile', '/profile', 'Profile'], ['create', '/upload', 'Create'],
+    ['nfts', '/gallery#nft', 'NFTs'], ['marketplace', '/gallery#marketplace', 'Marketplace'],
+    ['auctions', '/gallery#live_auctions', 'Auctions'], ['collections', '/gallery#collections', 'Collections'],
+    ['profile', '/profile', 'Profile'], ['collected', '/profile#collected', 'Collected ArtSoul NFTs'],
+    ['create', '/upload', 'Create'],
     ['guide', '/docs-protocol', 'How it works']
   ];
-  assert.deepEqual(tool.inputSchema.properties.page.enum, expected.map(([page]) => page));
+  assert.deepEqual(tool.inputSchema.properties.page.enum.toSorted(), [...expected.map(([page]) => page), 'walletNfts'].sort());
   assert.equal(tool.inputSchema.additionalProperties, false);
   for (const [page, url, title] of expected) {
     assert.deepEqual(JSON.parse(await tool.execute({ page })), { opened: true, page, url, title });
   }
   assert.deepEqual(opened, expected.map(([, url]) => url));
+});
+
+test('Wallet NFTs can open only for a connected visitor with the feature available', async () => {
+  const opened = [];
+  for (const [enabled, address, code] of [[false, '0xabc', 'wallet_nfts_unavailable'],
+    [true, '', 'wallet_required'], [true, '0xabc', null]]) {
+    const tool = toolsFrom(load(), {
+      openPath: url => opened.push(url),
+      walletNftsEnabled: async () => enabled,
+      readWalletAddress: () => address,
+      loadWalletRuntime: () => assert.fail('navigation cannot start a wallet connection')
+    }).get('open_page');
+    const result = JSON.parse(await tool.execute({ page: 'walletNfts' }));
+    assert.equal(result.opened, code === null);
+    assert.equal(result.code ?? null, code);
+  }
+  assert.deepEqual(opened, ['/profile#wallet-nfts']);
 });
 
 test('open_page rejects unknown destinations, arbitrary URLs and inherited properties', async () => {
@@ -751,6 +772,15 @@ test('open_page rejects unknown destinations, arbitrary URLs and inherited prope
     Object.create({ page: 'home' }), { page: 'home', url: 'https://example.test/' },
     JSON.parse('{"page":"home","__proto__":{"page":"guide"}}')]) {
     assert.equal(JSON.parse(await tool.execute(input)).opened, false);
+  }
+});
+
+test('page requests report a missing or unsuccessful navigation adapter', async () => {
+  for (const openPath of [undefined, async () => { throw new Error('Navigation unavailable'); }]) {
+    const tool = toolsFrom(load(), { openPath }).get('open_page');
+    const result = JSON.parse(await tool.execute({ page: 'collected' }));
+    assert.equal(result.opened, false);
+    assert.ok(result.reason);
   }
 });
 
@@ -774,6 +804,14 @@ test('open_artwork navigates, and refuses a work that does not exist', async () 
   const refused = JSON.parse(await missing.get('open_artwork').execute({ artwork_id: '77' }));
   assert.equal(refused.opened, false);
   assert.equal(opened.length, 1, 'a missing artwork must not navigate anywhere');
+});
+
+test('an artwork lookup cannot claim successful navigation without an accepting adapter', async () => {
+  for (const openPath of [undefined, async () => { throw new Error('Page did not open'); }]) {
+    const tool = toolsFrom(load(), { openPath, fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }) }).get('open_artwork');
+    const result = JSON.parse(await tool.execute({ artwork_id: '31' }));
+    assert.equal(result.opened, false);
+  }
 });
 
 test('end_expired_auction only finalizes an auction whose time has actually passed', async () => {

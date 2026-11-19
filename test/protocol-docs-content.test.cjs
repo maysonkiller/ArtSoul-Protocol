@@ -6,11 +6,11 @@ const {createHash} = require('node:crypto');
 const React = require('react');
 const {renderToStaticMarkup} = require('react-dom/server');
 
-// Rendered section hashes captured from the original JSX at 03f7134.
+// Rendered section baselines started at 03f7134 and include approved copy changes.
 // They preserve all text, semantic elements and classes without copying the content.
 const original = [
   ['what-is-artsoul', 'What Is ArtSoul?', '9f3cd5a56bcbe84fb377ebfba037ccc2ff40aefcab5320d1bd189614b97aec6a'],
-  ['auctions', 'Discovery-First Auctions', 'a1dc8c99769482658023e529bbe45969c11f1d5b01faf7cbe41bc70472ed6b14'],
+  ['auctions', 'Discovery-First Auctions', 'd92083cd203c512044b1338a52b196e133f771a4f5cadcb176e7ed5a9faa2c22'],
   ['deposits', 'Deposit-Based Bidding', '53c37e63db6f822569382e1e33fff05e51a11154bb64c6592f04fcd5a187e62a'],
   ['publishing', 'Publishing Artwork', 'd7f2bd3b09fe51f91091a4f3f10395c351c30ea707f27d06d2aa90a2895cf0c5'],
   ['ai-guidance', 'AI Value Guidance', 'b51e7cfecad6b9f4122452ae853549d84a01767110abd2ce4aef8633b3fa3597'],
@@ -19,40 +19,69 @@ const original = [
   ['trust-community', 'Trust and Community Signals', '9a4355ff62f507d10a9278aeb97cf70ff42f8fda05cc4d9fb14ab21287230093'],
   ['discovery', 'Discovery Ranking', 'b285e9a58f6ae58c61d886437145e2e6ff4e739a59696e48d4de503b91185d87'],
   ['settlement', 'Settlement and Lazy Minting', 'b651cdbe02ee3e6c3d7d7aa5d9edf0e20ddce0b398f40ab0e0698fe98a5056dd'],
-  ['reauctioning', 'Re-Auctioning', '5521a20e6794e6a23405778cd2581893a6e95c43b50d313ae9df95b7cd0f3dcd'],
+  ['reauctioning', 'Re-Auctioning', 'c9d1df9ae2dbfbfd370f7e66344c8723889f60c2f2609643e5a51f92c35e29bd'],
   ['provenance-resale', 'Provenance and Resale', '935a3b4eb49a87e02975e84173051cd7f638f56582bcded493db2a80fcd4bab5'],
   ['safety', 'Reports and Copyright', 'd0a0143658691a4997c8695d511d4326372d34eb520963ce6c2034e4c3a2654c'],
   ['faq', 'Frequently Asked Questions', '7812b5bd7459a4c238a46d799aa8ddc99d1967a72c7e62bd3c769c4d6e2ee35f']
 ];
 let compiled;
 async function components(runtime = React, bindings = {}) {
-  const [{transformWithOxc}, {PROTOCOL_DOC_SECTIONS: sections}] = await Promise.all([
-    import('vite'), import('../src/content/protocol-docs.js')
+  const [{transformWithOxc}, {PROTOCOL_DOC_SECTIONS: sections}, {auraFrameClassName}] = await Promise.all([
+    import('vite'), import('../src/content/protocol-docs.js'), import('../src/ui/components/aura-frame.js')
   ]);
   const source = fs.readFileSync('src/entries/docs-protocol.jsx', 'utf8')
     .replace(/^import .*;\r?$/gm, '')
     .replace(/createRoot\(document.getElementById\('app'\)\).render\(<ProtocolDocsApp \/>\);/, '');
   compiled ||= (await transformWithOxc(source, 'docs-content-fixture.jsx', {jsx: {runtime: 'classic'}})).code;
-  const scope = {React: runtime, sections, ...bindings};
+  const scope = {React: runtime, sections, auraFrameClassName, ...bindings};
   vm.runInNewContext(compiled + ';this.Block=ProtocolBlock;this.Section=ProtocolSection;this.App=ProtocolDocsApp;', scope);
   return scope;
 }
 
 test('shared documentation preserves every section ID, title and its original order', async () => {
   const {sections} = await components();
-  assert.deepEqual(sections.map(section => [section.id, section.title]), original.map(([id, title]) => [id, title]));
+  assert.deepEqual(sections.filter(section => !['collection-verification', 'nft-frames'].includes(section.id))
+    .map(section => [section.id, section.title]), original.map(([id, title]) => [id, title]));
   assert.equal(new Set(sections.map(section => section.id)).size, sections.length);
   const data = fs.readFileSync('src/content/protocol-docs.js', 'utf8');
   assert.doesNotMatch(data, /^\s*import\b/m, 'search can load the plain content without a UI runtime');
 });
 
-test('rendered documentation content is byte-identical to the original JSX', async () => {
+test('original documentation sections retain their rendered content', async () => {
   const {sections, Block} = await components();
-  for (const [index, section] of sections.entries()) {
+  for (const [id, , expected] of original) {
+    const section = sections.find(item => item.id === id);
     const html = renderToStaticMarkup(React.createElement(React.Fragment, null,
       section.blocks.map((block, key) => React.createElement(Block, {block, key}))));
-    assert.equal(createHash('sha256').update(html).digest('hex'), original[index][2], section.id);
+    assert.equal(createHash('sha256').update(html).digest('hex'), expected, id);
   }
+});
+
+test('the collection gallery links to a readable key for the origin mark', async () => {
+  const {sections, Section} = await components();
+  const section = sections.find(item => item.id === 'collection-verification');
+  const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
+  assert.match(html, /<svg[^>]*aria-hidden="true"/);
+  assert.match(html, /Blue check[^<]+verified collection origin/);
+  assert.match(section.text, /specific blockchain and collection contract/);
+  assert.match(section.text, /revoked/);
+  assert.match(section.text, /Sales volume plays no part/);
+  assert.match(section.text, /Any artist or project team.*without a blue check or Partner status/);
+  assert.match(section.text, /marketplace to transfer an NFT comes from its owner’s wallet/);
+  assert.match(fs.readFileSync('src/entries/gallery.jsx', 'utf8'), new RegExp('href="/docs-protocol#' + section.id + '"'));
+});
+
+test('the NFT frame guide names each example in priority order using the actual theme-aware frame', async () => {
+  const {sections, Section, auraFrameClassName} = await components();
+  const section = sections.find(item => item.id === 'nft-frames');
+  const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
+  assert.match(html, /<figcaption>Frame examples<\/figcaption><dl>/);
+  assert.deepEqual([...html.matchAll(/<dt class="([^"]+)">([^<]+)<\/dt><dd>/g)].map(([, classes, name]) => [classes, name]), [
+    ['platform', 'Platform'], ['genesis', 'Genesis'], ['partner', 'Partner collection']
+  ].map(([kind, name]) => ['protocol-frame-example ' + auraFrameClassName(kind), name]));
+  assert.match(section.text, /Base mainnet/);
+  assert.match(section.text, /without a confirmed match keep their standard frame/);
+  assert.match(section.text, /small screens and reduced motion keep every frame still/i);
 });
 
 test('searchable text comes from the same visible paragraphs, table cells, lists and FAQ', async () => {

@@ -24,9 +24,13 @@ class FakeElement {
     };
   }
 
-  appendChild(child) { this.children.push(child); return child; }
-  append(...children) { this.children.push(...children); }
-  remove() {}
+  appendChild(child) { this.children.push(child); child.parentElement = this; return child; }
+  append(...children) { children.forEach(child => this.appendChild(child)); }
+  remove() {
+    if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this);
+    this.parentElement = null;
+    this.isConnected = false;
+  }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   addEventListener() {}
 }
@@ -119,14 +123,15 @@ test('DOM cards share one timer and keep their compact body structure', () => {
 
   clock.now = future + 1;
   intervals[0]();
-  assert.equal(firstTimer.textContent, 'Ended');
-  assert.equal(secondTimer.textContent, 'Ended');
-  assert.match(firstTimer.className, /is-ended/);
+  assert.ok(!first.children.includes(firstTimer));
+  assert.ok(!second.children.includes(secondTimer));
   assert.equal(first.children[1].children[2].children[0], firstBadge, 'expiry updates the existing status');
-  assert.equal(firstBadge.textContent, 'No bids', 'expiry must update the status as well as the timer');
-  assert.equal(firstBadge.className, 'artsoul-card-status artsoul-card-status-ended_no_bids');
+  assert.equal(firstBadge.textContent, 'Discover', 'a bidless expiry displays the work in its discovery state');
+  assert.equal(firstBadge.className, 'artsoul-card-status artsoul-card-status-not_minted');
+  assert.equal(first.children[1].children[2].children[1].textContent, 'Auction');
+  assert.equal(first.children[1].children[2].children[2].children.at(-1).textContent, 'Ended without bids');
   const firstLink = first.children.find(child => child.className === 'artsoul-card-link');
-  assert.match(firstLink.title, /Status: No bids/);
+  assert.match(firstLink.title, /Status: Discover\nAuction: Ended without bids/);
   assert.doesNotMatch(firstLink.attributes['aria-label'], /Live/);
   assert.deepEqual(cleared, [1]);
 });
@@ -145,8 +150,8 @@ test('expiry with a bid changes the card status and a replacement round starts l
   timer.isConnected = true;
   clock.now += 1000;
   intervals[0]();
-  assert.equal(timer.textContent, 'Ended');
-  assert.equal(previous.children[1].children[2].children[0].textContent, 'Awaiting payment');
+  assert.ok(!previous.children.includes(timer));
+  assert.equal(previous.children[1].children[2].children[0].textContent, 'Bidding ended');
   assert.equal(meta.children[1].textContent, 'Final bid', 'an expired bid is no longer advertised as current');
   assert.equal(meta.children[2].children[1], value, 'expiry preserves the confirmed amount');
   assert.equal(value.textContent, '0.011 ETH');
@@ -216,7 +221,7 @@ test('React countdown retires the previous round and refreshes its card once at 
   assert.equal(render(previous).text, '0m 01s');
   clock.now += 500;
   const replacement = { auction_id: '67', auction_end_time: clock.now + 10000 };
-  assert.equal(render(replacement), null, 'an old timer must not paint during a round change');
+  assert.equal(render(replacement).text, '0m 10s', 'the incoming deadline paints immediately in the same timer position');
   assert.equal(render(replacement).text, '0m 10s');
   clock.now += 1000;
   intervals.at(-1)();
@@ -224,12 +229,25 @@ test('React countdown retires the previous round and refreshes its card once at 
   assert.equal(render(replacement).text, '0m 09s');
   clock.now = replacement.auction_end_time;
   intervals.at(-1)();
-  assert.equal(render(replacement).text, 'Ended');
+  assert.equal(render(replacement), null);
   assert.deepEqual(endedAt, [clock.now]);
   intervals.at(-1)();
   assert.deepEqual(endedAt, [clock.now], 'the expiry callback runs once');
   cleanup?.();
   assert.deepEqual(cleared, [1, 2]);
+});
+
+test('only a verified extension changes the card clock label', () => {
+  const { api, clock } = loadRuntime();
+  const original = clock.now + 5000;
+  const artwork = { id: '7', auction_id: '7', auction_end_time: original + 600000, file_type: 'image', file_url: 'image.jpg' };
+  const timerFor = row => api.createCardElement(row).children.find(child => child.attributes.role === 'timer');
+  assert.equal(timerFor(artwork).textContent, '10m 05s');
+  assert.equal(timerFor({ ...artwork, auction_original_end_time: artwork.auction_end_time }).textContent, '10m 05s');
+  const extended = timerFor({ ...artwork, auction_original_end_time: original });
+  assert.equal(extended.textContent, 'Extended · 10m 05s');
+  assert.equal(extended.attributes['aria-label'], 'Bidding extended. Auction ends in 10m 05s');
+  assert.equal(extended.attributes['aria-live'], 'off');
 });
 
 test('countdown implementation performs no API or RPC request', () => {

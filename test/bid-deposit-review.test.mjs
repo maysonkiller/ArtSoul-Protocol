@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
+import {Interface} from 'ethers';
 import {parseUserEthAmount} from '../src/features/auction/eth-amount.js';
 
 const source = fs.readFileSync('src/entries/artwork.jsx', 'utf8');
@@ -13,6 +14,31 @@ function extract(name) {
 }
 const creator = '0x1111111111111111111111111111111111111111';
 const collector = '0x2222222222222222222222222222222222222222';
+
+test('only the confirmed Core extension for the signed round changes the bidder clock', async () => {
+  const wallet = {};
+  const wrapper = fs.readFileSync('contracts-integration.js', 'utf8').replace(/^import .*;\r?\n/gm, '');
+  vm.runInNewContext(wrapper, { window: wallet, ethers: {}, console: { log() {} } });
+  const api = wallet.ArtSoulContracts;
+  const events = new Interface(['event AuctionExtended(uint256 indexed auctionId, uint256 oldEndTime, uint256 newEndTime)']);
+  const log = (address, round) => ({ address, ...events.encodeEventLog(events.getEvent('AuctionExtended'), [round, 100, 700]) });
+  let mined;
+  let submitted;
+  const sent = new Promise(resolve => { submitted = resolve; });
+  const closed = new Promise(resolve => { mined = resolve; });
+  Object.assign(api, { ensureBaseSepoliaWrite: async () => {}, resolveAuctionId: async () => 63n, parseEth: () => 1n,
+    coreContract: { interface: events, requiredDepositForBid: async () => 1n, placeBid: async () => {
+      submitted(); return {hash: 'bid', to: creator, wait: () => closed};
+    } } });
+  const observed = [];
+  const result = api.placeBid('63', '0.001', {onExtension: (...event) => observed.push(event)});
+  await sent;
+  assert.deepEqual(observed, []);
+  mined({status: 1, hash: 'bid', blockNumber: 202, logs: [log(collector, 63), log(creator, 62), log(creator, 63)]});
+  assert.equal(await result, 'bid');
+  assert.deepEqual(observed, [[100, 700, 202]]);
+});
+
 function harness({wallet = collector, value = '0,00001', highest = '', approved = false, liveWallet = wallet} = {}) {
   const notices = [], writes = [], reviews = [];
   let quoted;

@@ -111,7 +111,7 @@ async function galleryHarness(read) {
     ArtSoulArtworkCard: { hasSafeMedia: () => true, ReactCard: () => null, detailHref: art => '/artwork/' + art.id },
     ArtSoulDiscovery: { filterForGalleryTab: rows => rows } };
   const render = vm.runInNewContext(code + '\nGalleryPage;', { React, window, document: { addEventListener() {} },
-    CardGridSkeleton: function CardGridSkeleton() {}, setTimeout: () => 1, clearTimeout() {}, console: { error() {} } });
+    useAuctionExpiry: () => 0, CardGridSkeleton: function CardGridSkeleton() {}, setTimeout: () => 1, clearTimeout() {}, console: { error() {} } });
   let tree;
   const update = () => { stateIndex = refIndex = 0; tree = render(); if (!mounted) { mounted = true; effects.forEach(fn => fn()); } };
   update();
@@ -127,7 +127,7 @@ test('gallery failure never claims zero artworks; retry recovers, failed refresh
   assert.doesNotMatch(h.text(), /Showing 0|Awaiting live|Publish Artwork/);
   fail = false;
   await h.retry(); h.update();
-  assert.match(h.text(), /Showing 1 artworks/);
+  assert.match(h.text(), /Showing 1 artwork in/);
   assert.doesNotMatch(h.text(), /temporarily unavailable/);
   fail = true;
   h.listeners['artsoul:resale-confirmed']();
@@ -143,6 +143,24 @@ test('gallery genuine empty success retains its usual empty-state messaging', as
   assert.doesNotMatch(h.text(), /temporarily unavailable/);
 });
 
+test('a gallery refresh keeps the current results visible, including an empty selection', async () => {
+  for (const rows of [[], [row('v41:84532:38')]]) {
+    let completeRefresh;
+    const pending = new Promise(resolve => { completeRefresh = resolve; });
+    let reads = 0;
+    const h = await galleryHarness(() => ++reads === 1 ? rows : pending);
+    await tick(); h.update();
+    const settledText = h.text();
+    h.listeners['artsoul:resale-confirmed']();
+    await tick(); h.update();
+    assert.equal(h.text(), settledText);
+    assert.ok(!h.nodes().some(node => node.type?.name === 'CardGridSkeleton'));
+    completeRefresh([row('v41:84532:39')]);
+    await tick(); h.update();
+    assert.ok(h.nodes().some(node => node.props?.artwork?.id === 'v41:84532:39'));
+  }
+});
+
 test('gallery ignores an older failed request after a newer successful response', async () => {
   let reject;
   const pending = new Promise((_, fail) => { reject = fail; });
@@ -152,6 +170,31 @@ test('gallery ignores an older failed request after a newer successful response'
   await tick(); h.update();
   reject(unavailable());
   await tick(); h.update();
-  assert.match(h.text(), /Showing 1 artworks/);
+  assert.match(h.text(), /Showing 1 artwork in/);
   assert.doesNotMatch(h.text(), /temporarily unavailable/);
+});
+
+test('gallery counts available previews and retries failed media without reloading artwork data', async () => {
+  const rows = [row('first'), row('second')];
+  let reads = 0;
+  const h = await galleryHarness(() => { reads++; return rows; });
+  await tick(); h.update();
+  const cards = () => h.nodes().filter(node => node.props?.onMediaUnavailable);
+  const markFailed = node => { node.props.onMediaUnavailable(node.props.artwork); h.update(); };
+  markFailed(cards()[0]);
+  assert.match(h.text(), /Showing 1 artwork in/);
+  assert.equal(cards().length, 1);
+  markFailed(cards()[0]);
+  assert.match(h.text(), /2 artwork previews could not load/);
+  assert.match(h.text(), /Showing 0 artworks/);
+  assert.doesNotMatch(h.text(), /Awaiting live testnet artworks|Publish Artwork/);
+  rows[0].file_url = '/replacement.png';
+  h.listeners['artsoul:resale-confirmed']();
+  await tick(); h.update();
+  assert.equal(cards().length, 1, 'a replacement URL is attempted immediately');
+  h.nodes().find(node => node.type === 'button' && text(node) === 'Retry previews').props.onClick();
+  h.update();
+  assert.equal(cards().length, 2);
+  assert.doesNotMatch(h.text(), /could not load/);
+  assert.equal(reads, 2, 'preview retry does not fetch the projection again');
 });

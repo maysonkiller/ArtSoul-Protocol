@@ -287,9 +287,10 @@
     }
 
     function hasWinnerOrBid(artwork = {}) {
-        const winner = normalize(artwork.winner || artwork.auction_winner_address || artwork.current_bidder || artwork.highest_bidder);
-        return Boolean(winner && winner !== ZERO_ADDRESS) ||
-            toNumber(artwork.current_bid || artwork.highest_bid || artwork.final_price) > 0;
+        return [artwork.winner, artwork.auction_winner_address, artwork.current_bidder, artwork.highest_bidder]
+            .some(value => /^0x[0-9a-f]{40}$/.test(normalize(value)) && normalize(value) !== ZERO_ADDRESS) ||
+            [artwork.current_bid, artwork.highest_bid, artwork.winning_bid, artwork.final_price,
+                artwork.bid_count, artwork.bids_count, artwork.auction_bid_count].some(value => toNumber(value) > 0);
     }
 
     function activeAuctionId(artwork = {}) {
@@ -309,7 +310,7 @@
         if (state.key === 'live') return { key: 'live', label: 'Auction open' };
         if (state.key === 'listed') return { key: 'listed', label: 'For sale' };
         if (state.key === 'sold' && isMinted(artwork)) return { key: 'sold', label: 'NFT' };
-        if (state.key === 'not_minted') return { key: 'not_minted', label: 'Discover' };
+        if (state.key === 'not_minted' || state.key === 'ended_no_bids') return { key: 'not_minted', label: 'Discover' };
         return state;
     }
 
@@ -322,15 +323,19 @@
     function cardSummary(artwork = {}, now = Date.now()) {
         const state = statusInfo(artwork, now);
         if (state.key === 'finalizing') return { label: 'Status', value: 'Updating' };
+        if (state.key === 'ended_no_bids') return { label: 'Auction', value: 'Ended without bids' };
         if (isMinted(artwork) && !isListedForSale(artwork)) {
             return { label: 'Status', value: 'Not for sale' };
+        }
+        const hasBidPrice = [artwork.current_bid, artwork.highest_bid, artwork.winning_bid, artwork.final_price].some(value => toNumber(value) > 0);
+        if (!hasBidPrice && (state.key === 'awaiting_close' || state.key === 'awaiting_settlement' || state.key === 'settlement_expired')) {
+            return { label: 'Bid', value: 'Recorded' };
         }
         let price = formatPrice(artwork);
         if (!price) return { label: 'Price', value: 'Not set' };
         const chain = Number(artwork.chain_id || artwork.chainId ||
             String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\d+):/i)?.[1]);
         if ([84532, 11155111].includes(chain)) price = price.replace(/ ETH$/, ' test ETH');
-        const hasBidPrice = [artwork.current_bid, artwork.highest_bid].some(value => Number(value) > 0);
         const label = isListedForSale(artwork) ? 'Asking price' : hasBidPrice
             ? (state.key === 'live' ? 'Current bid' : 'Final bid') : 'Starting price';
         return { label, value: price };
@@ -374,12 +379,12 @@
                 ? { key: 'settlement_expired', label: 'Payment window closed' }
                 : { key: 'awaiting_settlement', label: 'Awaiting payment' };
         }
-        if (noBids || ((expired || ended || defaulted) && !hasBid)) {
+        if (!hasBid && (noBids || expired || ended || defaulted)) {
             return { key: 'ended_no_bids', label: 'No bids' };
         }
         if (defaulted) return { key: 'unsettled', label: 'Unsettled' };
         if ((expired || ended) && hasBid) {
-            return { key: 'awaiting_settlement', label: 'Awaiting payment' };
+            return { key: 'awaiting_close', label: 'Bidding ended' };
         }
         if (activeAuctionId(artwork) && !expired && !minted) return { key: 'live', label: 'Live' };
         return { key: 'not_minted', label: 'Not yet minted' };
@@ -387,6 +392,11 @@
 
     function auctionEndTimestamp(artwork = {}) {
         return toTimestamp(artwork.auction_end_time || artwork.end_time || artwork.endTime);
+    }
+
+    function auctionWasExtended(auction = {}) {
+        const original = toTimestamp(auction.auction_original_end_time || auction.originalEndTime);
+        return original > 0 && auctionEndTimestamp(auction) > original;
     }
 
     function formatAuctionCountdown(endTime, now = Date.now()) {
@@ -434,8 +444,8 @@
         };
     }
 
-    function countdownAriaLabel(label) {
-        return label === 'Ended' ? 'Auction ended' : `Auction ends in ${label}`;
+    function countdownAriaLabel(label, extended) {
+        return extended ? `Bidding extended. Auction ends in ${label}` : `Auction ends in ${label}`;
     }
 
     function createCountdownElement(artwork = {}, onEnd = null) {
@@ -449,17 +459,21 @@
         pill.setAttribute('aria-live', 'off');
         // Cards are built off-DOM. Paint the initial value before insertion;
         // only later ticks should stop when the card is disconnected.
-        pill.textContent = info.label;
-        pill.setAttribute('aria-label', countdownAriaLabel(info.label));
+        const extended = auctionWasExtended(artwork);
+        pill.textContent = extended ? 'Extended · ' + info.label : info.label;
+        pill.setAttribute('aria-label', countdownAriaLabel(info.label, extended));
 
         const update = (now = Date.now()) => {
             if ('isConnected' in pill && !pill.isConnected) return false;
             const label = formatAuctionCountdown(info.endTime, now);
-            pill.textContent = label;
-            pill.className = `artsoul-card-countdown${label === 'Ended' ? ' is-ended' : ''}`;
-            pill.setAttribute('aria-label', countdownAriaLabel(label));
-            if (label === 'Ended') onEnd?.(now);
-            return label !== 'Ended';
+            if (label === 'Ended') {
+                pill.remove();
+                onEnd?.(now);
+                return false;
+            }
+            pill.textContent = extended ? 'Extended · ' + label : label;
+            pill.setAttribute('aria-label', countdownAriaLabel(label, extended));
+            return true;
         };
 
         subscribeCountdown(update);
@@ -473,7 +487,7 @@
     function formatPrice(artwork = {}) {
         const candidates = isMinted(artwork)
             ? [artwork.sale_price, artwork.resale_price, artwork.listing_price, artwork.floor_price, artwork.canonical_floor, artwork.price]
-            : [artwork.current_bid, artwork.highest_bid, artwork.start_price, artwork.creator_value, artwork.price];
+            : [artwork.current_bid, artwork.highest_bid, artwork.winning_bid, artwork.final_price, artwork.start_price, artwork.creator_value, artwork.price];
 
         for (const value of candidates) {
             const numeric = Number(value);
@@ -537,6 +551,7 @@
     function cardDetailsText(artwork, now = Date.now()) {
         const summary = cardSummary(artwork, now);
         return [artwork.title || 'Untitled Artwork', `Creator: ${creatorLabel(artwork)}`,
+            window.ArtSoulArtworkAura?.(artwork)?.label,
             `Status: ${cardPreviewInfo(artwork, now).label}`, `${summary.label}: ${summary.value}`].filter(Boolean).join('\n');
     }
 
@@ -642,7 +657,7 @@
         button.dataset.allowRapid = 'true';
         button.dataset.savedArtwork = id;
         button.dataset.savedChain = String(chain);
-        button.setAttribute('aria-label', 'Save artwork');
+        button.setAttribute('aria-label', 'Add to Favorites');
         button.setAttribute('aria-pressed', 'false');
         button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="saved-icon-shape" d="M7 3.5h10a2 2 0 0 1 2 2v15l-7-4-7 4v-15a2 2 0 0 1 2-2Z"/><path class="saved-icon-check" d="m8.5 9 2.3 2.3 4.7-4.6"/></svg>';
         button.addEventListener('click', event => {
@@ -878,6 +893,8 @@
         const minimal = options.minimal === true;
         const surfaceClass = options.surface ? ` artsoul-artwork-card-${options.surface}` : '';
         card.className = `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surfaceClass}`;
+        const aura = window.ArtSoulArtworkAura?.(artwork);
+        if (aura) card.className += ' ' + aura.className;
         if (options.onClick) card.addEventListener('click', options.onClick);
 
         const status = cardPreviewInfo(artwork);
@@ -910,8 +927,8 @@
         priceLabel.textContent = summary.label;
         const priceEl = document.createElement('span');
         priceEl.className = 'artsoul-card-price';
-        if (cardPriceMark(summary.value)) {
-            const mark = document.createElement('img');
+        const mark = cardPriceMark(summary.value) ? document.createElement('img') : null;
+        if (mark) {
             mark.className = 'artsoul-card-price-mark';
             mark.src = cardPriceMark(summary.value);
             mark.alt = '';
@@ -950,7 +967,10 @@
             const next = cardPreviewInfo(artwork, now);
             badge.className = `artsoul-card-status artsoul-card-status-${next.key}`;
             badge.textContent = next.label;
-            priceLabel.textContent = cardSummary(artwork, now).label;
+            const summary = cardSummary(artwork, now);
+            priceLabel.textContent = summary.label;
+            value.textContent = summary.value;
+            if (!cardPriceMark(summary.value)) mark?.remove();
             if (link) {
                 link.title = cardDetailsText(artwork, now);
                 link.setAttribute('aria-label', `Open ${link.title.replace(/\n/g, '. ')}`);
@@ -1131,23 +1151,29 @@
 
             return subscribeCountdown(now => {
                 const label = formatAuctionCountdown(next.endTime, now);
+                if (label === 'Ended') {
+                    setDisplay(null);
+                    onEnd?.(now);
+                    return false;
+                }
                 setDisplay({ endTime: next.endTime, label });
-                if (label === 'Ended') onEnd?.(now);
-                return label !== 'Ended';
+                return true;
             });
         }, [endTime, activeAuctionId(artwork), isMinted(artwork), normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state), onEnd]);
 
-        if (!display || display.endTime !== endTime) return null;
+        const current = display?.endTime === endTime ? display : countdownInfo(artwork);
+        if (!current) return null;
+        const extended = auctionWasExtended(artwork);
         return h('span', {
-            className: `artsoul-card-countdown${display.label === 'Ended' ? ' is-ended' : ''}`,
-            'data-auction-end': String(display.endTime),
+            className: 'artsoul-card-countdown',
+            'data-auction-end': String(endTime),
             role: 'timer',
             'aria-live': 'off',
-            'aria-label': countdownAriaLabel(display.label)
-        }, display.label);
+            'aria-label': countdownAriaLabel(current.label, extended)
+        }, extended ? 'Extended · ' + current.label : current.label);
     }
 
-    function ReactCard({ artwork = {}, href = '', onOpen = null, actions = null, onStartAuction = null, respectHidden = true, minimal = false, surface = '' }) {
+    function ReactCard({ artwork = {}, href = '', onOpen = null, actions = null, onStartAuction = null, respectHidden = true, minimal = false, surface = '', onMediaUnavailable = null }) {
         const React = window.React;
         const h = React.createElement;
         // Only refresh the card at expiry; ordinary second ticks stay local
@@ -1160,8 +1186,9 @@
 
         const status = cardPreviewInfo(artwork);
         const summary = cardSummary(artwork);
+        const aura = window.ArtSoulArtworkAura?.(artwork);
         return h('div', {
-            className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surface ? ` artsoul-artwork-card-${surface}` : ''}`,
+            className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surface ? ` artsoul-artwork-card-${surface}` : ''}${aura ? ' ' + aura.className : ''}`,
             title: onOpen && !href ? cardDetailsText(artwork) : undefined,
             'aria-label': onOpen && !href ? `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` : undefined,
             onClick: onOpen || undefined,
@@ -1176,7 +1203,10 @@
             } : undefined
         },
             h('div', { className: 'artsoul-card-preview' },
-                h(ReactMedia, { artwork, onUnavailable: () => setMediaUnavailable(true) }),
+                h(ReactMedia, { artwork, onUnavailable: () => {
+                    setMediaUnavailable(true);
+                    onMediaUnavailable?.(artwork);
+                } }),
                 href || onOpen ? h(ReactSavedControl, { artwork }) : null
             ),
             h('div', { className: 'artsoul-card-body' },
@@ -1239,6 +1269,7 @@
         statusInfo,
         auctionEndTimestamp,
         formatAuctionCountdown,
+        auctionWasExtended,
         countdownInfo,
         discoveryStatusInfo,
         isListedForSale,

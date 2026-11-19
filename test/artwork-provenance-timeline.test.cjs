@@ -11,10 +11,11 @@ const FIRST_COLLECTOR = '0x2000000000000000000000000000000000000002';
 const CURRENT_OWNER = '0x3000000000000000000000000000000000000003';
 const TX = `0x${'ab'.repeat(32)}`;
 
-function jsonResponse(body, status = 200) {
+function jsonResponse(body, status = 200, contentRange = null) {
   return {
     ok: status < 400,
     status,
+    headers: new Headers(contentRange === null ? {} : { 'Content-Range': contentRange }),
     async text() {
       return JSON.stringify(body);
     }
@@ -142,13 +143,19 @@ const visibleFixtures = {
   artwork_social_signals: []
 };
 
-async function withSupabaseFixtures(fixtures, callback) {
+async function withSupabaseFixtures(fixtures, callback, { maxRows = Infinity, sendCount = true } = {}) {
   const originalFetch = global.fetch;
   const requests = [];
-  global.fetch = async url => {
+  global.fetch = async (url, options) => {
     const { parsed, table } = tableFromUrl(url);
-    requests.push({ table, search: parsed.search });
-    return jsonResponse(fixtures[table] || []);
+    requests.push({ table, search: parsed.search, prefer: options.headers.Prefer });
+    const fixture = fixtures[table];
+    const matches = typeof fixture === 'function' ? fixture(parsed.searchParams) : fixture || [];
+    const offset = Number(parsed.searchParams.get('offset') || '0');
+    const limit = Math.min(maxRows, Number(parsed.searchParams.get('limit') || Infinity));
+    const rows = matches.slice(offset, offset + limit);
+    const total = sendCount && options.headers.Prefer === 'count=estimated' ? matches.length : '*';
+    return jsonResponse(rows, 200, rows.length ? `${offset}-${offset + rows.length - 1}/${total}` : `*/${total}`);
   };
 
   try {
@@ -185,6 +192,8 @@ test('provenance endpoint returns a chain-scoped chronological lifecycle and can
     );
     assert.equal(res.body.complete, true);
     assert.match(res.headers['cache-control'], /^public,/);
+    assert.equal(requests.filter(row => row.table === 'v41_settlements').length, 1);
+    assert.equal(requests.filter(row => row.table === 'v41_resale_history').length, 1);
 
     for (const request of requests) {
       assert.match(request.search, /chain_id=eq\.84532/, `${request.table} stays chain-scoped`);
@@ -272,7 +281,7 @@ test('repricing and cancellation preserve each original listing price, date and 
       assert.equal(q.get('event_name'), 'eq.ResaleListed');
       assert.equal(q.get('event_data->>tokenId'), 'eq.900');
       assert.equal(q.get('chain_id'), 'eq.84532');
-      assert.equal(q.get('limit'), '200');
+      assert.equal(q.get('limit'), '201');
       assert.equal(q.get('order'), 'block_number.asc,log_index.asc');
       assert.equal(res.body.events.some(e => Object.hasOwn(e,'event_data')), false);
     });
@@ -289,13 +298,91 @@ test('missing listing logs never turn mutable state into a historical event', as
   });
 });
 
-test('bounded listing history reports truncation instead of claiming a complete timeline', async () => {
+test('history remains accurate under server row caps and when a proxy omits the count', async () => {
   const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
-  await withSupabaseFixtures({ ...visibleFixtures, contract_events: Array.from({length:200}, () => visibleFixtures.contract_events[0]) }, async () => {
+  for (const [count, maxRows, sendCount] of [
+    [199, 200, true], [200, 200, true], [201, 200, true], [201, 250, true],
+    [7, 7, true], [8, 7, true], [200, 200, false], [201, 200, false], [8, 7, false]
+  ]) {
+    const listings = Array.from({length: count}, (_, i) => ({ ...visibleFixtures.contract_events[0], block_number: 60 + i }));
+    await withSupabaseFixtures({ ...visibleFixtures, contract_events: listings }, async requests => {
+      const res = apiResponse();
+      await handler({ method: 'GET', query: { chain_id: '84532', artwork_id: '77' }, headers: {} }, res);
+      const visible = Math.min(200, maxRows, count);
+      assert.equal(res.body.complete, visible === count);
+      assert.deepEqual(res.body.truncated_sources, visible < count ? ['listings'] : []);
+      const retained = res.body.events.filter(event => event.type === 'resale_listed');
+      assert.equal(retained.length, visible);
+      assert.equal(retained.at(-1).block_number, 59 + visible);
+      const reads = requests.filter(row => row.table === 'contract_events');
+      assert.equal(reads.length, sendCount ? 1 : 2);
+      assert.equal(reads[0].prefer, 'count=estimated');
+      if (!sendCount) assert.equal(new URLSearchParams(reads[1].search).get('offset'), String(visible));
+    }, { maxRows, sendCount });
+  }
+});
+
+test('a capped timeline retains early events and resolves roles from the exact chain, work and token', async () => {
+  const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
+  for (const chain of ['84532', '11155111']) {
+    const fixture = { ...visibleFixtures, v41_artworks: [{ ...visibleFixtures.v41_artworks[0], chain_id: Number(chain) }] };
+    const sales = Array.from({length: 203}, (_, i) => ({
+      ...visibleFixtures.v41_resale_history[0], buyer: i === 202 ? CURRENT_OWNER : CREATOR,
+      block_number: 50 + Math.floor(i / 2), log_index: i % 2
+    }));
+    const attempts = Array.from({length: 203}, (_, i) => ({
+      ...visibleFixtures.v41_settlements[0], auction_id: String(500 + i), block_number: 40 + i,
+      settlement_status: i === 202 ? 'completed' : 'defaulted', winner: i === 202 ? FIRST_COLLECTOR : CREATOR
+    }));
+    fixture.v41_settlements = query => {
+      assert.equal(query.get('chain_id'), 'eq.' + chain);
+      assert.equal(query.get('artwork_id'), 'eq.77');
+      assert.equal(query.get('order'), 'block_number.asc,log_index.asc');
+      if (query.get('select') === 'winner') {
+        assert.equal(query.get('limit'), '1');
+        assert.equal(query.get('settlement_status'), 'eq.completed');
+        return attempts.filter(row => row.settlement_status === 'completed').slice(0, 1);
+      }
+      return attempts;
+    };
+    fixture.v41_resale_history = query => {
+      assert.equal(query.get('chain_id'), 'eq.' + chain);
+      assert.equal(query.get('token_id'), 'eq.900');
+      if (query.get('select') === 'buyer') {
+        assert.equal(query.get('limit'), '1');
+        assert.equal(query.get('order'), 'block_number.desc,log_index.desc');
+        return sales.slice(-1);
+      }
+      assert.equal(query.get('order'), 'block_number.asc,log_index.asc');
+      return sales;
+    };
+    await withSupabaseFixtures(fixture, async requests => {
+      const res = apiResponse();
+      await handler({ method: 'GET', query: { chain_id: chain, artwork_id: '77' }, headers: {} }, res);
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(res.body.roles, {
+        creator_address: CREATOR, first_collector_address: FIRST_COLLECTOR, current_owner_address: CURRENT_OWNER
+      });
+      assert.deepEqual(res.body.truncated_sources, ['settlements', 'resales']);
+      assert.equal(res.body.events.filter(event => event.type === 'settlement_defaulted').length, 200);
+      assert.equal(res.body.events.some(event => event.type === 'settlement_completed'), false);
+      assert.equal(res.body.events.filter(event => event.type === 'resale_completed').length, 200);
+      assert.equal(requests.filter(row => row.table === 'v41_settlements').length, 2);
+      assert.equal(requests.filter(row => row.table === 'v41_resale_history').length, 2);
+    }, { maxRows: 200 });
+  }
+});
+
+test('a disappearing resale read does not publish an older owner from an incomplete timeline', async () => {
+  const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
+  const fixture = { ...visibleFixtures, v41_resale_history: query => query.get('limit') === '1' ? []
+    : Array.from({length: 201}, (_, i) => ({ ...visibleFixtures.v41_resale_history[0], block_number: 60 + i })) };
+  await withSupabaseFixtures(fixture, async () => {
     const res = apiResponse();
     await handler({ method: 'GET', query: { chain_id: '84532', artwork_id: '77' }, headers: {} }, res);
-    assert.equal(res.body.complete,false);
-    assert.deepEqual(res.body.truncated_sources,['listings']);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error, 'NFT_OWNERSHIP_UNAVAILABLE');
+    assert.equal(res.headers['cache-control'], 'private, no-store');
   });
 });
 
