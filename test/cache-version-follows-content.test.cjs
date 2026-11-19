@@ -18,7 +18,8 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
-  'unified-styles.css': { version: 94, sha256: 'edbaac36ac1e7588' },
+  'unified-styles.css': { version: 95, sha256: 'eba59becaeb06ce6' },
+  'mobile-no-motion.css': { version: 3, sha256: '88eb61864da7f616' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 8, sha256: '618e006edefcf241' },
