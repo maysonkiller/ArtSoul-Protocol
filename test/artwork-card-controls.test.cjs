@@ -192,7 +192,12 @@ test('media footer alignment keeps full-size controls on wide cards and a two-ro
     const section = css.slice(css.lastIndexOf('/* Owner layout review 2026-11-16:'));
     assert.match(section, /\.artsoul-card-preview[\s\S]*?position: relative;/);
     assert.match(section, /\.saved-button-overlay\s*\{[\s\S]*?bottom: 8px !important;/);
-    assert.match(section, /\.artsoul-card-media-controls\s*\{[\s\S]*?left: 50% !important;[\s\S]*?translateX\(-50%\)/);
+    const controls = section.match(/\.artsoul-card-media-controls\s*\{([^}]+)\}/)[1];
+    assert.match(controls, /left: 0 !important;/);
+    assert.match(controls, /right: 0 !important;/);
+    assert.match(controls, /width: max-content;/);
+    assert.match(controls, /margin-inline: auto;/);
+    assert.doesNotMatch(controls, /(?:transform|translate)\s*:/, 'a touch press must keep the buttons in the same position');
     assert.match(section, /@container \(max-width: 215px\)[\s\S]*?bottom: 56px !important;/);
 });
 

@@ -412,14 +412,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             }
 
             return (
-                <div className="min-h-screen">
-                    {/* Main Content */}
-                    <main className="gallery-page-main site-page-container py-6">
-                        <div className="gallery-page-heading">
-                            <p className="home-section-kicker">Explore ArtSoul</p>
-                            <h1>Art worth discovering.</h1>
-                        </div>
-
+                <>
                         {/* Filters */}
                         <div className="gallery-filter-panel rounded-xl">
                             <div className="gallery-tab-row" ref={galleryTabsRef} role="group" aria-label="Artwork categories">
@@ -463,7 +456,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     data-artsoul-value={statusFilter}
                                     className="gallery-filter-select"
                                 >
-                                    <option value="all">All Status</option>
+                                    <option value="all">All statuses</option>
                                     <option value="draft">Draft</option>
                                     <option value="auction">Live</option>
                                     <option value="sold">Sold</option>
@@ -502,13 +495,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         onClick={() => setFiltersOpen(open => !open)}
                                         className="btn-secondary"
                                     >
-                                        {filtersOpen ? 'Hide Filters' : 'Filters'}
+                                        {filtersOpen ? 'Hide price range' : 'Price range'}
                                     </button>
                                     <button
                                         onClick={clearFilters}
                                         className="btn-secondary"
                                     >
-                                        Clear
+                                        Clear filters
                                     </button>
                                 </div>
                             </div>
@@ -593,20 +586,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                             <CardGridSkeleton className="gallery-results-grid" />
                         ) : (loadError || failedPreviewCount > 0) && filteredArtworks.length === 0 ? null
                         : filteredArtworks.length === 0 ? (
-                            <div className="text-center py-20 rounded-xl" style={{
-                                background: isClassic ? 'rgba(232, 227, 213, 0.03)' : 'rgba(var(--c-accent-rgb), 0.04)',
-                                border: isClassic ? '1px solid rgba(var(--c-accent-rgb), 0.35)' : '1px solid rgba(var(--c-accent-rgb), 0.22)'
-                            }}>
+                            <div className="gallery-empty-state">
                                 {(() => {
                                     const emptyState = emptyStateForTab(isGlobalSearch ? 'search' : activeTab, hasActiveFilters());
                                     return (
                                         <>
-                                <div className="text-xl opacity-50">
-                                                {emptyState.title}
-                                </div>
-                                <div className="text-sm opacity-30 mt-2">
-                                                {emptyState.detail}
-                                </div>
+                                            <h2>{emptyState.title}</h2>
+                                            <p>{emptyState.detail}</p>
                                             {emptyState.verificationGuide && (
                                                 <a className="inline-block mt-4 underline" href="/docs-protocol#collection-verification">How collection verification works</a>
                                             )}
@@ -732,7 +718,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                         <div className={`w-full h-full flex flex-col items-center justify-center ${isClassic ? 'bg-gray-800' : 'bg-gradient-to-br from-purple-900/30 to-cyan-900/30'}`} style={{position: 'relative'}}>
                                                             <img
                                                                 id={`music-logo-${artwork.id}`}
-                                                                src="/ARTSOULlogo.png"
+                                                                src="/brand/artsoul-audio-cover-384.webp"
                                                                 alt="Music"
                                                                 loading="lazy"
                                                                 decoding="async"
@@ -747,6 +733,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                             />
                                                             <audio
                                                                 src={artwork.file_url}
+                                                                preload="none"
                                                                 onError={() => hideFailedPreview(artwork)}
                                                                 controls
                                                                 crossOrigin="anonymous"
@@ -874,8 +861,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 })}
                             </div>
                         )}
-                    </main>
-                </div>
+                </>
             );
         }
 

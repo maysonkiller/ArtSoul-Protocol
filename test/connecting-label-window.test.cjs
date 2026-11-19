@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const prepaint = fs.readFileSync('header-prepaint.js', 'utf8');
+const { paintCachedHeader } = require('./helpers/avatar-dropdown-harness.cjs');
 const dropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
 
 const SHARED_HEADER_PAGES = [
@@ -11,25 +11,16 @@ const SHARED_HEADER_PAGES = [
 ];
 
 test('the resolving label is claimed only when there is nothing to paint', () => {
-  // `wallet-state-resolving` is what reveals the static "Connecting..." text
-  // that every shared-header page ships in its markup. It used to be set
-  // unconditionally in <head> and cleared only once hydrate() ran, which is
-  // after the account button has parsed. That window is one whole document:
-  //
-  //     artwork.html   prepaint line 69   button line 266   ~200 lines
-  //     profile.html   119                233               ~114
-  //     gallery.html    64                124                ~60
-  //     index.html     226                250                ~24
-  //
-  // Reported from production in exactly that order - most visible opening an
-  // artwork, not visible on the homepage. With a usable cached preview the
-  // prepaint can paint the whole identity, so the label must never be claimed.
-  assert.match(prepaint, /if \(!appKitDisconnectedAtBoot && !readPreview\(\)\s*\n\s*&& \(hasWallet \|\| cachedUiState === 'connected'\)\) \{/);
-  // readPreview must be defined before that decision, or it is always false.
-  assert.ok(
-    prepaint.indexOf('const readPreview =') < prepaint.indexOf("classList.add('wallet-state-resolving')"),
-    'readPreview must be defined before the class is decided'
-  );
+  const wallet = '0x' + 'a'.repeat(40);
+  const source = '/custom-avatar.png';
+  const identity = { wallet, name: 'Artist', avatarUrl: source };
+  const preview = { wallet, name: identity.name, source, dataUri: 'data:image/webp;base64,AAAA' };
+  const resolving = (cached, storage = {}) =>
+    paintCachedHeader(cached, { beforeShell: true, storage }).documentElement.classList.contains('wallet-state-resolving');
+  assert.equal(resolving(identity), true);
+  assert.equal(resolving({ ...identity, preview }), false);
+  assert.equal(resolving({ ...identity, preview: { ...preview, name: 'Previous name' } }), true);
+  assert.equal(resolving(identity, { artsoul_disconnecting: 'true' }), false);
 });
 
 test('every shared-header page hydrates immediately after its button', () => {

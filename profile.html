@@ -50,9 +50,9 @@
     <link rel="icon" type="image/jpeg" href="/favicon.jpg?v=3">
     <link rel="shortcut icon" type="image/jpeg" href="/favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
-    <script src="/header-prepaint.js?v=11"></script>
+    <script src="/header-prepaint.js?v=12"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
-    <link rel="stylesheet" href="/unified-styles.css?v=93">
+    <link rel="stylesheet" href="/unified-styles.css?v=94">
     <link rel="stylesheet" href="/button-effects.css?v=6">
     <link rel="stylesheet" href="/mobile-responsive.css?v=5">
     <link rel="stylesheet" href="/performance-optimizations.css?v=2">
@@ -68,12 +68,31 @@
     <script src="/modal-system.js?v=2" defer></script>
     <script src="/src/features/discovery/discovery-service.js?v=1" defer></script>
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
-    <script src="/src/ui/components/artwork-card.js?v=38" defer></script>
+    <script src="/src/ui/components/artwork-card.js?v=39" defer></script>
     <style>
         @keyframes profileAudioRotation {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+
+        .profile-page {
+            background: var(--c-bg);
+            color: var(--c-text);
+        }
+
+        .profile-page .saved-unavailable {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .profile-page .saved-unavailable > a { font-weight: 600; text-decoration: underline; }
+        .profile-page .saved-unavailable > .btn-secondary { margin-top: auto; min-height: 44px; padding: 0.4rem 0.75rem; }
+
+        .profile-page .profile-stat-card > .context-help-label { flex-wrap: wrap; overflow-wrap: normal; }
 
         .profile-artwork-grid {
             align-items: stretch;
@@ -117,11 +136,11 @@
         }
     </style>
     <script src="/data-prefetch.js?v=7" async></script>
-    <script src="/avatar-dropdown.js?v=72" defer></script>
+    <script src="/avatar-dropdown.js?v=73" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <!-- Agent tools (WebMCP). Registers nothing in a browser without the API. -->
-    <script src="/webmcp-tools.js?v=31" defer></script>
+    <script src="/webmcp-tools.js?v=32" defer></script>
     <!-- Voice commands: the same agent tools, spoken. Absent where the browser has no speech recognition. -->
     <script src="/voice-commands.js?v=17" defer></script>
     <script type="module" src="/contracts-integration.js?v=21"></script>

@@ -14,7 +14,7 @@ test('branded runtime media resolves from the site root on clean subpath routes'
     'src/entries/generate-favicon.js',
     'src/ui/components/artwork-card.js'
   ];
-  const relativeBrandAsset = /(['"])ARTSOULlogo(?:-clean)?\.png(?:\?[^'"]*)?\1/g;
+  const relativeBrandAsset = /(['"])(?:ARTSOULlogo(?:-clean)?\.png|brand\/artsoul-audio-cover-384\.webp)(?:\?[^'"]*)?\1/g;
 
   for (const file of runtimeFiles) {
     assert.doesNotMatch(
@@ -26,7 +26,7 @@ test('branded runtime media resolves from the site root on clean subpath routes'
 
   assert.match(
     read('src/entries/artwork.jsx'),
-    /src="\/ARTSOULlogo\.png"/,
+    /src="\/brand\/artsoul-audio-cover-384\.webp"/,
     'the audio detail must render its branded visual from the site root'
   );
 });

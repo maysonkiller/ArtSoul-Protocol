@@ -81,3 +81,13 @@ test('shared card images defer offscreen transfer and decode work', () => {
     assert.equal((gallerySource.match(/loading="lazy"/g) || []).length, 2);
     assert.equal((gallerySource.match(/decoding="async"/g) || []).length, 2);
 });
+
+test('audio card previews display the compact local cover before a listener presses play', () => {
+    const cover = '/brand/artsoul-audio-cover-384.webp';
+    const bytes = fs.readFileSync(path.join(__dirname, '..', 'public', cover));
+    assert.equal(bytes.toString('ascii', 8, 12), 'WEBP');
+    assert.ok(bytes.length < 64 * 1024);
+    assert.ok(source.includes(cover) && gallerySource.includes(cover));
+    assert.match(source, /audio\.preload = 'none'/);
+    assert.match(source, /className: 'artsoul-card-audio-element', preload: 'none'/);
+});

@@ -257,7 +257,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         <div className="artwork-detail-audio-visual">
                             <div className="artwork-detail-audio-logo-wrap">
                                 <img
-                                    src="/ARTSOULlogo.png"
+                                    src="/brand/artsoul-audio-cover-384.webp"
                                     alt="Music"
                                     className={`artwork-detail-audio-logo ${isPlaying ? 'is-playing' : ''}`}
                                 />

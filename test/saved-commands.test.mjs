@@ -149,19 +149,42 @@ test('a toggle owns the shared lock while authentication, lookup and its write a
   await h.savedConfig;
   const button = h.button(), toggle = h.window.ArtSoulSaved.toggle(button);
   assert.match((await h.setSavedArtwork('34', true)).reason, /being updated/);
-  assert.equal(h.calls.length, 0);
+  assert.match(h.calls[0].url, /artwork_ids=34/);
+  h.reply(0, {}, 401);
+  await tick();
+  assert.equal(h.signIns, 1);
   signIn.resolve(true);
   await tick();
-  assert.match(h.calls[0].url, /artwork_ids=34/);
+  assert.match(h.calls[1].url, /artwork_ids=34/);
   assert.match((await h.setSavedArtwork('34', false)).reason, /being updated/);
-  h.reply(0, { wallet: A, chainId: 84532, coreAddress: CORE, artworkIds: [] });
+  h.reply(1, { wallet: A, chainId: 84532, coreAddress: CORE, artworkIds: [] });
   await tick();
-  assert.deepEqual(JSON.parse(h.calls[1].options.body), { ...item, saved: true });
+  assert.deepEqual(JSON.parse(h.calls[2].options.body), { ...item, saved: true });
   assert.match((await h.setSavedArtwork('34', false)).reason, /being updated/);
-  h.reply(1, { wallet: A, saved: true });
+  h.reply(2, { wallet: A, saved: true });
   await toggle;
   assert.equal(button.disabled, false);
   assert.equal(h.savedStore.getState().saved.get(savedKey(item)), true);
+});
+
+test('card favorites reuse the server session and retry an expired write once with the same intent', async () => {
+  const h = harness();
+  await h.savedConfig;
+  const button = h.button();
+  const add = h.window.ArtSoulSaved.toggle(button);
+  h.reply(0, { wallet: A, chainId: 84532, coreAddress: CORE, artworkIds: [] });
+  await tick();
+  h.reply(1, { wallet: A, saved: true });
+  await add;
+  assert.equal(h.signIns, 0);
+  const remove = h.window.ArtSoulSaved.toggle(button);
+  h.reply(2, {}, 401);
+  await tick();
+  assert.equal(h.signIns, 1);
+  assert.deepEqual(JSON.parse(h.calls[3].options.body), { ...item, saved: false });
+  h.reply(3, { wallet: A, saved: false });
+  await remove;
+  assert.equal(button['aria-pressed'], 'false');
 });
 
 test('a write from the Saved list blocks a command through the same store pending state', async () => {

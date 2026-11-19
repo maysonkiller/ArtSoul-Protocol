@@ -114,4 +114,28 @@ function startAfterFirstPaint() {
     setTimeout(start, WALLET_RUNTIME_START_FALLBACK_MS);
 }
 
-void waitForDocumentReady().then(startAfterFirstPaint);
+// Public pages can be read without opening a fresh wallet SDK. Resume promptly
+// when an injected provider, a previous session or a wallet callback is present.
+// Unknown storage availability keeps the normal restore path, including on iOS.
+async function shouldRestoreWallet() {
+    const page = window.location?.pathname?.replace(/\.html$/, '').replace(/\/$/, '') || '/';
+    if (!['/', '/gallery', '/docs-protocol', '/artwork'].includes(page) && !page.startsWith('/artwork/')) return true;
+    if (window.ethereum || window.currentWalletAddress || /(?:wc:|wc%3a|wc_ev|walletconnect)/i.test(window.location?.href || '')) return true;
+    try {
+        if (!window.indexedDB?.databases) return true;
+        for (const storage of [window.localStorage, window.sessionStorage]) {
+            if (storage.getItem('artsoul_wallet') || storage.getItem('artsoul_authenticated_wallet') ||
+                storage.getItem('artsoul_header_ui_state') === 'connected') return true;
+            for (let i = 0; i < storage.length; i++) {
+                if (/walletconnect|wc@|reown|appkit|wagmi|web3_connect_cached_provider/i.test(storage.key(i))) return true;
+            }
+        }
+        return (await window.indexedDB.databases()).length > 0;
+    } catch {
+        return true;
+    }
+}
+
+void waitForDocumentReady().then(async () => {
+    if (await shouldRestoreWallet()) startAfterFirstPaint();
+});

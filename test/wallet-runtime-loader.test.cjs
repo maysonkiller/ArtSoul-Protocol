@@ -17,7 +17,7 @@ function deferred() {
     return { promise, resolve, reject };
 }
 
-function executeLoader(loadModuleForTest, readyState = 'complete', domContentLoadedEventStart = 0) {
+function executeLoader(loadModuleForTest, readyState = 'complete', domContentLoadedEventStart = 0, schedule = setTimeout) {
     const transformed = SOURCE.replace(
         "import('./appkit-init.js?v=57')",
         'loadModuleForTest()'
@@ -57,7 +57,7 @@ function executeLoader(loadModuleForTest, readyState = 'complete', domContentLoa
             }
         },
         requestAnimationFrame() {},
-        setTimeout,
+        setTimeout: schedule,
         console
     };
 
@@ -247,4 +247,35 @@ test('a tab that never gets a frame still boots the wallet runtime', async () =>
   assert.ok(Number.isFinite(fallback), 'the fallback delay must be a literal');
   assert.ok(fallback > 0 && fallback <= 3000,
     'long enough for a visible page to win on its own frame, short enough that a hidden tab is not stranded');
+});
+
+test('public guest browsing avoids SDK startup while existing wallets retain automatic restore', async () => {
+  const storage = { length: 0, getItem: () => null };
+  for (const [name, overrides, restore] of [
+    ['guest', {}, false],
+    ['persisted session', { indexedDB: { databases: async () => [{ name: 'wallet session' }] } }, true],
+    ['injected provider', { ethereum: {} }, true],
+    ['cached account', { localStorage: { ...storage, getItem: key => key === 'artsoul_wallet' ? 'cached' : null } }, true],
+    ['restricted storage', { indexedDB: { databases: async () => { throw new Error('storage unavailable'); } } }, true],
+    ['private profile', { location: { pathname: '/profile' } }, true]
+  ]) {
+    let loads = 0;
+    const timers = [];
+    const h = executeLoader(async () => {
+      loads++;
+      h.window.__artsoulAppKitBootPromise = Promise.resolve();
+      h.window.safeConnectWallet = async () => 'connected';
+    }, 'loading', 0, callback => { timers.push(callback); });
+    Object.assign(h.window, {
+      location: { pathname: '/gallery' }, localStorage: storage, sessionStorage: storage,
+      indexedDB: { databases: async () => [] }, ...overrides
+    });
+    h.fire('DOMContentLoaded');
+    await new Promise(resolve => setImmediate(resolve));
+    for (const fire of timers) fire();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(loads, Number(restore), name);
+    assert.equal(await h.window.safeConnectWallet(), 'connected');
+    assert.equal(loads, 1);
+  }
 });

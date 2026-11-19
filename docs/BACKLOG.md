@@ -1,6 +1,6 @@
 # ArtSoul Durable Backlog
 
-Updated: 2026-10-26
+Updated: 2026-11-20
 Canonical phase model: `A-D` from [`docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`](canon/ARTSOUL_CANON_BIBLE_FULL.md) section 17.
 
 This is the repository's durable work register. It consolidates verified completed work, open implementation work, founder-owned inputs, and code-level follow-ups so that ideas do not remain authoritative only in chat sessions or external prompt files.
@@ -16,6 +16,15 @@ This is the repository's durable work register. It consolidates verified complet
 7. Resource-gated work follows [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md). Missing funding defers activation; it never waives security, audit, role-separation, legal, migration, or mainnet acceptance requirements.
 
 ## Canonical Phase Mapping
+
+### November 20 recorded navigation and preview review
+
+| Item | Verified behavior | Remaining acceptance |
+| --- | --- | --- |
+| C15 wallet and page continuity | Chromium reproduced a 14px header shift across account restoration. The same control bounds held in both themes after the fix. Classic profile now uses the page background. A cached tab stays visible during refresh. [Header regression](../test/shared-header-navigation-flicker.test.cjs), [profile cases](../test/profile-organization.test.cjs). | A physical wallet reconnect and iPhone app switch on this release. |
+| C15 gallery and Favorites | Rendering starts with a static gallery heading. Audio cards defer track downloads until play and use a 44,106-byte ArtSoul cover. The private API confirms bookmark state, and expired sessions can sign in once and retry the original action. Four supplied bookmarks produce four rows even when individual previews fail. Both card renderers keep the media buttons centered during an active press. Chromium verified pointer, touch and keyboard playback in both themes. [Bookmark tests](../test/saved-commands.test.mjs), [store tests](../test/saved-state.test.mjs). | Compare private bookmarks for an explicitly connected account. |
+| C13 public journeys | Guest checks on the public testnet covered home, search, five gallery categories, artwork actions, public profiles, upload, collection draft review, Guide and the admin sign-in boundary. The Guide now exposes a shareable URL for the selected topic and restores it on Back and Forward. [Guide tests](../test/protocol-docs-content.test.cjs). | Signed publication, monetary actions, privileged moderation, and cohort acceptance use their separate testnet records. |
+
 
 ### October 22 publishing follow-up
 

@@ -324,6 +324,12 @@ function createAvatarHarness(options = {}) {
     setItem: (key, value) => storage.set(key, String(value)),
     removeItem: key => storage.delete(key)
   };
+  const tabStorage = options.tabStorage || new Map();
+  const sessionStorage = {
+    getItem: key => tabStorage.get(key) ?? null,
+    setItem: (key, value) => tabStorage.set(key, String(value)),
+    removeItem: key => tabStorage.delete(key)
+  };
 
   const documentListeners = new Map();
   const mutationObservers = [];
@@ -392,6 +398,7 @@ function createAvatarHarness(options = {}) {
         if (index >= 0) pendingTimeouts.splice(index, 1);
     },
     localStorage,
+    sessionStorage,
     // The shared header decodes the next avatar in a detached image before it
     // swaps the visible one, so the harness must provide the same constructor
     // the browser does.
@@ -714,7 +721,22 @@ function createAvatarHarness(options = {}) {
   return harness;
 }
 
+function paintCachedHeader(identity, { beforeShell = false, storage = {} } = {}) {
+  const page = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
+  const staticShellHtml = beforeShell ? '' : page.match(/<div class="avatar-dropdown-container">[\s\S]*?<\/button>\s*<\/div>/)[0];
+  return createAvatarHarness({
+    prepaint: true, readyState: 'loading', settled: false, staticShellHtml,
+    storage: {
+      artsoul_wallet: identity.wallet,
+      artsoul_header_ui_state: 'connected',
+      artsoul_header_identity: JSON.stringify(identity),
+      ...storage
+    }
+  });
+}
+
 module.exports = {
+  paintCachedHeader,
   createAvatarHarness,
   FakeElement,
   matches,

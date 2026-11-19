@@ -110,6 +110,8 @@ async function harness(hash = '', theme = 'future') {
   let index = 0, layoutIndex = 0, frameId = 0, mounted = false, committedOpen = {};
   const window = {location: new URL('https://artsoul.example/docs-protocol' + hash),
     addEventListener: (name, fn) => windowEvents.set(name, fn), removeEventListener: name => windowEvents.delete(name)};
+  const pushed = [];
+  window.history = {state: null, pushState(state, title, url) {window.location.hash = url; pushed.push(url);}};
   const document = {documentElement: {classList: {contains: value => value === theme}}, getElementById: id => ({
       scrollIntoView: options => { scrolls.push({id, ...options}); navigationEvents.push(`scroll:${id}`); layoutAtScroll.push({id, open: Boolean(committedOpen[id])}); },
       querySelector: selector => selector === '.protocol-section-trigger' ? {
@@ -127,7 +129,7 @@ async function harness(hash = '', theme = 'future') {
       layoutDeps[slot] = deps;
     }
   }, {window, document, URL, requestAnimationFrame: fn => {frames.set(++frameId, fn); return frameId;}, cancelAnimationFrame: id => frames.delete(id)});
-  const result = {window, values, frames, scrolls, focuses, navigationEvents, layoutAtScroll, windowEvents, documentEvents,
+  const result = {window, values, frames, scrolls, focuses, navigationEvents, layoutAtScroll, windowEvents, documentEvents, pushed,
     render() {
       index = 0; layoutIndex = 0;
       const view = scope.App();
@@ -137,8 +139,13 @@ async function harness(hash = '', theme = 'future') {
     },
     flush() {for (const [id, fn] of frames) {frames.delete(id); fn();}},
     hash(value) {window.location.hash = value; windowEvents.get('hashchange')();},
-    click(href, extra = {}, linkExtra = {}) {documentEvents.get('click')({button: 0,
-      target: {closest: () => ({href, target: '', hasAttribute: () => false, ...linkExtra})}, ...extra});}
+    click(href, extra = {}, linkExtra = {}) {documentEvents.get('click')({button: 0, preventDefault() {},
+      target: {closest: () => ({href, target: '', hasAttribute: () => false, closest: () => null, ...linkExtra})}, ...extra});},
+    selectTopic(id, flags = {}) {
+      const link = findElement(this.render(), element => element.type === 'a' && element.props.href === '#' + id);
+      assert.ok(link, 'contents includes a shareable link for ' + id);
+      this.click(new URL(link.props.href, window.location.href).href, flags, {closest: selector => selector === '#protocolSideNav'});
+    }
   };
   result.render(); mounted = true; result.cleanup = effects.map(fn => fn());
   return result;
@@ -164,9 +171,7 @@ test('contents navigation respects the current reduced-motion preference and kee
   for (const behavior of ['smooth', 'auto']) {
     reduceMotion = behavior === 'auto';
     h.values[1] = true;
-    const button = findElement(h.render(), element => element.type === 'button' && element.props.children === 'Fees and Economics');
-    assert.ok(button, 'the real contents button must remain available');
-    button.props.onClick();
+    h.selectTopic('fees');
     h.render(); h.flush();
     assert.equal(h.values[0].fees, true);
     assert.equal(h.values[1], false, 'choosing a topic closes the mobile contents');
@@ -179,17 +184,33 @@ test('contents navigation respects the current reduced-motion preference and kee
 
 test('contents navigation remains available when the browser has no motion-query API', async () => {
   const h = await harness();
-  const button = findElement(h.render(), element => element.type === 'button' && element.props.children === 'Frequently Asked Questions');
-  button.props.onClick(); h.render(); h.flush();
+  h.selectTopic('faq'); h.render(); h.flush();
   assert.deepEqual(h.scrolls, [{id: 'faq', behavior: 'smooth', block: 'start'}]);
 });
 
 test('Classic contents navigation is immediate even when motion is allowed', async () => {
   const h = await harness('', 'classic');
   h.window.matchMedia = () => ({matches: false});
-  const button = findElement(h.render(), element => element.type === 'button' && element.props.children === 'Frequently Asked Questions');
-  button.props.onClick(); h.render(); h.flush();
+  h.selectTopic('faq'); h.render(); h.flush();
   assert.deepEqual(h.scrolls, [{id: 'faq', behavior: 'auto', block: 'start'}]);
+});
+
+test('contents keeps shareable topic history, reopens the same topic and leaves modified clicks native', async () => {
+  const h = await harness('#deposits');
+  h.selectTopic('nft-frames', {ctrlKey: true});
+  assert.equal(h.window.location.hash, '#deposits');
+  h.selectTopic('nft-frames'); h.render();
+  assert.equal(h.window.location.hash, '#nft-frames');
+  h.values[0]['nft-frames'] = false;
+  h.selectTopic('nft-frames'); h.render();
+  assert.equal(h.values[0]['nft-frames'], true);
+  assert.deepEqual(h.pushed, ['#nft-frames']);
+  for (const id of ['deposits', 'nft-frames']) {
+    h.hash('#' + id); h.render();
+    assert.deepEqual(h.focuses.at(-1), {id, preventScroll: true});
+    assert.deepEqual(h.scrolls.at(-1), {id, behavior: 'auto', block: 'start'});
+  }
+  assert.deepEqual(h.pushed, ['#nft-frames']);
 });
 
 test('initial section links open and reveal the requested accordion without closing others', async () => {

@@ -572,13 +572,13 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=93">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=11"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=72" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=94">/, `${page} stylesheet pin`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=12"><\/script>/, `${page} prepaint pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=73" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=93');
-    const prepaint = html.indexOf('header-prepaint.js?v=11');
-    const component = html.indexOf('avatar-dropdown.js?v=72');
+    const stylesheet = html.indexOf('unified-styles.css?v=94');
+    const prepaint = html.indexOf('header-prepaint.js?v=12');
+    const component = html.indexOf('avatar-dropdown.js?v=73');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is
     // wallet-runtime-loader.js and appkit-init is imported from inside it. The
     // ordering this guard protects is unchanged: the header component still has
@@ -1585,6 +1585,52 @@ function restorableStorage(wallet, name, avatarUrl, previewOverrides = {}) {
     })
   };
 }
+
+test('same-tab navigation retains only the decorative logo until the wallet confirms', async () => {
+  const tabStorage = new Map();
+  const first = bootHarness({ tabStorage });
+  first.context.window.currentWalletAddress = WALLET_A;
+  first.dropdown.rememberWalletProvider({ name: 'Rabby', mark: 'rabby' }, WALLET_A);
+  const storage = restorableStorage(WALLET_A, 'Founder', AVATAR_A);
+  const next = bootHarness({ tabStorage, storage, settled: false });
+  assert.equal(next.button().dataset.providerPreview, 'rabby');
+  assert.doesNotMatch(next.button().getAttribute('aria-label'), /connected wallet/i);
+  next.dropdown.renderInitializingState();
+  assert.equal(next.button().dataset.providerPreview, 'rabby');
+  assert.equal(next.navButtons.querySelector('[data-avatar-name]').disabled, true);
+  assert.equal(next.context.window.currentWalletAddress, undefined);
+  assert.equal(next.accessCalls.length, 0);
+  assert.equal(next.dropdown.getRememberedWalletProvider(WALLET_A), null);
+
+  next.context.window.currentWalletAddress = WALLET_A;
+  next.dropdown.beginIdentityTransition(WALLET_A);
+  assert.equal(next.button().dataset.providerPreview, 'rabby', 'keep the mark while identifying the provider');
+  next.dropdown.rememberWalletProvider({ name: 'MetaMask', mark: 'metamask' }, WALLET_A);
+  next.dropdown.syncAccountWalletProvider(next.dropdown.getRememberedWalletProvider(WALLET_A));
+  const slot = next.button().querySelector('[data-avatar-wallet-provider]');
+  assert.match(slot.innerHTML, /src="\/brand\/metamask.png"/);
+  assert.equal(next.button().dataset.providerPreview, undefined);
+  assert.doesNotMatch(slot.innerHTML, /rabby/);
+  next.dropdown.beginIdentityTransition(WALLET_B);
+  assert.equal(slot.hidden, true);
+  assert.equal(tabStorage.size, 0);
+  next.context.window.currentWalletAddress = WALLET_B;
+  next.dropdown.rememberWalletProvider({ name: 'Rabby', mark: 'rabby' }, WALLET_B);
+  next.dropdown.beginIdentityTransition(null);
+  assert.equal(tabStorage.size, 0);
+});
+
+test('an unrelated or unrecognized saved connector never supplies a visible mark', () => {
+  const storage = restorableStorage(WALLET_A, 'Founder', AVATAR_A);
+  for (const cached of [WALLET_B + ':rabby', WALLET_A + ':https://foreign.test/logo', WALLET_A + ':rabby:extra']) {
+    const tabStorage = new Map([['artsoul_header_provider_mark', cached]]);
+    const h = bootHarness({ tabStorage, storage, settled: false });
+    assert.equal(h.button().dataset.providerPreview, undefined);
+    assert.ok(!h.button().querySelector('[data-avatar-wallet-provider]')?.innerHTML);
+    assert.equal(tabStorage.size, 0);
+    assert.equal(h.accessCalls.length, 0);
+  }
+});
 
 test('a successful avatar render stores a bounded paint-ready preview', async () => {
   const harness = bootHarness({

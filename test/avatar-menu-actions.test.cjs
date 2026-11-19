@@ -30,6 +30,12 @@ test('compact header keeps copy adjacent to short, missing and long names withou
     assert.match(compact, /\.avatar-info button:disabled\[data-copy-value=""\]/);
     assert.doesNotMatch(compact, /\.avatar-info button:disabled\s*\{\s*padding-right:/);
     assert.match(css, /\.avatar-info button\[data-copy-value\]:not\(\[data-copy-value=""\]\)::after/);
+    const paintedWallet = '#navButtons:has([data-avatar-image][data-avatar-identity^="0x"])';
+    const guest = '#navButtons:not(:has([data-avatar-image][data-avatar-identity^="0x"]))';
+    assert.ok(css.includes(paintedWallet + ' .avatar-info button:disabled::after'));
+    for (const selector of [':not([data-copy-value])', '[data-copy-value=""]']) {
+        assert.ok(compact.includes(guest + ' .avatar-info button:disabled' + selector));
+    }
 
     const harness = createAvatarHarness();
     const structure = harness.dropdown.getStableStructure();

@@ -15,7 +15,9 @@ test('React pages and shared card components use one exposed React runtime', () 
     assert.doesNotMatch(source, /from 'react'/, `${entry} must not import another React binding`);
   }
 
-  assert.match(read('src/entries/index.js'), /import '\.\/react-runtime\.js'/);
+  const homepage = read('src/entries/index.js');
+  assert.doesNotMatch(homepage, /import ['"].*react-runtime/);
+  assert.match(homepage, /window\.ArtSoulArtworkAura = projectedArtworkAura/);
   assert.match(read('src/entries/loading-skeletons.jsx'), /from '\.\/react-runtime\.js'/);
   assert.match(read('src/ui/components/artwork-card.js'), /const React = window\.React/);
 });

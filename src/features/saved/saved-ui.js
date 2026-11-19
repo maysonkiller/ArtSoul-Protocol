@@ -54,7 +54,7 @@ function scheduleScan() {
   scheduled = true;
   queueMicrotask(scan);
 }
-function notice(message) {
+function notice(message, showList = false) {
   let region = document.getElementById('saved-feedback');
   if (!region) {
     region = document.createElement('div');
@@ -63,9 +63,12 @@ function notice(message) {
     region.setAttribute('role', 'status');
     document.body.appendChild(region);
   }
-  region.replaceChildren(document.createTextNode(message + ' '));
-  const link = document.createElement('a');
-  link.href = '/profile#saved'; link.textContent = 'View Favorites'; region.appendChild(link);
+  region.replaceChildren(document.createTextNode(message));
+  if (showList) {
+    const link = document.createElement('a');
+    link.href = '/profile#saved'; link.textContent = 'View Favorites';
+    region.appendChild(document.createTextNode(' ')); region.appendChild(link);
+  }
   clearTimeout(notice.timer);
   notice.timer = setTimeout(() => region.remove(), 6000);
 }
@@ -87,16 +90,26 @@ async function toggle(button) {
   const before = currentSavedWallet();
   button.disabled = true;
   try {
-    if (!await signInForSaved()) { notice('Sign in with your wallet to add artworks to Favorites.'); return; }
-    if (before && revision !== walletRevision) return;
-    // A cold/auth-expired view cannot guess whether an existing save should be
-    // removed. Read the real state after sign-in before deciding the action.
-    if (!savedStore.getState().saved.has(key) && !await savedStore.lookup([item])) {
-      notice('Favorites are unavailable. Please try again.'); return;
+    const switched = () => before && (before !== currentSavedWallet() || revision !== walletRevision);
+    let known = before && savedStore.getState().saved.has(key);
+    if (before && !known && savedStore.getState().status !== 'auth') known = await savedStore.lookup([item]);
+    if (switched()) return;
+    // Remember the desired state even if the server session expires during the write.
+    let value = known ? !savedStore.getState().saved.get(key) : undefined;
+    let ok = known && await savedStore.set(item, value);
+    if (switched()) return;
+    if (!ok && (!before || savedStore.getState().status === 'auth')) {
+      notice('Sign a wallet message to access your private Favorites. No gas fee.');
+      if (!await signInForSaved()) { if (!switched()) notice('Sign in to update your Favorites.'); return; }
+      if (switched()) return;
+      if (value === undefined) {
+        if (!await savedStore.lookup([item])) { if (!switched()) notice('Favorites are unavailable. Please try again.'); return; }
+        value = !savedStore.getState().saved.get(key);
+      }
+      if (switched()) return;
+      ok = await savedStore.set(item, value);
     }
-    const value = savedStore.getState().saved.get(key) !== true;
-    const ok = await savedStore.set(item, value);
-    if (ok) notice(value ? 'Artwork added to Favorites.' : 'Artwork removed from Favorites.');
+    if (ok) notice(value ? 'Artwork added to Favorites.' : 'Artwork removed from Favorites.', true);
     else if (before === currentSavedWallet()) notice('Favorites could not be updated. Please try again.');
   } catch { notice('Sign-in was not completed. Please try again.'); }
   finally { if (operations.get(key) === operation) operations.delete(key); paint(); }

@@ -103,6 +103,14 @@ function ProtocolDocsApp() {
             if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
             const target = new URL(link.href, window.location.href);
             if (target.origin !== window.location.origin || !['/docs-protocol', '/docs-protocol.html'].includes(target.pathname)) return;
+            if (link.closest('#protocolSideNav')) {
+                event.preventDefault();
+                if (target.hash !== window.location.hash) {
+                    window.history.pushState(window.history.state, '', target.hash);
+                }
+                revealSection(target.hash.slice(1), true);
+                return;
+            }
             // Reopening the current section hash does not emit hashchange.
             if (target.hash === window.location.hash) reveal(target.hash);
         };
@@ -133,7 +141,7 @@ function ProtocolDocsApp() {
                     <p>On this page</p>
                     <nav>
                         {sections.map(section => (
-                            <button key={section.id} type="button" onClick={() => revealSection(section.id, true)}>{section.title}</button>
+                            <a key={section.id} href={`#${section.id}`}>{section.title}</a>
                         ))}
                     </nav>
                 </aside>

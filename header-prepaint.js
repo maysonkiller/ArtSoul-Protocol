@@ -10,12 +10,8 @@
     const NEUTRAL_AVATAR_URL = '/default-avatar.png';
     let neutralAvatar = NEUTRAL_AVATAR_URL;
 
-    const read = (key) => {
-        try {
-            return localStorage.getItem(key);
-        } catch {
-            return null;
-        }
+    const read = key => {
+        try { return localStorage.getItem(key); } catch { return null; }
     };
 
     const readIdentity = () => {
@@ -43,11 +39,7 @@
     const notificationWallet = !appKitDisconnectedAtBoot && cachedUiState === 'connected'
         && hasWallet && wallet === walletHint && identity?.wallet === wallet ? wallet : '';
 
-    if (!appKitDisconnectedAtBoot
-        && WALLET_PATTERN.test(walletHint)
-        && cachedUiState === 'connected'
-        && identity?.wallet === walletHint
-        && PRELOADABLE_AVATAR_URL.test(identity.avatarUrl)) {
+    if (notificationWallet && PRELOADABLE_AVATAR_URL.test(identity.avatarUrl)) {
         const preload = document.createElement('link');
         preload.rel = 'preload';
         preload.as = 'image';
@@ -64,17 +56,10 @@
         return PREVIEW_PATTERN.test(preview.dataUri) ? preview.dataUri : null;
     };
 
-    if (!appKitDisconnectedAtBoot && !readPreview()
-        && (hasWallet || cachedUiState === 'connected')) {
+    const preview = readPreview();
+    if (!appKitDisconnectedAtBoot && !preview && (hasWallet || cachedUiState === 'connected')) {
         document.documentElement.classList.add('wallet-state-resolving');
     }
-
-    const writeAddress = (node, value) => {
-        if (!node) return;
-        node.hidden = !value;
-        node.textContent = value;
-        node.setAttribute('aria-hidden', value ? 'false' : 'true');
-    };
 
     const hydrate = (container) => {
         const inbox = document.getElementById('header-notifications');
@@ -85,12 +70,20 @@
         const name = container.querySelector('[data-avatar-name]');
         const address = container.querySelector('[data-avatar-address]');
         if (!button || !image || !name || !address) return false;
+        try {
+            const cached = sessionStorage.getItem('artsoul_header_provider_mark');
+            const mark = cached?.split(':')[1];
+            if (notificationWallet && (mark === 'rabby' || mark === 'metamask') && cached === notificationWallet + ':' + mark) {
+                button.dataset.providerPreview = mark;
+            } else if (cached) sessionStorage.removeItem('artsoul_header_provider_mark');
+        } catch { /* Session storage is optional. */ }
         const shellSource = image.getAttribute('src') || '';
         if (image.dataset.avatarSource === NEUTRAL_AVATAR_URL && PREVIEW_PATTERN.test(shellSource)) {
             neutralAvatar = shellSource;
         }
 
-        const commit = ({ renderKey, source, paintSource, label, shortAddress, imageIdentity, uiState }) => {
+        const commit = ({ renderKey, source = NEUTRAL_AVATAR_URL, paintSource = neutralAvatar,
+            label, shortAddress = '', imageIdentity = shortAddress || 'guest', uiState }) => {
             const displayAddress = shortAddress && label.toLowerCase() !== shortAddress.toLowerCase()
                 ? shortAddress
                 : '';
@@ -99,7 +92,9 @@
             image.dataset.avatarSource = source;
             image.dataset.avatarIdentity = imageIdentity;
             name.textContent = label;
-            writeAddress(address, displayAddress);
+            address.hidden = !displayAddress;
+            address.textContent = displayAddress;
+            address.setAttribute('aria-hidden', String(!displayAddress));
             button.dataset.avatarContentKey = `${renderKey}|${source}|${label}|${displayAddress}`;
             container.dataset.avatarRenderKey = renderKey === `identity:${wallet}` ? 'cached-wallet' : renderKey;
             container.setAttribute('aria-busy', uiState === 'resolving' ? 'true' : 'false');
@@ -112,18 +107,13 @@
             delete container.dataset.avatarCacheHydrated;
             commit({
                 renderKey,
-                source: NEUTRAL_AVATAR_URL,
-                paintSource: neutralAvatar,
                 label: 'ArtSoul Guest',
-                shortAddress: '',
-                imageIdentity: 'guest',
                 uiState: 'disconnected'
             });
             return true;
         }
 
         const shortAddress = `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
-        const preview = readPreview();
         if (preview) {
             container.dataset.avatarCacheHydrated = 'true';
             commit({
@@ -132,23 +122,17 @@
                 paintSource: preview,
                 label: identity.name,
                 shortAddress,
-                imageIdentity: shortAddress,
                 uiState: 'restoring'
             });
             return true;
         }
 
-        const settledWithoutPicture = identity
-            && identity.wallet === wallet
-            && identity.avatarUrl === NEUTRAL_AVATAR_URL;
+        const settledWithoutPicture = identity?.wallet === wallet && identity.avatarUrl === NEUTRAL_AVATAR_URL;
         delete container.dataset.avatarCacheHydrated;
         commit({
             renderKey: `resolving:${wallet}`,
-            source: NEUTRAL_AVATAR_URL,
-            paintSource: neutralAvatar,
             label: settledWithoutPicture ? identity.name : shortAddress,
             shortAddress,
-            imageIdentity: shortAddress,
             uiState: 'resolving'
         });
         return true;

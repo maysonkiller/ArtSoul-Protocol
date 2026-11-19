@@ -45,6 +45,7 @@ async function verifyLocalReference(page, reference) {
 }
 
 await Promise.all(pages.map(page => access(path.join(dist, page))));
+await verifyLocalReference('Audio previews', '/brand/artsoul-audio-cover-384.webp');
 for (const filename of ['robots.txt', 'sitemap.xml']) {
     if (!(await readFile(path.join(dist, filename))).equals(await readFile(path.join(root, 'public', filename)))) {
         throw new Error(`Search discovery asset differs from its source: ${filename}`);
@@ -71,6 +72,10 @@ for (const page of pages) {
 
     if (page === 'collection-builder.html' && !/<div id="app">\s*<main\b[^>]*aria-busy="true"/.test(built)) {
         throw new Error('The collection editor must show its initial page while the application loads.');
+    }
+
+    if (page === 'gallery.html' && !/<h1>Art worth discovering\.<\/h1>[\s\S]*?<div id="app">/.test(built)) {
+        throw new Error('The gallery heading must be visible before the filter and artwork bundle starts.');
     }
 
     // Do not replace already painted fallback text when a font arrives late.

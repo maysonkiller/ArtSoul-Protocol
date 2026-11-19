@@ -2,7 +2,10 @@ import '../../supabase-client.js';
 import { renderHomeShowcase } from '../ui/home-showcase.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
-import './react-runtime.js';
+import { projectedArtworkAura } from '../ui/components/aura-frame.js';
+
+// The homepage uses DOM cards. The inbox loads React when a connected wallet needs it.
+window.ArtSoulArtworkAura = projectedArtworkAura;
 
 let morphActive = false;
         let originalPositions = [];
@@ -367,7 +370,7 @@ let morphActive = false;
                     audioPreview.style.cssText = 'width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(6, 182, 212, 0.3)); position: relative;';
 
                     const logoImg = document.createElement('img');
-                    logoImg.src = '/ARTSOULlogo.png';
+                    logoImg.src = '/brand/artsoul-audio-cover-384.webp';
                     logoImg.alt = 'Music';
                     logoImg.style.cssText = 'width: 50%; height: 50%; object-fit: contain; animation: spin 3s linear infinite; animation-play-state: paused; margin-bottom: 1rem;';
 
@@ -792,7 +795,7 @@ let morphActive = false;
                                 audioContainer.className = 'w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black';
 
                                 const logoImg = document.createElement('img');
-                                logoImg.src = '/ARTSOULlogo.png';
+                                logoImg.src = '/brand/artsoul-audio-cover-384.webp';
                                 logoImg.alt = 'Music';
                                 logoImg.style.cssText = 'width: 50%; height: 50%; object-fit: contain; animation: spin 8s linear infinite; margin-bottom: 1rem; transition: animation-duration 0.3s;';
                                 logoImg.onerror = function() {
@@ -805,7 +808,7 @@ let morphActive = false;
                                 audio.className = 'w-full px-4';
                                 audio.controls = true;
                                 audio.crossOrigin = 'anonymous';
-                                audio.preload = 'metadata';
+                                audio.preload = 'none';
                                 audio.onclick = (e) => e.stopPropagation();
 
                                 // Make logo spin faster when playing

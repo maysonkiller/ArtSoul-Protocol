@@ -28,6 +28,17 @@ test('private requests use no-store, session cookies and expected wallet', async
   calls[0].resolve(response({ wallet: A, artworkIds: ['34'] })); await pending;
   assert.equal(store.getState().saved.get(savedKey(item)), true);
 });
+test('the first list load adopts a newly connected wallet before capturing its request generation', async () => {
+  let wallet = '';
+  const store = createSavedStore({getWallet: () => wallet, request: async (_url, options) => {
+    assert.equal(options.headers['X-ArtSoul-Wallet'], A);
+    return response({wallet: A, items: [row]});
+  }});
+  wallet = A;
+  assert.equal(await store.load(), true);
+  assert.equal(store.getState().status, 'ready');
+  assert.deepEqual(store.getState().items, [row]);
+});
 test('switching wallets clears immediately and rejects an old response even if transport ignores abort', async () => {
   const { store, calls, switchWallet } = harness();
   const pending = store.load();
