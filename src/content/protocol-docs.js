@@ -132,6 +132,29 @@ const sections = [
         ]
     },
     {
+        id: "roadmap",
+        title: "ArtSoul roadmap",
+        blocks: [{
+            type: "faq",
+            items: [
+                {
+                    question: "What can I try today?",
+                    answer: "The marketplace is open on Base Sepolia. Artists can publish work and start an auction. Collectors can bid with test ETH, pay a winning bid to mint the NFT, and offer it for resale.",
+                    link: { text: "Explore the gallery", href: "/gallery" }
+                },
+                {
+                    question: "What is in preparation?",
+                    answer: "ArtSoul is testing the new auction contract together with the NFT contract that mints the artwork. Before launch, artists and collectors will rehearse the full trading flow on Base Sepolia, including refunds and resale. The contracts also need an independent security audit. Authors can already plan a collection and save the draft in their browser.",
+                    link: { text: "Create a collection draft", href: "/collection-builder" }
+                },
+                {
+                    question: "How will the move to Base mainnet work?",
+                    answer: "ArtSoul will announce the final testnet cutoff at least two weeks in advance. Snapshot A will preserve a record of testnet activity. After launch approval, auctions and sales of individual artworks open first on Base mainnet. Genesis grants have a separate pilot that follows a period of stable trading."
+                }
+            ]
+        }]
+    },
+    {
         id: "faq",
         title: "Frequently Asked Questions",
         blocks: [
@@ -143,7 +166,7 @@ const sections = [
 function blockText(block) {
     if (block.type === 'frame-examples') return [block.caption, ...block.items.map(item => item.name + ' ' + item.text)].join(' ');
     if (block.type === 'table') return [...block.headings, ...block.rows.flat()].join(' ');
-    if (block.type === 'faq') return block.items.map(item => item.question + ' ' + item.answer).join(' ');
+    if (block.type === 'faq') return block.items.map(item => [item.question, item.answer, item.link?.text].filter(Boolean).join(' ')).join(' ');
     if (block.type === 'ordered-list') return block.items.join(' ');
     return block.text;
 }

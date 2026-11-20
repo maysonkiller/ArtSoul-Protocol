@@ -9,6 +9,10 @@ const HASH = `0x${'d'.repeat(64)}`, OTHER_HASH = `0x${'e'.repeat(64)}`;
 const CORE_CODE = '0x6001600055', NFT_CODE = '0x6002600055';
 const abi = new Interface(['function nftContract() view returns (address)', 'function nft() view returns (address)', 'function core() view returns (address)']);
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
+const auctionAbi = new Interface([
+    'function auctions(uint256) view returns(uint256,uint256,uint256,uint256,uint256,address,uint256,uint256,uint8,address)',
+    'function runnerUpOffers(uint256) view returns(address,uint256,uint256)'
+]);
 
 function fixture({ blockNumber = 100, blockHash = HASH, coreGetter = 'nftContract', chainId = 84532 } = {}) {
     const value = { current: true, calls: [], replacements: new Map(), hook: null };
@@ -85,11 +89,16 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
         f.listener.nftAddress = NFT;
         const receipt = { status: '0x1', blockHash: HASH, transactionHash: tx, blockNumber: '0x64', logs: structuredClone(logs) };
         modifyReceipt(receipt);
+        f.replacements.set(2, { number: '0x64', hash: HASH, timestamp:'0x20' });
         f.replacements.set(7, { number: '0x64', hash: HASH });
         f.replacements.set(8, receipt);
+        f.replacements.set(9, auctionAbi.encodeFunctionResult('auctions', [17,1,2,2,3,OTHER,50,0,4,bidder]));
+        f.replacements.set(10, auctionAbi.encodeFunctionResult('runnerUpOffers', [bidder,31,32]));
         f.hook = (index, method, params) => {
             if (index === 7) assert.deepEqual([method, params], ['eth_getBlockByNumber', ['finalized', false]]);
             if (index === 8) assert.deepEqual([method, params], ['eth_getTransactionReceipt', [tx]]);
+            if (index === 9 || index === 10) assert.deepEqual([method, params], ['eth_call', [{to:CORE,
+                data:auctionAbi.encodeFunctionData(index === 9 ? 'auctions' : 'runnerUpOffers', [2])}, {blockHash:HASH, requireCanonical:true}]]);
         };
         configure(f);
         return f.listener.readOrdinarySettlement({ ...f.options, transactionHash: tx, auctionId: '2' });
@@ -105,6 +114,9 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
     assert.equal(result.priceWei, '31');
     assert.equal(result.logIndex, 9);
     assert.equal(result.runnerUpAccepted, true);
+    await assert.rejects(check(r => { r.logs.splice(2, 1); }), /finalized auction state disagree/);
+    await assert.rejects(check(undefined, f => { f.replacements.set(10, auctionAbi.encodeFunctionResult('runnerUpOffers', [bidder,31,30])); }), /finalized auction state disagree/);
+    await assert.rejects(check(undefined, f => { f.replacements.set(11, {number:'0x64',hash:OTHER_HASH}); }), /canonical block mismatch/);
     const base = await check(undefined, undefined, 8453);
     assert.deepEqual(base, { ...result, chainId: 8453 });
     await assert.rejects(check(undefined, f => { f.listener.chainId = 84532; }, 8453), /authority changed/);
@@ -128,10 +140,6 @@ const maxUint = 2n ** 256n - 1n;
 const zeroAddress = '0x' + '0'.repeat(40);
 
 test('runner-up terms require a canonical timestamp, finalized pair and matching auction state', async () => {
-    const auctionAbi = new Interface([
-        'function auctions(uint256) view returns(uint256,uint256,uint256,uint256,uint256,address,uint256,uint256,uint8,address)',
-        'function runnerUpOffers(uint256) view returns(address,uint256,uint256)'
-    ]);
     const auction = (state, first = zeroAddress) => auctionAbi.encodeFunctionResult('auctions', [1, 2, 4, 4, 5, CORE, 8, 1, state, first]);
     const offer = (bidder, price, deadline) => auctionAbi.encodeFunctionResult('runnerUpOffers', [bidder, price, deadline]);
     const header = { number: '0x64', hash: HASH, timestamp: '0x10' };

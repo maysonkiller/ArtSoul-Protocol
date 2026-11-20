@@ -163,7 +163,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     const { checkOrdinaryIntake } = await import('./helpers/ordinary-settlement-postgres.mjs');
     await checkOrdinaryIntake(pool);
     await pool.query(ordinaryMigration);
-    assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_settlements')).rows[0].count, '2');
+    assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_settlements')).rows[0].count, '3');
   });
   for (const name of ['identity', 'preparation', 'submission', 'registration', 'reorg']) {
     await pool.query(read(`sql/migrations/artwork_media_${name}.sql`));

@@ -40,13 +40,17 @@ describe('Runner-up offers for ordinary artworks', function () {
         await mine(engine.connect(creator).createAuction(id, eth('0.1'), DAY));
     });
 
-    async function readOffer(blockNumber = 'latest') {
+    async function localListener() {
         const { default: EventListener } = await import('../src/indexer/event-listener.js');
-        const block = await provider.getBlock(blockNumber);
-        const listener = Object.assign(Object.create(EventListener.prototype), {
+        return Object.assign(Object.create(EventListener.prototype), {
             chainId: 84532, contractAddress: engine.target, nftAddress: nft.target,
             readProviders: [evm], readRpcs: ['in-process'], readRpcUnavailableUntil: [0], baseTimeout: 5000
         });
+    }
+
+    async function readOffer(blockNumber = 'latest') {
+        const listener = await localListener();
+        const block = await provider.getBlock(blockNumber);
         return listener.readOrdinaryRunnerUpOffer({ ...reviewedPair, blockNumber: block.number,
             blockHash: block.hash, auctionId: id.toString(), isCurrent: () => true });
     }
@@ -153,11 +157,9 @@ describe('Runner-up offers for ordinary artworks', function () {
         await mine(engine.setEntryPaused(true));
         await at(deadline);
         const sale = await mine(engine.connect(runner).acceptRunnerUpOffer(id, { value }));
-        const rawReceipt = await evm.send('eth_getTransactionReceipt', [sale.hash]);
-        const { parseOrdinarySettlement } = await import('../src/indexer/ordinary-settlement.js');
-        const pair = { coreAddress: engine.target.toLowerCase(), nftAddress: nft.target.toLowerCase(),
-            chainId: 84532, blockNumber: sale.blockNumber, blockHash: sale.blockHash };
-        const projected = parseOrdinarySettlement(rawReceipt, pair, sale.hash, id.toString());
+        const projected = await (await localListener()).readOrdinarySettlement({ ...reviewedPair,
+            blockNumber: sale.blockNumber, blockHash: sale.blockHash, transactionHash: sale.hash,
+            auctionId: id.toString(), isCurrent: () => true });
         assert.equal(projected.firstCollector, runner.address.toLowerCase());
         assert.equal(projected.creator, creator.address.toLowerCase());
         assert.equal(projected.priceWei, value.toString());

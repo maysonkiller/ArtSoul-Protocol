@@ -253,6 +253,11 @@ test('public guest browsing avoids SDK startup while existing wallets retain aut
   const storage = { length: 0, getItem: () => null };
   for (const [name, overrides, restore] of [
     ['guest', {}, false],
+    ['guest opening a collection draft', { location: { pathname: '/collection-builder' } }, false],
+    ['guest opening the collection HTML entry', { location: { pathname: '/collection-builder.html' } }, false],
+    ['collection draft with a Coinbase extension', { location: { pathname: '/collection-builder' }, ethereum: {} }, true],
+    ['collection draft with a stored session', { location: { pathname: '/collection-builder' },
+      indexedDB: { databases: async () => [{ name: 'wallet session' }] } }, true],
     ['persisted session', { indexedDB: { databases: async () => [{ name: 'wallet session' }] } }, true],
     ['injected provider', { ethereum: {} }, true],
     ['cached account', { localStorage: { ...storage, getItem: key => key === 'artsoul_wallet' ? 'cached' : null } }, true],

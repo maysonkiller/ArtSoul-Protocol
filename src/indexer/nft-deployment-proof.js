@@ -120,6 +120,18 @@ async function readAtNftDeployment(listener, options, read, coreGetter = 'nftCon
     }
 }
 
+async function readOrdinaryAuctionField(send, proof, block, auctionId, method) {
+    const data = getters.encodeFunctionData(method, [auctionId]);
+    const raw = await send('eth_call', [{ to: proof.coreAddress, data }, block]);
+    const words = getters.getFunction(method).outputs.length;
+    if (typeof raw !== 'string' || raw.length !== 2 + 64 * words || !/^0x[0-9a-f]+$/i.test(raw)) {
+        throw new Error('Invalid ordinary offer response');
+    }
+    const result = getters.decodeFunctionResult(method, raw);
+    if (getters.encodeFunctionResult(method, result) !== raw.toLowerCase()) throw new Error('Invalid ordinary offer encoding');
+    return result;
+}
+
 // Read one sale on the reviewed replacement pair without modifying the prototype cursor.
 export async function readOrdinarySettlement(listener, options) {
     const tx = options?.transactionHash;
@@ -127,9 +139,22 @@ export async function readOrdinarySettlement(listener, options) {
         throw new Error('Invalid ordinary settlement request');
     }
     const transactionHash = tx.toLowerCase(), auctionId = options.auctionId;
-    return readAtNftDeployment(listener, options, async (send, proof) => {
+    return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
         const receipt = await send('eth_getTransactionReceipt', [transactionHash]);
-        return parseOrdinarySettlement(receipt, proof, transactionHash, auctionId);
+        const sale = parseOrdinarySettlement(receipt, proof, transactionHash, auctionId);
+        const auction = await readOrdinaryAuctionField(send, proof, block, auctionId, 'auctions');
+        const offer = await readOrdinaryAuctionField(send, proof, block, auctionId, 'runnerUpOffers');
+        // A prior losing bid can leave a price in this mapping even when no offer ever opened.
+        const accepted = offer.deadline !== 0n;
+        const buyer = accepted ? offer.bidder : auction.highestBidder;
+        const price = accepted ? offer.price : auction.price;
+        if (auction.state !== 4n || auction.artworkId.toString() !== sale.artworkId ||
+            auction.firstCollector.toLowerCase() !== sale.firstCollector || buyer.toLowerCase() !== sale.firstCollector ||
+            price.toString() !== sale.priceWei || sale.runnerUpAccepted !== accepted ||
+            (accepted && (!matches(quantityPattern, header.timestamp) || BigInt(header.timestamp) > offer.deadline))) {
+            throw new Error('Ordinary settlement receipt and finalized auction state disagree');
+        }
+        return sale;
     }, 'nft');
 }
 
@@ -160,20 +185,9 @@ export async function readOrdinaryRunnerUpOffer(listener, options) {
     if (!positiveUint256(auctionId)) throw new Error('Invalid ordinary auction ID');
     return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
         if (!matches(quantityPattern, header.timestamp)) throw new Error('Invalid ordinary offer block timestamp');
-        const read = async method => {
-            const data = getters.encodeFunctionData(method, [auctionId]);
-            const raw = await send('eth_call', [{ to: proof.coreAddress, data }, block]);
-            const words = getters.getFunction(method).outputs.length;
-            if (typeof raw !== 'string' || raw.length !== 2 + 64 * words || !/^0x[0-9a-f]+$/i.test(raw)) {
-                throw new Error('Invalid ordinary offer response');
-            }
-            const result = getters.decodeFunctionResult(method, raw);
-            if (getters.encodeFunctionResult(method, result) !== raw.toLowerCase()) throw new Error('Invalid ordinary offer encoding');
-            return result;
-        };
-        const auction = await read('auctions');
+        const auction = await readOrdinaryAuctionField(send, proof, block, auctionId, 'auctions');
         if (auction.artworkId === 0n || auction.state === 0n) throw new Error('Unknown ordinary auction');
-        const offer = await read('runnerUpOffers');
+        const offer = await readOrdinaryAuctionField(send, proof, block, auctionId, 'runnerUpOffers');
         const offered = offer.deadline !== 0n;
         const settled = 4n, defaulted = 5n, runnerUpOffer = 6n; // OrdinaryArtAuctions.State
         if (auction.state > runnerUpOffer || (auction.state === runnerUpOffer && !offered) ||

@@ -47,7 +47,10 @@ function ProtocolBlock({ block }) {
     );
     if (block.type === 'faq') return (
         <div className="protocol-faq">
-            {block.items.map((item, index) => <React.Fragment key={index}><h3>{item.question}</h3><p>{item.answer}</p></React.Fragment>)}
+            {block.items.map((item, index) => <React.Fragment key={index}>
+                <h3>{item.question}</h3>
+                <p>{item.answer}{item.link && <> <a href={item.link.href}>{item.link.text}</a></>}</p>
+            </React.Fragment>)}
         </div>
     );
     return null;
