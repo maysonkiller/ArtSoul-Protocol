@@ -21,6 +21,12 @@ This is the repository's durable work register. It consolidates verified complet
 
 The [numbered checklist](canon/12_IMPLEMENTATION_BACKLOG.md) has 14 of 40 accepted items. B engineering is closed. Its named public-beta journeys are tracked in C13. C6 is accepted on the concrete ordinary-market candidate after a 1 ETH resale and a separate 0.01 ETH Ecosystem Safe withdrawal in an isolated EVM. The independent review, fresh hosted rehearsal, announced Snapshot A, production custody and mainnet go/no-go are still open.
 
+### November 20 review of older proposals
+
+- [PR #278](https://github.com/maysonkiller/ArtSoul-Protocol/pull/278) is superseded by the shipped wrapping auction heading and its responsive regressions in [PR #500](https://github.com/maysonkiller/ArtSoul-Protocol/pull/500).
+- [PR #279](https://github.com/maysonkiller/ArtSoul-Protocol/pull/279) predates the [direct artist support decision](canon/SUPPORT_THE_ARTIST_DESIGN.md). The first mainnet release uses the artist's address. Sepolia retains its attributed support history.
+- [PR #393](https://github.com/maysonkiller/ArtSoul-Protocol/pull/393) predates the verified independent restoration and provider response. One continuity option remains open: a separately hosted read-only exhibit during a provider outage. Before selecting it, verify the manifest time, source checkpoint, counts and media hashes, and demonstrate a way to withdraw hidden media while the primary service is down. Omit media when current visibility cannot be confirmed. Omit trading controls and live ownership or price claims. This option schedules no migration or new service. [Incident and recovery evidence](audits/B30_B35_OPERATIONAL_RECHECK_2026-11-16.md).
+
 ### November 20 recorded navigation and preview review
 
 | Item | Verified behavior | Remaining acceptance |

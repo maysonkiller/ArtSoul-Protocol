@@ -63,7 +63,39 @@
         return expandArtworkId(search.get('id'));
     }
 
-    const api = { artworkPath, expandArtworkId, currentArtworkId, CANONICAL_ARTWORK_CHAIN_ID };
+    function updateArtworkIndexing(publiclyVisible = true) {
+        const socialUrl = document.getElementById('og-url');
+        if (!socialUrl) return;
+        const id = currentArtworkId();
+        const indexable = publiclyVisible && /^v41:(?:84532|11155111):[1-9]\d{0,77}$/.test(id);
+        let link = document.querySelector('link[rel="canonical"]');
+        let robots = document.querySelector('meta[data-artwork-robots]');
+        if (!indexable) {
+            link?.remove();
+            socialUrl.removeAttribute('content');
+            if (!robots) {
+                robots = document.createElement('meta');
+                robots.name = 'robots';
+                robots.content = 'noindex';
+                robots.setAttribute('data-artwork-robots', '');
+                document.head.appendChild(robots);
+            }
+            return;
+        }
+        robots?.remove();
+        if (!link) {
+            link = document.createElement('link');
+            link.rel = 'canonical';
+            document.head.appendChild(link);
+        }
+        link.href = 'https://artsoulprotocol.com' + artworkPath(id);
+        socialUrl.content = link.href;
+    }
+
+    const api = { artworkPath, expandArtworkId, currentArtworkId, updateArtworkIndexing, CANONICAL_ARTWORK_CHAIN_ID };
 
     if (typeof window !== 'undefined') window.ArtSoulArtworkUrl = api;
+    if (typeof document !== 'undefined' && document.currentScript?.hasAttribute('data-artwork-indexing')) {
+        updateArtworkIndexing();
+    }
 })();

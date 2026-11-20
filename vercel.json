@@ -6,6 +6,16 @@
   "trailingSlash": false,
   "headers": [
     {
+      "source": "/artwork/:id([1-9][0-9]{0,77})",
+      "headers": [
+        { "key": "Link", "value": "<https://artsoulprotocol.com/artwork/:id>; rel=\"canonical\"" }
+      ]
+    },
+    {
+      "source": "/api/public/artworks",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
@@ -83,12 +93,12 @@
   ],
   "rewrites": [
     {
-      "source": "/artwork/:id",
+      "source": "/artwork/:id((?:v41(?::|%3[Aa])(?:84532|11155111)(?::|%3[Aa]))?[1-9][0-9]{0,77})",
       "has": [{ "type": "header", "key": "user-agent", "value": ".*[Tt]witterbot.*" }],
       "destination": "/api/artwork-preview?id=:id"
     },
     {
-      "source": "/artwork/:id",
+      "source": "/artwork/:id((?:v41(?::|%3[Aa])(?:84532|11155111)(?::|%3[Aa]))?[1-9][0-9]{0,77})",
       "destination": "/artwork?id=:id"
     },
     {

@@ -1,5 +1,9 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Allow: /api/public/artworks?limit=100$
+Allow: /api/public/artworks?limit=200$
+Allow: /api/public/artworks?id=v41%3A84532%3A*&limit=1$
+Allow: /api/public/artworks?id=v41%3A11155111%3A*&limit=1$
 
 Sitemap: https://artsoulprotocol.com/sitemap.xml
