@@ -2,6 +2,76 @@ const assert = require('node:assert/strict');
 const { artifacts, network } = require('hardhat');
 const { ethers } = require('ethers');
 
+describe('Read-only wallet metadata acceptance on the ordinary market', function () {
+    this.timeout(30000);
+    it('reads a paid token before and after transfer at the exact blocks and checks the published bytes', async () => {
+        const hre = require('hardhat');
+        const { createProvider } = require('hardhat/internal/core/providers/construction');
+        const { createHash } = require('node:crypto');
+        const { mock } = require('node:test');
+        const { default: EventListener } = await import('../src/indexer/event-listener.js');
+        const { checkOrdinaryToken } = await import('../scripts/check-ordinary-token.mjs');
+        const chain = { ...hre.config.networks.hardhat, chainId: 84532, forking: undefined };
+        const evm = await createProvider({ ...hre.config, networks: { hardhat: chain } }, 'hardhat', artifacts);
+        const provider = new ethers.BrowserProvider(evm, undefined, { cacheTimeout: -1 });
+        provider.pollingInterval = 10;
+        try {
+            const [deployer, creator, first, next] = await provider.listAccounts();
+            const deploy = async (name, ...args) => {
+                const { abi, bytecode } = await artifacts.readArtifact(name);
+                return (await new ethers.ContractFactory(abi, bytecode, deployer).deploy(...args)).waitForDeployment();
+            };
+            const roles = [];
+            for (let i = 0; i < 3; i++) roles.push((await deploy('TreasuryAccountStub', 2)).target);
+            const core = await deploy('OrdinaryMarket', ...roles, 2, 30000);
+            const nft = new ethers.Contract(await core.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, first);
+            const listener = Object.assign(Object.create(EventListener.prototype), { chainId: 84532,
+                contractAddress: core.target, nftAddress: nft.target, readProviders: [evm], readRpcs: ['local'],
+                readRpcUnavailableUntil: [0], baseTimeout: 5000 });
+            const pair = { chainId: 84532, coreAddress: core.target, nftAddress: nft.target,
+                expectedCoreCodeHash: ethers.keccak256(await provider.getCode(core.target)),
+                expectedNftCodeHash: ethers.keccak256(await provider.getCode(nft.target)), isCurrent: () => true };
+            const read = (receipt, digest) => checkOrdinaryToken(listener, { ...pair, tokenId: '1',
+                blockNumber: receipt.blockNumber, blockHash: receipt.blockHash }, digest);
+            const cid = 'Qm' + 'a'.repeat(44);
+            const uri = 'ipfs://' + cid + '/item.json';
+            const metadata = JSON.stringify({ name: 'First edition', image: 'ipfs://' + cid + '/image.png' });
+            const digest = createHash('sha256').update(metadata).digest('hex');
+            const mine = async tx => (await tx).wait();
+            await mine(core.connect(creator).registerArtwork(uri));
+            await mine(core.connect(creator).createAuction(1, 1000, 86400));
+            const bid = await mine(core.connect(first).placeBid(1, 1000, { value: await core.requiredDepositForBid(1000) }));
+            await evm.send('evm_setNextBlockTimestamp', [Number((await core.auctions(1)).end)]);
+            const paid = await mine(core.connect(first).settleAuction(1));
+            const transferred = await mine(nft.transferFrom(first.address, next.address, 1));
+            await assert.rejects(read(bid), 'no wallet report exists before successful settlement');
+            const fetch = mock.method(globalThis, 'fetch', async (url, options) => {
+                assert.equal(url.href, 'https://ipfs.io/ipfs/' + cid + '/item.json');
+                assert.equal(options.redirect, 'error');
+                return new Response(metadata);
+            });
+            try {
+                const atMint = await read(paid);
+                const after = await read(transferred, digest);
+                assert.equal(atMint.owner, first.address.toLowerCase());
+                assert.equal(after.owner, next.address.toLowerCase());
+                for (const result of [atMint, after]) {
+                    assert.equal(result.creator, creator.address.toLowerCase());
+                    assert.equal(result.firstCollector, first.address.toLowerCase());
+                    assert.equal(result.metadataURI, uri);
+                    assert.equal(result.royaltyRecipient, result.creator);
+                    assert.equal(result.royaltyBps, 550);
+                }
+                assert.equal(after.metadata.name, 'First edition');
+                assert.equal(after.metadata.sha256, digest);
+                assert.equal(fetch.mock.callCount(), 1);
+                await assert.rejects(read(transferred, '0'.repeat(64)), /differs from the expected/);
+                assert.equal(await provider.getBlockNumber(), transferred.blockNumber);
+            } finally { fetch.mock.restore(); }
+        } finally { provider.destroy(); }
+    });
+});
+
 describe('Ordinary artwork NFT paired with its issuing engine', function () {
     let provider, publisher, creator, collector, buyer, source, nft;
     const uri = 'ipfs://artwork-fixture';

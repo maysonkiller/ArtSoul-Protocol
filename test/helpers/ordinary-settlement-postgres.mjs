@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import { Interface, ZeroAddress, keccak256, toQuantity } from 'ethers';
 import EventListener from '../../src/indexer/event-listener.js';
 import { ingestOrdinarySettlement } from '../../src/indexer/ordinary-settlement-intake.js';
+import { ingestOrdinaryRunnerUpOffer } from '../../src/indexer/ordinary-runner-up-intake.js';
 
 const address = n => '0x' + n.toString(16).padStart(40, '0');
 const hash = n => '0x' + n.toString(16).padStart(64, '0');
@@ -50,7 +51,7 @@ function fixture(pair, overrides = {}) {
             if (method === 'eth_chainId') return toQuantity(options.chainId);
             if (method === 'eth_getBlockByNumber') return {
                 number: args[0] === 'finalized' && overrides.unfinalized ? '0x0' : blockNumber,
-                hash: offerRead && overrides.reorg ? hash(999) : blockHash, timestamp: '0x10'
+                hash: offerRead && overrides.reorg ? hash(999) : blockHash, timestamp: toQuantity(overrides.timestamp ?? 16)
             };
             if (method === 'eth_getCode') return args[0] === coreAddress ? '0x6001' : '0x6002';
             if (method === 'eth_call') {
@@ -58,7 +59,7 @@ function fixture(pair, overrides = {}) {
                 if (isCore && args[0].data === abi.encodeFunctionData('auctions', [auctionId])) {
                     assert.deepEqual(args[1], {blockHash, requireCanonical:true});
                     return abi.encodeFunctionResult('auctions', [artwork,1,2,2,3,stateOffer ? address(42) : buyer,
-                        stateOffer ? BigInt(price) + 1n : price,0,4,buyer]);
+                        stateOffer ? BigInt(price) + 1n : price,0,overrides.state ?? 4,buyer]);
                 }
                 if (isCore && args[0].data === abi.encodeFunctionData('runnerUpOffers', [auctionId])) {
                     offerRead = true;
@@ -97,7 +98,7 @@ async function verifyCommand(pool) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const dir = await mkdtemp(join(tmpdir(), 'artsoul-ordinary-command-'));
     const pair = join(dir, 'pair.json'), locator = join(dir, 'receipt.json');
-    const command = () => promisify(execFile)(process.execPath, ['scripts/index-ordinary-settlement.mjs', pair, locator], {
+    const command = (args = ['scripts/index-ordinary-settlement.mjs', pair, locator]) => promisify(execFile)(process.execPath, args, {
         windowsHide: true, timeout: 25000, env: { ...process.env, ARTSOUL_ORDINARY_RPC_URL: 'http://127.0.0.1:' + server.address().port + '/' + secret,
             ARTSOUL_ORDINARY_DATABASE_URL: 'postgresql://postgres@127.0.0.1:' + pool.options.port + '/postgres' }
     });
@@ -110,6 +111,14 @@ async function verifyCommand(pool) {
         assert.equal(report.inserted, false);
         assert.equal(report.sale.priceWei, '1000000000000000001');
         assert.ok(!stdout.includes(secret));
+        const args = ['scripts/read-ordinary-runner-up.mjs', pair, auctionId, String(blockNumber), blockHash];
+        const observation = () => pool.query('SELECT 1 FROM artsoul_private.ordinary_runner_up_observations WHERE core_address=$1', [coreAddress]);
+        const dry = await command(args);
+        assert.equal(JSON.parse(dry.stdout.trim().split(/\r?\n/).at(-1)).status, 'not_offered');
+        assert.equal((await observation()).rowCount, 0, 'a configured database alone never enables persistence');
+        const stored = await command([...args, '--persist']);
+        assert.equal(JSON.parse(stored.stdout.trim().split(/\r?\n/).at(-1)).changed, true);
+        assert.equal((await observation()).rowCount, 1);
         rejectRead = true;
         await assert.rejects(command, e => e.code === 1 && !e.stdout.includes(secret) && !e.stderr.includes(secret));
     } finally {
@@ -117,6 +126,39 @@ async function verifyCommand(pool) {
         await Promise.all([unlink(pair), unlink(locator)]);
         await rmdir(dir);
     }
+}
+
+export async function checkRunnerUpIntake(pool) {
+    const observe = (pair, height, overrides = {}) => {
+        const { listener, options } = fixture(pair, { ...overrides,
+            location: { blockNumber: height, blockHash: hash(height), ...overrides.location } });
+        return ingestOrdinaryRunnerUpOffer(pool, listener, options);
+    };
+    const open = { offer:true, state:6 };
+    const results = await Promise.all([observe(61, 100, open), observe(61, 100, open), observe(62, 100, open)]);
+    assert.deepEqual(results.slice(0, 2).map(result => result.changed).sort(), [false, true]);
+    assert.equal(results[2].offer.priceWei, '1000000000000000001');
+    await assert.rejects(observe(61, 99, open), /Stale runner-up/);
+    await assert.rejects(observe(61, 100, { ...open, location:{blockHash:hash(111)} }), /Conflicting runner-up/);
+    await assert.rejects(observe(61, 100, { ...open, price:'1000000000000000002' }), /Conflicting runner-up/);
+    await assert.rejects(observe(61, 101, { ...open, price:'1000000000000000002' }), /Inconsistent runner-up/);
+    await assert.rejects(observe(61, 101, { ...open, artwork:2 }), /Inconsistent runner-up/);
+    await assert.rejects(observe(63, 101, { ...open, reorg:true }), /canonical block mismatch/);
+    await assert.rejects(observe(63, 101, { ...open, unfinalized:true }), /not finalized/);
+    assert.equal((await observe(61, 101, { ...open, timestamp:17 })).offer.status, 'expired');
+    await assert.rejects(observe(61, 102, open), /Inconsistent runner-up/);
+    assert.equal((await observe(61, 102, { ...open, state:5, timestamp:18 })).offer.status, 'closed');
+    assert.equal((await observe(62, 101, { ...open, state:4 })).offer.status, 'accepted');
+    const stored = await pool.query(`SELECT core_address, status, block_number, price_wei FROM artsoul_private.ordinary_runner_up_observations
+        WHERE core_address IN ($1,$2,$3) ORDER BY core_address`, [address(61), address(62), address(63)]);
+    assert.deepEqual(stored.rows.map(row => [row.core_address, row.status, row.block_number, row.price_wei]), [
+        [address(61),'closed','102','1000000000000000001'], [address(62),'accepted','101','1000000000000000001']
+    ]);
+    const table = 'artsoul_private.ordinary_runner_up_observations';
+    const roles = await pool.query(`SELECT has_table_privilege(rolname, $1, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') AS allowed
+        FROM pg_roles WHERE rolname IN ('anon', 'authenticated', 'service_role')`, [table]);
+    assert.equal(roles.rowCount, 3);
+    assert.ok(roles.rows.every(row => !row.allowed));
 }
 
 export async function checkOrdinaryIntake(pool) {

@@ -17,12 +17,11 @@ async function appendExact(client, table, row) {
     return false;
 }
 
-export async function ingestOrdinarySettlement(pool, listener, options) {
-    const sale = await listener.readOrdinarySettlement(options);
+export async function withOrdinaryIssuer(pool, listener, options, proof, write) {
     const assertCurrent = () => {
-        if (options.isCurrent() !== true || listener.chainId !== sale.chainId ||
-            listener.contractAddress?.toLowerCase() !== sale.coreAddress || listener.nftAddress?.toLowerCase() !== sale.nftAddress) {
-            throw new Error('Ordinary settlement intake superseded');
+        if (options.isCurrent() !== true || listener.chainId !== proof.chainId ||
+            listener.contractAddress?.toLowerCase() !== proof.coreAddress || listener.nftAddress?.toLowerCase() !== proof.nftAddress) {
+            throw new Error('Ordinary intake superseded');
         }
     };
     assertCurrent();
@@ -32,22 +31,28 @@ export async function ingestOrdinarySettlement(pool, listener, options) {
         await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
         assertCurrent();
         await appendExact(client, 'ordinary_issuers', {
-            chain_id: sale.chainId, core_address: sale.coreAddress, nft_address: sale.nftAddress,
-            core_code_hash: sale.coreCodeHash, nft_code_hash: sale.nftCodeHash
+            chain_id: proof.chainId, core_address: proof.coreAddress, nft_address: proof.nftAddress,
+            core_code_hash: proof.coreCodeHash, nft_code_hash: proof.nftCodeHash
         });
-        const inserted = await appendExact(client, 'ordinary_settlements', {
-            chain_id: sale.chainId, core_address: sale.coreAddress, auction_id: sale.auctionId, artwork_id: sale.artworkId,
-            token_id: sale.tokenId, price_wei: sale.priceWei, creator: sale.creator, first_collector: sale.firstCollector,
-            runner_up_accepted: sale.runnerUpAccepted, transaction_hash: sale.transactionHash, block_number: sale.blockNumber,
-            block_hash: sale.blockHash, log_index: sale.logIndex
-        });
+        const result = await write(client);
         assertCurrent();
         await client.query('COMMIT');
-        return { inserted, sale };
+        return result;
     } catch (error) {
         try { await client.query('ROLLBACK'); } catch (rollbackError) { discard = rollbackError; }
         throw error;
     } finally {
         client.release(discard);
     }
+}
+
+export async function ingestOrdinarySettlement(pool, listener, options) {
+    const sale = await listener.readOrdinarySettlement(options);
+    const inserted = await withOrdinaryIssuer(pool, listener, options, sale, client => appendExact(client, 'ordinary_settlements', {
+        chain_id: sale.chainId, core_address: sale.coreAddress, auction_id: sale.auctionId, artwork_id: sale.artworkId,
+        token_id: sale.tokenId, price_wei: sale.priceWei, creator: sale.creator, first_collector: sale.firstCollector,
+        runner_up_accepted: sale.runnerUpAccepted, transaction_hash: sale.transactionHash, block_number: sale.blockNumber,
+        block_hash: sale.blockHash, log_index: sale.logIndex
+    }));
+    return { inserted, sale };
 }
