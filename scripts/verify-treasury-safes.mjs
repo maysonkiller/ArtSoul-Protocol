@@ -1,15 +1,17 @@
 // Read-only verification against a private, independently reviewed custody register.
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { Interface, ZeroAddress, getAddress, id, isAddress, keccak256 } from 'ethers';
+import { Interface, MaxUint256, ZeroAddress, getAddress, id, isAddress, keccak256 } from 'ethers';
 
 const roles = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
+const refundSettings = ['refundBatchLimit', 'refundTransferGas'];
 const views = new Interface([
     'function getOwners() view returns (address[])',
     'function getThreshold() view returns (uint256)',
     'function getModulesPaginated(address start, uint256 size) view returns (address[], address)',
     'function nft() view returns (address)',
     'function core() view returns (address)',
+    ...refundSettings.map(name => 'function ' + name + '() view returns (uint256)'),
     ...roles.map(role => 'function ' + role + '() view returns (address)')
 ]);
 const sentinel = '0x0000000000000000000000000000000000000001';
@@ -64,15 +66,30 @@ export async function verifyTreasurySafes(register, rpc, expectedBlock) {
 }
 
 export async function verifyTreasurySafesWithTwoProviders(register, first, second, { requirePair = false } = {}) {
-    if (requirePair) check(register.core && register.nft, 'The pair check requires reviewed Core and NFT entries');
+    let refundLimits;
+    if (requirePair) {
+        check(register.core && register.nft, 'The pair check requires reviewed Core and NFT entries');
+        for (const role of roles) {
+            check(register[role]?.threshold === 2 && addressSet(register[role].owners, role + ' owners').length === 3,
+                'The ordinary release requires a two-of-three Safe for ' + role);
+        }
+        refundLimits = {};
+        for (const name of refundSettings) {
+            const value = register.core[name];
+            check((Number.isSafeInteger(value) && value > 0) ||
+                (typeof value === 'string' && /^[1-9]\d{0,77}$/.test(value) && BigInt(value) <= MaxUint256),
+                'Supply the reviewed positive uint256 for ' + name);
+            refundLimits[name] = String(value);
+        }
+    }
     const [firstHead, secondHead] = await Promise.all([finalizedBlock(register.chainId, first), finalizedBlock(register.chainId, second)]);
     const block = BigInt(firstHead.number) <= BigInt(secondHead.number) ? firstHead : secondHead;
     await Promise.all([confirmFinalizedBlock(first, firstHead, block), confirmFinalizedBlock(second, secondHead, block)]);
-    const [result] = await Promise.all([verifyAtBlock(register, first, block), verifyAtBlock(register, second, block)]);
+    const [result] = await Promise.all([verifyAtBlock(register, first, block, refundLimits), verifyAtBlock(register, second, block, refundLimits)]);
     return result;
 }
 
-async function verifyAtBlock(register, rpc, block) {
+async function verifyAtBlock(register, rpc, block, refundLimits) {
     const assigned = roles.map(role => address(register[role]?.address, role));
     check(new Set(assigned).size === roles.length, 'Each custody role needs its own Safe address');
     if (register.nft) check(register.core, 'An NFT register entry requires its paired Core');
@@ -120,6 +137,12 @@ async function verifyAtBlock(register, rpc, block) {
             const [bound] = await view(core, role);
             check(bound === getAddress(register[role].address), 'Core binding mismatch for ' + role);
         }
+        if (refundLimits) {
+            for (const name of refundSettings) {
+                const [actual] = await view(core, name);
+                check(actual === BigInt(refundLimits[name]), 'Core refund setting mismatch for ' + name);
+            }
+        }
         if (register.nft) {
             const nft = address(register.nft.address, 'NFT');
             check(new Set([...assigned, core, nft]).size === roles.length + 2, 'Core, NFT and custody addresses must be distinct');
@@ -132,7 +155,8 @@ async function verifyAtBlock(register, rpc, block) {
     }
     return {
         chainId: register.chainId, block, roles: summary,
-        coreBindingsChecked: Boolean(register.core), nftPairChecked: Boolean(register.nft)
+        coreBindingsChecked: Boolean(register.core), nftPairChecked: Boolean(register.nft),
+        ...(refundLimits && { refundLimits })
     };
 }
 

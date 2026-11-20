@@ -171,7 +171,9 @@ Provide `ARTSOUL_CUSTODY_RPC_URL` privately. Set `ARTSOUL_CUSTODY_RPC_CHECK_URL`
 node scripts/verify-treasury-safes.mjs /private/path/to/approved-custody.json
 ```
 
-For a deployed ordinary pair, collect the release evidence with the command below. It requires both reviewed contract entries and two independent RPC endpoints. Both providers must verify the pair and its custody roles at the same finalized block hash. Archive the output with `nftPairChecked: true` and `rpcReadings: 2` alongside the reviewed build and register. This verifies the deployed wiring. The independent contract review and rehearsal are separate release requirements.
+For a deployed ordinary pair, collect the release evidence with the command below. In the register's `core` entry, put the independently reviewed fourth and fifth constructor values in `refundBatchLimit` and `refundTransferGas`, respectively. The first is a count of refunds per call and the second is gas per transfer. Use exact positive decimal strings for values above JavaScript's safe integer range. Copy the values from the deployment review before checking the chain.
+
+The release check requires two independent RPC endpoints. Both must confirm the same finalized block, the three two-of-three Safes, both directions of the Core/NFT binding and both refund settings. Archive `refundLimits`, `nftPairChecked: true` and `rpcReadings: 2` with the reviewed build and register. Existing custody-only registers remain usable for routine checks. The independent contract review and public rehearsal retain separate acceptance.
 
 ```sh
 node scripts/verify-treasury-safes.mjs /private/path/to/approved-custody.json --require-pair

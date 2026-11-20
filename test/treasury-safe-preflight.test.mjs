@@ -12,6 +12,7 @@ const iface = new Interface([
     'function getOwners() returns (address[])', 'function getThreshold() returns (uint256)',
     'function getModulesPaginated(address,uint256) returns (address[],address)',
     'function nft() returns (address)', 'function core() returns (address)',
+    'function refundBatchLimit() returns (uint256)', 'function refundTransferGas() returns (uint256)',
     ...roles.map(role => 'function ' + role + '() returns (address)')
 ]);
 const slots = new Map([
@@ -23,7 +24,7 @@ const slots = new Map([
 function fixture() {
     const register = {
         chainId: 84532,
-        core: { address: addr(20), codeHash: keccak256('0x6003') },
+        core: { address: addr(20), codeHash: keccak256('0x6003'), refundBatchLimit: 3, refundTransferGas: '45000' },
         nft: { address: addr(23), codeHash: keccak256('0x6004') }
     };
     for (const [index, role] of roles.entries()) {
@@ -54,6 +55,9 @@ function fixture() {
         const { to, data } = params[0];
         const fn = iface.parseTransaction({ data });
         if (to === chain.core.address) {
+            if (fn.name === 'refundBatchLimit' || fn.name === 'refundTransferGas') {
+                return iface.encodeFunctionResult(fn.name, [chain.core[fn.name]]);
+            }
             const value = fn.name === 'nft' ? chain.core.pairedNFT : chain[fn.name].address;
             return iface.encodeFunctionResult(fn.name, [value]);
         }
@@ -98,6 +102,40 @@ test('the explicit pair check requires both reviewed contracts before reading pr
     const { register, rpc } = fixture();
     delete register.core;
     await assert.rejects(verifyTreasurySafes(register, rpc), /requires its paired Core/);
+});
+
+test('strict release checks reject incomplete refund settings and non-release custody before RPC', async () => {
+    const failIfCalled = () => assert.fail('Unexpected RPC read');
+    for (const name of ['refundBatchLimit', 'refundTransferGas']) {
+        for (const invalid of [undefined, '0', -1, 0.5, Number.MAX_SAFE_INTEGER + 1, '1e3', String(1n << 256n)]) {
+            const { register } = fixture();
+            register.core[name] = invalid;
+            await assert.rejects(verifyTreasurySafesWithTwoProviders(register, failIfCalled, failIfCalled, { requirePair: true }),
+                new RegExp('reviewed positive uint256 for ' + name));
+        }
+    }
+    for (const role of roles) {
+        const { register } = fixture();
+        register[role].threshold = 3;
+        await assert.rejects(verifyTreasurySafesWithTwoProviders(register, failIfCalled, failIfCalled, { requirePair: true }),
+            new RegExp('two-of-three Safe for ' + role));
+    }
+    const { register, rpc } = fixture();
+    delete register.core.refundBatchLimit;
+    delete register.core.refundTransferGas;
+    assert.equal((await verifyTreasurySafesWithTwoProviders(register, rpc, rpc)).refundLimits, undefined);
+});
+
+test('both independent reads must match the reviewed refund settings exactly at the agreed block', async () => {
+    for (const name of ['refundBatchLimit', 'refundTransferGas']) {
+        const first = fixture(), second = fixture();
+        const aboveSafeInteger = '9007199254740993';
+        first.register.core[name] = first.chain.core[name] = second.chain.core[name] = aboveSafeInteger;
+        const verify = () => verifyTreasurySafesWithTwoProviders(first.register, first.rpc, second.rpc, { requirePair: true });
+        assert.equal((await verify()).refundLimits[name], aboveSafeInteger);
+        second.chain.core[name] = '9007199254740992';
+        await assert.rejects(verify(), new RegExp('Core refund setting mismatch for ' + name));
+    }
 });
 
 test('verifies each Safe independently through two successive owner replacements', async () => {
