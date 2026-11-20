@@ -1,4 +1,5 @@
 import { normalizeWallet, supabaseRest } from './backend.js';
+import { verifiedArtworkAura } from './verified-artwork-aura.js';
 
 function matchesRegistrationId(value, id) {
   return value === id || (Number.isSafeInteger(value) && String(value) === id);
@@ -6,8 +7,8 @@ function matchesRegistrationId(value, id) {
 
 // The deployment and publisher are designated together. Changing the active
 // Core cannot carry a previous deployment's visual status into its successor.
-export async function readPlatformArtworkIds(artworks, ownership) {
-  const qualified = new Set();
+export async function readArtworkAuraKinds(artworks, ownership) {
+  const qualified = new Map();
   if (!ownership || ownership.config.chainId !== 84532) return qualified;
   const designation = process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA || '';
   const [core, publisher, ...extra] = designation.toLowerCase().split(':');
@@ -49,7 +50,14 @@ export async function readPlatformArtworkIds(artworks, ownership) {
         event.artwork_id === artwork.artwork_id && matchesRegistrationId(event.event_data?.artworkId, artwork.artwork_id) &&
         typeof event.event_data.creator === 'string' && event.event_data.creator.toLowerCase() === publisher &&
         event.event_data.metadataURI === artwork.metadata_uri);
-      if (matches.length === 1) qualified.add(artwork.artwork_id);
+      if (matches.length === 1) {
+        const { chainId, nftAddress } = ownership.config;
+        const identity = { chainId, nftAddress, tokenId: proven.get(artwork.artwork_id).token_id };
+        const kind = verifiedArtworkAura(identity, {
+          platformRegistration: { chainId: Number(artwork.chain_id), address: nftAddress, tokenId: artwork.token_id }
+        });
+        if (kind) qualified.set(artwork.artwork_id, kind);
+      }
     }
   }));
   return qualified;

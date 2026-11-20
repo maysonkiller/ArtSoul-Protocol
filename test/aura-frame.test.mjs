@@ -31,7 +31,9 @@ test('only the verified minted projection exposes a named frame to the interface
     });
     for (const artwork of [null, {}, { metadata: nft }, { ...nft, source: 'wallet' }, { ...nft, source: 'pending_indexer' },
         { ...nft, minted: 'true' }, { ...nft, minted: false }, { ...nft, ownership_status: 'unavailable' },
-        { ...nft, aura_kind: '__proto__' }, { ...nft, aura_kind: 'genesis' }]) {
+        { ...nft, aura_kind: '__proto__' }, { ...nft, aura_kind: 'genesis' },
+        { ...nft, chain_id: 11155111 }, { ...nft, chain_id: 1, aura_kind: 'partner' },
+        { ...nft, chain_id: null }, { ...nft, chain_id: [84532] }]) {
         assert.equal(projectedArtworkAura(artwork), null);
     }
     assert.equal(projectedArtworkAura({ ...nft, chain_id: 8453, aura_kind: 'genesis' }).label, 'Genesis aura');

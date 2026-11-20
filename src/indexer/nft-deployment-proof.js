@@ -6,7 +6,9 @@ const getters = new Interface([
     'function nft() view returns (address)',
     'function core() view returns (address)',
     'function totalSupply() view returns (uint256)',
-    'function getActiveResale(uint256 tokenId) view returns (bool active, address seller, uint256 price, uint256 version)'
+    'function getActiveResale(uint256 tokenId) view returns (bool active, address seller, uint256 price, uint256 version)',
+    'function auctions(uint256 id) view returns (uint256 artworkId, uint256 startPrice, uint256 originalEnd, uint256 end, uint256 paymentDeadline, address highestBidder, uint256 price, uint256 deposit, uint8 state, address firstCollector)',
+    'function runnerUpOffers(uint256 id) view returns (address bidder, uint256 price, uint256 deadline)'
 ]);
 const transfers = new Interface(['event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)']);
 const transferTopic = transfers.getEvent('Transfer').topicHash;
@@ -72,10 +74,11 @@ async function readAtNftDeployment(listener, options, read, coreGetter = 'nftCon
                     !matches(hashPattern, header?.hash) || header.hash.toLowerCase() !== snapshot.blockHash) {
                     throw new Error('NFT deployment proof canonical block mismatch');
                 }
+                return header;
             };
             const block = Object.freeze({ blockHash: snapshot.blockHash, requireCanonical: true });
             await checkChain();
-            await checkHeader();
+            const header = await checkHeader();
             for (const [address, expectedHash] of [[snapshot.coreAddress, snapshot.coreCodeHash],
                 [snapshot.nftAddress, snapshot.nftCodeHash]]) {
                 const code = await send('eth_getCode', [address, block]);
@@ -105,7 +108,7 @@ async function readAtNftDeployment(listener, options, read, coreGetter = 'nftCon
                     throw new Error('Ordinary deployment block is not finalized');
                 }
             }
-            const result = read ? await read(send, identity, block) : identity;
+            const result = read ? await read(send, identity, block, header) : identity;
             await checkHeader();
             await checkChain();
             return result;
@@ -147,6 +150,47 @@ export async function readOrdinaryResaleQuote(listener, options) {
         }
         return Object.freeze({ ...proof, tokenId, active, seller: active ? seller.toLowerCase() : null,
             priceWei: price.toString(), version: version.toString() });
+    }, 'nft');
+}
+
+// The runner-up mapping remembers bids before an offer and retains its terms after closure.
+// Only the auction state and timestamp of the same finalized block establish a purchase right.
+export async function readOrdinaryRunnerUpOffer(listener, options) {
+    const auctionId = options?.auctionId;
+    if (!positiveUint256(auctionId)) throw new Error('Invalid ordinary auction ID');
+    return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
+        if (!matches(quantityPattern, header.timestamp)) throw new Error('Invalid ordinary offer block timestamp');
+        const read = async method => {
+            const data = getters.encodeFunctionData(method, [auctionId]);
+            const raw = await send('eth_call', [{ to: proof.coreAddress, data }, block]);
+            const words = getters.getFunction(method).outputs.length;
+            if (typeof raw !== 'string' || raw.length !== 2 + 64 * words || !/^0x[0-9a-f]+$/i.test(raw)) {
+                throw new Error('Invalid ordinary offer response');
+            }
+            const result = getters.decodeFunctionResult(method, raw);
+            if (getters.encodeFunctionResult(method, result) !== raw.toLowerCase()) throw new Error('Invalid ordinary offer encoding');
+            return result;
+        };
+        const auction = await read('auctions');
+        if (auction.artworkId === 0n || auction.state === 0n) throw new Error('Unknown ordinary auction');
+        const offer = await read('runnerUpOffers');
+        const offered = offer.deadline !== 0n;
+        const settled = 4n, defaulted = 5n, runnerUpOffer = 6n; // OrdinaryArtAuctions.State
+        if (auction.state > runnerUpOffer || (auction.state === runnerUpOffer && !offered) ||
+            (offered && (auction.state < settled || !nonzero(offer.bidder) || offer.price === 0n ||
+                (auction.state === settled && auction.firstCollector !== offer.bidder)))) {
+            throw new Error('Inconsistent ordinary runner-up offer');
+        }
+        let status = 'not_offered';
+        if (offered) {
+            if (auction.state === settled) status = 'accepted';
+            else if (auction.state === defaulted) status = 'closed';
+            else status = BigInt(header.timestamp) <= offer.deadline ? 'open' : 'expired';
+        }
+        const bidder = offered ? offer.bidder.toLowerCase() : null;
+        return Object.freeze({ ...proof, auctionId, artworkId: auction.artworkId.toString(), status, bidder,
+            eligibleBuyer: status === 'open' ? bidder : null, priceWei: offered ? offer.price.toString() : null,
+            deadline: offered ? offer.deadline.toString() : null });
     }, 'nft');
 }
 

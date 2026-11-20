@@ -474,6 +474,16 @@ test('both independently restored directories must verify against one supplied r
   const at = (...extra) => run(announced, '--second-copy', announcedCopy, '--expected-root', archive.rootHash,
     '--announced-cut-off', ...extra);
   assert.equal(at('2001-01-02T01:00:00.123456+01:00').status, 0);
+  const withNotice = (...extra) => at('2001-01-02T01:00:00.123456+01:00', '--notice-published-at', ...extra);
+  const fullNotice = withNotice('2000-12-19T00:00:00.123456Z');
+  assert.equal(fullNotice.status, 0, fullNotice.stderr);
+  assert.match(fullNotice.stdout, /14-day public notice/);
+  const shortNotice = withNotice('2000-12-19T00:00:00.123457Z');
+  assert.equal(shortNotice.status, 1);
+  assert.match(shortNotice.stderr, /14 full days/);
+  assert.equal(withNotice('invalid').status, 1);
+  assert.equal(withNotice('2000-12-10T00:00:00Z', '--notice-published-at', '2000-12-11T00:00:00Z').status, 1);
+  assert.equal(run(announced, '--expected-root', archive.rootHash, '--notice-published-at', '2000-12-19T00:00:00Z').status, 1);
   const wrongInstant = at('2001-01-02T00:00:00.123455Z');
   assert.equal(wrongInstant.status, 1);
   assert.equal(wrongInstant.stdout.match(/does not match the announced Base Sepolia cut-off/g).length, 2);

@@ -1,17 +1,25 @@
 const assert = require('node:assert/strict');
-const { artifacts, network } = require('hardhat');
+const hre = require('hardhat');
+const { artifacts } = hre;
+const { createProvider } = require('hardhat/internal/core/providers/construction');
 const { ethers } = require('ethers');
 
 const DAY = 86400n;
 const eth = ethers.parseEther;
 const id = 1n;
 const mine = async tx => (await tx).wait();
-const at = timestamp => network.provider.send('evm_setNextBlockTimestamp', [Number(timestamp)]);
 const event = (receipt, name) => receipt.logs.find(log => log.fragment?.name === name)?.args;
 
 describe('Runner-up offers for ordinary artworks', function () {
     this.timeout(90000);
-    let provider, operator, creator, winner, runner, third, treasury, engine, nft;
+    let evm, provider, operator, creator, winner, runner, third, treasury, engine, nft, reviewedPair;
+    const at = timestamp => evm.send('evm_setNextBlockTimestamp', [Number(timestamp)]);
+
+    before(async () => {
+        const chain = { ...hre.config.networks.hardhat, chainId: 84532, forking: undefined };
+        evm = await createProvider({ ...hre.config, networks: { hardhat: chain } }, 'hardhat', artifacts);
+    });
+    afterEach(() => provider?.destroy());
 
     async function deploy(name, ...args) {
         const artifact = await artifacts.readArtifact(name);
@@ -19,15 +27,29 @@ describe('Runner-up offers for ordinary artworks', function () {
     }
 
     beforeEach(async () => {
-        await network.provider.send('hardhat_reset');
-        provider = new ethers.BrowserProvider(network.provider, undefined, { cacheTimeout: -1 });
+        await evm.send('hardhat_reset');
+        provider = new ethers.BrowserProvider(evm, undefined, { cacheTimeout: -1 });
         provider.pollingInterval = 10;
         [operator, creator, winner, runner, third, treasury] = await provider.listAccounts();
         engine = await deploy('OrdinaryAuctionFixture', treasury.address);
         nft = new ethers.Contract(await engine.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, provider);
+        reviewedPair = { chainId: 84532, coreAddress: engine.target, nftAddress: nft.target,
+            expectedCoreCodeHash: ethers.keccak256(await provider.getCode(engine.target)),
+            expectedNftCodeHash: ethers.keccak256(await provider.getCode(nft.target)) };
         await mine(engine.connect(creator).registerArtwork('ipfs://ordinary'));
         await mine(engine.connect(creator).createAuction(id, eth('0.1'), DAY));
     });
+
+    async function readOffer(blockNumber = 'latest') {
+        const { default: EventListener } = await import('../src/indexer/event-listener.js');
+        const block = await provider.getBlock(blockNumber);
+        const listener = Object.assign(Object.create(EventListener.prototype), {
+            chainId: 84532, contractAddress: engine.target, nftAddress: nft.target,
+            readProviders: [evm], readRpcs: ['in-process'], readRpcUnavailableUntil: [0], baseTimeout: 5000
+        });
+        return listener.readOrdinaryRunnerUpOffer({ ...reviewedPair, blockNumber: block.number,
+            blockHash: block.hash, auctionId: id.toString(), isCurrent: () => true });
+    }
 
     async function bid(bidder, amount) {
         const price = eth(amount);
@@ -61,6 +83,35 @@ describe('Runner-up offers for ordinary artworks', function () {
         });
     }
 
+    it('reads the reviewed runner-up offer from a finalized local block through the operator CLI', async () => {
+        const { execFile } = require('node:child_process');
+        const { mkdtemp, writeFile, unlink, rmdir } = require('node:fs/promises');
+        const { join } = require('node:path');
+        const { tmpdir } = require('node:os');
+        const { promisify } = require('node:util');
+        const deadline = await openOffer();
+        const block = await provider.getBlock('latest');
+        const rpc = await hre.run('node:create-server', { provider: evm, hostname: '127.0.0.1', port: 0 });
+        const dir = await mkdtemp(join(tmpdir(), 'artsoul-runner-up-'));
+        const file = join(dir, 'pair.json');
+        try {
+            await writeFile(file, JSON.stringify(reviewedPair));
+            const { port } = await rpc.listen();
+            const { stdout } = await promisify(execFile)(process.execPath,
+                [require.resolve('../scripts/read-ordinary-runner-up.mjs'), file, '1', String(block.number), block.hash], {
+                    timeout: 15000, windowsHide: true,
+                    env: { SystemRoot: process.env.SystemRoot || '', ARTSOUL_ORDINARY_RPC_URL: `http://127.0.0.1:${port}` }
+                });
+            const offer = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
+            assert.deepEqual(offer, await readOffer(block.number));
+            assert.equal(offer.deadline, deadline.toString());
+        } finally {
+            await rpc.close();
+            await unlink(file);
+            await rmdir(dir);
+        }
+    });
+
     it('refunds returning bidders before default and honors only the runner-up’s last bid at the exact offer deadline', async () => {
         await bid(runner, '0.1');
         await bid(winner, '0.2');
@@ -68,6 +119,9 @@ describe('Runner-up offers for ordinary artworks', function () {
         await bid(runner, '0.4');
         await bid(winner, '0.5');
         await close();
+        const pending = await readOffer();
+        assert.deepEqual([pending.status, pending.eligibleBuyer, pending.bidder, pending.priceWei, pending.deadline],
+            ['not_offered', null, null, null, null]);
         const value = eth('0.4');
         await rejects(engine.connect(runner).acceptRunnerUpOffer.staticCall(id, { value }), 'WrongAuctionState');
         const earlierBalance = await provider.getBalance(runner.address);
@@ -79,6 +133,9 @@ describe('Runner-up offers for ordinary artworks', function () {
         assert.deepEqual(Array.from(event(receipt, 'AuctionDefaulted')), [id, winner.address, eth('0.05')]);
         const deadline = BigInt((await provider.getBlock(receipt.blockNumber)).timestamp) + DAY;
         assert.deepEqual(Array.from(event(receipt, 'RunnerUpOfferOpened')), [id, runner.address, value, deadline]);
+        const opened = await readOffer(receipt.blockNumber);
+        assert.deepEqual([opened.status, opened.eligibleBuyer, opened.priceWei, opened.deadline],
+            ['open', runner.address.toLowerCase(), value.toString(), deadline.toString()]);
         assert.deepEqual(Array.from(await engine.runnerUpOffers(id)), [runner.address, value, deadline]);
         assert.equal(await engine.credits(creator.address), eth('0.04'));
         assert.equal(await engine.credits(treasury.address), eth('0.01'));
@@ -96,16 +153,20 @@ describe('Runner-up offers for ordinary artworks', function () {
         await mine(engine.setEntryPaused(true));
         await at(deadline);
         const sale = await mine(engine.connect(runner).acceptRunnerUpOffer(id, { value }));
-        const rawReceipt = await network.provider.send('eth_getTransactionReceipt', [sale.hash]);
+        const rawReceipt = await evm.send('eth_getTransactionReceipt', [sale.hash]);
         const { parseOrdinarySettlement } = await import('../src/indexer/ordinary-settlement.js');
         const pair = { coreAddress: engine.target.toLowerCase(), nftAddress: nft.target.toLowerCase(),
-            chainId: 31337, blockNumber: sale.blockNumber, blockHash: sale.blockHash };
+            chainId: 84532, blockNumber: sale.blockNumber, blockHash: sale.blockHash };
         const projected = parseOrdinarySettlement(rawReceipt, pair, sale.hash, id.toString());
         assert.equal(projected.firstCollector, runner.address.toLowerCase());
         assert.equal(projected.creator, creator.address.toLowerCase());
         assert.equal(projected.priceWei, value.toString());
         assert.equal(projected.runnerUpAccepted, true);
         assert.deepEqual(Array.from(event(sale, 'RunnerUpOfferAccepted')), [id, runner.address, value]);
+        const accepted = await readOffer(sale.blockNumber);
+        assert.deepEqual([accepted.status, accepted.eligibleBuyer, accepted.bidder, accepted.priceWei],
+            ['accepted', null, runner.address.toLowerCase(), value.toString()]);
+        assert.deepEqual(await readOffer(receipt.blockNumber), opened);
         assert.deepEqual(Array.from(event(sale, 'AuctionSettled')), [id, id, 1n, value]);
         const auction = await engine.auctions(id);
         assert.equal(auction.highestBidder, winner.address);
@@ -138,6 +199,7 @@ describe('Runner-up offers for ordinary artworks', function () {
         assert.equal(await provider.getBalance(runner.address) - before, eth('0.02'));
         const receipt = await mine(engine.connect(runner).declineRunnerUpOffer(id));
         assert.deepEqual(Array.from(event(receipt, 'RunnerUpOfferDeclined')), [id, runner.address]);
+        assert.equal((await readOffer(receipt.blockNumber)).status, 'closed');
         assert.equal(await engine.currentAuctionForWork(id), 0n);
         assert.equal((await engine.works(id)).floor, 0n);
         assert.equal(await nft.totalSupply(), 0n);
@@ -156,12 +218,17 @@ describe('Runner-up offers for ordinary artworks', function () {
             const deadline = await openOffer();
             if (!lazyRelist) await mine(engine.setEntryPaused(true));
             await at(deadline);
-            await network.provider.send('evm_mine');
+            await evm.send('evm_mine');
+            const atDeadline = await readOffer();
+            assert.equal(atDeadline.eligibleBuyer, runner.address.toLowerCase());
             assert.equal(await engine.currentAuctionForWork(id), id);
             assert.equal(await engine.dueAuctionAction(id), 0n);
             await rejects(engine.connect(third).expireRunnerUpOffer.staticCall(id), 'WrongAuctionState');
             await at(deadline + 1n);
-            await network.provider.send('evm_mine');
+            await evm.send('evm_mine');
+            const expired = await readOffer();
+            assert.deepEqual([expired.status, expired.eligibleBuyer, expired.deadline],
+                ['expired', null, deadline.toString()]);
             assert.equal(await engine.dueAuctionAction(id), 3n);
             assert.equal(await engine.currentAuctionForWork(id), 0n);
             await rejects(engine.connect(runner).acceptRunnerUpOffer.staticCall(id, { value: eth('0.1') }), 'WrongAuctionState');
@@ -170,6 +237,7 @@ describe('Runner-up offers for ordinary artworks', function () {
                 ? await mine(engine.connect(creator).createAuction(id, eth('0.1'), DAY))
                 : await mine(engine.connect(third).expireRunnerUpOffer(id));
             assert.deepEqual(Array.from(event(receipt, 'RunnerUpOfferExpired')), [id, runner.address]);
+            assert.equal((await readOffer(receipt.blockNumber)).status, 'closed');
             assert.equal(await engine.currentAuctionForWork(id), lazyRelist ? 2n : 0n);
             assert.equal(await engine.dueAuctionAction(id), 0n);
             await rejects(engine.expireRunnerUpOffer.staticCall(id), 'WrongAuctionState');
@@ -186,6 +254,7 @@ describe('Runner-up offers for ordinary artworks', function () {
         await close();
         const receipt = await recordDefault();
         assert.equal(event(receipt, 'RunnerUpOfferOpened'), undefined);
+        assert.equal((await readOffer(receipt.blockNumber)).status, 'not_offered');
         assert.equal(await engine.currentAuctionForWork(id), 0n);
         assert.equal(await engine.dueAuctionAction(id), 0n);
         await rejects(engine.connect(winner).acceptRunnerUpOffer.staticCall(id, { value: eth('0.2') }), 'WrongAuctionState');

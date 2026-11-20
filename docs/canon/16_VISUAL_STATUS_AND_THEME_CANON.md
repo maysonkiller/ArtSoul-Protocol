@@ -46,3 +46,15 @@ One aura can be auto-assigned to an NFT by priority:
 4. None.
 
 Users do not pick aura colors. Running border text is Future-only and admin-toggleable.
+
+### Evidence for each frame
+
+The artwork API currently supplies Platform status for a verified Base Sepolia NFT whose original registration matches the designated Core and publisher. Gallery, profile, Saved and detail consume the same projected status. Historical Ethereum Sepolia cards have no aura.
+
+The resolver also accepts evidence for the two new mint formats. A finalized mint receipt must match a canonical block obtained independently, and the NFT contract must emit the ERC-721 mint to the same recipient as its grant or collection event.
+
+- A grant on the designated Base mainnet Genesis contract identifies that exact Genesis token. Showing a frame on a separate artwork requires its own verified link. The transferable testnet prototype and a creator's wallet holdings cannot establish that link.
+- A Partner mint requires the current curated Partner approval for that chain and collection address, plus a matching token in the range emitted by `CollectionMinted`. A blue identity check authenticates the collection's origin and confers no Partner status.
+- Top-100k is a numbered mainnet profile badge. It has no input to this resolver. Its live display depends on confirmed eligibility and issuance records.
+
+All eight combinations of eligible sources and rollback cases are covered in `test/verified-artwork-aura.test.mjs`. The Genesis and Partner receipt formats were also exercised on a disposable chain using a two-token Genesis grant and a three-token collection mint. The public feed currently lacks both the new mint sources and the curated Partner approval registry. Neither status is active there.

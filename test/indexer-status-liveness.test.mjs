@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
+import handler, {
   LIVENESS,
   describeLiveness,
   buildChainStatus
@@ -41,8 +41,14 @@ test('a chain stopped on purpose is not an incident', () => {
   // Ethereum Sepolia is read-only legacy under canon 13 and its indexer is
   // meant to be off. Paging somebody about it every day would teach them to
   // ignore the signal.
-  assert.equal(verdict({ status: 'stopped', last_indexed_at: ago(7569304) }), 'stopped_by_design');
-  assert.equal(verdict({ status: 'stopped', last_indexed_at: ago(10) }), 'stopped_by_design');
+  assert.equal(verdict({ chain_id: 11155111, status: 'stopped', last_indexed_at: ago(7569304) }), 'stopped_by_design');
+  assert.equal(verdict({ chain_id: '11155111', status: 'stopped', last_indexed_at: ago(10) }), 'stopped_by_design');
+});
+
+test('a fresh shutdown on the operational chain raises an incident and an unconfirmed state fails closed', () => {
+  const state = { chain_id: 84532, last_indexed_at: ago(1) };
+  assert.equal(verdict({ ...state, status: 'stopped' }), 'stalled');
+  for (const status of ['initialized', 'error', '', null]) assert.equal(verdict({ ...state, status }), 'unknown');
 });
 
 test('a missing timestamp is unknown rather than healthy', () => {
@@ -66,6 +72,17 @@ test('a clock skew that puts the timestamp ahead does not read as stale', () => 
   const detail = describeLiveness({ status: 'running', last_indexed_at: ago(-30) }, NOW);
   assert.equal(detail.seconds_since_last_indexed, 0);
   assert.equal(detail.liveness, 'healthy');
+  assert.equal(verdict({ status: 'running', last_indexed_at: ago(-31) }), 'unknown');
+  assert.equal(verdict({ status: 'running', last_indexed_at: ago(-86400) }), 'unknown');
+});
+
+test('the status route restricts shared cache freshness to its advertised monitoring window', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('[]'));
+  const headers = new Map();
+  let payload;
+  const res = { setHeader: (key, value) => headers.set(key, value), status: () => res, json: value => { payload = value; } };
+  await handler({ method: 'GET' }, res);
+  assert.equal(headers.get('Cache-Control'), `public, max-age=0, s-maxage=${payload.chains[0].response_max_age_seconds}, must-revalidate`);
 });
 
 test('the chain rows carry the verdict beside the numbers that hid the problem', () => {
@@ -123,7 +140,7 @@ test('the runbook and the endpoint name the same verdicts', async () => {
     describeLiveness({ status: 'running', last_indexed_at: ago(10) }, NOW).liveness,
     describeLiveness({ status: 'running', last_indexed_at: ago(300) }, NOW).liveness,
     describeLiveness({ status: 'running', last_indexed_at: ago(99999) }, NOW).liveness,
-    describeLiveness({ status: 'stopped', last_indexed_at: ago(10) }, NOW).liveness,
+    describeLiveness({ chain_id: 11155111, status: 'stopped', last_indexed_at: ago(10) }, NOW).liveness,
     describeLiveness({ status: 'running' }, NOW).liveness
   ]);
 

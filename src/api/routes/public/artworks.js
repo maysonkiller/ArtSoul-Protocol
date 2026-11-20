@@ -1,7 +1,7 @@
 import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
 import { PUBLIC_PROFILE_SOURCE } from '../../profile-fields.js';
-import { readPlatformArtworkIds } from '../../platform-artwork-aura.js';
+import { readArtworkAuraKinds } from '../../platform-artwork-aura.js';
 import { allowedArtworkUrl, readArtworkMetadata } from '../../safe-artwork-fetch.js';
 import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
 import { MULTIMEDIA_NFT_COVER } from '../../../config/upload-policy.js';
@@ -633,7 +633,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     auction_winner_address: auctionWinnerAddress,
     current_owner_address: currentOwnerAddress,
     ...(ownershipStatus ? { ownership_status: ownershipStatus } : {}),
-    ...(ownershipStatus === 'verified' && maps.platformArtworkIds.has(artworkId) ? { aura_kind: 'platform' } : {}),
+    ...(ownershipStatus === 'verified' && maps.artworkAuraKinds.has(artworkId) ? { aura_kind: maps.artworkAuraKinds.get(artworkId) } : {}),
     vote_count: signals.like,
     like_count: signals.like,
     would_buy_count: signals.would_buy,
@@ -745,16 +745,16 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
   }
   // Creator names and immutable metadata are independent reads. Starting them
   // together removes one serial network round trip from a cold projection.
-  let [publicIdentities, metadataRows, platformArtworkIds] = await Promise.all([
+  let [publicIdentities, metadataRows, artworkAuraKinds] = await Promise.all([
     preload.publicIdentities ?? publicIdentitiesByAddress(tableData.v41_artworks.map(artwork => artwork.creator), warnings),
     preload.metadataRows ?? Promise.all(
       tableData.v41_artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
     ),
-    readPlatformArtworkIds(tableData.v41_artworks, ownership)
+    readArtworkAuraKinds(tableData.v41_artworks, ownership)
   ]);
   const maps = {
     ownership,
-    platformArtworkIds,
+    artworkAuraKinds,
     publicIdentities,
     includeOwnershipProfiles: preload.includeOwnershipProfiles === true,
     auctions: latestAuctionByArtwork(tableData.v41_auctions),

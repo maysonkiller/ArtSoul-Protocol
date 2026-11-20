@@ -1,0 +1,2 @@
+# Solidity includes source-byte hashes in the bytecode metadata of the ordinary pair.
+contracts/replacement/*.sol text eol=lf
