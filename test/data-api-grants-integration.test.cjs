@@ -51,7 +51,7 @@ const rpcOnly = [
 // No Data API role may create or advance a coverage attestation.
 const indexerReadOnly = ['nft_transfer_coverage'];
 
-test('new table migrations must join the no-default-grant rehearsal', () => {
+test('new table migrations must join the no-default-grant rehearsal', async () => {
   // These immutable historical files are covered by the legacy 18.7b
   // classifier, not by assuming platform default grants. New features must
   // join the explicit-grant rehearsal above rather than this exception list.
@@ -65,14 +65,14 @@ test('new table migrations must join the no-default-grant rehearsal', () => {
   const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services',
     '20261119150000_collection_origin_reviews', ...features]
     .map(name => `sql/migrations/${name}.sql`));
+  const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
+  for (const migration of listIndexerMigrations()) covered.add(migration.sourcePath);
   const missing = [];
   for (const dir of ['migrations', 'sql/schema', 'sql/migrations', 'src/indexer/migrations']) {
     for (const name of fs.readdirSync(dir).filter(name => name.endsWith('.sql'))) {
       const file = `${dir}/${name}`;
       if (!/\bCREATE\s+TABLE\b/i.test(fs.readFileSync(file, 'utf8').replace(/--[^\n]*/g, ''))) continue;
-      const inIndexerSequence = dir === 'sql/migrations' && /^00[123]_/.test(name)
-        || dir === 'src/indexer/migrations' && /^(00[4-9]|01[0-8])_/.test(name);
-      if (!inIndexerSequence && !covered.has(file) && !legacy.has(file)) missing.push(file);
+      if (!covered.has(file) && !legacy.has(file)) missing.push(file);
     }
   }
   assert.deepEqual(missing, [], 'rehearse each new table and its explicit grants before release');
@@ -103,12 +103,20 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   `);
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
   for (const migration of listIndexerMigrations()) query(migration.sql);
-  await t.test('ordinary issuer and settlement evidence has no Data API table privileges', () => {
+  await t.test('ordinary issuer, settlement and runner-up evidence has no effective Data API table privileges', () => {
     for (const role of ['anon', 'authenticated', 'service_role']) {
-      for (const table of ['ordinary_issuers', 'ordinary_settlements']) {
+      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations']) {
         assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.${table}',
-          'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER');`), 'f');
+          'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN');`), 'f', `${role}: ${table}`);
       }
+    }
+    const table = 'artsoul_private.ordinary_runner_up_observations';
+    assert.equal(query(`SELECT relrowsecurity FROM pg_class WHERE oid='${table}'::regclass;`), 't');
+    query(`GRANT SELECT ON ${table} TO PUBLIC; GRANT UPDATE ON ${table} TO anon, authenticated, service_role;`);
+    query(fs.readFileSync('src/indexer/migrations/019_ordinary_runner_up_observations.sql', 'utf8'));
+    for (const role of ['anon', 'authenticated', 'service_role']) {
+      assert.equal(query(`SELECT has_table_privilege('${role}', '${table}', 'SELECT,UPDATE');`), 'f', role);
+      assert.throws(() => query(`SET ROLE ${role}; SELECT * FROM ${table} LIMIT 0;`), /permission denied/);
     }
   });
   // Profiles predate the reproducible indexer sequence. Model only its public

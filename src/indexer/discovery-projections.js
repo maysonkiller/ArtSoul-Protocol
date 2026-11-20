@@ -35,7 +35,6 @@ export function computeTrustWeight(signal = {}) {
     score += Math.min(toNumber(signal.auctionParticipations), 10) * 1.5;
     score += Math.min(toNumber(signal.successfulSettlements), 5) * 8;
     score += Math.min(toNumber(signal.artworkInteractions), 20) * 0.5;
-    score += signal.genesisOwned ? 10 : 0;
     score -= Math.min(toNumber(signal.failedSettlements), 5) * 6;
     score -= Math.min(toNumber(signal.suspiciousFlags), 4) * 8;
 
@@ -66,9 +65,6 @@ export function buildTrustProjection(events = [], externalSignals = {}) {
         } else if (name === 'SettlementDefaulted') {
             const user = ensureUser(users, data.winner);
             if (user) user.failedSettlements += 1;
-        } else if (name === 'ProjectNFTMinted') {
-            const user = ensureUser(users, data.user);
-            if (user) user.genesisOwned = true;
         }
     }
 
@@ -77,7 +73,6 @@ export function buildTrustProjection(events = [], externalSignals = {}) {
         if (!user) continue;
         user.artworkInteractions += toNumber(extra.artworkInteractions);
         user.suspiciousFlags += toNumber(extra.suspiciousFlags);
-        user.genesisOwned = user.genesisOwned || Boolean(extra.genesisOwned);
     }
 
     return Array.from(users.values()).map(signal => ({

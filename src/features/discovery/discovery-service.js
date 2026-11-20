@@ -167,7 +167,6 @@
         const failedSettlements = toNumber(extra.failedSettlements ?? profile.failed_settlements);
         const auctionParticipations = toNumber(extra.auctionParticipations ?? profile.auction_participations);
         const interactionCount = toNumber(extra.interactionCount ?? profile.artwork_interactions);
-        const genesisOwned = Boolean(extra.genesisOwned || profile.genesis_holder || profile.has_genesis);
         const suspiciousFlags = toNumber(extra.suspiciousFlags ?? profile.suspicious_flags);
         const profileCreated = Boolean(profile.wallet_address || profile.username || profile.created_at);
 
@@ -183,7 +182,6 @@
         score += Math.min(auctionParticipations, 10) * 1.5;
         score += Math.min(successfulSettlements, 5) * 8;
         score += Math.min(interactionCount, 20) * 0.5;
-        score += genesisOwned ? 10 : 0;
         score += ageBonus;
         score -= Math.min(failedSettlements, 5) * 6;
         score -= Math.min(suspiciousFlags, 4) * 8;
@@ -206,7 +204,8 @@
                 successfulSettlements,
                 failedSettlements,
                 interactionCount,
-                genesisOwned,
+                // This projection has no verified mainnet Genesis grant source.
+                genesisOwned: false,
                 suspiciousFlags
             }
         };

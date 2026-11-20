@@ -23,6 +23,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 \i src/indexer/migrations/017_event_contract_provenance.sql
 BEGIN;
 \i src/indexer/migrations/018_ordinary_settlement_evidence.sql
+\i src/indexer/migrations/019_ordinary_runner_up_observations.sql
 COMMIT;
 
 -- Verify setup

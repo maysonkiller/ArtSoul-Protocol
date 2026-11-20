@@ -7,24 +7,28 @@ import { parseDraft, reviewConfig, safeUrl } from '../src/features/collections/l
 
 // Read only the URI that the collection builder previews for its first ERC-721 token.
 export async function checkCollectionMetadata(draftJson, expectedSha256) {
-    if (expectedSha256 !== undefined && !/^[a-f0-9]{64}$/i.test(expectedSha256)) {
-        throw new Error('The expected SHA-256 must be a 64-character hex digest.');
-    }
     const draft = parseDraft(draftJson);
     const { tokenOneMetadataURI } = reviewConfig(draft);
     if (!tokenOneMetadataURI) throw new Error('Set a valid token metadata prefix in the collection draft.');
-    if (!allowedArtworkUrl(tokenOneMetadataURI)) {
+    return { chainId: draft.chainId, ...await checkPublishedTokenMetadata(tokenOneMetadataURI, '1', expectedSha256) };
+}
+
+export async function checkPublishedTokenMetadata(metadataURI, tokenId, expectedSha256) {
+    if (expectedSha256 !== undefined && !/^[a-f0-9]{64}$/i.test(expectedSha256)) {
+        throw new Error('The expected SHA-256 must be a 64-character hex digest.');
+    }
+    if (!allowedArtworkUrl(metadataURI)) {
         throw new Error('This URI is outside the supported public artwork stores. Verify its response separately.');
     }
-    const response = await fetchArtworkResource(tokenOneMetadataURI, { maxBytes: MAX_METADATA_BYTES, timeoutMs: 8000 });
+    const response = await fetchArtworkResource(metadataURI, { maxBytes: MAX_METADATA_BYTES, timeoutMs: 8000 });
     if (!response) throw new Error('Could not read a complete metadata response within the size and time limits.');
     const sha256 = createHash('sha256').update(response.data).digest('hex');
     if (expectedSha256 !== undefined && sha256 !== expectedSha256.toLowerCase()) {
         throw new Error('The served metadata differs from the expected SHA-256.');
     }
-    const metadata = parseTokenMetadata(response.data, '1');
+    const metadata = parseTokenMetadata(response.data, tokenId);
     return {
-        chainId: draft.chainId, tokenId: '1', metadataURI: tokenOneMetadataURI, sha256,
+        tokenId, metadataURI, sha256,
         bytes: response.data.length, name: metadata.name, image: metadata.image,
         ...(metadata.animation_url !== undefined && { animation_url: metadata.animation_url })
     };

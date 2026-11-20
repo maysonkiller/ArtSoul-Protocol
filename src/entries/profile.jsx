@@ -825,11 +825,8 @@ const { useState, useEffect, useRef } = React;
 
             function buildDiscoveryProfile(profileData, fullArtworkCorpus, genesisState) {
                 if (!profileData?.wallet_address || !window.ArtSoulDiscovery) return null;
-                const trust = window.ArtSoulDiscovery.computeTrustProfile(profileData, fullArtworkCorpus, {
-                    genesisOwned: genesisState.owned
-                });
+                const trust = window.ArtSoulDiscovery.computeTrustProfile(profileData, fullArtworkCorpus);
                 const genesisProgress = window.ArtSoulDiscovery.getGenesisProgress(profileData, fullArtworkCorpus, {
-                    genesisOwned: genesisState.owned,
                     auctionParticipations: trust.signals.auctionParticipations,
                     successfulSettlements: trust.signals.successfulSettlements,
                     interactionCount: trust.signals.interactionCount

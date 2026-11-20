@@ -137,6 +137,16 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
         VALUES ($1,$2,172,170,now(),now(),'running')`, [chain,address]);
       await seedCursor(8453,CORE);
       assert.ok(await verify() > 20);
+      await pool.query(`INSERT INTO artsoul_private.ordinary_issuers
+        (chain_id,core_address,nft_address,core_code_hash,nft_code_hash) VALUES (8453,$1,$2,$3,$4)`,
+        [CORE, CREATOR, hash(1), hash(2)]);
+      assert.ok(await verify() > 20, 'the reviewed issuer can be registered before the first artwork');
+      await pool.query(`INSERT INTO artsoul_private.ordinary_runner_up_observations
+        (chain_id,core_address,auction_id,artwork_id,block_number,block_hash,status,bidder,price_wei,deadline)
+        VALUES (8453,$1,1,1,169,$2,'open',$3,10,1800000000)`, [CORE, hash(169), WINNER]);
+      await assert.rejects(verify(), /artsoul_private\.ordinary_runner_up_observations/);
+      assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_runner_up_observations')).rows[0].count,'1');
+      await pool.query('DELETE FROM artsoul_private.ordinary_runner_up_observations WHERE chain_id=8453 AND core_address=$1', [CORE]);
       await seedCursor(CHAIN,CORE);
       await assert.rejects(verify(), /database cursor/);
       await pool.query('DELETE FROM public.indexer_state WHERE chain_id=$1',[CHAIN]);
@@ -164,6 +174,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     await checkOrdinaryIntake(pool);
     await pool.query(ordinaryMigration);
     assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_settlements')).rows[0].count, '3');
+  });
+  await t.test('runner-up observations advance by finalized block and retain independent deployment states', async () => {
+    const { checkRunnerUpIntake } = await import('./helpers/ordinary-settlement-postgres.mjs');
+    await checkRunnerUpIntake(pool);
   });
   for (const name of ['identity', 'preparation', 'submission', 'registration', 'reorg']) {
     await pool.query(read(`sql/migrations/artwork_media_${name}.sql`));

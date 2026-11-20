@@ -11,6 +11,14 @@ const getters = new Interface([
     'function runnerUpOffers(uint256 id) view returns (address bidder, uint256 price, uint256 deadline)'
 ]);
 const transfers = new Interface(['event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)']);
+const token = new Interface([
+    'function supportsInterface(bytes4) view returns (bool)',
+    'function ownerOf(uint256) view returns (address)',
+    'function tokenCreator(uint256) view returns (address)',
+    'function firstCollector(uint256) view returns (address)',
+    'function tokenURI(uint256) view returns (string)',
+    'function royaltyInfo(uint256,uint256) view returns (address,uint256)'
+]);
 const transferTopic = transfers.getEvent('Transfer').topicHash;
 const addressPattern = /^0x[0-9a-f]{40}$/i;
 const hashPattern = /^0x[0-9a-f]{64}$/i;
@@ -155,6 +163,36 @@ export async function readOrdinarySettlement(listener, options) {
             throw new Error('Ordinary settlement receipt and finalized auction state disagree');
         }
         return sale;
+    }, 'nft');
+}
+
+// Read the same interface a wallet can use, pinned to one reviewed issuer and finalized block.
+export async function readOrdinaryToken(listener, options) {
+    const tokenId = options?.tokenId;
+    if (!positiveUint256(tokenId)) throw new Error('Invalid ordinary token ID');
+    return readAtNftDeployment(listener, options, async (send, proof, block) => {
+        const field = async (name, args) => {
+            const data = token.encodeFunctionData(name, args);
+            const raw = await send('eth_call', [{ to: proof.nftAddress, data }, block]);
+            const result = token.decodeFunctionResult(name, raw);
+            if (token.encodeFunctionResult(name, result) !== raw.toLowerCase()) throw new Error('Invalid ordinary token encoding');
+            return result;
+        };
+        const interfaces = [['0x01ffc9a7', true], ['0xffffffff', false],
+            ['0x80ac58cd', true], ['0x5b5e139f', true], ['0x2a55205a', true]];
+        await Promise.all(interfaces.map(async ([id, expected]) => {
+            const [supported] = await field('supportsInterface', [id]);
+            if (supported !== expected) throw new Error('Ordinary token interfaces differ from the reviewed standard');
+        }));
+        const [[owner], [creator], [firstCollector], [metadataURI], [recipient, royalty]] = await Promise.all([
+            field('ownerOf', [tokenId]), field('tokenCreator', [tokenId]), field('firstCollector', [tokenId]),
+            field('tokenURI', [tokenId]), field('royaltyInfo', [tokenId, 10_000n])
+        ]);
+        if (![owner, creator, firstCollector].every(nonzero) || !metadataURI.trim() ||
+            recipient !== creator || royalty !== 550n) throw new Error('Invalid ordinary token provenance or royalty');
+        return Object.freeze({ ...proof, tokenId, owner: owner.toLowerCase(), creator: creator.toLowerCase(),
+            firstCollector: firstCollector.toLowerCase(), metadataURI, royaltyRecipient: recipient.toLowerCase(),
+            royaltyBps: Number(royalty) });
     }, 'nft');
 }
 

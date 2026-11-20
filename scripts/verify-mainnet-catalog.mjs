@@ -18,7 +18,7 @@ const emptyIndexerTables = [
     'public.v41_resale_listings', 'public.v41_resale_history', 'public.v41_floor_history',
     'public.v41_genesis_holders', 'public.v41_project_eligibility', 'public.v41_trust_signals',
     'public.artwork_social_signals', 'public.v41_public_metric_participants', 'public.v41_public_metric_events',
-    'artsoul_private.ordinary_settlements'
+    'artsoul_private.ordinary_settlements', 'artsoul_private.ordinary_runner_up_observations'
 ];
 
 export async function verifyMainnetProjectionRows(client, expectedCore, deploymentBlock) {
