@@ -1,6 +1,6 @@
 # C1 — Decision records and accounting invariants
 
-Status: **DRAFT; no architecture approval or implementation authorization.**
+Status: **C1 remains open. The immutable native ordinary-work pair and its D2 entry pause and payment window were selected on November 19.** The [replacement boundaries](C1_REPLACEMENT_BOUNDARIES_2026-11-16.md) identify what the local candidate implements.
 Source reviewed: `0ccb0597159b0cf09ad028d00979892c16257da2`, November 2, 2026.
 This annex turns the existing rework direction into specific decisions and
 acceptance cases; it does not replace the rework roadmap.
@@ -17,7 +17,7 @@ covers application/data boundaries; it is not replacement-contract acceptance.
 - **FACT** means current source behavior, not a mainnet guarantee.
 - **REQUIREMENT** means already recorded canon or approved rework direction.
 - **RECOMMENDATION** is a reviewable design preference, not an adopted rule.
-- **UNDECIDED** requires an explicit decision before replacement Solidity.
+- **UNDECIDED** requires a decision before the affected policy can ship. A local fixture may exercise alternatives.
 
 The six records below connect a decision to protected state, money, authority,
 events and falsifiable acceptance cases. They do not select signer addresses,
@@ -56,6 +56,9 @@ for separate deployments, document how provenance resolves both versions.
 
 **UNDECIDED.** Actual boundaries; mint-authority rotation/removal and drain policy;
 ultimate upgrade powers; governance/delay/emergency policy; migration consent.
+November 19 update for ordinary artworks: the [deployment lifetime decision](C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#ordinary-artworks-after-mainnet-launch)
+selects a permanently paired issuer and engine with independent obligations.
+Governance, emergency policy and other modules are still open.
 This ownership map is not a Solidity storage-slot layout or proxy safety proof.
 The [current-source storage baseline](../audits/C1_STORAGE_BASELINE_2026-11-02.md)
 now records six existing layouts and immutable bindings with reproducible compiler
@@ -95,7 +98,7 @@ local reproduction; it does not establish compromise of the deployed protocol.
 
 ## 3. D2 — Pause, deadlines and reachable exit paths
 
-**FACT.** The following matrix describes current modifiers and checks only.
+**PROTOTYPE FACT.** The following matrix describes the existing Core and generic Launch.
 “Available” still requires all normal authorization, time and state conditions.
 
 | Action | Core while Core paused | Generic Launch while Launch paused |
@@ -121,21 +124,15 @@ Ending with a winner assigns `settlementDeadline = executionTime + 24 hours`.
 Settlement permits `t == settlementDeadline`; default requires `t > deadline`.
 Pause does not stop either clock. A pause spanning settlement expiry can therefore
 remove the winner's settlement opportunity while later allowing default.
-Current anti-sniping extends from the previous end, capped by the original end
-plus its configured constant; these prototype constants are not selected anew here.
+The prototype extends from the previous end, capped by the original end plus
+its configured maximum. The November 19 ordinary-pair decision fixes the same
+10-minute window, 10-minute increment and one-hour total cap in the new engine.
 
 **REQUIREMENT.** Preserve approved durations/outcomes and deterministic permissionless
 no-bid finalization. No NFT or floor arises from no-bid/default. An administrator
 must not silently obtain power to extend economic deadlines or trap accrued claims.
 
-**RECOMMENDATION.** Review entry pause separately from fulfillment/exit controls.
-Compare leaving validated fulfillment open with any expressly approved alternative;
-state the exploit-containment tradeoff rather than assuming every action can remain open.
-Keep already-created credits independently reachable subject to their authorization.
-
-**UNDECIDED.** Which fulfillment paths can pause; expiry during emergency;
-settlement-window anchor; no-bid lazy trigger; exit guarantees and emergency powers.
-No clock compensation, grace period or delay value is proposed as approved policy.
+**SELECTED on November 19 for the new native ordinary-work pair.** Pause blocks new registration, auction creation, bids, resale listings and purchases. Anyone can close an expired auction, including during a pause. A bidless work can also be closed when its creator starts another auction after entry reopens. If a winner exists, closing starts 24 hours at the closing block timestamp. The winner can settle at the deadline. Only after that deadline can anyone finalize an unpaid default. Closing, settlement and its mint, default, listing cancellation, refund batches and withdrawals keep their ordinary authorization and state checks during a pause. The pause does not stop the clock. The three mainnet Safe accounts and ordinary payout rounding are recorded in the November 19 release decisions. Production wiring and review remain open. [Decision and candidate scope](C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#selected-entry-pause-and-payment-window)
 
 **Acceptance cases:** `endTime - 1`, equality and `+1`; delayed end transaction;
 `deadline - 1`, equality and `+1`; pause before/after funding and across expiry;
@@ -149,6 +146,11 @@ The new [funded pause characterization](../../test/ArtSoulV41.test.cjs#L901)
 reproduces payment denial during pause, the unchanged deadline, subsequent payment
 expiry and default after unpause. No payment or mint-side state survives a failed
 transaction. This is current-source evidence, not approval of that deadline policy.
+
+November 18 local EVM checks cover bidding, closing, payment and default at
+the exact block boundary and on both adjacent seconds. The replacement
+specification also covers relisting an expired ordinary work with no bids.
+See the [lifecycle test results](../audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md#november-18--closing-and-reopening-ordinary-auctions).
 
 ## 4. D3 — Exact liabilities, rounding and failed-recipient recovery
 
@@ -182,8 +184,7 @@ Use `W=10000` and integer floor `q_i=floor(P*w_i/W)` for explicit arithmetic rev
 Canonical weight vectors are primary `(9750,250)`, resale `(9250,550,100,100)`
 and default `(8000,2000)`, in their canonical recipient order.
 Define unassigned remainder `r=P-sum(q_i)`; for `n` recipients, `0 <= r < n`.
-The final design must assign exactly `r` once under an approved rule; this draft
-does **not** assign it to any recipient or create a new dust/treasury entitlement.
+The November 19 decision assigns exactly `r` wei to the `r` largest fractional remainders, using canonical recipient order for ties. [Approved rule and tie examples](../canon/14_PROTOCOL_REVENUE_AND_TEAM.md#whole-wei-payouts-on-the-new-ordinary-market)
 
 | Arithmetic vector | Independent floor quotas, in canonical order | Unassigned wei |
 | --- | --- | ---: |
@@ -220,10 +221,7 @@ push/batch/credit mechanics. Evaluate creditor-authorized alternate recipients f
 rejecting wallets; prohibit operator-chosen diversion. Use overflow-safe arithmetic
 equivalent to the equations and test upper representable bounds without inventing caps.
 
-**UNDECIDED.** Remainder assignment; refund-recipient authorization; bounded executor
-limits and operational gas payer; when treasury destinations become fixed for funded
-sales. [Core:574](../../contracts/ArtSoulCore.sol#L574) currently changes the treasury
-used by later settlement/default/resale; it does not move already-recorded credits.
+The November 19 decisions fix remainder assignment and bind the two treasuries at construction for the new ordinary pair. Selection of bounded executor limits, an operational gas payer and alternate refund-recipient authorization remains open. The [prototype](../../contracts/ArtSoulCore.sol#L574) allows a treasury change to affect a later settlement, default or resale. Existing credited balances retain their recipients.
 
 **Acceptance cases:** all vectors; zero/double obligations; over-deposit; multiple
 auctions sharing recipients; partial batch/retry; recipient revert/reentry; withdrawal
@@ -252,15 +250,17 @@ Do not claim an epoch for external NFTs that cannot enforce the chosen policy.
 | Transition | Required acceptance observation | Unresolved policy |
 | --- | --- | --- |
 | List / replace | New terms invalidate prior authorization | Expiry and external order scope |
-| Cancel | Old authorization remains unusable; reconstructible cancellation | Permission to cancel while paused |
+| Cancel | Existing listing can be cancelled while paused. Its authorization stays unusable and cancellation can be reconstructed | None for entry pause |
 | Transfer away / return | Old listing never becomes executable again | External NFT compatibility |
-| Approval revoke / restore | Unapproved execution fails | Whether revocation permanently cancels the listing |
+| Approval revoke / restore | Explicit revocation of Core approval invalidates affected listings permanently. Removing and readmitting an external operator requires fresh grants in the new generation for token-specific and wallet-wide approval. A reversible entry pause preserves otherwise valid Core listings. | Each venue's execution route and release rehearsal. The [admission authority and delay are selected](../canon/CONTRACT_REWORK_PLAN.md#external-marketplace-admission). |
 | Buy / competing buy | Exactly one execution at the accepted item/terms | Future signed-intent interface |
 
 **Acceptance cases:** preserve the existing round-trip reproduction; add same-price
 replacement, cancel/relist, approval races, two competing buyers, cross-engine replay
 and indexer rebuild from events. Extend [resale tests:643–791](../../test/ArtSoulV41.test.cjs#L643)
 after the interface/policy decision, rather than rewriting prototype behavior now.
+
+**November 19 local evidence.** The paired NFT and native resale engine bind each sale to its listing version, current owner, transfer epoch and Core approval history. Six local cases exercise payout conservation, repeat buyers, repricing, cancellation during a pause, owner revocation and reapproval, transfer away and back, and rejected ERC-721 delivery. Expiry and external orders remain open. [Resale tests](../../test/OrdinaryArtResales.test.cjs)
 
 ## 6. D5 — Automatic execution, optional gas reserves and payment funding
 
@@ -292,10 +292,10 @@ permission to start a new auction or spend funds without the creator's consent.
 | Situation | Target user experience | Necessary execution and boundary |
 | --- | --- | --- |
 | Expired with no bids | Work returns to Discovery as unminted; no separate End button | Derive effective expiry from canonical end time and bids. Atomically finalize/revalidate the previous auction in the next authorized creation; a permissionless executor can also finalize. Record the closure once, before a new auction event |
-| Expired with a winner | Show winner payment status and remaining amount | Executor can trigger deterministic finalization. D2 must decide the settlement-window anchor; do not shorten the payment opportunity because a worker was late |
+| Expired with a winner | Show winner payment status and remaining amount | Anyone can close the native ordinary auction, including during a pause. The winner's full 24 hours start at that transaction's block timestamp |
 | Winner enables automatic payment | Settle and mint once when eligible and sufficiently funded | Separate, explicit payment authorization and a reliable source of the remaining price; gas sponsorship alone is insufficient |
 | Winner has not enabled/funded automatic payment | Show the normal payment action and reminders | Retain the agreed settlement path; no silent wallet debit. Actual missed settlement follows approved default rules, not a worker's guess |
-| Settlement deadline passed without successful payment | Work remains unminted; show default and re-auction eligibility under the applicable rules | Deterministic default execution accounts for the defaulted winner's deposit once. Gas reserve and extra purchase prefunding are separate obligations; D2 must resolve pauses before automating this path |
+| Settlement deadline passed without successful payment | Work remains unminted. Show default and re-auction eligibility under the applicable rules | Strictly after the deadline, anyone can finalize default once, including during a pause. A reserve or additional purchase prefunding requires separate accounting |
 | Refund or unused reserve becomes payable | Show paid refund or available credit, with a receipt | Bounded transfer attempt/batch, then individually withdrawable credit on failure; no recipient can block everyone else |
 
 Derived expiry is a view, not a fabricated `AuctionEnded` event. UI, contract
@@ -395,7 +395,7 @@ delivery; native/contract wallets; conserved obligations across every terminal
 state. Do not let a failing refund or optional automation hook block an otherwise
 valid settlement. No failing external optional service may become the sole exit.
 
-**UNDECIDED before Solidity:** settlement anchor and pause policy (D2), executor
+**UNDECIDED for optional automation:** executor
 funding/source of operating gas, reserve opt-in/payer/caps/reimbursement and refund
 rules, optional prefunding/authorization/revocation terms, treatment of extra
 prefunding on default, supported payment routes/assets and recovery payer. The
@@ -565,7 +565,7 @@ website-only gate as the financial security boundary. None is a canon amendment.
 
 The annex is ready for policy comparison, not C1 sign-off. Populate decisions and
 their canon impacts explicitly; no unanswered cell becomes a constructor default.
-No Solidity, schema, signing, deployment or live protocol operation was changed.
+The November 2 document review did not change Solidity, schema, signing, deployment or live protocol operation.
 The initial document review checked references and integer vectors without running
 contracts. The subsequent [D1/D2 characterization](../audits/C1_PAUSE_AUTHORITY_CHARACTERIZATION_2026-11-02.md)
 added three local executed cases and passed 52 tests at that point.

@@ -45,6 +45,12 @@ That single constraint produces every design decision below.
 Every row carries `indexed_at`, the projection's indexing timestamp. It is not
 a substitute for the original block timestamp.
 
+The capture query applies the inclusive cut-off directly to each table's
+`TIMESTAMPTZ` column. New captures retain six fractional digits in UTC so the
+offline verifier can compare the recorded times at PostgreSQL precision.
+Previously exported version 1 files remain readable at their recorded precision.
+A reader cannot recover discarded microseconds from an older file.
+
 ## What is deliberately excluded
 
 - **Genesis and eligibility tables.** Canon says testnet activity never qualifies
@@ -71,6 +77,16 @@ The verifier checks all eight required data files, section shapes, allowlisted
 columns, chain scope, participant derivation, aggregate counts and hashes. Use
 `--expected-root` with the separately retained capture hash for durable-copy
 acceptance. Without it, a successful result proves internal consistency only.
+The verifier rejects damaged UTF-8 and prints the root, cut-off and counts
+from the manifest it checked. The result describes the bytes read during that
+run. Reverify the durable copies against the retained root immediately before
+reset, even if their filesystem modification dates appear unchanged.
+
+When a trusted root is supplied, the directory must contain the nine regular
+files listed above. Additional files and subdirectories fail the check before
+upload or after retrieval. Store the verifier kit, notes and retrieval receipts
+beside the archive directory. The plain consistency check remains available
+for inspecting the listed files in older mixed directories.
 
 Output is deterministic for identical input rows: object keys and rows are
 sorted and every file ends with a newline. A timestamp cut-off alone does not
@@ -86,10 +102,21 @@ Run this on the announced cut-off date, before any destructive step.
 **1. Export.**
 
 ```bash
-node scripts/export-snapshot-a.mjs --out ../snapshot-a --cut-off <ISO-8601 UTC>
+node scripts/export-snapshot-a.mjs --chain-id 84532 --out ../snapshot-a --cut-off <ISO-8601 UTC>
 ```
 
-Needs `DATABASE_URL`, an explicit cut-off and a new output directory inside an
+New captures target Base Sepolia (84532). The explicit chain option takes
+precedence over `ARTSOUL_INDEXER_CHAIN_ID`; when both are absent the exporter
+uses 84532. The CLI checks the chain, calendar date and options before opening
+the database connection.
+
+A November 20 rehearsal on an isolated PostgreSQL 18.4 server captured the
+Base Sepolia row exactly at a leap-day cut-off expressed as a numeric UTC
+offset. A row one microsecond later and a Base mainnet row were excluded.
+The exported archive verified offline against its capture root.
+
+Needs `DATABASE_URL`, a cut-off with an explicit time zone (UTC `Z` or a numeric
+offset and up to six fractional digits), and a new output directory inside an
 existing parent. Existing directories are refused before connecting; file writes
 are exclusive. A failed partial capture remains inspectable and must not be
 reused. Tables are read in one repeatable-read, read-only transaction; any failed
@@ -110,9 +137,22 @@ node scripts/verify-snapshot-a.mjs ../snapshot-a --expected-root <trusted SHA-25
 providers, not two buckets in one account: the point is surviving the loss of any
 single one.
 
-**5. Verify each copy in its own location against the independently retained
-capture root.** Record the command, root hash and result from each. Do not obtain
-the expected root from the same copy being tested.
+**5. Verify both durable copies against the independently retained capture root.**
+Immediately before cutover, retrieve the complete export from each provider into
+its own new directory. Use the offline verifier from the reviewed kit.
+
+```bash
+node scripts/verify-snapshot-a.mjs /restore/provider-a --second-copy /restore/provider-b --expected-root TRUSTED_CAPTURE_ROOT
+```
+
+The command reads both restores and succeeds only when each matches the trusted
+root. It reports the chain, cut-off, counts and root for each valid copy, and
+rejects reused files, including directory aliases and detectable hard links.
+Compare the chain and cut-off with the announced capture record. Save the
+command, exit status, output and the provider's object or version identifier
+for each retrieval. Two local directories alone cannot establish independent
+remote custody. On separate recovery machines, run the single-copy command
+from step 3 on each and retain both results against the same trusted root.
 
 **6. Record in the migration runbook:** the cut-off, the root hash, both
 locations, and the verification result from each. Bible section 16 point 2 asks
@@ -123,21 +163,44 @@ re-imported as live product state.
 
 ## Verifying a copy years later
 
-Retain a verifier package with each durable copy: the reviewed
-`scripts/verify-snapshot-a.mjs` and `src/snapshot/snapshot-a.js` with those relative
-paths, plus a `package.json` containing `{"type":"module"}`. It uses only Node
-built-ins, needs no npm install, and reads no database or API. Retain the reviewed
-Git revision and tool-file hashes in the capture record. The offline test runs
-these copies outside the repository. With the data and verifier package available:
+Prepare the offline verifier once from a reviewed Git commit. Run the builder
+in the development checkout with a full commit ID and a new directory alongside
+the archive. It reads the committed verifier and schema module from local Git,
+adds a minimal module declaration and writes their byte hashes to `SHA256SUMS`.
+This step can be rehearsed before the final capture or a database is available.
 
 ```bash
-node verification-tools/scripts/verify-snapshot-a.mjs /path/to/copy --expected-root <trusted SHA-256>
+node scripts/package-snapshot-a-verifier.mjs REVIEWED_COMMIT ../verification-tools
 ```
 
-The verifier exits non-zero and names every problem it finds rather than stopping
-at the first, so two damaged copies can be compared in a single pass. If a copy
-fails, fetch another durable copy and verify that one. Never repair a copy by
-hand — a hand-edited snapshot is no longer a record of anything.
+Record the printed commit and `SHA256SUMS` digest independently of the kit.
+Keep the archive's separate trusted root from capture step 2. Copy the kit
+alongside each durable archive. To check a recovered copy, change into its kit
+directory and compare the first command's digest with the recorded kit digest
+before checking the three files and running the verifier.
+
+```bash
+sha256sum SHA256SUMS
+sha256sum -c SHA256SUMS
+node scripts/verify-snapshot-a.mjs /path/to/copy --expected-root TRUSTED_CAPTURE_ROOT
+```
+
+In PowerShell use `Get-FileHash -Algorithm SHA256 -LiteralPath SHA256SUMS`
+for the first comparison. Compare the three hashes from
+`Get-FileHash -Algorithm SHA256 -LiteralPath package.json,scripts/verify-snapshot-a.mjs,src/snapshot/snapshot-a.js`
+with the matching paths in the checked `SHA256SUMS`. Stop on any mismatch.
+The recovered machine needs Node and a trusted hash utility. The kit runs
+without the source repository, npm, a wallet or a database connection.
+
+The November 18 rehearsal packaged verifier commit
+`c1d1687d99eb88b404d71e239a9c1013a9ece670`. Its `SHA256SUMS` digest was
+`331fc893346975ddf75ac1949150883bc1f639450f5bc78d003b811107b6c965`.
+The operator checked all three packaged files against that list on Windows.
+Retain a fresh reference to the reviewed kit alongside the final capture record.
+
+The verifier exits non-zero when either restored copy fails. It reports both
+results even if one restore is missing. Retrieve a fresh copy from the
+corresponding durable source and repeat the check.
 
 ## October 28 verifier hardening evidence
 
@@ -166,6 +229,14 @@ the current schema/read path, not a final cut-off or two durable copies.
 Final-contract schema alignment and a fresh stabilized-source rehearsal remain
 required before the late-C capture. Current schema version 1 is not automatically
 valid for future contract projections.
+
+On November 18 the three snapshot suites passed 29 local checks, including the
+PostgreSQL 17 integration test. Across all seven tables, the test included the row
+at the cut-off and excluded the one a microsecond later under a different session
+time zone. The offline verifier also rejected a later row in an otherwise
+internally consistent fixture. For legacy unzoned cut-offs, verification retains
+the existing hash and structural checks. These results use synthetic test rows.
+The final cut-off and the verification of both durable locations remain open.
 
 ## October 28 tooling release
 

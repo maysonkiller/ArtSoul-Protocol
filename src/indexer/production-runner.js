@@ -531,78 +531,11 @@ class ProductionIndexer {
     }
 
     async _initializeState() {
-        // Validate config before initialization
-        if (!this.config.contractAddress || this.config.contractAddress === '0x0000000000000000000000000000000000000000') {
-            throw new Error('[ProductionIndexer] Invalid contract address - cannot initialize');
-        }
-
-        if (!this.config.chainId || this.config.chainId === 0) {
-            throw new Error('[ProductionIndexer] Invalid chainId - cannot initialize');
-        }
-
-        const existing = await this.db.query(
-            'SELECT * FROM indexer_state WHERE chain_id = $1',
-            [this.config.chainId.toString()]
-        );
-
-        if (existing.length === 0) {
-            // Fresh initialization
-            await this.db.query(
-                `INSERT INTO indexer_state (
-                    contract_address, chain_id, last_indexed_block, last_confirmed_block,
-                    confirmation_depth, last_indexed_at, started_at, status
-                ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), 'initialized')`,
-                [
-                    this.config.contractAddress,
-                    this.config.chainId,
-                    this.config.startBlock,
-                    this.config.startBlock,
-                    this.confirmationDepth
-                ]
-            );
-
-            console.log(`[ProductionIndexer] Initialized state at block ${this.config.startBlock}`);
-            console.log(`  Contract: ${this.config.contractAddress}`);
-            console.log(`  Chain ID: ${this.config.chainId}`);
-        } else {
-            const state = existing[0];
-
-            // Check if existing state has invalid data (zero address or zero chainId)
-            const hasInvalidAddress = !state.contract_address || state.contract_address === '0x0000000000000000000000000000000000000000';
-            const hasInvalidChainId = !state.chain_id || parseInt(state.chain_id) === 0;
-
-            if (hasInvalidAddress || hasInvalidChainId) {
-                // Startup is not authority to assign old data to a deployment.
-                throw new Error('[ProductionIndexer] Invalid persisted deployment; explicit recovery required');
-            } else {
-                // Validate existing state matches config
-                if (state.contract_address !== this.config.contractAddress) {
-                    throw new Error(
-                        `[ProductionIndexer] Contract address mismatch!\n` +
-                        `  Database: ${state.contract_address}\n` +
-                        `  Config: ${this.config.contractAddress}\n` +
-                        `  Cannot proceed - database may be for different contract`
-                    );
-                }
-
-                if (parseInt(state.chain_id) !== this.config.chainId) {
-                    throw new Error(
-                        `[ProductionIndexer] Chain ID mismatch!\n` +
-                        `  Database: ${state.chain_id}\n` +
-                        `  Config: ${this.config.chainId}\n` +
-                        `  Cannot proceed - database may be for different chain`
-                    );
-                }
-
-                console.log(`[ProductionIndexer] Resuming from block ${state.last_indexed_block}`);
-                console.log(`  Contract: ${state.contract_address}`);
-                console.log(`  Chain ID: ${state.chain_id}`);
-            }
-
-            // Reconcile the persisted confirmation depth with the active config
-            // so /health and /api/public/indexer-status report the same value.
-            // Metadata-only and cursor-safe; see reconcileConfirmationDepth.
-            await this._reconcileConfirmationDepth();
+        const { contractAddress, chainId, startBlock } = this.config;
+        const created = await this.syncEngine.initialize(contractAddress, chainId, startBlock, this.confirmationDepth);
+        if (!created) {
+            const result = await this._reconcileConfirmationDepth();
+            if (result.reason === 'no_state_row') throw new Error('[ProductionIndexer] Deployment changed during initialization');
         }
     }
 
@@ -612,6 +545,7 @@ class ProductionIndexer {
             this.config.chainId,
             this.confirmationDepth,
             {
+                contractAddress: this.config.contractAddress,
                 onError: (error) => {
                     this.confirmationDepthSyncError = {
                         message: error.message,

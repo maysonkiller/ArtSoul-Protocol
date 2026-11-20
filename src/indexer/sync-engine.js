@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { enqueueAIJob } from '../queue.js';
+import { parseIndexerStartBlock } from './chain-config.js';
 import { projectDonation } from './donation-events.js';
 import { restorePrimaryReorgProjections, captureLegacyReorgUsers, restoreLegacyReorgProjections } from './reorg-projections.js';
 import { prepareResaleRewind, lockResaleRewind, applyResaleRewind, verifyResaleRewindAuthority } from './reorg-resale.js';
@@ -133,40 +134,53 @@ class IndexerSyncEngine {
         return '0x' + result[0].hash;
     }
 
-    async initialize(contractAddress, chainId, startBlock) {
-        this.chainId = Number(chainId);
-
-        if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
-            throw new Error('[IndexerSyncEngine] Invalid contract address - cannot initialize with zero address');
+    async initialize(contractAddress, chainId, startBlock = 0, confirmationDepth = 12) {
+        const chain = Number(chainId);
+        if (!Number.isSafeInteger(chain) || chain <= 0 || Number(this.eventListener.chainId) !== chain) {
+            throw new Error('[IndexerSyncEngine] Invalid chain or listener deployment');
+        }
+        if (typeof contractAddress !== 'string' || !/^0x[0-9a-f]{40}$/i.test(contractAddress) ||
+            /^0x0{40}$/i.test(contractAddress) ||
+            this.eventListener.contractAddress?.toLowerCase() !== contractAddress.toLowerCase()) {
+            throw new Error('[IndexerSyncEngine] Invalid Core or listener deployment');
         }
 
-        if (!chainId || chainId === 0) {
-            throw new Error('[IndexerSyncEngine] Invalid chainId - cannot initialize with zero or null');
-        }
-
-        const existing = await this.db.query(
-            'SELECT * FROM indexer_state WHERE chain_id = $1',
-            [this._chainIdString()]
-        );
-
-        if (existing.length === 0) {
-            await this.db.query(
+        const select = 'SELECT chain_id, contract_address, last_indexed_block FROM indexer_state WHERE chain_id = $1';
+        let rows = await this.db.query(select, [String(chain)]);
+        if (!rows.length) {
+            const firstBlock = parseIndexerStartBlock(startBlock);
+            // Both runners resume at last_indexed_block + 1. A zero start
+            // means scan from block 1; genesis has no transaction receipts.
+            const cursor = Math.max(0, firstBlock - 1);
+            const inserted = await this.db.query(
                 `INSERT INTO indexer_state (
-                    contract_address, chain_id, last_indexed_block,
-                    last_confirmed_block, confirmation_depth,
-                    last_indexed_at, started_at, status, state_hash
-                ) VALUES ($1, $2, $3, $3, 12, NOW(), NOW(), 'initialized', $4)`,
-                [contractAddress, chainId, startBlock, '0x0']
+                    contract_address, chain_id, last_indexed_block, last_confirmed_block,
+                    confirmation_depth, last_indexed_at, started_at, status
+                ) VALUES ($1, $2, $3, $3, $4, NOW(), NOW(), 'initialized')
+                ON CONFLICT (chain_id) DO NOTHING RETURNING chain_id`,
+                [contractAddress, chain, cursor, confirmationDepth]
             );
-
-            console.log(`[IndexerSyncEngine] Initialized at block ${startBlock}`);
-            console.log(`  Contract: ${contractAddress}`);
-            console.log(`  Chain ID: ${chainId}`);
-        } else {
-            console.log(`[IndexerSyncEngine] Already initialized at block ${existing[0].last_indexed_block}`);
-            console.log(`  Contract: ${existing[0].contract_address}`);
-            console.log(`  Chain ID: ${existing[0].chain_id}`);
+            if (inserted.length) {
+                this.chainId = chain;
+                console.log('[IndexerSyncEngine] First indexed range starts at', cursor + 1, 'for', contractAddress, 'on chain', chain);
+                return true;
+            }
+            // A competing startup committed first. Read its deployment in a
+            // fresh snapshot; adopting or updating that cursor would mix histories.
+            rows = await this.db.query(select, [String(chain)]);
         }
+
+        const state = rows[0];
+        if (rows.length !== 1 || String(state.chain_id) !== String(chain) ||
+            state.contract_address?.toLowerCase() !== contractAddress.toLowerCase()) {
+            throw new Error(
+                `[IndexerSyncEngine] Invalid persisted deployment for ${chain}/${contractAddress}: ` +
+                `found ${state?.chain_id ?? 'missing'}/${state?.contract_address ?? 'missing'}; explicit recovery required`
+            );
+        }
+        this.chainId = chain;
+        console.log('[IndexerSyncEngine] Resuming at block', state.last_indexed_block, 'for', contractAddress, 'on chain', chain);
+        return false;
     }
 
     async start() {

@@ -87,12 +87,12 @@ test('Phase A local moderation route journey and captured email (virtual credent
     globalThis.fetch = originalFetch;
     if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
     if (pool) await pool.end();
-    if (created) docker('rm', '-f', CONTAINER);
+    if (created) docker('rm', '-f', '-v', CONTAINER);
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
     }
   });
-  docker('run', '-d', '--name', CONTAINER, '-e', 'POSTGRES_PASSWORD=local-disposable-only',
+  docker('run', '-d', '--rm', '--name', CONTAINER, '-e', 'POSTGRES_PASSWORD=local-disposable-only',
     '-e', 'POSTGRES_DB=artsoul', '-p', '127.0.0.1::5432', 'postgres:17');
   created = true;
   const endpoint = docker('port', CONTAINER, '5432/tcp');

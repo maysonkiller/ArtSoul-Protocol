@@ -383,6 +383,12 @@ ProtocolTreasury or the Ecosystem Pool.
 
 ### Revenue sanity check
 
+For the November 19 paid-place pilot, primary volume includes each retained place premium and the additional mint payment actually earned. Count each once. Exclude place resales, refunded amounts and gas. At a comparable primary price of 1 ETH, the ArtSoul candidate assigns 0.025 ETH to ProtocolTreasury and 0.975 ETH to the creator, with no additional platform fee for the buyer. OpenSea typically takes 0.10 ETH on a 1 ETH primary drop. On a direct 1 ETH primary art sale SuperRare's published terms allocate 0.15 ETH of that price to its DAO treasury, and the buyer contributes a further 0.03 ETH. Those platforms publish terms for different types of NFT sales. Their fees are benchmarks for pricing and offer no evidence of demand for ArtSoul's paid places. [OpenSea fees](https://support.opensea.io/en/articles/8867091-what-fees-do-i-pay-on-opensea) · [SuperRare sale terms](https://help.superrare.com/en/articles/10629742-offers-auctions-and-pricing)
+
+Highlight's published Base mainnet configuration lists a fixed 0.0008 ETH fee for a native ETH mint. This equals the ArtSoul primary fee at 0.032 ETH of gross primary proceeds. ArtSoul's fee is smaller below that price, while the fixed fee is smaller above it. This compares the platform fee on a single successful mint before network gas. [Highlight chain and currency configuration](https://api.highlight.xyz/config/chains)
+
+The last recorded Supabase billing estimate was USD 25. At 2.5%, USD 1,000 of primary volume at settlement-time exchange rates yields USD 25 of gross fees. A monthly cost of USD 100 across all services would require USD 4,000 of primary volume, or USD 10,000 of eligible ArtSoul NFT resale volume at 1%. Treat these as sensitivity cases. Compare realized fees with the full cost for the same period, including infrastructure, staff or support, independent review and any gas subsidy. The pilot earns zero on refunded payments and place resales. Use actual traffic, gas and costs to evaluate expansion. [Billing observation](../audits/B30_B35_OPERATIONAL_RECHECK_2026-11-16.md) · [Keeper gas budget](../runbooks/ORDINARY_AUCTION_KEEPER.md)
+
 Under approved target economics, gross protocol fees are `0.025 x primary volume
 + 0.01 x resale volume`. USD examples require a stated valuation time. At an
 illustrative $100,000 primary volume, gross protocol fees are $2,500; at $100,000

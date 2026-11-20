@@ -141,13 +141,21 @@ function pickColumns(row, columns) {
     return picked;
 }
 
-function withinCutOff(row, timeColumn, cutOffMs) {
-    if (cutOffMs === null) return true;
-    const stamp = Date.parse(String(row[timeColumn] ?? ''));
+function timestampMicros(value) {
+    // pg normally returns Date objects. Date#toString would discard their
+    // milliseconds; ISO strings from the capture query retain microseconds.
+    const ms = value instanceof Date ? value.getTime() : typeof value === 'string' ? Date.parse(value) : NaN;
+    if (!Number.isFinite(ms)) return null;
+    const fraction = typeof value === 'string' ? value.match(/\d{2}:\d{2}:\d{2}\.(\d+)/)?.[1] : '';
+    return BigInt(ms) * 1000n + BigInt((fraction || '').padEnd(6, '0').slice(3, 6));
+}
+
+function withinCutOff(row, timeColumn, cutOffMicros) {
+    if (cutOffMicros === null) return true;
+    const stamp = timestampMicros(row[timeColumn]);
     // A row with no readable timestamp is kept: dropping data because a column
     // is malformed would silently shrink a permanent record.
-    if (!Number.isFinite(stamp)) return true;
-    return stamp <= cutOffMs;
+    return stamp === null || stamp <= cutOffMicros;
 }
 
 /**
@@ -203,8 +211,8 @@ export function buildSnapshot({ tables, cutOff = null, chainId, hashText }) {
     if (typeof hashText !== 'function') throw new Error('hashText is required');
     if (!chainId) throw new Error('chainId is required');
 
-    const cutOffMs = cutOff === null ? null : Date.parse(String(cutOff));
-    if (cutOff !== null && !Number.isFinite(cutOffMs)) {
+    const cutOffMicros = timestampMicros(cutOff);
+    if (cutOff !== null && cutOffMicros === null) {
         throw new Error('cutOff must be an ISO-8601 timestamp');
     }
 
@@ -213,7 +221,7 @@ export function buildSnapshot({ tables, cutOff = null, chainId, hashText }) {
         const rows = Array.isArray(tables?.[spec.table]) ? tables[spec.table] : [];
         sections[spec.name] = sortRows(
             rows
-                .filter(row => withinCutOff(row, spec.timeColumn, cutOffMs))
+                .filter(row => withinCutOff(row, spec.timeColumn, cutOffMicros))
                 .map(row => pickColumns(row, spec.columns))
         );
     }
@@ -270,7 +278,7 @@ export function verifySnapshot({ readFile, hashText, expectedRootHash = null }) 
 
     const manifestText = readFile('manifest.json');
     if (typeof manifestText !== 'string') {
-        return { ok: false, problems: ['manifest.json is missing'] };
+        return { ok: false, problems: ['manifest.json is missing or unreadable'] };
     }
 
     try {
@@ -327,7 +335,7 @@ export function verifySnapshot({ readFile, hashText, expectedRootHash = null }) 
     for (const name of requiredFiles) {
         const content = readFile(name);
         if (typeof content !== 'string') {
-            problems.push(`${name} is listed in the manifest but missing`);
+            problems.push(`${name} is listed in the manifest but missing or unreadable`);
             continue;
         }
         if (hashText(content) !== manifest.files[name]) {
@@ -337,6 +345,10 @@ export function verifySnapshot({ readFile, hashText, expectedRootHash = null }) 
     }
     if (problems.length) return { ok: false, problems };
 
+    // Old v1 archives can lack a cut-off or an explicit zone. Only compare
+    // instants whose boundary is independent of this verifier's local time.
+    const cutOffMicros = /(?:Z|[+-]\d\d:?\d\d)$/i.test(manifest.source_cut_off || '')
+        ? timestampMicros(manifest.source_cut_off) : null;
     const sections = {};
     for (const spec of EXPORTED_TABLES) {
         const name = `${spec.name}.json`;
@@ -358,6 +370,10 @@ export function verifySnapshot({ readFile, hashText, expectedRootHash = null }) 
             problems.push(`${name} contains invalid columns or a different chain`);
             continue;
         }
+        if (section.rows.some(row => !withinCutOff(row, spec.timeColumn, cutOffMicros))) {
+            problems.push(`${name} contains a row after the source cut-off`);
+            continue;
+        }
         sections[spec.name] = section.rows;
     }
     if (problems.length) return { ok: false, problems };
@@ -377,5 +393,6 @@ export function verifySnapshot({ readFile, hashText, expectedRootHash = null }) 
         }
     } catch { problems.push('settlement values cannot be aggregated'); }
 
-    return { ok: problems.length === 0, problems };
+    if (problems.length) return { ok: false, problems };
+    return { ok: true, problems, manifest };
 }

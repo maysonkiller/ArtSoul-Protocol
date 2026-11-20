@@ -9,8 +9,8 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function available(){try{return docker('version','--format','{{.Server.Os}}')==='linux';}catch{return false;}}
 test('staff catalog and manual visibility changes preserve complaint restrictions (PostgreSQL 17)',{skip:available()?false:'Docker unavailable'},async t=>{
   let created=false,pool;
-  t.after(async()=>{if(pool)await pool.end();if(created)docker('rm','-f',CONTAINER);});
-  docker('run','-d','--name',CONTAINER,'-e','POSTGRES_PASSWORD=local-catalog-only','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
+  t.after(async()=>{if(pool)await pool.end();if(created)docker('rm','-f','-v',CONTAINER);});
+  docker('run','-d','--rm','--name',CONTAINER,'-e','POSTGRES_PASSWORD=local-catalog-only','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
   const port=Number(docker('port',CONTAINER,'5432/tcp').split(':')[1]);
   pool=new Pool({host:'127.0.0.1',port,user:'postgres',database:'artsoul',password:'local-catalog-only',connectionTimeoutMillis:1000,max:8});
   for(let n=0;n<60;n++){try{await pool.query('SELECT 1');await delay(200);await pool.query('SELECT 1');break;}catch{await delay(500);}}

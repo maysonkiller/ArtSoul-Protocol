@@ -39,6 +39,27 @@ test('accepts a fresh healthy Base Sepolia indexer response', () => {
     assert.deepEqual(result.failures, []);
 });
 
+test('reports malformed counters instead of treating them as a healthy zero', async () => {
+    for (const value of [null, undefined, false, '', ' ', [], [0], -1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+        const payload = healthyPayload({
+            indexer: { unresolvedErrors: value, blocksBehind: value },
+            metrics: { rpcErrorsLastMinute: value }
+        });
+        const result = await checkIndexerHealth(config, {
+            fetchImpl: async () => Response.json(payload),
+            now: NOW
+        });
+        assert.equal(result.ok, false);
+        assert.deepEqual(result.failures.map(failure => failure.code), ['UNRESOLVED_ERRORS', 'BLOCK_LAG', 'RPC_ERRORS']);
+    }
+    for (const zero of [0, '0']) {
+        assert.equal(evaluateIndexerHealth(healthyPayload({
+            indexer: { unresolvedErrors: zero, blocksBehind: zero },
+            metrics: { rpcErrorsLastMinute: zero }
+        }), config, NOW).ok, true);
+    }
+});
+
 test('fails closed on wrong chain, confirmation drift, lag and unresolved errors', () => {
     const result = evaluateIndexerHealth(healthyPayload({
         indexer: {

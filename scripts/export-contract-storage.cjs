@@ -8,7 +8,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
-const targets = [
+const legacyTargets = [
   ['contracts/ArtSoulCore.sol', 'ArtSoulCore'],
   ['contracts/ArtSoulNFT.sol', 'ArtSoulNFT'],
   ['contracts/ArtSoulProjectNFT.sol', 'ArtSoulProjectNFT'],
@@ -16,18 +16,57 @@ const targets = [
   ['contracts/launch/CollectionLaunch.sol', 'CollectionLaunch'],
   ['contracts/launch/CollectionForge.sol', 'CollectionForge'],
 ];
+const replacementTargets = ['SettledArtworkNFT', 'OrdinaryArtAuctions', 'OutbidRefunds', 'OrdinaryArtResales', 'TreasuryBoundOrdinaryArt']
+  .map(name => [`contracts/replacement/${name}.sol`, name]);
 const sha256 = value => crypto.createHash('sha256').update(value).digest('hex');
 
-function main() {
-  const [buildFile, compilerFile, outputFile, mode, ...extra] = process.argv.slice(2);
-  assert(buildFile && compilerFile && outputFile && !extra.length && (!mode || mode === '--check'),
-    'Usage: node scripts/export-contract-storage.cjs <build-info.json> <trusted-solc-executable> <output.json> [--check]');
-  const root = path.resolve(__dirname, '..');
-  const build = JSON.parse(fs.readFileSync(buildFile, 'utf8'));
+function verifyBuild(build) {
   assert.equal(build._format, 'hh-sol-build-info-1');
   assert.equal(build.solcVersion, '0.8.24');
   assert.equal(build.solcLongVersion, '0.8.24+commit.e11b9ed9');
   assert.equal(build.input.language, 'Solidity');
+}
+
+// Hardhat can combine unrelated sources in one build or produce several incremental builds.
+// Resolve exactly each candidate and its imports from the compiler's own AST.
+function replacementBuild(root) {
+  const sources = {};
+  let settings;
+  for (const [source, name] of replacementTargets) {
+    const dir = path.join(root, 'artifacts', source);
+    const debugFile = path.join(dir, name + '.dbg.json');
+    const { buildInfo } = JSON.parse(fs.readFileSync(debugFile, 'utf8'));
+    const build = JSON.parse(fs.readFileSync(path.resolve(dir, buildInfo), 'utf8'));
+    verifyBuild(build);
+    const { outputSelection, ...contractSettings } = build.input.settings;
+    if (settings) assert.deepEqual(contractSettings, settings, 'Replacement compiler settings differ');
+    settings = contractSettings;
+    const pending = [source];
+    const visited = new Set();
+    while (pending.length) {
+      const file = pending.pop();
+      if (visited.has(file)) continue;
+      visited.add(file);
+      const content = build.input.sources[file].content.replace(/\r\n/g, '\n');
+      if (sources[file]) assert.equal(sources[file].content, content, `Conflicting builds: ${file}`);
+      sources[file] = { content };
+      for (const node of build.output.sources[file].ast.nodes) {
+        if (node.nodeType === 'ImportDirective') pending.push(node.absolutePath);
+      }
+    }
+  }
+  return { solcLongVersion: '0.8.24+commit.e11b9ed9', input: { language: 'Solidity', sources, settings } };
+}
+
+function main() {
+  const [buildFile, compilerFile, outputFile, mode, ...extra] = process.argv.slice(2);
+  assert(buildFile && compilerFile && outputFile && !extra.length && (!mode || mode === '--check'),
+    'Usage: node scripts/export-contract-storage.cjs <build-info.json|--replacement> <trusted-solc-executable> <output.json> [--check]');
+  const root = path.resolve(__dirname, '..');
+  const replacement = buildFile === '--replacement';
+  const targets = replacement ? replacementTargets : legacyTargets;
+  const build = replacement ? replacementBuild(root) : JSON.parse(fs.readFileSync(buildFile, 'utf8'));
+  if (!replacement) verifyBuild(build);
 
   // Reject stale artifacts instead of presenting an older build as current source.
   const sources = {};
@@ -86,7 +125,8 @@ function main() {
   const { outputSelection, ...settings } = build.input.settings;
   const artifact = {
     schemaVersion: 1,
-    scope: 'Current constructor-based source; not deployed state or upgrade compatibility',
+    scope: replacement ? 'Fresh-deployment candidates; abstract layouts are partial. No deployed state or in-place upgrade.'
+      : 'Current constructor-based source; not deployed state or upgrade compatibility',
     sourceNormalization: 'CRLF to LF; no other source transformations',
     compiler: build.solcLongVersion,
     settings, sources,

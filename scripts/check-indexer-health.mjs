@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { DEFAULT_HEALTH_MAX_BLOCKS_BEHIND } from '../src/indexer/health-policy.js';
+import { DEFAULT_HEALTH_MAX_BLOCKS_BEHIND, isIndexerWithinHealthLag, parseHealthCount } from '../src/indexer/health-policy.js';
 
 const DEFAULTS = Object.freeze({
     healthUrl: 'http://127.0.0.1:3001/health',
@@ -74,10 +74,10 @@ export function evaluateIndexerHealth(payload, config, now = Date.now()) {
 
     addFailure(failures, payload?.status === 'healthy', 'STATUS', `expected healthy, received ${payload?.status ?? 'missing'}`);
     addFailure(failures, payload?.database?.healthy === true, 'DATABASE', 'database health is not true');
-    addFailure(failures, Number(indexer?.chainId) === config.expectedChainId, 'CHAIN_ID', `expected ${config.expectedChainId}, received ${indexer?.chainId ?? 'missing'}`);
+    addFailure(failures, parseHealthCount(indexer?.chainId) === config.expectedChainId, 'CHAIN_ID', `expected ${config.expectedChainId}, received ${indexer?.chainId ?? 'missing'}`);
     addFailure(
         failures,
-        Number(indexer?.confirmationDepth) === config.expectedConfirmationDepth,
+        parseHealthCount(indexer?.confirmationDepth) === config.expectedConfirmationDepth,
         'CONFIRMATION_DEPTH',
         `expected ${config.expectedConfirmationDepth}, received ${indexer?.confirmationDepth ?? 'missing'}`
     );
@@ -87,17 +87,17 @@ export function evaluateIndexerHealth(payload, config, now = Date.now()) {
         'CONFIRMATION_DEPTH_SYNC',
         String(indexer?.confirmationDepthSyncError || 'unknown synchronization error')
     );
-    addFailure(failures, Number(indexer?.unresolvedErrors) === 0, 'UNRESOLVED_ERRORS', `received ${indexer?.unresolvedErrors ?? 'missing'}`);
+    addFailure(failures, parseHealthCount(indexer?.unresolvedErrors) === 0, 'UNRESOLVED_ERRORS', `received ${indexer?.unresolvedErrors ?? 'missing'}`);
     addFailure(
         failures,
-        Number.isFinite(Number(indexer?.blocksBehind)) && Number(indexer.blocksBehind) < config.maxBlocksBehind,
+        isIndexerWithinHealthLag(indexer?.blocksBehind, config.maxBlocksBehind),
         'BLOCK_LAG',
         `expected less than ${config.maxBlocksBehind}, received ${indexer?.blocksBehind ?? 'missing'}`
     );
     addFailure(failures, indexer?.isSynced === true, 'SYNC_STATE', 'indexer is not synchronized');
     addFailure(
         failures,
-        Number.isFinite(Number(metrics?.rpcErrorsLastMinute)) && Number(metrics.rpcErrorsLastMinute) <= config.maxRpcErrorsPerMinute,
+        parseHealthCount(metrics?.rpcErrorsLastMinute) <= config.maxRpcErrorsPerMinute,
         'RPC_ERRORS',
         `expected at most ${config.maxRpcErrorsPerMinute}, received ${metrics?.rpcErrorsLastMinute ?? 'missing'}`
     );

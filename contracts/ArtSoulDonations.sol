@@ -8,10 +8,9 @@ import "./interfaces/IArtSoulArtworkRegistry.sol";
 
 /// @notice Voluntary ETH support routed in full to a registered artwork's creator.
 /// @dev Separate from auctions. Deployment must independently verify the Core and administration Safe.
-contract ArtSoulDonations is Ownable2Step, Pausable, ReentrancyGuard {
+abstract contract CreatorDonations is Ownable2Step, Pausable, ReentrancyGuard {
     // This resource bound is not a character count. ArtSoul display also requires at most 140 graphemes.
     uint256 public constant MAX_MESSAGE_BYTES = 560;
-    IArtSoulArtworkRegistry public immutable core;
 
     error InvalidCore();
     error InvalidAdministrationOwner();
@@ -36,14 +35,15 @@ contract ArtSoulDonations is Ownable2Step, Pausable, ReentrancyGuard {
         if (core_.code.length == 0) revert InvalidCore();
         // Contract code alone does not prove a Safe or its owners/threshold; the deployment preflight does.
         if (administrationSafe_.code.length == 0) revert InvalidAdministrationOwner();
-        core = IArtSoulArtworkRegistry(core_);
     }
+
+    function _registeredCreator(uint256 artworkId) internal view virtual returns (address);
 
     function donate(address creator, uint256 artworkId, string calldata message, bool isAnonymous)
         external payable nonReentrant whenNotPaused
     {
         if (msg.value == 0) revert ZeroDonation();
-        (address registeredCreator,,,,,) = core.artworks(artworkId);
+        address registeredCreator = _registeredCreator(artworkId);
         if (registeredCreator == address(0)) revert ArtworkNotFound();
         if (creator != registeredCreator) revert CreatorMismatch();
 
@@ -96,5 +96,18 @@ contract ArtSoulDonations is Ownable2Step, Pausable, ReentrancyGuard {
             }
             ++i;
         }
+    }
+}
+
+/// @notice Supports artwork registered in the original Core.
+contract ArtSoulDonations is CreatorDonations {
+    IArtSoulArtworkRegistry public immutable core;
+
+    constructor(address core_, address administrationSafe_) CreatorDonations(core_, administrationSafe_) {
+        core = IArtSoulArtworkRegistry(core_);
+    }
+
+    function _registeredCreator(uint256 artworkId) internal view override returns (address creator) {
+        (creator,,,,,) = core.artworks(artworkId);
     }
 }

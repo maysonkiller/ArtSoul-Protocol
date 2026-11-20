@@ -11,7 +11,7 @@ const { execFileSync, execSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 
 const ROOT = path.resolve(__dirname, '..');
-const CONTAINER = `artsoul-a15-pg-${process.pid}`;
+const CONTAINER = `artsoul-a15-pg-${process.pid}-${globalThis.crypto.randomUUID()}`;
 const IMAGE = 'postgres:17';
 const CHAIN_ID = '84532';
 const OTHER_CHAIN_ID = '11155111';
@@ -54,18 +54,13 @@ test('A-15/A-43 fenced failure records (PostgreSQL 17)', {
     let database;
     let leaseApi;
 
+    let containerId;
     t.before(async () => {
-        try {
-            execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
-        } catch {
-            // The disposable container does not normally exist beforehand.
-        }
-
-        execSync(
-            `docker run -d --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres ` +
+        containerId = execSync(
+            `docker run -d --rm --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres ` +
             `-e POSTGRES_DB=artsoul -p 127.0.0.1::5432 ${IMAGE}`,
-            { stdio: 'ignore' }
-        );
+            { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+        ).trim();
 
         let ready = false;
         for (let attempt = 0; attempt < 60; attempt++) {
@@ -147,7 +142,7 @@ test('A-15/A-43 fenced failure records (PostgreSQL 17)', {
 
     t.after(async () => {
         await pool?.end();
-        execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
+        if (containerId) execFileSync('docker', ['rm', '-f', '-v', containerId], { stdio: 'ignore' });
     });
 
     t.beforeEach(async () => {

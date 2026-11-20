@@ -139,10 +139,15 @@ npm run build
 
 pm2 restart artsoul-base-sepolia --update-env
 
-npm run --silent monitor:indexer
+ARTSOUL_MONITOR_MAX_BLOCKS_BEHIND=50 npm run --silent monitor:indexer
 curl -fsS http://127.0.0.1:3001/health
 pm2 status
 ```
+
+The explicit 50-block override matches the current Base Sepolia deployment
+policy in [A9](A9_INFRA_COST_MONITORING.md#repository-health-check); the
+standalone check requires lag strictly below that value. Confirmation depth
+and the other health thresholds are unchanged.
 
 Confirm:
 

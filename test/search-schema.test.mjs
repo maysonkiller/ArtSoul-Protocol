@@ -26,8 +26,8 @@ test('indexed global search, visibility and metadata lifecycle in PostgreSQL 17'
   skip:available?false:'Disposable PostgreSQL requires Docker'
 },async t=>{
   let created=false,pool;
-  t.after(async()=>{if(pool)await pool.end();if(created)docker('rm','-f',container);});
-  docker('run','-d','--name',container,'-e','POSTGRES_PASSWORD=local-search-fixture','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
+  t.after(async()=>{if(pool)await pool.end();if(created)docker('rm','-f','-v',container);});
+  docker('run','-d','--rm','--name',container,'-e','POSTGRES_PASSWORD=local-search-fixture','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
   const endpoint=docker('port',container,'5432/tcp');assert.match(endpoint,/^127\.0\.0\.1:\d+$/);
   pool=new pg.Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',user:'postgres',password:'local-search-fixture',connectionTimeoutMillis:1000});
   let ready=false;

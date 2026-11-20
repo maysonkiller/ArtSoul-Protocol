@@ -11,7 +11,7 @@
  * Metadata-only and safe by construction:
  *  - updates ONLY confirmation_depth; never last_indexed_block,
  *    last_confirmed_block, state_hash, or any event data;
- *  - chain-scoped via WHERE chain_id;
+ *  - scoped to the configured chain and Core on both the read and the write;
  *  - restart-idempotent and free of write churn (no UPDATE when already
  *    correct; the IS DISTINCT FROM guard also no-ops concurrent startups);
  *  - never throws — on failure it reports precise evidence via onError and
@@ -22,14 +22,15 @@
  *
  * @returns {Promise<{updated: boolean, storedDepth?: number, configuredDepth: number, reason?: string, error?: Error}>}
  */
-export async function reconcileConfirmationDepth(db, chainId, configuredDepth, { onError } = {}) {
+export async function reconcileConfirmationDepth(db, chainId, configuredDepth, { contractAddress, onError } = {}) {
     const chainKey = chainId.toString();
 
     try {
-        const rows = await db.query(
-            'SELECT confirmation_depth FROM indexer_state WHERE chain_id = $1',
-            [chainKey]
+        const readDepth = () => db.query(
+            'SELECT confirmation_depth FROM indexer_state WHERE chain_id = $1 AND lower(contract_address) = lower($2)',
+            [chainKey, contractAddress]
         );
+        const rows = await readDepth();
 
         if (!rows || rows.length === 0) {
             return { updated: false, configuredDepth, reason: 'no_state_row' };
@@ -40,12 +41,18 @@ export async function reconcileConfirmationDepth(db, chainId, configuredDepth, {
             return { updated: false, storedDepth, configuredDepth };
         }
 
-        await db.query(
+        const changed = await db.query(
             `UPDATE indexer_state
              SET confirmation_depth = $1
-             WHERE chain_id = $2 AND confirmation_depth IS DISTINCT FROM $1`,
-            [configuredDepth, chainKey]
+             WHERE chain_id = $2 AND lower(contract_address) = lower($3)
+               AND confirmation_depth IS DISTINCT FROM $1 RETURNING confirmation_depth`,
+            [configuredDepth, chainKey, contractAddress]
         );
+        if (!changed.length) {
+            const current = await readDepth();
+            if (!current.length) return { updated: false, configuredDepth, reason: 'no_state_row' };
+            return { updated: false, storedDepth: Number(current[0].confirmation_depth), configuredDepth };
+        }
 
         console.log(JSON.stringify({
             phase: 'confirmation_depth_reconcile',

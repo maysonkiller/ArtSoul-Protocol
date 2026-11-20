@@ -93,8 +93,20 @@ There is no sales-volume threshold. It is not a guarantee of quality or value
 and does not change Trust, price, floor, fees or ownership. Render it as an
 overlay on collection media only when an authoritative verification exists;
 profile text, collection metadata or a creator's own claim cannot grant it.
-The verification registry and its approved administration are not implemented
-by this documentation change.
+
+The November 19 clarification makes authorship open to individual artists and
+project teams. A blue check and Partner status are optional. For collection
+covers, the [local review registry](../../sql/migrations/20261119150000_collection_origin_reviews.sql)
+records the creator wallet, chain, collection contract and latest decision.
+A reviewed relationship on one collection applies only to that contract.
+
+An identity check on a profile would attest to the named artist or project's
+control of that profile. It needs its own scoped, revocable review and public
+projection before badges can appear on profiles. A verified social login,
+collection review, Partner frame or Safe signature is insufficient evidence on
+its own. Badge decisions belong to application review. The Admin Security Safe
+governs admission of external trading operators for the new ordinary NFTs.
+The reviewer's grant authority and public badge publication remain open.
 
 ## October 8 factor setup and recovery amendment
 

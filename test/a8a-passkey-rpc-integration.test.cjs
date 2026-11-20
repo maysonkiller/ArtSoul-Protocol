@@ -13,7 +13,7 @@ const { execSync, execFileSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
 const MIGRATION = fs.readFileSync(path.join(root, 'sql', 'migrations', 'a8a_moderation_passkey_foundation.sql'), 'utf8');
-const CONTAINER = `artsoul-a8a-pg-${process.pid}`;
+const CONTAINER = `artsoul-a8a-pg-${process.pid}-${globalThis.crypto.randomUUID()}`;
 const IMAGE = 'postgres:17';
 
 const STAFF = '0x1111111111111111111111111111111111111111';
@@ -57,16 +57,12 @@ function esc(value) {
 }
 
 test('A8a atomic RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false : 'Docker is not available' }, async (t) => {
+  let containerId;
   t.before(() => {
-    try {
-      execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
-    } catch {
-      // The disposable container does not normally exist before the test.
-    }
-    execSync(
-      `docker run -d --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
-      { stdio: 'ignore' }
-    );
+    containerId = execSync(
+      `docker run -d --rm --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    ).trim();
 
     // pg_isready can report that the server accepts connections before the
     // requested database is usable. Prove two real queries instead so the
@@ -97,7 +93,7 @@ test('A8a atomic RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false :
   });
 
   t.after(() => {
-    execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
+    if (containerId) execFileSync('docker', ['rm', '-f', '-v', containerId], { stdio: 'ignore' });
   });
 
   t.beforeEach(() => {

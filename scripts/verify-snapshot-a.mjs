@@ -15,35 +15,80 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { parseArgs } from 'node:util';
 import { verifySnapshot } from '../src/snapshot/snapshot-a.js';
 
 const hashText = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
-const [directory, flag, expectedRootHash, ...extra] = process.argv.slice(2);
-if ((flag !== undefined && flag !== '--expected-root') ||
-    (flag === '--expected-root' && !/^[0-9a-f]{64}$/i.test(expectedRootHash || '')) || extra.length) {
-    console.error('Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256>]');
+const usage = 'Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256> [--second-copy <directory>]]';
+let args;
+try {
+    args = parseArgs({ allowPositionals: true, options: {
+        'expected-root': { type: 'string', multiple: true }, 'second-copy': { type: 'string', multiple: true }
+    } });
+} catch {
+    console.error(usage);
     process.exit(1);
 }
-const dir = path.resolve(directory || path.join('..', 'snapshot-a'));
+const roots = args.values['expected-root'] ?? [];
+const copies = args.values['second-copy'] ?? [];
+const [expectedRootHash] = roots;
+if (args.positionals.length > 1 || roots.length > 1 || copies.length > 1 ||
+    (roots.length && !/^[0-9a-f]{64}$/i.test(expectedRootHash)) ||
+    (copies.length && (!copies[0] || !args.positionals[0] || !expectedRootHash))) {
+    console.error(usage);
+    process.exit(1);
+}
+const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
-const readFile = (name) => {
-    // Names come from the manifest, which is untrusted input until it verifies.
-    // A traversal attempt is a verification failure, not a file read.
-    if (name.includes('/') || name.includes('\\') || name.includes('..')) return undefined;
-    try {
-        return fs.readFileSync(path.join(dir, name), 'utf8');
-    } catch {
-        return undefined;
+const filesFromFirstCopy = new Set();
+function verifyDirectory(dir, second) {
+    const problems = [];
+    const readFile = name => {
+        if (name.includes('/') || name.includes('\\') || name.includes('..')) return undefined;
+        const file = path.join(dir, name);
+        try {
+            if (expectedRootHash) {
+                const stat = fs.lstatSync(file, { bigint: true });
+                if (!stat.isFile()) {
+                    problems.push(`${name} must be a regular restored file`);
+                    return undefined;
+                }
+                if (copies.length) {
+                    // Compare real paths and filesystem IDs for the two restored copies.
+                    const ids = [fs.realpathSync.native(file)];
+                    if (stat.ino !== 0n) ids.push(`${stat.dev}:${stat.ino}`);
+                    if (second && ids.some(id => filesFromFirstCopy.has(id))) {
+                        problems.push(`${name} points to the same file as the first copy`);
+                    }
+                    if (!second) for (const id of ids) filesFromFirstCopy.add(id);
+                }
+            }
+            return utf8.decode(fs.readFileSync(file));
+        } catch {
+            return undefined;
+        }
+    };
+    const result = verifySnapshot({ readFile, hashText, expectedRootHash });
+    problems.push(...result.problems);
+    if (expectedRootHash && result.ok) {
+        try {
+            const extras = fs.readdirSync(dir).filter(name =>
+                name !== 'manifest.json' && !Object.hasOwn(result.manifest.files, name));
+            if (extras.length) problems.push(`Directory contains unlisted archive entries (${extras.length})`);
+        } catch {
+            problems.push('Unable to list the archive directory');
+        }
     }
-};
-
-const result = verifySnapshot({ readFile, hashText, expectedRootHash });
-
-console.log(`snapshot : ${dir}`);
-
-if (result.ok) {
-    const manifest = JSON.parse(readFile('manifest.json'));
+    console.log(`snapshot : ${dir}`);
+    if (problems.length) {
+        console.log('INVALID:');
+        for (const problem of problems) console.log(`  - ${problem}`);
+        process.exitCode = 1;
+        return;
+    }
+    const { manifest } = result;
+    console.log(`chain    : ${manifest.chain_id}`);
     console.log(`root hash: ${manifest.root_hash}`);
     console.log(`cut-off  : ${manifest.source_cut_off || 'none'}`);
     console.log(`counts   : ${JSON.stringify(manifest.counts)}`);
@@ -52,11 +97,12 @@ if (result.ok) {
     console.log(expectedRootHash
         ? 'The root hash also matches the independently supplied trusted capture record.'
         : 'Internal consistency only. Authenticity is NOT checked without --expected-root.');
-} else {
-    console.log('');
-    console.log('INVALID:');
-    for (const problem of result.problems) console.log(`  - ${problem}`);
-    console.log('');
-    console.log('Do not repair a copy by hand. Fetch another durable copy and verify that one.');
-    process.exitCode = 1;
+}
+
+verifyDirectory(path.resolve(args.positionals[0] || path.join('..', 'snapshot-a')), false);
+if (copies.length) verifyDirectory(path.resolve(copies[0]), true);
+if (process.exitCode) {
+    console.log('Fetch another durable copy and verify it against the same trusted root.');
+} else if (copies.length) {
+    console.log('Both restored copies match the trusted capture root. Record the two retrieval sources separately.');
 }

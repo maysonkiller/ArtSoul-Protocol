@@ -21,6 +21,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 \i src/indexer/migrations/015_public_metrics_projection.sql
 \i src/indexer/migrations/016_indexer_state_hash.sql
 \i src/indexer/migrations/017_event_contract_provenance.sql
+BEGIN;
+\i src/indexer/migrations/018_ordinary_settlement_evidence.sql
+COMMIT;
 
 -- Verify setup
 SELECT 'Extensions installed:' as status;

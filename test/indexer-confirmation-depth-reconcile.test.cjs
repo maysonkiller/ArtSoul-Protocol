@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const test = require('node:test');
 const { pathToFileURL } = require('node:url');
+const CORE = '0x' + 'a'.repeat(40);
 
 const repoRoot = path.resolve(__dirname, '..');
 const moduleUrl = pathToFileURL(
@@ -18,7 +19,8 @@ const moduleUrl = pathToFileURL(
 
 async function loadReconcile() {
     const mod = await import(moduleUrl);
-    return mod.reconcileConfirmationDepth;
+    return (db, chainId, depth, options) =>
+        mod.reconcileConfirmationDepth(db, chainId, depth, { contractAddress: CORE, ...options });
 }
 
 // Minimal in-memory stand-in for PostgreSQLDatabase that supports exactly the
@@ -40,17 +42,20 @@ function makeFakeDb(rowsByChain) {
             if (/SELECT\s+confirmation_depth\s+FROM\s+indexer_state/i.test(sql)) {
                 stats.selects += 1;
                 const row = rows.get(String(params[0]));
-                return row ? [{ confirmation_depth: row.confirmation_depth }] : [];
+                assert.match(sql, /lower\(contract_address\) = lower\(\$2\)/);
+                return row?.contract_address.toLowerCase() === params[1] ? [{ confirmation_depth: row.confirmation_depth }] : [];
             }
 
             if (/UPDATE\s+indexer_state\s+SET\s+confirmation_depth/i.test(sql)) {
                 stats.updates += 1;
-                const [target, chainId] = params;
+                const [target, chainId, core] = params;
                 const row = rows.get(String(chainId));
+                assert.match(sql, /lower\(contract_address\) = lower\(\$3\)/);
                 // Model the "IS DISTINCT FROM" guard: no-op when already equal.
-                if (row && Number(row.confirmation_depth) !== Number(target)) {
+                if (row?.contract_address.toLowerCase() === core && Number(row.confirmation_depth) !== Number(target)) {
                     row.confirmation_depth = Number(target);
                     stats.updateRowsAffected += 1;
+                    return [{ confirmation_depth: Number(target) }];
                 }
                 return [];
             }
@@ -62,6 +67,7 @@ function makeFakeDb(rowsByChain) {
 
 function baseRow(overrides = {}) {
     return {
+        contract_address: CORE,
         confirmation_depth: 12,
         last_indexed_block: 5_000_000,
         last_confirmed_block: 4_999_997,
@@ -159,6 +165,21 @@ test('missing state row is a safe no-op (fresh install handles its own insert)',
     assert.equal(result.updated, false);
     assert.equal(result.reason, 'no_state_row');
     assert.equal(db.stats.updates, 0);
+});
+
+test('a replacement Core cannot receive the previous deployment’s depth when the row changes between read and update', async () => {
+    const reconcile = await loadReconcile();
+    const db = makeFakeDb({ 84532: baseRow() });
+    const query = db.query.bind(db);
+    db.query = (sql, params) => {
+        if (sql.startsWith('UPDATE')) db.row(84532).contract_address = '0x' + 'b'.repeat(40);
+        return query(sql, params);
+    };
+    const result = await reconcile(db, 84532, 3);
+    assert.equal(result.updated, false);
+    assert.equal(result.reason, 'no_state_row');
+    assert.equal(db.stats.updateRowsAffected, 0);
+    assert.equal(db.row(84532).confirmation_depth, 12);
 });
 
 test('a failed reconcile surfaces evidence without touching the cursor', async () => {

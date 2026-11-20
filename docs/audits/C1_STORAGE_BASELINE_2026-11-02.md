@@ -88,3 +88,15 @@ and fresh testnet deployment remain separate gates.
 Interpretation: capture current source as a comparison baseline while the future
 topology is undecided. No proxy choice, migration policy, fee, parameter or
 permission is inferred from the artifact.
+
+## November 19 — fresh-deployment candidates
+
+The [separate candidate record](../architecture/C1_REPLACEMENT_STORAGE_2026-11-19.json) covers `SettledArtworkNFT`, `OrdinaryArtAuctions`, `OutbidRefunds`, `OrdinaryArtResales` and `TreasuryBoundOrdinaryArt`. The NFT stores provenance, ownership-transfer epochs and approval-revocation counters, with its issuing engine embedded as an immutable. The four abstract contracts have storage and immutable declarations, including the two treasury addresses and entry-pause authority. Only a concrete implementation can provide their deployed-bytecode offsets and final combined layout. This evidence covers fresh deployments and does not authorize an in-place migration or release.
+
+After compiling the current sources with Hardhat, reproduce the candidate record with the matching trusted native compiler:
+
+```text
+node scripts/export-contract-storage.cjs --replacement <trusted-solc-executable> docs/architecture/C1_REPLACEMENT_STORAGE_2026-11-19.json --check
+```
+
+This profile uses the compiler's resolved imports for each target, allowing incremental Hardhat builds to reproduce the same record. The [fast source check](../../test/replacement-storage-baseline.test.cjs) also runs in the Node unit suite.

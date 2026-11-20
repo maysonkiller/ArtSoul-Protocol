@@ -19,8 +19,8 @@ let available = false;
 try {available = execFileSync('docker', ['version','--format','{{.Server.Os}}'], {encoding:'utf8', stdio:['ignore','pipe','pipe'],timeout:15000}).trim()==='linux';} catch {}
 
 test('A8e TOTP persistence uses actual PostgreSQL transactions', {skip:available ? false : 'Docker unavailable'}, async t => {
-  execFileSync('docker', ['run','-d','--name',container,'-e','POSTGRES_PASSWORD=postgres','-e','POSTGRES_DB=artsoul','postgres:17'], {stdio:'ignore',timeout:120000});
-  t.after(() => execFileSync('docker', ['rm','-f',container], {stdio:'ignore',timeout:30000}));
+  execFileSync('docker', ['run','-d','--rm','--name',container,'-e','POSTGRES_PASSWORD=postgres','-e','POSTGRES_DB=artsoul','postgres:17'], {stdio:'ignore',timeout:120000});
+  t.after(() => execFileSync('docker', ['rm','-f','-v',container], {stdio:'ignore',timeout:30000}));
   let ready = false;
   for(let attempt=0;attempt<60;attempt++) {
     try {sql('SELECT 1');await delay(300);sql('SELECT 1');ready=true;break;} catch {await delay(500);}

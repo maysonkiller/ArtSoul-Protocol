@@ -27,15 +27,23 @@ Exit: all Phase A backlog items accepted, no P1 open, green local/CI baselines, 
 
 ## Phase B — Public Beta
 
+On November 18 the founder closed the active B engineering workstream.
+Controlled owner journeys and snapshot-tooling checks are recorded in the
+[closeout](../PHASE_B_STATUS_2026-11-02.md). Public cohort validation moves
+to the final-contract testnet in C13. Optional voice and WebMCP acceptance
+will resume on a separate schedule.
+
 Goal: validate the complete user journey on testnet with a controlled real cohort.
 
-Run publish → auction → settlement → mint → resale journeys; operate monitoring and incident response; process moderation cases and beta defects; report progress through verified cached metrics; and keep snapshot tooling ready. The October 28 founder amendment moves the actual Snapshot A capture to the end of the full final-contract testnet in late Phase C; it does not end the current beta or assign a cut-off now.
+Run publish → auction → settlement → mint → resale journeys; operate monitoring and incident response; process moderation cases and beta defects; report progress through verified cached metrics; and keep snapshot tooling ready. The October 28 founder amendment moved actual Snapshot A capture to the end of the full final-contract testnet in late Phase C. Its cut-off remains unset.
 
 Snapshot A is a community record only. It survives later database reset through versioned machine-readable data, a cryptographic manifest, independent durable copies, and a documented verification procedure. It creates no Genesis, token, points, airdrop, or other entitlement.
 
-Exit: stable beta, feedback processed, moderation proven, snapshot tooling ready, and Phase C inputs ready. The actual Snapshot A capture is not a Phase B exit gate.
+Public-beta acceptance requires a stable cohort, processed feedback, moderation evidence, snapshot tooling and Phase C inputs. The cohort and its feedback remain outstanding. Snapshot A capture belongs to late C.
 
 ## Phase C — Mainnet Preparation
+
+Local engineering is active. The launch and deployment gates remain in force.
 
 Goal: build, test, and audit the product-grade contract and operations topology.
 
@@ -46,7 +54,7 @@ in Phase A; contract custody remains separate. See the October 11 moderation
 acceptance record. Isolated checks never count as native enrollment or phone
 acceptance. This status correction does not introduce a new recovery policy.
 
-Complete the Core, ArtworkNFT, ArtSoulGenesis, Partner Collections, Ecosystem Pool, indexer/database, admin/eligibility, and aura/badge work defined in the backlog and `CONTRACT_REWORK_PLAN.md`. Consolidate the existing promoted-banner planning delta into the full Bible before implementing that feature. Rehearse the final topology on fresh Base Sepolia contracts and hand privileged roles to rehearsal Safes.
+Complete the Core, ArtworkNFT, ArtSoulGenesis, Partner Collections, Ecosystem Pool, indexer/database, admin/eligibility, and aura/badge work defined in the backlog and `CONTRACT_REWORK_PLAN.md`. [Bible §6.1](ARTSOUL_CANON_BIBLE_FULL.md#61-promoted-homepage-banners) records the promoted-banner rules. The reserve policy still needs a decision before implementation. Rehearse the final topology on fresh Base Sepolia contracts and hand privileged roles to rehearsal Safes.
 
 The following remain explicit planning inputs rather than frozen canon:
 
@@ -68,6 +76,44 @@ Goal: launch on Base without combining every risk into one event.
 Re-verify Snapshot A, execute the Bible §16 reset, deploy the audited Core topology, transfer roles, and pass production smoke tests. Observe Core through the approved stability window. Run Genesis as a separate bounded pilot only after Core stability is demonstrated, then expand through the audited grant path.
 
 Exit: stable Base mainnet operations, verified treasuries, monitored public metrics, and controlled Genesis rollout.
+
+## Delivery sequence for the first Base release (November 19, 2026)
+
+The product we can demonstrate today is the Base Sepolia testnet marketplace. A founder-led walkthrough can show publication, bidding, a settled NFT with its creator, First Collector and owner, and resale using the [recorded journeys](../PHASE_B_STATUS_2026-11-02.md). Identify the network and test ETH throughout. Use a recorded settlement when a live auction is still running. The replacement contracts have a separate local test record. A demo using them on a public network requires fresh C13 deployment receipts.
+
+For a short demo that requires no wallet signature:
+
+1. Open the [gallery](https://artsoulprotocol.com/gallery) and select a registered work still awaiting its first sale. Show the bidding terms and where a collector can see the network.
+2. Open [Taes](https://artsoulprotocol.com/artwork/38). Trace its first successful settlement to the mint of token 7, then distinguish the artist, the First Collector and the current owner. [Base Sepolia settlement receipt](https://sepolia.basescan.org/tx/0x9276c36e2d3df54fa13b6c3e8efdadda2b6c38b5c368027dd2dee9d6125d457f).
+3. Open [Music 2](https://artsoulprotocol.com/artwork/32). Find token 5's secondary sale at 0.0001 test ETH in its history and compare it with the confirmed transfer. Ask the viewer how they would tell who owns the work now. [Base Sepolia resale receipt](https://sepolia.basescan.org/tx/0x86ae0bd17970acdd3dfda92ced13896e4a69099853435ce72604dd676ce5aab5).
+
+### What needs an address
+
+| Scope | Addresses and implementation | Release dependency |
+| --- | --- | --- |
+| Ordinary artworks, primary auctions and resale | Two new application contracts. The engine creates its permanently paired [NFT](../../contracts/replacement/OrdinaryArtAuctions.sol) in its constructor. It also owns the shared ETH ledger, including the ecosystem resale allocation. | Release and verify the exact pair together. [Safe binding](../../contracts/replacement/TreasuryBoundOrdinaryArt.sol) currently supplies abstract policy hooks. Only reviewed production policy and bytecode qualify for deployment. |
+| Custody and emergency pause | Three existing Base mainnet Safe accounts receive protocol fees, receive ecosystem allocations, and administer entry pause and delayed external marketplace admission respectively. | Recheck the [custody register and on-chain configuration](../RESOURCE_GATED_WORK.md#checking-the-three-contract-custody-roles) for all roles at cutover. Actual binding happens when the replacement engine is deployed. The keeper calls the engine using a gas-only account with ordinary caller permissions. |
+| Voluntary creator support | At first mainnet launch, supporters copy the original creator’s address and send ETH from their own wallet on Base. This requires no additional deployment. | Preserve the Base Sepolia donation history. Revisit artwork-linked support if users need public attribution or messages. A later activation requires its own review and rehearsal. [Support decision and gas measurements](SUPPORT_THE_ARTIST_DESIGN.md) |
+| Genesis | One dedicated soulbound contract for the bounded post-stability pilot. The transferable testnet ProjectNFT is retired at migration. | C4 grant controls, public eligibility categories and an audited register precede D5 activation. |
+| Partner Collections | C5 needs a reviewed template with the single first auction, attempt and cooldown rules, and flat remaining mint price. Factory and per-collection address counts follow the selected design. | Rehearse its first successful and failed auction paths before opening a collection. Generic [Launch](../../contracts/launch/CollectionLaunch.sol) and [Forge](../../contracts/launch/CollectionForge.sol) are separate local scaffolds with their own product and audit decisions. |
+
+The ordinary market therefore involves **two new application addresses and three existing Safe addresses**. Other modules extend that inventory as they qualify. This count describes the smallest ordinary-market deployment. Full Phase C acceptance still uses the backlog scope above. Record any founder-approved change to that scope before using a narrower release checklist.
+
+### Order of work and evidence to advance
+
+For external NFT display, the release check starts after the first successful mint. Read the token's `ownerOf` and `tokenURI` through a public RPC, fetch the JSON and image, and open the media referenced by `animation_url` for an audio or video work. Compare the artwork and owner in a Base-compatible wallet and on OpenSea when indexed. Record the network, issuing NFT address and token ID. A collector can use the same identity for manual import in wallets that support it. An unminted work remains discoverable on ArtSoul. External trading permissions require a separate operator policy. [ERC-721 metadata](https://eips.ethereum.org/EIPS/eip-721) · [OpenSea metadata](https://docs.opensea.io/docs/metadata-standards) · [MetaMask NFT display and import](https://support.metamask.io/manage-crypto/nfts/nft-tokens-in-your-metamask-wallet/)
+
+On November 19, a Base Sepolia read of [Music 2, token 5](https://sepolia.basescan.org/token/0xf061f70503c37cf2196a28f4785e524d0fb32538?a=5) confirmed that its existing JSON supplies an audio URL but omits a still image. New audio and video publications carry a static ArtSoul cover for image-only clients. The original media remains in `animation_url`. ArtSoul still prefers the work's own poster or video frame on its site. Registration stops before requesting the wallet if the metadata upload fails. [Metadata builder](../../ipfs-client.js) · [Publication checks](../../test/upload-publication.test.mjs)
+
+| Step | Accountable role | Evidence needed to advance |
+| --- | --- | --- |
+| 1. Prepare and demonstrate the testnet product | Product and support | Assemble the walkthrough above, give visitors a testnet entry point, record feedback by journey, and distinguish testnet volume from revenue. Keep the currently available voice helper. Broader voice and WebMCP parity stays on its separate track. |
+| 2. Freeze the release candidate | Contract and application maintainers | Resolve remaining [policy decisions](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md), compile the concrete engine, and pin constructor inputs, build identity, paired NFT, and event ABI. Indexer and UI must distinguish deployments even when artwork IDs repeat. Evidence covers no-bid close, winner payment and default, runner-up expiry or purchase, refunds and credits, resale and provenance. |
+| 3. Rehearse on fresh Base Sepolia and finish independent review | Release operator, independent reviewer and cohort lead | Use rehearsal Safes and the exact candidate. Run C13 with artists and collectors, save receipts and support outcomes, and verify the page updates without a reload. Exercise [keeper restart and gas limits](../runbooks/ORDINARY_AUCTION_KEEPER.md), a manual close during an outage, pause, withdrawals, event replay and recovery. Record costs and alarms. Resolve C12 findings and rerun affected journeys on the final build. |
+| 4. Complete the launch decision | Founder, counsel, finance and operations | Confirm independently recoverable signer custody, organization and contracting authority, terms and privacy, IP and complaint handling, audit and recurring operating budget, domain ownership and incident coverage. Keep company fundraising outside the [protocol and ecosystem treasuries](14_PROTOCOL_REVENUE_AND_TEAM.md). Announce the final testnet cutoff at least two weeks ahead, produce Snapshot A, and independently read and verify both durable copies. Record scope and go/no-go against C0–C15. |
+| 5. Open ordinary trading on Base in stages | Release operator and authorized Safe signers | Publish chain, deployment blocks, addresses and verified source. Check the immutable pair, all three Safe bindings, indexer reconciliation and recovery access before enabling writes. Keep testnet history separately identified. Observe real settlements, withdrawals and service costs through the agreed Core stability window before Genesis grants or further public activation. |
+
+**Public roadmap update.** On November 19 the [public Guide](https://artsoulprotocol.com/docs) returned HTTP 200 and `/roadmap` returned 404. At the next content release, add a roadmap section to the Guide and link to it from the site. Publish three milestones with evidence: the Base Sepolia marketplace people can try, the replacement-contract rehearsal when its public addresses exist, and the Base mainnet opening after approval. Put audited expansion features on their own timeline. Before publication, verify each link against the intended network and reconcile the claimed status with this roadmap and the [implementation backlog](12_IMPLEMENTATION_BACKLOG.md).
 
 ## Founder-Owned Inputs
 

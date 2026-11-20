@@ -3,7 +3,7 @@
 // contract suite, ignore unrelated files, and order deterministically.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { collectUnitTestFiles, CONTRACT_SUITE, CONTRACT_SUITES } from '../scripts/run-unit-tests.mjs';
@@ -20,6 +20,9 @@ test('collects all three supported test extensions', () => {
 });
 
 test('excludes every Hardhat contract suite', () => {
+    const { scripts } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    const contractFiles = scripts['test:contracts'].split(/\s+/).filter(arg => arg.startsWith('test/'));
+    assert.deepEqual(contractFiles, CONTRACT_SUITES.map(file => 'test/' + file));
     const collected = collectUnitTestFiles([...CONTRACT_SUITES, 'unit.test.cjs']);
     for (const suite of CONTRACT_SUITES) assert.ok(!collected.includes(suite), `${suite} must be excluded`);
     assert.deepEqual(collected, ['unit.test.cjs']);

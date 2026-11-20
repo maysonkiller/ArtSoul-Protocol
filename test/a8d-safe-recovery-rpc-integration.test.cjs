@@ -11,7 +11,7 @@ const { execFile, execFileSync, execSync } = require('node:child_process');
 const root = path.join(__dirname, '..');
 const A8A = fs.readFileSync(path.join(root, 'sql', 'migrations', 'a8a_moderation_passkey_foundation.sql'), 'utf8');
 const A8D = fs.readFileSync(path.join(root, 'sql', 'migrations', 'a8d_moderation_safe_recovery.sql'), 'utf8');
-const CONTAINER = `artsoul-a8d-pg-${process.pid}`;
+const CONTAINER = `artsoul-a8d-pg-${process.pid}-${globalThis.crypto.randomUUID()}`;
 const IMAGE = 'postgres:17';
 const STAFF = '0x1111111111111111111111111111111111111111';
 const SAFE = '0x3333333333333333333333333333333333333333';
@@ -88,9 +88,9 @@ function completionSql(request, tokenHash = hh()) {
 }
 
 test('A8d atomic recovery RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false : 'Docker is not available' }, async (t) => {
+  let containerId;
   t.before(() => {
-    try { execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' }); } catch { /* no prior container */ }
-    execSync(`docker run -d --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`, { stdio: 'ignore' });
+    containerId = execSync(`docker run -d --rm --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     let ready = false;
     for (let attempt = 0; attempt < 60; attempt++) {
       try {
@@ -107,7 +107,7 @@ test('A8d atomic recovery RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER 
   });
 
   t.after(() => {
-    execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
+    if (containerId) execFileSync('docker', ['rm', '-f', '-v', containerId], { stdio: 'ignore' });
   });
 
   t.beforeEach(() => {

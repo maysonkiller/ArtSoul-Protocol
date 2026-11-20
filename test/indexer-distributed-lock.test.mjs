@@ -36,9 +36,9 @@ test('distributed leadership pins and releases a physical PostgreSQL session wit
 },async t=>{
   const container=`artsoul-lock-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   let created=false,pool;const locks=[];
-  t.after(async()=>{await Promise.all(locks.map(lock=>lock.release()));await pool?.end();if(created)docker('rm','-f',container);});
+  t.after(async()=>{await Promise.all(locks.map(lock=>lock.release()));await pool?.end();if(created)docker('rm','-f','-v',container);});
   t.mock.method(console,'log',()=>{});t.mock.method(console,'warn',()=>{});t.mock.method(console,'error',()=>{});
-  docker('run','-d','--name',container,'-e','POSTGRES_PASSWORD=local-lock-fixture','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
+  docker('run','-d','--rm','--name',container,'-e','POSTGRES_PASSWORD=local-lock-fixture','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
   const endpoint=docker('port',container,'5432/tcp');assert.match(endpoint,/^127\.0\.0\.1:\d+$/);
   pool=new pg.Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',user:'postgres',password:'local-lock-fixture',max:6,connectionTimeoutMillis:1000});
   pool.on('error',()=>{});

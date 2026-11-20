@@ -64,8 +64,8 @@ test('media identity migration keeps the foundation private and introduces no re
 });
 
 test('media identity claims and catalog use real PostgreSQL transactions', {skip:docker ? false : 'Docker unavailable; atomic behavior remains unverified'}, async t => {
-  execFileSync('docker', ['run','-d','--name',container,'-e','POSTGRES_PASSWORD=postgres','-e','POSTGRES_DB=artsoul','postgres:17'], {stdio:'ignore',timeout:120000});
-  t.after(() => execFileSync('docker', ['rm','-f',container], {stdio:'ignore',timeout:30000}));
+  execFileSync('docker', ['run','-d','--rm','--name',container,'-e','POSTGRES_PASSWORD=postgres','-e','POSTGRES_DB=artsoul','postgres:17'], {stdio:'ignore',timeout:120000});
+  t.after(() => execFileSync('docker', ['rm','-f','-v',container], {stdio:'ignore',timeout:30000}));
   let ready = false;
   for(let attempt=0;attempt<60;attempt++) {
     try {sql('SELECT 1');await delay(300);sql('SELECT 1');ready=true;break;} catch {await delay(500);}

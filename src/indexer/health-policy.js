@@ -16,7 +16,11 @@ export function resolveHealthMaxBlocksBehind(
     return parsed;
 }
 
+export function parseHealthCount(value) {
+    const count = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+    return Number.isSafeInteger(count) && count >= 0 ? count : NaN;
+}
+
 export function isIndexerWithinHealthLag(blocksBehind, maxBlocksBehind) {
-    const lag = Number(blocksBehind);
-    return Number.isFinite(lag) && lag >= 0 && lag < maxBlocksBehind;
+    return parseHealthCount(blocksBehind) < maxBlocksBehind;
 }

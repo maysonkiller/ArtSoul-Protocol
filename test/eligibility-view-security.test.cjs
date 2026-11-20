@@ -28,8 +28,8 @@ test('eligibility view preserves public results while enforcing caller permissio
   skip: available ? false : 'Disposable PostgreSQL requires Docker', timeout: 120000
 }, async t => {
   let created = false;
-  t.after(() => { if (created) docker(['rm', '-f', CONTAINER]); });
-  docker(['run', '-d', '--name', CONTAINER, '--network', 'none',
+  t.after(() => { if (created) docker(['rm', '-f', '-v', CONTAINER]); });
+  docker(['run', '-d', '--rm', '--name', CONTAINER, '--network', 'none',
     '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=artsoul', 'postgres:17']);
   created = true;
   let ready = false;

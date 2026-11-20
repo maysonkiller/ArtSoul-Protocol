@@ -3,7 +3,9 @@
 Status: **C1 research/design in progress; architecture sign-off pending.**
 Reviewed: 2026-10-26 against repository `b4ca2523e18c8837ec79174a83c2fb8b1a3b639e`.
 This replaces the July 13 proposal in this maintained file; history remains in Git.
-No contract, network activation, economics or upgrade topology changes here.
+The November 19 [ordinary-artwork decision](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#ordinary-artworks-after-mainnet-launch)
+sets the lifetime of the mainnet auction and NFT contracts for the design.
+Deployment and architecture sign-off are still pending.
 
 Authority: [October 26 direction](CHANGELOG_2026-10-26_CONTRACT_EXTENSIBILITY.md).
 Baseline: [Bible](ARTSOUL_CANON_BIBLE_FULL.md),
@@ -37,7 +39,10 @@ Corrections to July's proposal: the function is `listResale`, not `listForResale
 ProjectNFT is not automatically awarded by auction settlement; collections now
 exist in source; UUPS was proposed, not approved; pull credits do not guarantee
 gas-free refunds. Permissionless/lazy/keeper finalization requires a transaction.
-Orphan artifact cleanup remains C-19 after inventory, never a reason to revive token code.
+November 18 inventory closed C-19. The current Hardhat build contains 12
+first-party Solidity source files and 18 first-party and fixture artifacts.
+Each artifact resolves to a source in the checkout. Git tracks no Hardhat
+artifacts, and the active build contains no retired Marketplace or Token contract.
 
 ### Reproduced resale invalidation gap
 
@@ -116,8 +121,7 @@ Proposed critical-change governance: multisig plus a reviewed delay, separate fr
 operational pause. Signer thresholds, delay, recovery and emergency exceptions
 require approval. A [timelock](https://docs.openzeppelin.com/contracts/5.x/api/governance)
 provides review time, not proof of harmlessness. Test lost/revoked signers and deadlock.
-Pause policy must specify pending claims, withdrawals and deadlines; do not silently
-trap funds indefinitely or extend economic deadlines.
+The selected ordinary-pair entry pause keeps fulfillment and exits available throughout the payment window. Other product families retain their own decision records. [Ordinary-pair policy](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#selected-entry-pause-and-payment-window)
 
 ## 3. Canon coverage
 
@@ -125,7 +129,8 @@ trap funds indefinitely or extend economic deadlines.
 | --- | --- |
 | Ordinary 1/1 | Publish → auction → successful settlement → mint; no-bid/default creates neither NFT nor floor |
 | Economics | Primary 97.5/2.5; resale 92.5/5.5/1/1; default deposit 80/20; current deposit max(0.01 ETH, ceiling(10% of bid)); increment max(+0.01 ETH, +2.5%) with exact integer rounding; auctions 24/36/48h, settlement 24h |
-| Deadline semantics | Specify anti-sniping and boundaries. Current settlement window starts when endAuction executes; changing that anchor needs an explicit decision |
+| Deadline semantics | In the new ordinary-work pair, an accepted bid in the final 10 minutes extends the current end by 10 minutes, up to one hour past the original end. Bidding closes at the exact end. Permissionless close starts a full 24 hours for payment. Settlement is inclusive at the payment deadline and default strictly later. Entry pause preserves both paths. |
+| Ordinary runner-up after default | One voluntary 24-hour offer at the distinct runner-up's own bid, with full separate refund and exact new payment. Decline or expiry releases the work. Record the actual buyer and sale price. [Decision](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#voluntary-purchase-by-the-second-highest-bidder) |
 | Refunds | Full losing-deposit obligations, bounded execution, failed-transfer credits, no required losing-bidder participation, no double payment. Keeper/relayer gas has an operating cost |
 | Floor | Only successful canonical settlement or collection buyNowMint establishes it; never Trust, AI or donations |
 | Partner Collections | One first auction, three attempts then Cancelled/30-day cooldown; remaining supply flat buyNowMint at settled collection price, reusing per-artwork floor semantics |
@@ -151,6 +156,65 @@ home chain, total cost, recipient, conditions and failure/refund path. Utility t
 must distinguish contract-enforced rights, integrations and creator obligations;
 ownership checks alone cannot guarantee an external service.
 
+### Collection launches on ArtSoul
+
+The November 19 product direction places the collection announcement, live auction, settlement history and primary mint on ArtSoul. A compatible external marketplace can display an issued NFT and its link back to ArtSoul. When a stable public collection URL is available, use it for the collection's external link. External listing distribution is optional and can follow the primary launch.
+
+| Creator's goal | Proposed launch experience | Price shown to collectors |
+| --- | --- | --- |
+| Launch a series from one distinctive work | Any author can draft the first-artwork auction. One paid winning bid fixes the price for later primary mints. The collection reserves token 1 and its metadata for this buyer even if another collector claims a later NFT first. | If the first work settles for 10 ETH, each remaining primary mint costs 10 ETH. A round with no sale sets no price. |
+| Launch comparable editions as an individual or a project | Allocate multiple NFTs to an opening auction, one funded bid for one NFT per wallet. Link the public mint to the opening round's clearing price. | With 100 places filled, all winners pay the 100th-ranked accepted bid. If that bid is 1 ETH and the highest is 10 ETH, the public mint price is 1 ETH. The high bidder can withdraw the 9 ETH excess. |
+
+In the generic prototype, equal bids are ordered by their on-chain sequence. With fewer qualifying bids than places, winners pay the preset reserve. With no bids, no NFT is allocated by the auction. The linked public phase requires a full round or a fallback disclosed before bidding. The template leaves the public phase unavailable when the round does not fill. Only unused allocation can roll over under its published rule. A winning allocation remains claimable. The author still sets supply, allocations, reserve and dates. [Local collection contract](../../contracts/launch/CollectionLaunch.sol) · [Launch tests](../../test/CollectionLaunch.test.cjs)
+
+**Free community allowlist.** Membership is free. The published mint price and network gas can still be payable. Disclose the allocation, wallet limits and dates before anyone participates. Any creator can choose a launch model. The blue origin mark records a separate review, and Partner status identifies a curated relationship. The partner model retains its first-auction retry limit and 30-day cooldown. [Partner rules](ARTSOUL_CANON_BIBLE_FULL.md#8-partner-collections)
+
+The edition auction allocates actual NFTs. The reservation auction below allocates the right to buy one later. Keep reservation turnover out of artwork sale prices. Publish allocations, unit prices and completed mints separately.
+
+#### Checking the published metadata for token 1
+
+Export the collection from **Manage drafts → Download draft** and run the read-only check against the prepared metadata.
+
+```sh
+node scripts/check-collection-metadata.mjs draft.json
+```
+
+The check fetches the builder's exact token 1 URI from the public IPFS gateway or the configured public ArtSoul artwork store. It requires a display name and image URL, checks the optional animation URL, and prints the SHA-256 of the original response bytes. A later run can pass that digest as the second argument to detect changes. The check reads only the JSON document. Media availability, the rest of the edition, and a deployed contract's actual `tokenURI(1)` each require separate evidence. Other HTTPS hosts require an independent read.
+
+#### Auction of mint reservations
+
+**Local prototype, open for drafting by individual creators and projects.** The builder previews both prices before bidding. The [reservation escrow](../../contracts/launch/MintReservationEscrow.sol) reuses the funded auction and holds the price of each place through its own redemption window. The [local fixture](../../contracts/test/MintReservationFixture.sol) exercises custody and NFT issuance on a disposable EVM. The builder has no payment or publishing entry point for this format.
+
+**Terms visible before bidding.** Publish the collection, currency, reserved supply, public mint price, exact additional mint payment for a holder, minimum bid for a place and the full timetable. Lock the inventory against public sales. Use a reserve expressed in ETH. Choose the highest funded bids up to the number of places. All winners pay the lowest winning bid when full, or the published reserve when undersubscribed. Break ties by confirmed bid sequence. Losing bids and excess funding become withdrawable in full. The winning payment buys a time-limited right and is separate from the mint payment. Show the bidder's maximum total before signing.
+
+| Illustrative public mint at 1 ETH | Paid for the place | Paid to mint | Total outlay before gas |
+| --- | ---: | ---: | ---: |
+| Winner keeps the place | 0.10 ETH | 0.80 ETH | 0.90 ETH |
+| Another collector buys the place from the winner | 0.15 ETH | 0.80 ETH | 0.95 ETH |
+| Another collector pays a higher asking price | 0.30 ETH | 0.80 ETH | 1.10 ETH |
+
+**Transfer and redemption.** For a pilot, allow one fixed-price resale per place on ArtSoul within 24 hours, then give every final holder a separate full redemption window. Publish its duration before bidding. The first owner can simply keep the place. The contract updates ownership and accepts the resale payment atomically. A cancelled or filled listing cannot be reused. Only the current holder can redeem once. Mint the artwork and collect the exact additional payment together. The UI shows the seller's asking price, the additional payment, the total and when sale proceeds become withdrawable.
+
+| Outcome | Reservation settlement |
+| --- | --- |
+| Mint succeeds | Credit the creator 97.5% and the protocol 2.5% of the original clearing premium plus the actual mint payment, rounded once. Credit the full resale payment to the selling holder. |
+| Holder lets a fully available mint window expire | The place expires, the reserved unit is released, and the place payments settle as above. There is no mint payment or NFT. |
+| Launch fails before delivery and before the holder has had the full usable window | Credit the original place payment to the original payer and any resale payment to its buyer. Keep both payments escrowed until success or normal expiry. Each payer can withdraw independently. Network gas is separate. |
+
+The local contract locks the holder price and reserved inventory before bidding. Finalization opens the windows at its mined timestamp. An entry pause can interrupt the 24-hour resale period. Holders can redeem throughout the following mint window during that pause, and anyone with a credit can withdraw. Resolving an expired place releases at most one unit to the public phase while it is still available. Unsold places stay unminted. The [escrow tests](../../test/MintReservationEscrow.test.cjs) cover exact deadlines, unfilled rounds, separate payer withdrawals, rejected mint recipients, public supply limits, and settlement during a pause.
+
+Before accepting funds, specify how the contract independently establishes a failed launch and its timestamp. The fixture uses a synthetic failure to exercise the refund path. A production implementation and independent review remain open. An indexer must count fulfilled NFT mints for provenance and sale prices, and record place purchases and resales separately. Track the number of redeemed places and unique wallets that minted alongside the published supply.
+
+In local receipts, awarding and reselling a place produced neither a mint nor an NFT transfer. Exercising it emitted one mint at the additional mint price and recorded the NFT recipient as First Collector, including when the holder paid for a gift. The public indexer does not yet ingest these launch events.
+
+**Fee basis selected under the founder's November 19 pricing delegation for the first reservation release.** Apply the existing 2.5% primary rate once to the amount earned by the creator for each resolved place. Redemption earns the original clearing premium plus the actual additional mint payment. Normal expiry earns only the premium. Delivery failure earns zero and both payers recover their full payments. Exclude losing bids, excess deposits, gas and the separate resale payment from the basis. The pilot credits the entire optional resale payment to the selling holder. Ordinary secondary sales of issued NFTs follow the [existing resale split](14_PROTOCOL_REVENUE_AND_TEAM.md#resale). A fee on the mint payment alone would yield zero revenue for a fully prepaid place. A fee-free resale also leaves a project-affiliated holder able to earn resale proceeds. Compare primary proceeds, place resale turnover and redeemed units before expanding the pilot.
+
+For a winning premium of 0.10 ETH, resale at 0.15 ETH and mint payment of 0.80 ETH, redemption credits 0.0225 ETH to ProtocolTreasury, 0.8775 ETH to the creator and 0.15 ETH to the first holder. On normal expiry those credits are 0.0025, 0.0975 and 0.15 ETH respectively. The on-chain mint event records the additional 0.80 ETH on redemption. The launch draft previews the split at the minimum bid. If the final clearing premium is higher, settlement uses the actual funded premium.
+
+The public mint price and the holder's additional mint payment are visible from the start. This mode has no price-reveal step.
+
+OpenSea Studio documents public and allowlisted sale stages. QQL documents separately issued passes traded on OpenSea and redeemable for one work, without expiry. These are precedents for individual features. Their documentation does not establish a Studio template for an auction of reserved places with one 24-hour resale window. [OpenSea Studio and SeaDrop](https://docs.opensea.io/docs/seadrop) · [QQL Mint Pass](https://www.qql.art/docs/how-to-qql/what-is-a-qql-mint-pass)
+
 ### Resale completeness
 
 List, choose price/use floor, replace price, cancel and relist. Emit every transition,
@@ -165,6 +229,30 @@ ERC-1155 editions need separately approved mechanics and tests.
 enforcement. Evaluate approval whitelists against smart wallets, wrappers and
 external marketplaces; a wallet transfer cannot reliably reveal a paid OTC sale.
 Do not promise unrestricted composability and unavoidable fees without an enforceable design.
+
+### Same asking price across marketplaces
+
+The primary launch and its price history belong on ArtSoul. External display and links back to the project take priority over cross-listing. For any future opt-in distribution of an already minted NFT's fixed-price listing, the goal is a common gross asking price wherever ArtSoul shows the same order. Sellers should see the proceeds for each available venue before signing. The wallet-facing identity is the Base chain ID, issuing NFT contract and token ID. Token metadata can be indexed before a seller lists a token.
+
+| Path | Source of the price | What the collector can buy |
+| --- | --- | --- |
+| A partner displays an ArtSoul listing | The executable quote from the issuing Core, including the listing version, exact price in wei and current seller | The buyer's wallet can call the same Core directly. A filled, revoked, paused or superseded listing must stop presenting an executable price. The regular ArtSoul split applies once. |
+| OpenSea accepts an external listing | An active seller-authorized order on the supported network. Match the token, seller, payment asset and exact gross consideration for one NFT, including required fee recipients. | For the first integration, prefer showing one external order on both sites with its settlement venue identified. Enable a purchase link only after the venue confirms the order. Its fees, creator earnings, seller proceeds and network gas must be distinguishable. An independent order can have a different price. |
+| Partner collection | ArtSoul's first successful settlement establishes the mint price of its remaining supply. | Each already owned item can have its own resale listing. An external collection floor reflects the available asks indexed by that venue and can differ from the ArtSoul mint price. |
+
+For a buyer-facing ask of 1 ETH, compare exact wei in native ETH on Base. A 1 WETH offer, a converted fiat estimate, the seller's net proceeds, a prior sale and a collection floor each represent different things. A preview that cannot verify a live order can still link to the work. It must not promise that it can be bought at a cached price. [OpenSea listing actions](https://docs.opensea.io/reference/create_listing_actions) · [Best listing by NFT](https://docs.opensea.io/reference/get_best_listing_nft) · [Marketplace fees](https://docs.opensea.io/docs/opensea-fees)
+
+Keep the initial ArtSoul auction on the issuing Core. It accepts bids before the ordinary NFT exists and mints at successful settlement. OpenSea documents fixed-price listings and offers on existing NFTs. Revisit an external bidding integration if it can reflect the same bids, extensions, deposits, settlement and mint on that Core. [OpenSea selling](https://support.opensea.io/en/articles/8867002-how-do-i-sell-an-nft)
+
+Future venue admission must identify the actual transfer operator and its execution paths on Base. A shared conduit alone cannot establish which website initiated a trade, which price the owner signed or which fees were paid. Keep entrant approvals separate from public reads. Before activating a specific operator, verify treatment of creator and treasury amounts for that execution route, and test explicit wallet consent, cancellation, partial outages and price changes. When an existing independent order can still fill, retain its true status until its cancellation or expiry is verified. Expose a synchronized ask only while both references represent the same executable terms. No venue has been activated by this decision. [Seaport order model](https://docs.opensea.io/docs/seaport-models) · [Order cancellation and status](https://docs.opensea.io/docs/seaport-interface)
+
+#### External marketplace admission
+
+For new ordinary NFTs, the founder selected the existing ArtSoul Admin Security Safe. It publicly schedules the exact operator address with a fixed 48-hour delay. Scheduling and activation require the bound Safe to have three owners and threshold two. After the delay, anyone can submit the activation transaction for that address. The Safe can cancel a pending admission or immediately disable an active external operator. Both defensive actions still work if the Safe strengthens its quorum. Base chain identity, reviewed Safe code, owner custody and enabled modules remain part of the release preflight.
+
+An NFT owner can grant permission for one NFT or a collection-wide operator permission. Within the scope of that grant, the operator can transfer without asking for a further signature on every transfer. Disabling the operator makes both types of grant ineffective immediately. Readmission starts a new 48-hour review and requires fresh owner consent. Separately cancel unwanted orders at the venue before granting permission again. Public metadata and direct transfers by owners stay available. [ERC-721 owner and operator permissions](https://eips.ethereum.org/EIPS/eip-721)
+
+Admission is per deployment and per transfer contract. Review any proxy upgrade rights, conduit controllers, sale terms and fee routing before scheduling a real address. Monitoring the on-chain announcement gives collectors time to inspect it. The security Safe receives no authority through admission to set prices, move an owner's NFT or withdraw funds. The local candidate starts with its own market and no admitted external market. [Safe-bound candidate](../../contracts/replacement/TreasuryBoundOrdinaryArt.sol) · [Local governance tests](../../test/TreasuryBoundOrdinaryArt.test.cjs)
 
 ## 4. Pay from another chain; keep the NFT on its home chain
 
@@ -241,6 +329,17 @@ no stale listing revival; bounded utility inputs/output supply. Test native and
 contract wallets, rejected signatures, relayer identity and partial completion.
 Prototype tests do not prove these future guarantees.
 
+### Independent review scope for the first Base release
+
+Request separate prices for the following scopes once the production candidate is frozen. Record the Git commit, compiler and optimizer settings, dependency lockfile, constructor inputs and build hashes on the quote. Ask each reviewer to list exclusions, cost and coverage of a fix review, and which later changes would require another review. An estimate has yet to be obtained. [Audit preparation guidance](https://www.openzeppelin.com/readiness-guide)
+
+| Scope to price | Code and boundaries | Review outcome |
+| --- | --- | --- |
+| Ordinary market, required for launch | Concrete Core and its [auction](../../contracts/replacement/OrdinaryArtAuctions.sol), [refund](../../contracts/replacement/OutbidRefunds.sol), [resale](../../contracts/replacement/OrdinaryArtResales.sol) and [Safe binding](../../contracts/replacement/TreasuryBoundOrdinaryArt.sol) code, the paired [NFT](../../contracts/replacement/SettledArtworkNFT.sol), relevant inherited libraries and the release wiring. | Trace a deposit through every terminal outcome and withdrawal. Verify conservation and rounding, who can mint or move an NFT, marketplace approvals and their revocation, pause authority, callbacks, and both permanent pair bindings. Verify the deployment payer receives no administrative or treasury role. |
+| Artwork-linked creator support, optional incremental quote | [CreatorDonations](../../contracts/ArtSoulDonations.sol), [registry adapter](../../contracts/replacement/OrdinaryArtDonations.sol) and their inherited code. Include the original creator lookup, recipient callbacks and failure behavior, message bounds, pause and two-step ownership transfer. | Verify the creator receives the exact payment, a failed transfer rolls back its event, and the forwarder has no special authority over deposits or minting. Review ownership renunciation while paused and preflight the actual admin Safe. Identify the configuration and receipt checks needed to attribute support to the correct work and deployment. |
+
+The first release supports direct ETH transfers to the original creator. Its Core and NFT have no dependency on the donation forwarder. An incremental quote lets the project weigh verified per-artwork history and messages against independent review and ongoing maintenance. Later changes to either side of the registry interface need an impact review. [Creator support decision](SUPPORT_THE_ARTIST_DESIGN.md)
+
 ## 6. Delivery and decisions
 
 The [November 2 decision/invariant annex](../architecture/C1_DECISION_INVARIANTS_2026-11-02.md)
@@ -256,9 +355,7 @@ and undecided policy. It is not architecture sign-off or replacement Solidity.
 The November 16 [minimal replacement boundaries](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md)
 narrow this into a proposed immutable engine/NFT pair, deployment-scoped identity,
 settlement-bound mint capability and isolated liabilities with bounded refunds.
-Source hashes still match the characterization baseline. The document separates
-necessary safety invariants from unselected topology, emergency, rounding,
-treasury and governance policies; it is not replacement implementation or sign-off.
+The November 19 decisions select the ordinary-market entry pause, whole-wei payout rounding, three Safe addresses and delayed external operator admission. Contract sign-off still needs a concrete production build, bounded refund execution settings and independent review. Each external operator requires its own compatibility evidence.
 
 1. C1: state/rounding/deadline specification, identity/capability graph, upgrade
    selection, threats and invariants. Approve changed rules before Solidity.
@@ -276,8 +373,16 @@ treasury and governance policies; it is not replacement implementation or sign-o
    approval and controlled mainnet release. Prefer an isolated new mainnet database;
    never destroy old history before required copies/verification.
 
-Pending decisions: immutable/proxy boundaries and powers; multisig/delay/emergency
-policy; pause/deadline/exit; mint authority rotation; metadata permanence; first
+November 19 delegated design decision for ordinary artworks: keep each Core and
+its NFT contract permanently paired. Future mainnet publications can use a new
+pair while old tokens, ongoing auctions, resale history and payable claims
+remain accessible on the same site under their original addresses. The
+[deployment lifetime decision](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#ordinary-artworks-after-mainnet-launch)
+includes the ERC-721 identity rule and the operational trade-off. Repair of
+immutable code requires a new deployment. This choice does not authorize a launch.
+
+Pending decisions: other components' upgrade boundaries and emergency policies, retirement authority,
+multisig/delay/recovery, metadata permanence, first
 collection template/terms; payment asset/route/refund policy; external marketplace
 compatibility; editions/offers scope. Do not select these through constructor defaults.
 

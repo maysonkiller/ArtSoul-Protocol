@@ -42,6 +42,12 @@ Publish media and metadata, register artwork, create auction, bid, settle, lazy-
 
 No NFT exists before successful settlement.
 
+For the new native ordinary-work pair, anyone can close an expired auction, which opens the winner's full 24-hour payment window. An expired round without bids returns to Discovery without a wallet action. Relisting closes the old round in the same transaction. A ready winner can close and pay in one transaction. Entry can pause while settlement, default and exits remain available. [Exact timing and scope](ARTSOUL_CANON_BIBLE_FULL.md#2-artwork-lifecycle)
+
+Recording a winning bidder's default opens a single voluntary 24-hour offer to the second-highest distinct bidder at their own bid. All losing deposits remain fully refundable. Decline or expiry releases the work for relisting. A paid offer mints to its actual buyer at the actual sale price.
+
+The local replacement candidate exercises the full path from primary settlement through resale and withdrawal. It enforces the canonical four resale shares and invalidates an advertised sale when ownership changes or the seller cancels, replaces the listing or revokes Core approval. The deployed Base Sepolia prototype retains its existing behavior. [Resale evidence and remaining policies](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#selected-entry-pause-and-payment-window)
+
 ### Future Contract Requirement: Automatic No-Bid Finalization
 
 > **FUTURE / MAINNET REDEPLOY ONLY - NOT CURRENT TESTNET BEHAVIOR**

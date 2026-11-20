@@ -123,6 +123,17 @@ const baseEnv = { BASE_SEPOLIA_RPC_URLS: 'https://ordinary.example/rpc', BASE_SE
     ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA: CORE, ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA: NFT,
     BASE_SEPOLIA_READ_RPC_URLS: undefined };
 
+test('first block accepts a complete decimal height and refuses a truncated or unsafe height', () => {
+    withEnv({ ...baseEnv, BASE_SEPOLIA_START_BLOCK: '101', INDEXER_START_BLOCK: '2' }, () => {
+        assert.equal(resolveIndexerChainConfig('base-sepolia').startBlock, 101);
+    });
+    for (const value of ['101oops', '-1', '9007199254740992']) {
+        withEnv({ ...baseEnv, BASE_SEPOLIA_START_BLOCK: undefined, INDEXER_START_BLOCK: value }, () => {
+            assert.throws(() => resolveIndexerChainConfig('base-sepolia'), /Invalid indexer start block/);
+        });
+    }
+});
+
 test('Base read RPC override preserves ordinary providers and de-duplicates its explicit order', () => {
     withEnv({ ...baseEnv, BASE_SEPOLIA_READ_RPC_URLS: 'https://archive.example/rpc, https://reader.example, https://archive.example/rpc' }, () => {
         const resolved = resolveIndexerChainConfig('base-sepolia');

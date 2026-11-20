@@ -21,6 +21,8 @@ The checker reads the existing indexer `/health` response and exits non-zero whe
 - RPC errors in the last minute do not exceed `5`;
 - the response timestamp is no more than two minutes old.
 
+Missing or malformed counters fail their respective `BLOCK_LAG`, `UNRESOLVED_ERRORS` or `RPC_ERRORS` check. Record the sampled `/health` fields and verify that the producer reported integer counts before accepting a healthy interval.
+
 Run on the Hetzner host from the deployed repository:
 
 ```bash

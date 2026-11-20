@@ -67,6 +67,9 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const port = await freePort();
   const evidence = {kind: 'atomic-rewind-regression', directory, port, host: '127.0.0.1', results: []};
   let pool, initialized = false;
+  let childrenPassed = true;
+  // The parent can report passed inside its after hook even when a child failed.
+  t.afterEach(child => { if (child.passed !== true || child.signal.aborted) childrenPassed = false; });
   const command = (name, args) => execFileSync(executable(name), args, {
     cwd: directory, encoding: 'utf8', windowsHide: true,
     timeout: name === 'pg_ctl' && args.includes('stop') ? 185000 : 30000,
@@ -77,17 +80,31 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       TMP: process.env.TMP, HOME: directory, USERPROFILE: directory
     }
   });
-  t.after(async () => {
-    await pool?.end();
-    if (initialized) {
-      let running = false;
-      try {command('pg_ctl', ['-D', data, 'status']); running = true;}
-      catch (error) {if (error.status !== 3) throw error;}
-      if (running) command('pg_ctl', ['-D', data, '-m', 'fast', '-t', '180', '-w', 'stop']);
-      evidence.clusterStopped = true;
+  const clusterRunning = () => {
+    try { command('pg_ctl', ['-D', data, 'status']); return true; }
+    catch (error) { if (error.status === 3) return false; throw error; }
+  };
+  const expectedData = path.join(fs.realpathSync.native(ROOT), 'docs', 'private', `reorg-atomicity-${suffix}`, 'cluster');
+  t.after(async context => {
+    evidence.checksPassed = context.passed === true && !context.signal.aborted && childrenPassed;
+    try {
+      await pool?.end();
+      if (initialized) {
+        assert.equal(fs.realpathSync.native(data), expectedData);
+        if (clusterRunning()) command('pg_ctl', ['-D', data, '-m', 'fast', '-t', '180', '-w', 'stop']);
+        assert.equal(clusterRunning(), false, 'disposable PostgreSQL must have stopped');
+        evidence.clusterStopped = true;
+      }
+    } finally {
+      fs.writeFileSync(path.join(directory, 'evidence.json'), JSON.stringify(evidence, null, 2), {flag: 'wx'});
+      t.diagnostic(`Evidence retained: ${directory}; cluster stopped: ${evidence.clusterStopped === true}`);
     }
-    fs.writeFileSync(path.join(directory, 'evidence.json'), JSON.stringify(evidence, null, 2));
-    t.diagnostic(`Evidence retained: ${directory}; cluster stopped: ${evidence.clusterStopped === true}`);
+    if (evidence.checksPassed && evidence.clusterStopped) {
+      assert.equal(fs.realpathSync.native(data), expectedData);
+      assert.equal(fs.existsSync(path.join(data, 'postmaster.pid')), false);
+      fs.rmSync(data, {recursive: true, maxRetries: 3, retryDelay: 200});
+      t.diagnostic('Removed the successful run\'s disposable PostgreSQL data directory.');
+    }
   });
   evidence.postgresVersion = command('postgres', ['--version']).trim();
   command('initdb', ['-D', data, '-U', 'postgres', '--auth=trust', '--encoding=UTF8', '--locale=C']);
@@ -100,9 +117,19 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   assert.equal(path.resolve((await pool.query('SHOW data_directory')).rows[0].data_directory), path.resolve(data),
     'the connection must be the newly created disposable cluster');
   assert.equal((await pool.query('SHOW listen_addresses')).rows[0].listen_addresses, '127.0.0.1');
+  const ordinaryMigration = read('src/indexer/migrations/018_ordinary_settlement_evidence.sql');
+  // A standalone node has no hosted Data API roles. The normal setup below
+  // replays this additive migration after those roles are present.
+  await pool.query(ordinaryMigration);
   await pool.query('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE EXTENSION pgcrypto');
   const migrations = [...read('src/indexer/setup-database.sql').matchAll(/^\\i (.+)$/gm)].map(match => match[1].trim());
   for (const migration of migrations) await pool.query(read(migration));
+  await t.test('finalized settlement intake isolates issuers, accepts identical concurrent receipts and rejects contradictions', async () => {
+    const { checkOrdinaryIntake } = await import('./helpers/ordinary-settlement-postgres.mjs');
+    await checkOrdinaryIntake(pool);
+    await pool.query(ordinaryMigration);
+    assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_settlements')).rows[0].count, '2');
+  });
   for (const name of ['identity', 'preparation', 'submission', 'registration', 'reorg']) {
     await pool.query(read(`sql/migrations/artwork_media_${name}.sql`));
   }
@@ -230,6 +257,54 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   }
   t.beforeEach(reset);
 
+  await t.test('competing fresh indexers never reassign a deployment cursor', async () => {
+    for (const [fixtureChain, secondCore] of [[99001, CORE], [99002, CREATOR]]) {
+      const bothRead = deferred();
+      let initialReads = 0;
+      const racingDb = { async query(sql, params) {
+        const rows = await db.query(sql, params);
+        if (sql.startsWith('SELECT') && rows.length === 0) {
+          if (++initialReads === 2) bothRead.resolve();
+          await bothRead.promise;
+        }
+        return rows;
+      } };
+      const cores = [CORE, secondCore];
+      const results = await Promise.allSettled(cores.map((contractAddress, i) =>
+        new Engine(racingDb, {chainId: fixtureChain, contractAddress}).initialize(contractAddress, fixtureChain, 200 + i, 3)));
+      const rows = await db.query('SELECT * FROM indexer_state WHERE chain_id=$1', [fixtureChain]);
+      const created = results.findIndex(result => result.status === 'fulfilled' && result.value === true);
+      assert.notEqual(created, -1);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].contract_address, cores[created]);
+      assert.equal(Number(rows[0].last_indexed_block), 199 + created);
+      assert.equal(Number(rows[0].last_confirmed_block), 199 + created);
+      assert.equal(rows[0].confirmation_depth, 3);
+      assert.equal(rows[0].state_hash, '0x0');
+      if (CORE === secondCore) assert.deepEqual(results[1-created], {status: 'fulfilled', value: false});
+      else {
+        assert.equal(results[1-created].status, 'rejected');
+        assert.match(results[1-created].reason.message, /Invalid persisted deployment/);
+      }
+    }
+  });
+  await t.test('fresh cursor includes registration in the configured first block and resumes after it', async () => {
+    const chain = 99003, firstBlock = 101;
+    const writer = historicalWriter([]);
+    writer.eventListener.chainId = chain;
+    writer.eventListener.queryAllHistoricalEvents = async (from, to) => {
+      assert.deepEqual([from, to], [firstBlock, firstBlock]);
+      return [{...bufferedBid(firstBlock), eventName: 'ArtworkRegistered',
+        eventData: {artworkId: 1, creator: CREATOR, metadataURI: 'ipfs://first-block'}}];
+    };
+    assert.equal(await writer.initialize(CORE, chain, firstBlock), true);
+    const initial = await writer.getIndexerState();
+    assert.equal(await writer.syncHistoricalEvents(initial.last_indexed_block + 1, firstBlock, {currentBlock: 113}), 1);
+    const works = await db.query('SELECT block_number, minted FROM v41_artworks WHERE chain_id=$1', [chain]);
+    assert.deepEqual(works.map(row => [Number(row.block_number), row.minted]), [[firstBlock, false]]);
+    assert.equal(await writer.initialize(CORE, chain, 1), false);
+    assert.equal((await writer.getIndexerState()).last_confirmed_block, firstBlock);
+  });
   for (const sampleSize of [12, 2, undefined]) await t.test(
     `a fork before sparse sampled headers removes every orphan auction (sample ${sampleSize ?? 'default'})`, async () => {
       await pool.query('DELETE FROM block_hashes WHERE chain_id=$1 AND block_number=109',[CHAIN]);
@@ -1168,17 +1243,16 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     }).trim();
     const container=`artsoul-combined-cache-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
     const clients=[],details={image:'redis:7.4-alpine',loopbackOnly:true,containerRemoved:false};
-    let creationAttempted=false;
+    let containerId;
     sub.after(()=>{
       for(const client of clients)client.disconnect();
-      if(creationAttempted){
-        try{docker('rm','-f',container);}
+      if(containerId){
+        try{docker('rm','-f','-v',containerId);}
         catch(error){if(!/No such container/i.test(String(error.stderr)))throw error;}
         details.containerRemoved=true;
       }
     });
-    creationAttempted=true;
-    docker('run','-d','--name',container,'-p','127.0.0.1::6379',
+    containerId=docker('run','-d','--rm','--name',container,'-p','127.0.0.1::6379',
       details.image,'redis-server','--save','','--appendonly','no');
     const endpoint=docker('port',container,'6379/tcp');
     assert.match(endpoint,/^127\.0\.0\.1:\d+$/);
@@ -1800,10 +1874,16 @@ const {pathToFileURL}=require('node:url');
     assert.deepEqual((await pool.query(sql,[CHAIN,nft,token])).rows,[{block_number:'110',log_index:9}]);
     const client=await pool.connect();
     try {
-      await client.query('SET enable_seqscan=off');
+      await client.query('BEGIN');
+      // The planner can correctly prefer a small sort for the five lookup cases alone.
+      // Measure the selective lookup among transfers from many different tokens.
+      await client.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,event_data,block_number,transaction_hash,log_index)
+        SELECT $1,'Transfer',$2,jsonb_build_object('tokenId',i::text),1000+i,
+          '0x'||lpad(to_hex(10000000+i),64,'0'),0 FROM generate_series(1,2048) AS ids(i)`,[CHAIN,nft]);
+      await client.query('ANALYZE contract_events');
       const plan=(await client.query('EXPLAIN (COSTS OFF) '+sql,[CHAIN,nft,token])).rows.map(row=>row['QUERY PLAN']).join('\n');
       assert.match(plan,/contract_events_nft_transfer_token/);
-    } finally {await client.query('RESET enable_seqscan');client.release();}
+    } finally {await client.query('ROLLBACK');client.release();}
   });
   await t.test('ordinary cursor writes, unchanged purge tokens and acknowledgements preserve NFT coverage', async () => {
     await pool.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);

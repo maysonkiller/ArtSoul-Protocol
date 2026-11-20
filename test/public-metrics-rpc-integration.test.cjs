@@ -9,7 +9,7 @@ const test = require('node:test');
 const { execFileSync, execSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-const CONTAINER = `artsoul-a11-pg-${process.pid}`;
+const CONTAINER = `artsoul-a11-pg-${process.pid}-${globalThis.crypto.randomUUID()}`;
 const IMAGE = 'postgres:17';
 const MIGRATION = fs.readFileSync(
   path.join(ROOT, 'src/indexer/migrations/015_public_metrics_projection.sql'),
@@ -62,16 +62,12 @@ function record({ index, name, type = null, address = null, auctions = 0, volume
 test('A11 public metrics are idempotent and reverse with contract-event rollback', {
   skip: HAVE_DOCKER ? false : 'Docker is not available'
 }, t => {
+  let containerId;
   t.before(() => {
-    try {
-      execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
-    } catch {
-      // The disposable container does not normally exist before the test.
-    }
-    execSync(
-      `docker run -d --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
-      { stdio: 'ignore' }
-    );
+    containerId = execSync(
+      `docker run -d --rm --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    ).trim();
 
     let ready = false;
     for (let attempt = 0; attempt < 60; attempt++) {
@@ -128,7 +124,7 @@ test('A11 public metrics are idempotent and reverse with contract-event rollback
   });
 
   t.after(() => {
-    execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
+    if (containerId) execFileSync('docker', ['rm', '-f', '-v', containerId], { stdio: 'ignore' });
   });
 
   const artist = '0x1111111111111111111111111111111111111111';

@@ -62,7 +62,8 @@ test('new table migrations must join the no-default-grant rehearsal', () => {
     'sql/migrations/phase11_ai_core.sql', 'sql/migrations/phase12_correctness.sql',
     'sql/migrations/stabilization_layer.sql'
   ]);
-  const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services', ...features]
+  const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services',
+    '20261119150000_collection_origin_reviews', ...features]
     .map(name => `sql/migrations/${name}.sql`));
   const missing = [];
   for (const dir of ['migrations', 'sql/schema', 'sql/migrations', 'src/indexer/migrations']) {
@@ -70,7 +71,7 @@ test('new table migrations must join the no-default-grant rehearsal', () => {
       const file = `${dir}/${name}`;
       if (!/\bCREATE\s+TABLE\b/i.test(fs.readFileSync(file, 'utf8').replace(/--[^\n]*/g, ''))) continue;
       const inIndexerSequence = dir === 'sql/migrations' && /^00[123]_/.test(name)
-        || dir === 'src/indexer/migrations' && /^(00[4-9]|01[0-5])_/.test(name);
+        || dir === 'src/indexer/migrations' && /^(00[4-9]|01[0-8])_/.test(name);
       if (!inIndexerSequence && !covered.has(file) && !legacy.has(file)) missing.push(file);
     }
   }
@@ -81,8 +82,8 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   skip: available ? false : 'Docker Linux PostgreSQL is unavailable'
 }, async t => {
   let created = false;
-  t.after(() => { if (created) docker('rm', '-f', container); });
-  docker('run', '-d', '--name', container, '-e', 'POSTGRES_PASSWORD=local-grants-only',
+  t.after(() => { if (created) docker('rm', '-f', '-v', container); });
+  docker('run', '-d', '--rm', '--name', container, '-e', 'POSTGRES_PASSWORD=local-grants-only',
     '-e', 'POSTGRES_DB=artsoul', 'postgres:17');
   created = true;
   let ready = false;
@@ -102,6 +103,14 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   `);
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
   for (const migration of listIndexerMigrations()) query(migration.sql);
+  await t.test('ordinary issuer and settlement evidence has no Data API table privileges', () => {
+    for (const role of ['anon', 'authenticated', 'service_role']) {
+      for (const table of ['ordinary_issuers', 'ordinary_settlements']) {
+        assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.${table}',
+          'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER');`), 'f');
+      }
+    }
+  });
   // Profiles predate the reproducible indexer sequence. Model only its public
   // and OAuth-owned columns needed by the indexed search migration.
   query(`CREATE TABLE profiles(id UUID DEFAULT gen_random_uuid(),created_at TIMESTAMPTZ DEFAULT now(),
@@ -230,9 +239,19 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
         AND NOT has_table_privilege('authenticated','public.${name}','SELECT');`), 't', name);
     }
   });
-  await t.test('read-only verification accepts explicit grants with empty default grants', () => {
+  await t.test('the collection review draft supports authoritative reads with no default grants', () => {
+    query(noImplicitGrants);
+    query(fs.readFileSync('sql/migrations/20261119150000_collection_origin_reviews.sql', 'utf8'));
+    query(fs.readFileSync('test/fixtures/collection-origin-reviews.sql', 'utf8'));
+  });
+  await t.test('read-only verification accepts explicit grants and detects drift in review column permissions', () => {
     const report = fs.readFileSync('sql/verification/phase_a_security_verification.sql', 'utf8');
     assert.ok(report.includes('-- 9.'));
-    assert.equal(query(report.slice(report.indexOf('-- 9.'))), '');
+    const checks = report.slice(report.indexOf('-- 9.'));
+    assert.equal(query(checks), '');
+    for (const change of [
+      'REVOKE SELECT (verified) ON public.collection_origin_reviews FROM service_role',
+      'GRANT SELECT (reason) ON public.collection_origin_reviews TO service_role'
+    ]) assert.equal(query(`BEGIN; ${change};\n${checks}\nROLLBACK;`), 'collection_origin_reviews');
   });
 });

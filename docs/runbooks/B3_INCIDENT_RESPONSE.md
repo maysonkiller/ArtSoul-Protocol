@@ -121,12 +121,17 @@ A-15 was built to prevent.
 
 ## 5. Cost
 
-**Find out:** the founder's monthly review, plus any Supabase or Alchemy usage
-alert.
+**Find out:** the founder or named operator reviews costs every Tuesday and
+Friday and after any indexer/RPC/database deployment, following
+[A9's manual review schedule](A9_INFRA_COST_MONITORING.md#manual-review-schedule).
+Check provider usage alerts where available; they do not replace this review.
 
-Running cost during the beta is roughly 150 to 200 USD a month across Vercel,
-Supabase and the Hetzner indexer host, with no revenue against it. A cost
-incident in a beta is usually a new uncached consumer, not growth.
+Record each provider's account, billing period, current/projected costs and
+applicable limits separately. Use dated dashboard evidence, such as the
+[November 16 Supabase recheck](../audits/B30_B35_OPERATIONAL_RECHECK_2026-11-16.md#provider-and-cost-boundaries),
+without treating one provider's estimate as the total operating cost or a
+future spending guarantee. Investigate changed request volume, cache behavior
+and provider incidents before choosing a corrective action.
 
 **Do:** A9 §Incident response covers the signals and the order. Its first rule
 holds here: revert the new uncached consumer before considering a plan change,

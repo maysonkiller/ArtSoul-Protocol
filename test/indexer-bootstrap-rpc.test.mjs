@@ -24,14 +24,14 @@ test('the complete indexer bootstrap supports state hashes without a fixture sch
     t.after(async () => {
         await fresh?.end();
         await legacy?.end();
-        if (created) docker('rm', '-f', container);
+        if (created) docker('rm', '-f', '-v', container);
         if (priorRedis === undefined) delete process.env.REDIS_URL;
         else process.env.REDIS_URL = priorRedis;
     });
     t.mock.method(console, 'log', () => {});
     t.mock.method(console, 'warn', () => {});
     const { default: Engine } = await import('../src/indexer/sync-engine.js');
-    docker('run', '-d', '--name', container, '-e', 'POSTGRES_PASSWORD=local-bootstrap-fixture',
+    docker('run', '-d', '--rm', '--name', container, '-e', 'POSTGRES_PASSWORD=local-bootstrap-fixture',
         '-e', 'POSTGRES_DB=fresh', '-p', '127.0.0.1::5432', 'postgres:17');
     created = true;
     const endpoint = docker('port', container, '5432/tcp');
@@ -60,8 +60,10 @@ test('the complete indexer bootstrap supports state hashes without a fixture sch
             } });
         engine.getRecoveryAuthority = () => ({ lockName: 'bootstrap-fixture', instanceId: 'worker-fixture',
             fencingToken: '1', isCurrent: () => true });
-        await engine.initialize(CORE, 84532, 100);
-        assert.equal((await engine.getIndexerState()).state_hash, '0x0');
+        await engine.initialize(CORE, 84532, 101);
+        const initialized = await engine.getIndexerState();
+        assert.equal(initialized.last_indexed_block, 100);
+        assert.equal(initialized.state_hash, '0x0');
         const blockHash = `0x${'2'.repeat(64)}`;
         await fresh.query(`INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
             VALUES(84532,101,$1,$2,1700000000)`, [blockHash, `0x${'3'.repeat(64)}`]);
@@ -72,9 +74,9 @@ test('the complete indexer bootstrap supports state hashes without a fixture sch
         assert.equal(state.last_indexed_block, 101);
         assert.equal(state.last_confirmed_block, 101);
         assert.equal(state.state_hash, `0x${crypto.createHash('sha256').update(blockHash).digest('hex')}`);
-        assert.equal(applied.migrations.length, 17);
+        assert.equal(applied.migrations.length, 18);
         const ledger = (await fresh.query('SELECT * FROM artsoul_schema_migrations ORDER BY migration_id')).rows;
-        assert.equal(ledger.length, 17);
+        assert.equal(ledger.length, 18);
         assert.deepEqual(ledger.map(row => [row.migration_id, row.sha256]), migrations.map(row => [row.id, row.checksum]));
         const before = (await fresh.query('SELECT * FROM indexer_state ORDER BY chain_id')).rows;
         const repeated = await applyIndexerMigrations(options);

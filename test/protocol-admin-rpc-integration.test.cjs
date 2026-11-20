@@ -11,7 +11,7 @@ const ROOT = path.resolve(__dirname, '..');
 const VISIBILITY = fs.readFileSync(path.join(ROOT, 'sql/migrations/phase18_artwork_moderation_visibility.sql'), 'utf8');
 const INTAKE = fs.readFileSync(path.join(ROOT, 'sql/migrations/a8b_artwork_report_intake.sql'), 'utf8');
 const REVIEW = fs.readFileSync(path.join(ROOT, 'sql/migrations/a8c_protocol_admin_review.sql'), 'utf8');
-const CONTAINER = `artsoul-a8c-pg-${process.pid}`;
+const CONTAINER = `artsoul-a8c-pg-${process.pid}-${globalThis.crypto.randomUUID()}`;
 const IMAGE = 'postgres:17';
 const STAFF = '0x1111111111111111111111111111111111111111';
 const REPORTER_A = '0x2222222222222222222222222222222222222222';
@@ -94,16 +94,12 @@ function review(reportId, action, reason) {
 }
 
 test('A8c review RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false : 'Docker is not available' }, async t => {
+  let containerId;
   t.before(() => {
-    try {
-      execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
-    } catch {
-      // The disposable container does not normally exist before the test.
-    }
-    execSync(
-      `docker run -d --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
-      { stdio: 'ignore' }
-    );
+    containerId = execSync(
+      `docker run -d --rm --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    ).trim();
 
     let ready = false;
     for (let attempt = 0; attempt < 60; attempt++) {
@@ -134,7 +130,7 @@ test('A8c review RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false :
   });
 
   t.after(() => {
-    execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
+    if (containerId) execFileSync('docker', ['rm', '-f', '-v', containerId], { stdio: 'ignore' });
   });
 
   t.beforeEach(() => {
