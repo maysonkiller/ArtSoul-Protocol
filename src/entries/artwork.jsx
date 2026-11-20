@@ -1936,8 +1936,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     setAiGuidance(readAIValuation(data.ai_guidance));
 
                     // Keep share previews branded; artwork-specific data stays in the page content.
-                    const pageUrl = window.location.href;
-                    document.getElementById('og-url').setAttribute('content', pageUrl);
+                    window.ArtSoulArtworkUrl.updateArtworkIndexing(data.moderation_hidden !== true);
                     document.title = data.title + ' - ArtSoul';
 
                     // Exact projections already contain public role identities.
@@ -2113,6 +2112,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         return false;
                     }
                     if (error?.code === 'ARTWORK_UNAVAILABLE') {
+                        window.ArtSoulArtworkUrl.updateArtworkIndexing(false);
                         loadedArtworkIdRef.current = null;
                         setArtwork(null);
                         setAuction(null);
@@ -2120,6 +2120,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         setRefreshError('');
                         setError({ code: 'ARTWORK_UNAVAILABLE', message: 'This artwork is currently unavailable.' });
                     } else if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
+                        window.ArtSoulArtworkUrl.updateArtworkIndexing(false);
                         setError({
                             code: 'V41_ARTWORK_NOT_INDEXED',
                             artworkId: error.artwork_id || artworkId

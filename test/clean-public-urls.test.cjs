@@ -31,7 +31,7 @@ test('short artwork URLs are routed and trailing slashes are normalised', () => 
 
   assert.equal(config.trailingSlash, false);
   assert.ok(
-    config.rewrites.some(route => route.source === '/artwork/:id' && route.destination === '/artwork?id=:id'),
+    config.rewrites.some(route => route.source.startsWith('/artwork/:id(') && route.destination === '/artwork?id=:id'),
     'the short artwork path must rewrite onto the existing artwork route'
   );
 
@@ -97,6 +97,11 @@ test('public metadata and runtime navigation use canonical extensionless URLs', 
 
   for (const [file, canonicalUrl] of canonicalPages) {
     const source = read(file);
+    if (file === 'artwork.html') {
+      assert.doesNotMatch(source, /<link\s+rel="canonical"/, 'the shared shell cannot identify one work before the request');
+      assert.match(source, /id="og-url" property="og:url">/);
+      continue;
+    }
     if (file === 'profile.html') assert.match(source, /data-profile-canonical/);
     else assert.ok(source.includes(`<link rel="canonical" href="${canonicalUrl}">`), `${file} canonical URL`);
     assert.ok(source.includes(`content="${canonicalUrl}"`), `${file} Open Graph URL`);
