@@ -29,6 +29,16 @@ npm run keeper:auctions -- --config /private/engine.json --state /private/keeper
 
 Omit `--once` for continuous operation. An idle cycle runs once a minute. If an RPC limits the size of a log query, set `logBlockRange` in the manifest (1–5000 blocks, default 1000). `rangesPerCycle` controls the catch-up batch (1–10 ranges, default 2). A changed checkpoint hash stops action selection. Verify the RPC and deployment first. If a rebuild is required, start a new discovery file at the reviewed origin and preserve the transaction journal.
 
+## Observe open runner-up offers
+
+Use `--runner-up-pair` with the [reviewed Core/NFT pair file](../security/MIGRATION_RUNBOOK.md#read-a-runner-up-offer) for a single read-only cycle. The Core and its runtime hash must match the keeper's deployment manifest. The existing discovery database supplies candidate auction IDs, including offers seen before a restart. The observer verifies each auction and its terms against both bound contracts at the same finalized block.
+
+```sh
+npm run keeper:auctions -- --config /private/engine.json --state /private/keeper.sqlite --once --runner-up-pair /private/pair.json
+```
+
+`runnerUpOffers` contains the block hash, auction and artwork IDs, eligible buyer, exact price in wei and the final Unix second for acceptance. If the discovery cursor is catching up, the field is null. Once caught up, an empty list means the page contains no active offers at that finalized block. For more than 16 candidates, pass the returned `nextAfterAuction` to `--after-auction`. Each invocation identifies its own finalized block. The monitor broadcasts no transactions or notifications and runs only on request.
+
 ## Execution rehearsal
 
 For the isolated local chain, set `chainId` to 31337, supply a loopback IP endpoint and set `operator` to an unlocked disposable Hardhat account. Append `--local-execute`. The normal contract tests also run a full expiry, default and offer lifecycle with two bidders.

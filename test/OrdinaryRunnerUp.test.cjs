@@ -98,8 +98,16 @@ describe('Runner-up offers for ordinary artworks', function () {
         const rpc = await hre.run('node:create-server', { provider: evm, hostname: '127.0.0.1', port: 0 });
         const dir = await mkdtemp(join(tmpdir(), 'artsoul-runner-up-'));
         const file = join(dir, 'pair.json');
+        const keeperConfig = join(dir, 'keeper.json');
         try {
             await writeFile(file, JSON.stringify(reviewedPair));
+            await writeFile(keeperConfig, JSON.stringify({chainId:84532,engine:engine.target,codeHash:reviewedPair.expectedCoreCodeHash,startBlock:1}));
+            for (const path of [file, '']) {
+                const args = [require.resolve('../scripts/auction-keeper.mjs'), '--config', keeperConfig, '--state', ':memory:',
+                    '--once', '--runner-up-pair', path, '--testnet-execute'];
+                await assert.rejects(promisify(execFile)(process.execPath,args,{windowsHide:true,env:{SystemRoot:process.env.SystemRoot || ''}}),
+                    error => error.code === 1 && /cannot execute/.test(error.stderr));
+            }
             const { port } = await rpc.listen();
             const { stdout } = await promisify(execFile)(process.execPath,
                 [require.resolve('../scripts/read-ordinary-runner-up.mjs'), file, '1', String(block.number), block.hash], {
@@ -112,8 +120,38 @@ describe('Runner-up offers for ordinary artworks', function () {
         } finally {
             await rpc.close();
             await unlink(file);
+            await unlink(keeperConfig);
             await rmdir(dir);
         }
+    });
+
+    it('monitors funded runner-up offers from the existing keeper queue without a signer or a notification', async () => {
+        const {openKeeperStore} = await import('../scripts/auction-keeper-discovery.mjs');
+        const {runKeeperCycle} = await import('../scripts/auction-keeper.mjs');
+        const startBlock = (await engine.deploymentTransaction().wait()).blockNumber;
+        const config = {chainId:84532, engine:engine.target, codeHash:reviewedPair.expectedCoreCodeHash, startBlock};
+        const store = openKeeperStore(':memory:',config);
+        const read = overrides => runKeeperCycle({provider,store,config,runnerUpPair:reviewedPair,...overrides});
+        try {
+            const deadline = await openOffer();
+            const lastBlock = await provider.getBlock('latest');
+            const partial = await read({config:{...config,logBlockRange:1,rangesPerCycle:1}});
+            assert.equal(partial.caughtUp,false);
+            assert.equal(partial.runnerUpOffers,null);
+            const result = await read();
+            assert.deepEqual(result.actions, []);
+            assert.equal(result.runnerUpOffers.blockHash,lastBlock.hash);
+            assert.equal(result.runnerUpOffers.nftAddress,nft.target.toLowerCase());
+            assert.deepEqual(result.runnerUpOffers.offers,[{auctionId:'1',artworkId:'1',runnerUp:runner.address.toLowerCase(),
+                priceWei:eth('0.1').toString(),deadline:String(deadline)}]);
+            assert.equal(await provider.getBlockNumber(),lastBlock.number);
+            await assert.rejects(read({executeLocal:true}), /read-only/);
+            await assert.rejects(read({submitter:{}}), /read-only/);
+            await assert.rejects(read({runnerUpPair:{...reviewedPair,expectedCoreCodeHash:ethers.ZeroHash}}), /differs/);
+            await assert.rejects(read({runnerUpPair:{...reviewedPair,expectedNftCodeHash:ethers.id('other code')}}), /runtime code mismatch/);
+            await mine(engine.connect(runner).declineRunnerUpOffer(id));
+            assert.deepEqual((await read()).runnerUpOffers.offers,[]);
+        } finally { store.close(); }
     });
 
     it('refunds returning bidders before default and honors only the runner-up’s last bid at the exact offer deadline', async () => {

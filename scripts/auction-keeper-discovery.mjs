@@ -47,6 +47,7 @@ export function openKeeperStore(filename, { chainId, engine, codeHash, startBloc
             );
             CREATE INDEX IF NOT EXISTS keeper_ready ON rounds(eligible,id) WHERE action <> 'unfunded';
             CREATE INDEX IF NOT EXISTS keeper_unfunded ON rounds(due) WHERE action = 'unfunded';
+            CREATE INDEX IF NOT EXISTS keeper_offer_ids ON rounds(length(id), id) WHERE action = 'expireRunnerUpOffer';
         `);
         persisted = db.prepare('SELECT * FROM checkpoint WHERE singleton=1').get();
         if (!persisted) {
@@ -73,6 +74,8 @@ export function openKeeperStore(filename, { chainId, engine, codeHash, startBloc
     const select = db.prepare(`SELECT id, action, due FROM rounds WHERE action <> 'unfunded' AND eligible<=?
         ORDER BY eligible,id LIMIT ?`);
     const defer = db.prepare(`UPDATE rounds SET eligible=? WHERE id=? AND action <> 'unfunded' AND eligible<?`);
+    const openOffers = db.prepare(`SELECT id FROM rounds WHERE action='expireRunnerUpOffer' AND due>?
+        AND (length(id),id)>(length(?),?) ORDER BY length(id),id LIMIT ?`);
     let cursor = { height: persisted.height, hash: persisted.hash };
     let active = false;
 
@@ -172,6 +175,26 @@ export function openKeeperStore(filename, { chainId, engine, codeHash, startBloc
     }
     return {
         sync,
+        offerCandidates(tip, afterId, limit) {
+            if (tip.number !== cursor.height || blockHash(tip.hash) !== cursor.hash) throw new Error('Offer checkpoint differs from requested block');
+            const timestamp = tip.timestamp;
+            integer(timestamp, 'offer timestamp');
+            integer(limit, 'offer page size', 1, 16);
+            if (typeof afterId !== 'string' || !/^(?:0|[1-9]\d{0,77})$/.test(afterId) ||
+                BigInt(afterId) >= 1n << 256n) throw new Error('Invalid offer cursor');
+            db.exec('BEGIN');
+            try {
+                const actual = db.prepare('SELECT height,hash FROM checkpoint WHERE singleton=1').get();
+                if (actual.height !== persisted.height || actual.hash !== persisted.hash) throw new Error('Another worker advanced the keeper database');
+                const page = openOffers.all(timestamp, afterId, afterId, limit + 1).map(row => row.id);
+                const ids = page.slice(0, limit);
+                db.exec('COMMIT');
+                return { ids, nextAfterAuction: page.length > limit ? ids.at(-1) : null };
+            } catch (error) {
+                db.exec('ROLLBACK');
+                throw error;
+            }
+        },
         ready(timestamp, limit) {
             integer(timestamp, 'due timestamp');
             integer(limit, 'due limit', 1, 1000);

@@ -5,6 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { Contract, FetchRequest, Interface, JsonRpcProvider, ZeroAddress, getAddress, keccak256 } from 'ethers';
 import { openKeeperStore } from './auction-keeper-discovery.mjs';
+import { readOrdinaryRunnerUpOffers } from '../src/indexer/nft-deployment-proof.js';
 
 const lifecycle = [null, 'closeAuction', 'finalizeDefault', 'expireRunnerUpOffer'];
 const abi = new Interface([
@@ -50,8 +51,13 @@ export function checkKeeperAgainstMainnetCustody(operator, register) {
     }
 }
 
-export async function runKeeperCycle({ provider, store, config, executeLocal = false, submitter }) {
+export async function runKeeperCycle({ provider, store, config, executeLocal = false, submitter, runnerUpPair, afterAuction = '0' }) {
     validateKeeperConfig(config);
+    if (runnerUpPair) {
+        check(!submitter && !executeLocal && [8453, 84532].includes(config.chainId), 'Runner-up observation requires read-only Base mode');
+        check(runnerUpPair.chainId === config.chainId && getAddress(runnerUpPair.coreAddress) === getAddress(config.engine) &&
+            runnerUpPair.expectedCoreCodeHash?.toLowerCase() === config.codeHash.toLowerCase(), 'Runner-up pair differs from keeper deployment');
+    }
     check(!submitter || (!executeLocal && config.chainId === 84532), 'Testnet submissions require Base Sepolia');
     check(BigInt(await provider.send('eth_chainId', [])) === BigInt(config.chainId), 'Keeper RPC chain mismatch');
     if (executeLocal) {
@@ -65,6 +71,18 @@ export async function runKeeperCycle({ provider, store, config, executeLocal = f
     check(code !== '0x' && keccak256(code) === config.codeHash.toLowerCase(), 'Keeper engine runtime mismatch');
     const progress = await store.sync(provider, tip.number, { blockRange: config.logBlockRange, maxRanges: config.rangesPerCycle });
     const actions = [];
+    if (runnerUpPair) {
+        if (!progress.caughtUp) return { ...progress, actions, runnerUpOffers: null };
+        const { ids, nextAfterAuction } = store.offerCandidates(tip, afterAuction, batchSize);
+        const listener = { chainId: config.chainId, contractAddress: config.engine, nftAddress: runnerUpPair.nftAddress,
+            _readRpcCall: read => read(provider) };
+        const page = await readOrdinaryRunnerUpOffers(listener, { ...runnerUpPair, blockNumber: tip.number, blockHash: tip.hash,
+            isCurrent: () => true }, ids);
+        const offers = page.offers.filter(offer => offer.status === 'open').map(({auctionId, artworkId, eligibleBuyer, priceWei, deadline}) =>
+            ({auctionId, artworkId, runnerUp: eligibleBuyer, priceWei, deadline}));
+        return { ...progress, actions, runnerUpOffers: {chainId:page.chainId, coreAddress:page.coreAddress, nftAddress:page.nftAddress,
+            blockNumber:page.blockNumber, blockHash:page.blockHash, offers, nextAfterAuction} };
+    }
     if (submitter) {
         const pending = await submitter.reconcile();
         if (pending) return { ...progress, actions: [pending] };
@@ -123,11 +141,21 @@ async function main() {
     const { values } = parseArgs({ options: {
         config: { type: 'string' }, state: { type: 'string' }, once: { type: 'boolean' },
         'local-execute': { type: 'boolean' }, 'testnet-execute': { type: 'boolean' }, outbox: { type: 'string' },
-        custody: { type: 'string' }
+        custody: { type: 'string' }, 'runner-up-pair': { type: 'string' }, 'after-auction': { type: 'string' }
     } });
     check(values.config && values.state, 'Supply --config <deployment.json> and --state <local.sqlite>');
     const config = JSON.parse(await readFile(values.config, 'utf8'));
     validateKeeperConfig(config);
+    const observeOffers = values['runner-up-pair'] !== undefined;
+    check(values['after-auction'] === undefined || observeOffers, '--after-auction requires --runner-up-pair');
+    let runnerUpPair;
+    if (observeOffers) {
+        check(values.once && !values['local-execute'] && !values['testnet-execute'],
+            'Runner-up observation requires --once and cannot execute');
+        check(values['runner-up-pair'], 'Supply a reviewed runner-up pair file');
+        runnerUpPair = JSON.parse(await readFile(values['runner-up-pair'], 'utf8'));
+        check(runnerUpPair && typeof runnerUpPair === 'object', 'Expected reviewed runner-up pair');
+    }
     const endpoint = process.env.ARTSOUL_KEEPER_RPC_URL;
     check(endpoint, 'Set ARTSOUL_KEEPER_RPC_URL');
     validateKeeperEndpoint(endpoint, config.chainId, values['local-execute']);
@@ -161,7 +189,8 @@ async function main() {
         while (!stop.signal.aborted) {
             let delay = 60000;
             try {
-                const result = await runKeeperCycle({ provider, store, config, executeLocal: values['local-execute'], submitter });
+                const result = await runKeeperCycle({ provider, store, config, executeLocal: values['local-execute'], submitter,
+                    runnerUpPair, afterAuction: values['after-auction'] });
                 const outcome = JSON.stringify([result.caughtUp, result.actions]);
                 if (values.once || failures || outcome !== lastOutcome || Date.now() - lastReportAt >= 3600000) {
                     console.log(JSON.stringify(result));
