@@ -29,10 +29,10 @@ function verifyBuild(build) {
 
 // Hardhat can combine unrelated sources in one build or produce several incremental builds.
 // Resolve exactly each candidate and its imports from the compiler's own AST.
-function replacementBuild(root) {
+function replacementBuild(root, targets) {
   const sources = {};
   let settings;
-  for (const [source, name] of replacementTargets) {
+  for (const [source, name] of targets) {
     const dir = path.join(root, 'artifacts', source);
     const debugFile = path.join(dir, name + '.dbg.json');
     const { buildInfo } = JSON.parse(fs.readFileSync(debugFile, 'utf8'));
@@ -61,11 +61,13 @@ function replacementBuild(root) {
 function main() {
   const [buildFile, compilerFile, outputFile, mode, ...extra] = process.argv.slice(2);
   assert(buildFile && compilerFile && outputFile && !extra.length && (!mode || mode === '--check'),
-    'Usage: node scripts/export-contract-storage.cjs <build-info.json|--replacement> <trusted-solc-executable> <output.json> [--check]');
+    'Usage: node scripts/export-contract-storage.cjs <build-info.json|--replacement|--ordinary> <trusted-solc-executable> <output.json> [--check]');
   const root = path.resolve(__dirname, '..');
-  const replacement = buildFile === '--replacement';
-  const targets = replacement ? replacementTargets : legacyTargets;
-  const build = replacement ? replacementBuild(root) : JSON.parse(fs.readFileSync(buildFile, 'utf8'));
+  const ordinary = buildFile === '--ordinary';
+  const replacement = ordinary || buildFile === '--replacement';
+  const targets = ordinary ? [['contracts/replacement/OrdinaryMarket.sol', 'OrdinaryMarket'], replacementTargets[0]]
+    : replacement ? replacementTargets : legacyTargets;
+  const build = replacement ? replacementBuild(root, targets) : JSON.parse(fs.readFileSync(buildFile, 'utf8'));
   if (!replacement) verifyBuild(build);
 
   // Reject stale artifacts instead of presenting an older build as current source.
@@ -125,7 +127,8 @@ function main() {
   const { outputSelection, ...settings } = build.input.settings;
   const artifact = {
     schemaVersion: 1,
-    scope: replacement ? 'Fresh-deployment candidates; abstract layouts are partial. No deployed state or in-place upgrade.'
+    scope: ordinary ? 'Concrete ordinary market and its paired NFT. Fresh deployments with no in-place storage migration.'
+      : replacement ? 'Fresh-deployment candidates; abstract layouts are partial. No deployed state or in-place upgrade.'
       : 'Current constructor-based source; not deployed state or upgrade compatibility',
     sourceNormalization: 'CRLF to LF; no other source transformations',
     compiler: build.solcLongVersion,

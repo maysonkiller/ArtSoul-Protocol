@@ -1,0 +1,961 @@
+{
+  "schemaVersion": 1,
+  "scope": "Concrete ordinary market and its paired NFT. Fresh deployments with no in-place storage migration.",
+  "sourceNormalization": "CRLF to LF; no other source transformations",
+  "compiler": "0.8.24+commit.e11b9ed9",
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "evmVersion": "paris"
+  },
+  "sources": {
+    "@openzeppelin/contracts/interfaces/IERC2981.sol": {
+      "sha256": "5bbbb6dfc9b0d248cc19f10e7a14fc7706138fbf3b63cea6655fd7968e1666e0"
+    },
+    "@openzeppelin/contracts/interfaces/draft-IERC6093.sol": {
+      "sha256": "4aea87243e6de38804bf8737bf86f750443d3b5e63dd0fd0b7ad92f77cdbd3e3"
+    },
+    "@openzeppelin/contracts/token/ERC721/ERC721.sol": {
+      "sha256": "94f07f843e2f541a5a000a6375a41345412c6d6da9316c547f39e0fe1f2447f7"
+    },
+    "@openzeppelin/contracts/token/ERC721/IERC721.sol": {
+      "sha256": "8239cba58986af2deb65af8092d5abcd4ffe60a38dee00cb2e8c6465f945c2d0"
+    },
+    "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol": {
+      "sha256": "ad84633afd30a71a888403875e2ca7db9e97499d258ccdd98f48dd7cea8229f5"
+    },
+    "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol": {
+      "sha256": "63d104c065c281e8d8e1fabe0eda19ff83d4660ce1378f9dad2471226d2bf34f"
+    },
+    "@openzeppelin/contracts/utils/Context.sol": {
+      "sha256": "9c1cc43aa4a2bde5c7dea0d4830cd42c54813ff883e55c8d8f12e6189bf7f10a"
+    },
+    "@openzeppelin/contracts/utils/Pausable.sol": {
+      "sha256": "6543160582b3c0319a180f31660faf6ba0a8444acbdb03357c09790a96256835"
+    },
+    "@openzeppelin/contracts/utils/ReentrancyGuard.sol": {
+      "sha256": "8d0bac508a25133c9ff80206f65164cef959ec084645d1e7b06050c2971ae0fc"
+    },
+    "@openzeppelin/contracts/utils/Strings.sol": {
+      "sha256": "0519199dbc635f98ce2e4537986604ee618bca665c65e9a1738702dfacf72010"
+    },
+    "@openzeppelin/contracts/utils/introspection/ERC165.sol": {
+      "sha256": "99348354365cbdeb90157e2903334b861a00d69faab7720ae542d911d5c70d87"
+    },
+    "@openzeppelin/contracts/utils/introspection/IERC165.sol": {
+      "sha256": "07ae1ac964ab74dedada999e2dfc642031a6495469cffc0bf715daa4f1e4f904"
+    },
+    "@openzeppelin/contracts/utils/math/Math.sol": {
+      "sha256": "a6ee779fc42e6bf01b5e6a963065706e882b016affbedfd8be19a71ea48e6e15"
+    },
+    "@openzeppelin/contracts/utils/math/SignedMath.sol": {
+      "sha256": "768c28e3a33c3312e57ae8a1caaec2893bc89ac6e386621de018f85e9a2d6e99"
+    },
+    "contracts/replacement/MarketplaceAdmissions.sol": {
+      "sha256": "adc7e6e7a06f367b626ac30ed19c8d3ee36adee97d54d087619f23497ed62e5b"
+    },
+    "contracts/replacement/OrdinaryArtAuctions.sol": {
+      "sha256": "d0c96078127d75b7d6398b3d0a6947e4ea3535010a320b6748c57ece9a203afd"
+    },
+    "contracts/replacement/OrdinaryArtResales.sol": {
+      "sha256": "bfcd1ee5fcae4d2dbefc8ffcc67b7a174eff53ed1286a4365af4198f79e9f284"
+    },
+    "contracts/replacement/OrdinaryMarket.sol": {
+      "sha256": "2e35fcccaa314e58045de4db54d6740b1cf97e7e46df1dd39518c5b5b8c05b03"
+    },
+    "contracts/replacement/OutbidRefunds.sol": {
+      "sha256": "c5aa307208654949528aa0db08f6c13b245a6016abb1bda0af6622f93513d9b1"
+    },
+    "contracts/replacement/SettledArtworkNFT.sol": {
+      "sha256": "c203cc2a06ffc228bb099aba5b89cc70d7111b883b4eb34ee6ef80cdc5d2c083"
+    },
+    "contracts/replacement/TreasuryBoundOrdinaryArt.sol": {
+      "sha256": "0cdb9a3a58c516c1aac6e5caac01b68e716caf3721f9e2b38d36154746f1822e"
+    }
+  },
+  "compilerInputSha256": "eff0a0d6f5026d6b4b5431c88b6c0bbd8c49b2d5f0b9b09b532dd36c8949388d",
+  "contracts": {
+    "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket": {
+      "storage": [
+        {
+          "astId": 1359,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "_paused",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_bool"
+        },
+        {
+          "astId": 1478,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "_status",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5570,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "refundQueues",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_mapping(t_uint256,t_struct(RefundQueue)5561_storage)"
+        },
+        {
+          "astId": 5574,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "credits",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 3003,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "_externalMarkets",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_mapping(t_address,t_struct(Admission)2998_storage)"
+        },
+        {
+          "astId": 3215,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "workCount",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 3217,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "auctionCount",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 3222,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "works",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_mapping(t_uint256,t_struct(Work)3169_storage)"
+        },
+        {
+          "astId": 3227,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "auctions",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_mapping(t_uint256,t_struct(Auction)3191_storage)"
+        },
+        {
+          "astId": 3232,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "runnerUpOffers",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_mapping(t_uint256,t_struct(RunnerUpOffer)3198_storage)"
+        },
+        {
+          "astId": 4715,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "resaleListings",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_mapping(t_uint256,t_struct(Listing)4710_storage)"
+        },
+        {
+          "astId": 6632,
+          "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+          "label": "marketplaceAdmissionReadyAt",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_mapping(t_address,t_uint256)"
+        }
+      ],
+      "types": {
+        "t_address": {
+          "encoding": "inplace",
+          "label": "address",
+          "numberOfBytes": "20"
+        },
+        "t_array(t_struct(Refund)5554_storage)dyn_storage": {
+          "base": "t_struct(Refund)5554_storage",
+          "encoding": "dynamic_array",
+          "label": "struct OutbidRefunds.Refund[]",
+          "numberOfBytes": "32"
+        },
+        "t_bool": {
+          "encoding": "inplace",
+          "label": "bool",
+          "numberOfBytes": "1"
+        },
+        "t_bytes32": {
+          "encoding": "inplace",
+          "label": "bytes32",
+          "numberOfBytes": "32"
+        },
+        "t_enum(State)3155": {
+          "encoding": "inplace",
+          "label": "enum OrdinaryArtAuctions.State",
+          "numberOfBytes": "1"
+        },
+        "t_mapping(t_address,t_struct(Admission)2998_storage)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => struct MarketplaceAdmissions.Admission)",
+          "numberOfBytes": "32",
+          "value": "t_struct(Admission)2998_storage"
+        },
+        "t_mapping(t_address,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_mapping(t_uint256,t_struct(Auction)3191_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct OrdinaryArtAuctions.Auction)",
+          "numberOfBytes": "32",
+          "value": "t_struct(Auction)3191_storage"
+        },
+        "t_mapping(t_uint256,t_struct(Listing)4710_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct OrdinaryArtResales.Listing)",
+          "numberOfBytes": "32",
+          "value": "t_struct(Listing)4710_storage"
+        },
+        "t_mapping(t_uint256,t_struct(RefundQueue)5561_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct OutbidRefunds.RefundQueue)",
+          "numberOfBytes": "32",
+          "value": "t_struct(RefundQueue)5561_storage"
+        },
+        "t_mapping(t_uint256,t_struct(RunnerUpOffer)3198_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct OrdinaryArtAuctions.RunnerUpOffer)",
+          "numberOfBytes": "32",
+          "value": "t_struct(RunnerUpOffer)3198_storage"
+        },
+        "t_mapping(t_uint256,t_struct(Work)3169_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => struct OrdinaryArtAuctions.Work)",
+          "numberOfBytes": "32",
+          "value": "t_struct(Work)3169_storage"
+        },
+        "t_string_storage": {
+          "encoding": "bytes",
+          "label": "string",
+          "numberOfBytes": "32"
+        },
+        "t_struct(Admission)2998_storage": {
+          "encoding": "inplace",
+          "label": "struct MarketplaceAdmissions.Admission",
+          "members": [
+            {
+              "astId": 2995,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "generation",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_uint64"
+            },
+            {
+              "astId": 2997,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "active",
+              "offset": 8,
+              "slot": "0",
+              "type": "t_bool"
+            }
+          ],
+          "numberOfBytes": "32"
+        },
+        "t_struct(Auction)3191_storage": {
+          "encoding": "inplace",
+          "label": "struct OrdinaryArtAuctions.Auction",
+          "members": [
+            {
+              "astId": 3171,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "artworkId",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3173,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "startPrice",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3175,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "originalEnd",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3177,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "end",
+              "offset": 0,
+              "slot": "3",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3179,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "deadline",
+              "offset": 0,
+              "slot": "4",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3181,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "highestBidder",
+              "offset": 0,
+              "slot": "5",
+              "type": "t_address"
+            },
+            {
+              "astId": 3183,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "price",
+              "offset": 0,
+              "slot": "6",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3185,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "deposit",
+              "offset": 0,
+              "slot": "7",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3188,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "state",
+              "offset": 0,
+              "slot": "8",
+              "type": "t_enum(State)3155"
+            },
+            {
+              "astId": 3190,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "firstCollector",
+              "offset": 1,
+              "slot": "8",
+              "type": "t_address"
+            }
+          ],
+          "numberOfBytes": "288"
+        },
+        "t_struct(Listing)4710_storage": {
+          "encoding": "inplace",
+          "label": "struct OrdinaryArtResales.Listing",
+          "members": [
+            {
+              "astId": 4703,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "version",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4705,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "seller",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_address"
+            },
+            {
+              "astId": 4707,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "price",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 4709,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "authorization",
+              "offset": 0,
+              "slot": "3",
+              "type": "t_bytes32"
+            }
+          ],
+          "numberOfBytes": "128"
+        },
+        "t_struct(Refund)5554_storage": {
+          "encoding": "inplace",
+          "label": "struct OutbidRefunds.Refund",
+          "members": [
+            {
+              "astId": 5551,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "creditor",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_address"
+            },
+            {
+              "astId": 5553,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "amount",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_uint256"
+            }
+          ],
+          "numberOfBytes": "64"
+        },
+        "t_struct(RefundQueue)5561_storage": {
+          "encoding": "inplace",
+          "label": "struct OutbidRefunds.RefundQueue",
+          "members": [
+            {
+              "astId": 5558,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "entries",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_array(t_struct(Refund)5554_storage)dyn_storage"
+            },
+            {
+              "astId": 5560,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "cursor",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_uint256"
+            }
+          ],
+          "numberOfBytes": "64"
+        },
+        "t_struct(RunnerUpOffer)3198_storage": {
+          "encoding": "inplace",
+          "label": "struct OrdinaryArtAuctions.RunnerUpOffer",
+          "members": [
+            {
+              "astId": 3193,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "bidder",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_address"
+            },
+            {
+              "astId": 3195,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "price",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3197,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "deadline",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_uint256"
+            }
+          ],
+          "numberOfBytes": "96"
+        },
+        "t_struct(Work)3169_storage": {
+          "encoding": "inplace",
+          "label": "struct OrdinaryArtAuctions.Work",
+          "members": [
+            {
+              "astId": 3162,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "creator",
+              "offset": 0,
+              "slot": "0",
+              "type": "t_address"
+            },
+            {
+              "astId": 3164,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "metadataURI",
+              "offset": 0,
+              "slot": "1",
+              "type": "t_string_storage"
+            },
+            {
+              "astId": 3166,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "activeAuction",
+              "offset": 0,
+              "slot": "2",
+              "type": "t_uint256"
+            },
+            {
+              "astId": 3168,
+              "contract": "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket",
+              "label": "floor",
+              "offset": 0,
+              "slot": "3",
+              "type": "t_uint256"
+            }
+          ],
+          "numberOfBytes": "128"
+        },
+        "t_uint256": {
+          "encoding": "inplace",
+          "label": "uint256",
+          "numberOfBytes": "32"
+        },
+        "t_uint64": {
+          "encoding": "inplace",
+          "label": "uint64",
+          "numberOfBytes": "8"
+        }
+      },
+      "immutables": [
+        {
+          "name": "protocolTreasury",
+          "declaredIn": "contracts/replacement/TreasuryBoundOrdinaryArt.sol:TreasuryBoundOrdinaryArt",
+          "type": "address",
+          "astId": 6621,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 1735
+            },
+            {
+              "length": 32,
+              "start": 11184
+            },
+            {
+              "length": 32,
+              "start": 12973
+            }
+          ]
+        },
+        {
+          "name": "ecosystemTreasury",
+          "declaredIn": "contracts/replacement/TreasuryBoundOrdinaryArt.sol:TreasuryBoundOrdinaryArt",
+          "type": "address",
+          "astId": 6623,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 723
+            },
+            {
+              "length": 32,
+              "start": 13006
+            }
+          ]
+        },
+        {
+          "name": "adminSecurity",
+          "declaredIn": "contracts/replacement/TreasuryBoundOrdinaryArt.sol:TreasuryBoundOrdinaryArt",
+          "type": "address",
+          "astId": 6625,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 2316
+            },
+            {
+              "length": 32,
+              "start": 7029
+            },
+            {
+              "length": 32,
+              "start": 7096
+            },
+            {
+              "length": 32,
+              "start": 8173
+            },
+            {
+              "length": 32,
+              "start": 10108
+            },
+            {
+              "length": 32,
+              "start": 10175
+            },
+            {
+              "length": 32,
+              "start": 12027
+            },
+            {
+              "length": 32,
+              "start": 12304
+            }
+          ]
+        },
+        {
+          "name": "nft",
+          "declaredIn": "contracts/replacement/OrdinaryArtAuctions.sol:OrdinaryArtAuctions",
+          "type": "contract SettledArtworkNFT",
+          "astId": 3201,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 1142
+            },
+            {
+              "length": 32,
+              "start": 4646
+            },
+            {
+              "length": 32,
+              "start": 6260
+            },
+            {
+              "length": 32,
+              "start": 6494
+            },
+            {
+              "length": 32,
+              "start": 7507
+            },
+            {
+              "length": 32,
+              "start": 10350
+            },
+            {
+              "length": 32,
+              "start": 11720
+            },
+            {
+              "length": 32,
+              "start": 11836
+            },
+            {
+              "length": 32,
+              "start": 13226
+            }
+          ]
+        },
+        {
+          "name": "refundBatchLimit",
+          "declaredIn": "contracts/replacement/OutbidRefunds.sol:OutbidRefunds",
+          "type": "uint256",
+          "astId": 5563,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 910
+            },
+            {
+              "length": 32,
+              "start": 3279
+            }
+          ]
+        },
+        {
+          "name": "refundTransferGas",
+          "declaredIn": "contracts/replacement/OutbidRefunds.sol:OutbidRefunds",
+          "type": "uint256",
+          "astId": 5565,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 1555
+            },
+            {
+              "length": 32,
+              "start": 3599
+            }
+          ]
+        }
+      ]
+    },
+    "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT": {
+      "storage": [
+        {
+          "astId": 189,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_name",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 191,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_symbol",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 195,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_owners",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 199,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_balances",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 203,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_tokenApprovals",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 209,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_operatorApprovals",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_mapping(t_address,t_mapping(t_address,t_bool))"
+        },
+        {
+          "astId": 5958,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "totalSupply",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5962,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "artworkToToken",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 5966,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "auctionToToken",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 5970,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "tokenToArtwork",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 5974,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "tokenCreator",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 5978,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "firstCollector",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_mapping(t_uint256,t_address)"
+        },
+        {
+          "astId": 5982,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "transferEpoch",
+          "offset": 0,
+          "slot": "12",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 5986,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_metadataURIs",
+          "offset": 0,
+          "slot": "13",
+          "type": "t_mapping(t_uint256,t_string_storage)"
+        },
+        {
+          "astId": 5990,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_coreTokenRevocations",
+          "offset": 0,
+          "slot": "14",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 5994,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_coreOperatorRevocations",
+          "offset": 0,
+          "slot": "15",
+          "type": "t_mapping(t_address,t_uint256)"
+        },
+        {
+          "astId": 5998,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_tokenGrantGenerationMinusOne",
+          "offset": 0,
+          "slot": "16",
+          "type": "t_mapping(t_uint256,t_uint256)"
+        },
+        {
+          "astId": 6004,
+          "contract": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "label": "_operatorGrantGenerationMinusOne",
+          "offset": 0,
+          "slot": "17",
+          "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))"
+        }
+      ],
+      "types": {
+        "t_address": {
+          "encoding": "inplace",
+          "label": "address",
+          "numberOfBytes": "20"
+        },
+        "t_bool": {
+          "encoding": "inplace",
+          "label": "bool",
+          "numberOfBytes": "1"
+        },
+        "t_mapping(t_address,t_bool)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => bool)",
+          "numberOfBytes": "32",
+          "value": "t_bool"
+        },
+        "t_mapping(t_address,t_mapping(t_address,t_bool))": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => mapping(address => bool))",
+          "numberOfBytes": "32",
+          "value": "t_mapping(t_address,t_bool)"
+        },
+        "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => mapping(address => uint256))",
+          "numberOfBytes": "32",
+          "value": "t_mapping(t_address,t_uint256)"
+        },
+        "t_mapping(t_address,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_address",
+          "label": "mapping(address => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_mapping(t_uint256,t_address)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => address)",
+          "numberOfBytes": "32",
+          "value": "t_address"
+        },
+        "t_mapping(t_uint256,t_string_storage)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => string)",
+          "numberOfBytes": "32",
+          "value": "t_string_storage"
+        },
+        "t_mapping(t_uint256,t_uint256)": {
+          "encoding": "mapping",
+          "key": "t_uint256",
+          "label": "mapping(uint256 => uint256)",
+          "numberOfBytes": "32",
+          "value": "t_uint256"
+        },
+        "t_string_storage": {
+          "encoding": "bytes",
+          "label": "string",
+          "numberOfBytes": "32"
+        },
+        "t_uint256": {
+          "encoding": "inplace",
+          "label": "uint256",
+          "numberOfBytes": "32"
+        }
+      },
+      "immutables": [
+        {
+          "name": "core",
+          "declaredIn": "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT",
+          "type": "contract ISettledArtworkSource",
+          "astId": 5956,
+          "bytecodeReferences": [
+            {
+              "length": 32,
+              "start": 1025
+            },
+            {
+              "length": 32,
+              "start": 1505
+            },
+            {
+              "length": 32,
+              "start": 1827
+            },
+            {
+              "length": 32,
+              "start": 1992
+            },
+            {
+              "length": 32,
+              "start": 2691
+            },
+            {
+              "length": 32,
+              "start": 3117
+            },
+            {
+              "length": 32,
+              "start": 3459
+            },
+            {
+              "length": 32,
+              "start": 3955
+            },
+            {
+              "length": 32,
+              "start": 4469
+            },
+            {
+              "length": 32,
+              "start": 4553
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

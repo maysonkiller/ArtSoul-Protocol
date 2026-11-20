@@ -84,13 +84,12 @@ async function toggle(button) {
   if (!item || button.disabled) return;
   const key = savedKey(item);
   if (operations.has(key)) return;
-  const operation = Symbol();
-  operations.set(key, operation);
-  const revision = walletRevision;
   const before = currentSavedWallet();
+  const operation = { wallet: before };
+  operations.set(key, operation);
+  const switched = () => operations.get(key) !== operation || (operation.wallet && operation.wallet !== currentSavedWallet());
   button.disabled = true;
   try {
-    const switched = () => before && (before !== currentSavedWallet() || revision !== walletRevision);
     let known = before && savedStore.getState().saved.has(key);
     if (before && !known && savedStore.getState().status !== 'auth') known = await savedStore.lookup([item]);
     if (switched()) return;
@@ -102,6 +101,7 @@ async function toggle(button) {
       notice('Sign a wallet message to access your private Favorites. No gas fee.');
       if (!await signInForSaved()) { if (!switched()) notice('Sign in to update your Favorites.'); return; }
       if (switched()) return;
+      operation.wallet = currentSavedWallet();
       if (value === undefined) {
         if (!await savedStore.lookup([item])) { if (!switched()) notice('Favorites are unavailable. Please try again.'); return; }
         value = !savedStore.getState().saved.get(key);
@@ -109,9 +109,10 @@ async function toggle(button) {
       if (switched()) return;
       ok = await savedStore.set(item, value);
     }
+    if (switched()) return;
     if (ok) notice(value ? 'Artwork added to Favorites.' : 'Artwork removed from Favorites.', true);
-    else if (before === currentSavedWallet()) notice('Favorites could not be updated. Please try again.');
-  } catch { notice('Sign-in was not completed. Please try again.'); }
+    else notice('Favorites could not be updated. Please try again.');
+  } catch { if (!switched()) notice('Sign-in was not completed. Please try again.'); }
   finally { if (operations.get(key) === operation) operations.delete(key); paint(); }
 }
 // Commands express a desired state, never a toggle. They use the existing
@@ -130,7 +131,7 @@ export async function setSavedArtwork(artworkId, value) {
   const key = savedKey(item);
   if (!config.enabled || !key) return failure('Favorites are unavailable. Please try again.');
   if (operations.has(key) || savedStore.getState().pending.has(key)) return failure('This artwork is being updated. Wait for it to finish, then repeat the command.');
-  const operation = Symbol();
+  const operation = { wallet };
   operations.set(key, operation);
   paint();
   try {
@@ -145,7 +146,15 @@ export async function setSavedArtwork(artworkId, value) {
 window.ArtSoulSaved = { toggle, scheduleScan, setArtwork: setSavedArtwork };
 const invalidate = event => {
   contextRevision++;
-  if (event?.type === 'artsoul:wallet-state-changed') { walletRevision++; operations.clear(); }
+  if (event?.type === 'artsoul:wallet-state-changed') {
+    walletRevision++;
+    const wallet = currentSavedWallet();
+    for (const [key, operation] of operations) {
+      // The initial connection belongs to the guest's pending click.
+      if (!operation.wallet) operation.wallet = wallet;
+      else if (operation.wallet !== wallet) operations.delete(key);
+    }
+  }
   requested.clear(); savedStore.invalidate();
   document.getElementById('saved-feedback')?.remove();
   if (event?.type !== 'pagehide') scheduleScan();

@@ -14,6 +14,8 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         return (await new ethers.ContractFactory(abi, bytecode, deployer).deploy(...args)).waitForDeployment();
     }
 
+    const deployMarket = (...roles) => deploy('OrdinaryMarket', ...roles, 2, 30_000);
+
     async function rejects(operation, name) {
         await assert.rejects(operation, error => {
             const data = error.data ?? error.error?.data;
@@ -28,24 +30,33 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         provider.pollingInterval = 10;
         [deployer, artist, collector, buyer] = await provider.listAccounts();
         protocol = await deploy('TreasuryAccountStub', 2);
-        ecosystem = await deploy('TreasuryAccountStub', 3);
+        ecosystem = await deploy('TreasuryAccountStub', 2);
         security = await deploy('TreasuryAccountStub', 2);
-        engine = await deploy('TreasuryBindingFixture', protocol.target, ecosystem.target, security.target);
+        engine = await deployMarket(protocol.target, ecosystem.target, security.target);
     });
 
-    it('requires three distinct deployed accounts with multi-party thresholds', async () => {
+    it('requires three distinct two-of-three accounts and explicit refund limits at creation', async () => {
         assert.deepEqual([await engine.protocolTreasury(), await engine.ecosystemTreasury(), await engine.adminSecurity()],
             [protocol.target, ecosystem.target, security.target]);
         const single = await deploy('TreasuryAccountStub', 1);
+        const three = await deploy('TreasuryAccountStub', 3);
+        const fourOwners = await deploy('TreasuryAccountStub', 2);
+        await mine(fourOwners.addOwner(buyer.address));
         for (const index of [0, 1, 2]) {
             const roles = [protocol.target, ecosystem.target, security.target];
-            for (const invalid of [ethers.ZeroAddress, deployer.address, single.target]) {
+            for (const invalid of [ethers.ZeroAddress, deployer.address, single.target, three.target, fourOwners.target]) {
                 roles[index] = invalid;
-                await rejects(deploy('TreasuryBindingFixture', ...roles), 'InvalidMultisig');
+                await rejects(deployMarket(...roles), 'InvalidMultisig');
             }
             roles[index] = roles[(index + 1) % 3];
-            await rejects(deploy('TreasuryBindingFixture', ...roles), 'OverlappingSafeRoles');
+            await rejects(deployMarket(...roles), 'OverlappingSafeRoles');
         }
+        const safes = [protocol.target, ecosystem.target, security.target];
+        for (const limits of [[0, 30_000], [2, 0]]) {
+            await rejects(deploy('OrdinaryMarket', ...safes, ...limits), 'InvalidRefundLimits');
+        }
+        assert.equal(await engine.refundBatchLimit(), 2n);
+        assert.equal(await engine.refundTransferGas(), 30_000n);
     });
 
     it('reserves both entry-pause directions for the bound governance account with a current quorum', async () => {
@@ -170,7 +181,7 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
 
         const firstPayment = await openAndBid(engine, collector, firstPrice, 'ipfs://first-pair-work');
         const nextSecurity = await deploy('TreasuryAccountStub', 2);
-        const next = await deploy('TreasuryBindingFixture', protocol.target, ecosystem.target, nextSecurity.target);
+        const next = await deployMarket(protocol.target, ecosystem.target, nextSecurity.target);
         const secondPayment = await openAndBid(next, buyer, secondPrice, 'ipfs://second-pair-work');
         await mine(nextSecurity.setPause(next.target, true));
         assert.equal(await next.paused(), true);
@@ -204,6 +215,7 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
     });
 
     it('matches largest remainders in role order for all price residues and full-width prices', async () => {
+        const quotes = await deploy('TreasuryBindingFixture', protocol.target, ecosystem.target, security.target);
         function expectedShares(amount, weights) {
             const denominator = weights.reduce((sum, weight) => sum + weight, 0n);
             const shares = weights.map(weight => amount * weight / denominator);
@@ -216,7 +228,7 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         const amounts = Array.from({ length: 200 }, (_, i) => BigInt(i));
         amounts.push(1n << 255n, ethers.MaxUint256 - 199n, ethers.MaxUint256 - 1n, ethers.MaxUint256);
         for (const amount of amounts) {
-            const [primary, penalty, resale] = await engine.payoutQuotes(amount);
+            const [primary, penalty, resale] = await quotes.payoutQuotes(amount);
             assert.deepEqual([amount - primary, primary], expectedShares(amount, [39n, 1n]), String(amount));
             assert.deepEqual([amount - penalty, penalty], expectedShares(amount, [4n, 1n]), String(amount));
             assert.deepEqual([...resale], expectedShares(amount, [185n, 11n, 2n, 2n]), String(amount));

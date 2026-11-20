@@ -16,18 +16,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
 import { SUPPORTED_INDEXER_CHAINS } from '../src/indexer/chain-config.js';
-import { buildSnapshot, EXPORTED_TABLES, SNAPSHOT_SCHEMA_VERSION } from '../src/snapshot/snapshot-a.js';
-
-function validCutOff(value) {
-    const match = /^(\d{4}-\d\d-\d\d)T(\d\d):\d\d:\d\d(?:\.(\d{1,6}))?(?:Z|[+-](\d\d):?\d\d)$/i.exec(value || '');
-    if (!match || !Number.isFinite(Date.parse(value))) return false;
-    const [, day, hour, fraction = '', offsetHour = '00'] = match;
-    // Date.parse rolls invalid month-end days forward and truncates sub-millisecond
-    // fractions. PostgreSQL also requires AD years and offsets below sixteen hours.
-    const midnight = new Date(day + 'T00:00:00Z');
-    return !day.startsWith('0000-') && midnight.toISOString().slice(0, 10) === day &&
-        Number(offsetHour) < 16 && (hour !== '24' || !/[1-9]/.test(fraction));
-}
+import { buildSnapshot, captureCutOffMicros, EXPORTED_TABLES, SNAPSHOT_SCHEMA_VERSION } from '../src/snapshot/snapshot-a.js';
 
 const hashText = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
@@ -82,7 +71,7 @@ async function main() {
 
     if (chainId !== baseSepolia) throw new Error(`Snapshot A capture requires Base Sepolia (chain ${baseSepolia})`);
     if (fs.existsSync(outDir)) throw new Error('Output directory already exists; choose a new directory');
-    if (!validCutOff(cutOff)) {
+    if (captureCutOffMicros(cutOff) === null) {
         throw new Error('An explicit ISO-8601 --cut-off with a time zone and at most six fractional digits is required');
     }
     if (!connectionString) throw new Error('DATABASE_URL is required');

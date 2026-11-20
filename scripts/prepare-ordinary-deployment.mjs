@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url';
 import { Interface, ZeroAddress, concat, dataLength, getAddress, getCreateAddress, isAddress, isHexString, keccak256, toQuantity } from 'ethers';
 
 const roleNames = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
+const sourceName = 'contracts/replacement/OrdinaryMarket.sol';
+const contractName = 'OrdinaryMarket';
 const maxRuntimeBytes = 24_576; // EIP-170
 const maxInitCodeBytes = 49_152; // EIP-3860, including encoded constructor arguments
 class ReviewError extends Error {}
@@ -17,11 +19,8 @@ export function prepareOrdinaryDeployment(artifact, review, custody) {
     requireReview(Number.isSafeInteger(nonce) && nonce >= 0, 'Supply the exact nonnegative deployment nonce');
     requireReview(isAddress(review.payer) && getAddress(review.payer) !== ZeroAddress, 'Supply a deployment payer');
     const payer = getAddress(review.payer);
-    const contractName = artifact.contractName;
-    requireReview(typeof contractName === 'string' && /^[A-Za-z][A-Za-z0-9_]*$/.test(contractName) &&
-        /^contracts\/replacement\/[A-Za-z][A-Za-z0-9_]*\.sol$/.test(artifact.sourceName) &&
-        !/fixture|harness|mock|stub/i.test(contractName + ':' + artifact.sourceName) &&
-        review.contract === artifact.sourceName + ':' + contractName, 'Expected the reviewed qualified production Core artifact');
+    requireReview(artifact.sourceName === sourceName && artifact.contractName === contractName &&
+        review.contract === sourceName + ':' + contractName, 'Expected the reviewed qualified production Core artifact');
     requireReview(isHexString(artifact.bytecode, true) && artifact.bytecode !== '0x', 'Expected nonempty linked creation bytecode');
     requireReview(isHexString(artifact.deployedBytecode, true) && artifact.deployedBytecode !== '0x', 'Expected nonempty linked runtime bytecode');
     const runtimeTemplateBytes = dataLength(artifact.deployedBytecode);
@@ -36,21 +35,23 @@ export function prepareOrdinaryDeployment(artifact, review, custody) {
         requireReview(Array.isArray(account.owners) && account.owners.length > 0 && account.owners.every(isAddress),
             'Missing reviewed owners for ' + role);
         requireReview(!account.owners.some(owner => getAddress(owner) === payer), 'The deployment payer is an active Safe owner');
+        const owners = account.owners.map(getAddress);
+        requireReview(account.threshold === 2 && owners.length === 3 && new Set(owners).size === 3 &&
+            !owners.includes(ZeroAddress), 'Expected three distinct Safe owners and two confirmations for ' + role);
     }
     requireReview(new Set([payer, ...Object.values(roles)]).size === 4, 'Use three distinct Safes and a separate payer');
 
     const abi = new Interface(artifact.abi);
     requireReview(Array.isArray(review.constructorArgs) && review.constructorArgs.length === abi.deploy.inputs.length,
         'The constructor argument count differs from the artifact');
-    const seen = [];
-    const values = review.constructorArgs.map((value, index) => {
-        const role = typeof value === 'string' && value.startsWith('$') ? value.slice(1) : null;
-        if (!roleNames.includes(role)) return value;
-        requireReview(abi.deploy.inputs[index].type === 'address', 'A Safe reference must occupy an address argument');
-        seen.push(role);
-        return roles[role];
-    });
-    requireReview(seen.join() === roleNames.join(), 'Use each custody reference once in protocol, ecosystem, security order');
+    requireReview(abi.deploy.inputs.map(input => input.type).join() === 'address,address,address,uint256,uint256',
+        'Expected three address arguments and two refund limits');
+    requireReview(roleNames.every((role, index) => review.constructorArgs[index] === '$' + role),
+        'Use each custody reference once in protocol, ecosystem, security order');
+    const limits = review.constructorArgs.slice(3);
+    requireReview(limits.every(value => (typeof value === 'string' && /^[1-9]\d*$/.test(value)) ||
+        (Number.isSafeInteger(value) && value > 0)), 'Supply two positive integer refund limits');
+    const values = [...roleNames.map(role => roles[role]), ...limits];
     const data = concat([artifact.bytecode, abi.encodeDeploy(values)]);
     const initCodeBytes = dataLength(data);
     requireReview(initCodeBytes <= maxInitCodeBytes, 'Full Core initcode exceeds the EIP-3860 limit of 49152 bytes');

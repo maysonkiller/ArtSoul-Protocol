@@ -18,15 +18,15 @@ function setup() {
     const artifact = {
         contractName: 'OrdinaryMarket', sourceName: 'contracts/replacement/OrdinaryMarket.sol',
         bytecode: '0x600160005260206000f3', deployedBytecode: '0x' + '00'.repeat(31) + '01',
-        abi: ['constructor(address protocol, address ecosystem, address security, uint256 limit)']
+        abi: ['constructor(address protocol, address ecosystem, address security, uint256 limit, uint256 transferGas)']
     };
     const custody = { chainId: 84532 };
     const roles = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
-    for (const [i, role] of roles.entries()) custody[role] = { address: addr(i + 1), owners: [addr(10), addr(11), addr(12)] };
+    for (const [i, role] of roles.entries()) custody[role] = { address: addr(i + 1), threshold: 2, owners: [addr(10), addr(11), addr(12)] };
     const review = {
         chainId: 84532, nonce: 5, payer, expectedCore, expectedNFT, contract: artifact.sourceName + ':' + artifact.contractName,
-        constructorArgs: ['$protocolTreasury', '$ecosystemTreasury', '$adminSecurity', '4'],
-        initCodeHash: '0xb23df02aa94fb724bc4917bf4bf6c578fee819de3b9a659e290f20861c682e27'
+        constructorArgs: ['$protocolTreasury', '$ecosystemTreasury', '$adminSecurity', '4', '30000'],
+        initCodeHash: '0xfcc7b5e7f00faa6a361417fe7a67ded5077e8741609b7663e5bcae4ed4630369'
     };
     return { artifact, custody, review };
 }
@@ -38,7 +38,7 @@ test('builds a zero-value unsigned creation request and predicts the nested NFT 
         const plan = prepareOrdinaryDeployment(artifact, review, custody);
         assert.deepEqual(plan.transaction, {
             from: payer, to: null, chainId: '0x' + chainId.toString(16), nonce: '0x5', value: '0x0',
-            data: artifact.bytecode + [1, 2, 3, 4].map(n => n.toString(16).padStart(64, '0')).join('')
+            data: artifact.bytecode + [1, 2, 3, 4, 30000].map(n => n.toString(16).padStart(64, '0')).join('')
         });
         assert.equal(plan.core, expectedCore);
         assert.equal(plan.nft, expectedNFT);
@@ -66,7 +66,7 @@ test('the public CLI prints the reviewed request and withholds output on a hash 
 
 test('enforces both size limits at the byte boundary including the encoded constructor arguments', () => {
     const { artifact, review, custody } = setup();
-    const args = [1, 2, 3, 4].map(n => n.toString(16).padStart(64, '0')).join('');
+    const args = [1, 2, 3, 4, 30000].map(n => n.toString(16).padStart(64, '0')).join('');
     artifact.bytecode = '0x' + '00'.repeat(49_152 - args.length / 2);
     artifact.deployedBytecode = '0x' + '00'.repeat(24_576);
     review.initCodeHash = keccak256(artifact.bytecode + args);
@@ -94,10 +94,17 @@ test('requires an independently matching build, constructor, custody and deploym
         [s => { s.review.constructorArgs[3] = '5'; }, /differs from the independent review/],
         [s => { s.review.constructorArgs.pop(); }, /argument count/],
         [s => { s.review.constructorArgs[0] = '$ecosystemTreasury'; }, /each custody reference/],
-        [s => { s.artifact.abi = ['constructor(uint256,address,address,uint256)']; }, /address argument/],
+        [s => { s.artifact.abi = ['constructor(uint256,address,address,uint256,uint256)']; }, /address argument/],
+        [s => { s.review.constructorArgs[3] = '0'; }, /positive integer refund limits/],
+        [s => { s.review.constructorArgs[4] = Number.MAX_SAFE_INTEGER + 1; }, /positive integer refund limits/],
+        [s => { s.artifact.contractName = 'OrdinaryArtDonations'; s.artifact.sourceName = 'contracts/replacement/OrdinaryArtDonations.sol';
+            s.review.contract = s.artifact.sourceName + ':' + s.artifact.contractName; }, /qualified production Core/],
         [s => { s.custody.protocolTreasury.address = addr(21); }, /differs from the independent review/],
         [s => { s.custody.adminSecurity.address = addr(2); }, /distinct Safes/],
         [s => { s.custody.adminSecurity.owners = [payer]; }, /active Safe owner/],
+        [s => { s.custody.ecosystemTreasury.threshold = 1; }, /two confirmations/],
+        [s => { s.custody.adminSecurity.owners[1] = s.custody.adminSecurity.owners[0]; }, /distinct Safe owners/],
+        [s => { s.custody.protocolTreasury.owners[1] = addr(0); }, /distinct Safe owners/],
         [s => { s.review.payer = addr(1); }, /separate payer/],
         [s => { s.review.payer = addr(15); }, /reviewed address/],
         [s => { s.review.nonce++; }, /reviewed address/],

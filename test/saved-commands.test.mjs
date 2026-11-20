@@ -187,6 +187,45 @@ test('card favorites reuse the server session and retry an expired write once wi
   assert.equal(button['aria-pressed'], 'false');
 });
 
+test('connecting from a guest keeps the clicked card locked until its first save is confirmed', async () => {
+  const signIn = deferred(), h = harness({ wallet: '', authenticate: () => signIn.promise });
+  await h.savedConfig;
+  const button = h.button();
+  const first = h.window.ArtSoulSaved.toggle(button);
+  h.wallet(A);
+  await tick();
+  assert.equal(button.disabled, true, 'connecting the wallet is part of the same click');
+  await h.window.ArtSoulSaved.toggle(button);
+  assert.equal(h.signIns, 1);
+  // The normal scan may request membership as soon as the wallet connects.
+  h.reply(0, { wallet: A, chainId: 84532, coreAddress: CORE, artworkIds: [] });
+  signIn.resolve(true);
+  await tick();
+  h.reply(1, { wallet: A, chainId: 84532, coreAddress: CORE, artworkIds: [] });
+  await tick();
+  h.reply(2, { wallet: A, saved: true });
+  await first;
+  assert.equal(button['aria-pressed'], 'true');
+  assert.equal(button.disabled, false);
+  assert.equal(h.calls.filter(call => call.options.method === 'PUT').length, 1);
+});
+
+test('a guest save stops when the first connected wallet is replaced during sign-in', async () => {
+  const signIn = deferred(), h = harness({ wallet: '', authenticate: () => signIn.promise });
+  await h.savedConfig;
+  const button = h.button(), first = h.window.ArtSoulSaved.toggle(button);
+  h.wallet(A);
+  h.wallet(B);
+  await tick();
+  const scans = h.calls.length;
+  signIn.resolve(true);
+  await tick();
+  assert.equal(h.calls.length, scans, 'the earlier click must not continue using the second wallet');
+  await first;
+  assert.equal(button.disabled, false);
+  assert.equal(h.calls.some(call => call.options.method === 'PUT'), false);
+});
+
 test('a write from the Saved list blocks a command through the same store pending state', async () => {
   const h = harness();
   await h.savedConfig;
