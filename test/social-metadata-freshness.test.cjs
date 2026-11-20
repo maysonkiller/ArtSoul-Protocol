@@ -23,7 +23,12 @@ test('the server-rendered OG and X metadata matches the current product on all s
         assert.equal(tag(html, 'name', 'twitter:description'), desc, page);
         assert.doesNotMatch(html, /Discover digital art through auctions, collector conviction, and delayed minting/);
         assert.match(html, /property="og:image" content="https:\/\/artsoulprotocol\.com\/artsoul-social-preview-v2\.png"/);
-        assert.match(html, /property="og:url" content="https:\/\/artsoulprotocol\.com\//);
+        if (page === 'artwork.html') {
+            assert.equal(tag(html, 'property', 'og:url'), null, 'the static shell must not give every artwork one shared URL');
+            assert.match(html, /id="og-url" property="og:url"/);
+        } else {
+            assert.match(html, /property="og:url" content="https:\/\/artsoulprotocol\.com\//);
+        }
     }
 });
 

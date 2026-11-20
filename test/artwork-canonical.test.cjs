@@ -11,6 +11,7 @@ function openArtwork(path) {
     const elements = new Set();
     const social = { removeAttribute(name) { delete this[name]; } };
     const document = {
+        currentScript: { hasAttribute: name => name === 'data-artwork-indexing' },
         getElementById: () => social,
         createElement: () => ({
             setAttribute(name, value) { this[name] = value; },
@@ -30,6 +31,16 @@ function openArtwork(path) {
         update: window.ArtSoulArtworkUrl.updateArtworkIndexing
     };
 }
+
+test('only the artwork entry opts its shared URL helper into document metadata', () => {
+    for (const file of ['artwork.html', 'index.html', 'gallery.html', 'admin.html', 'upload.html', 'profile.html']) {
+        const script = fs.readFileSync(file, 'utf8').match(/<script[^>]*src="\/src\/ui\/artwork-url\.js[^"]*"[^>]*>/)[0];
+        assert.equal(script.includes('data-artwork-indexing'), file === 'artwork.html', file);
+    }
+    const window = {};
+    vm.runInNewContext(urlScript, {window, document: {}, URLSearchParams});
+    assert.equal(window.ArtSoulArtworkUrl.artworkPath('v41:84532:38'), '/artwork/38');
+});
 
 test('distinct works and legacy query or path aliases have one stable public identity', () => {
     for (const [path, expectedPath] of [

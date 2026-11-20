@@ -95,5 +95,7 @@
     const api = { artworkPath, expandArtworkId, currentArtworkId, updateArtworkIndexing, CANONICAL_ARTWORK_CHAIN_ID };
 
     if (typeof window !== 'undefined') window.ArtSoulArtworkUrl = api;
-    if (typeof document !== 'undefined') updateArtworkIndexing();
+    if (typeof document !== 'undefined' && document.currentScript?.hasAttribute('data-artwork-indexing')) {
+        updateArtworkIndexing();
+    }
 })();
