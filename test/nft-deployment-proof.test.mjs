@@ -7,17 +7,17 @@ import { readNftDeploymentProof } from '../src/indexer/nft-deployment-proof.js';
 const CORE = `0x${'a'.repeat(40)}`, NFT = `0x${'b'.repeat(40)}`, OTHER = `0x${'c'.repeat(40)}`;
 const HASH = `0x${'d'.repeat(64)}`, OTHER_HASH = `0x${'e'.repeat(64)}`;
 const CORE_CODE = '0x6001600055', NFT_CODE = '0x6002600055';
-const abi = new Interface(['function nftContract() view returns (address)', 'function core() view returns (address)']);
+const abi = new Interface(['function nftContract() view returns (address)', 'function nft() view returns (address)', 'function core() view returns (address)']);
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 
-function fixture({ blockNumber = 100, blockHash = HASH } = {}) {
+function fixture({ blockNumber = 100, blockHash = HASH, coreGetter = 'nftContract', chainId = 84532 } = {}) {
     const value = { current: true, calls: [], replacements: new Map(), hook: null };
     const pin = { blockHash, requireCanonical: true };
-    value.options = { chainId: 84532, coreAddress: CORE, nftAddress: NFT, blockNumber, blockHash,
+    value.options = { chainId, coreAddress: CORE, nftAddress: NFT, blockNumber, blockHash,
         expectedCoreCodeHash: keccak256(CORE_CODE), expectedNftCodeHash: keccak256(NFT_CODE),
         isCurrent: () => value.current };
     const reply = (method, params) => {
-        if (method === 'eth_chainId') { assert.deepEqual(params, []); return '0x14a34'; }
+        if (method === 'eth_chainId') { assert.deepEqual(params, []); return '0x' + chainId.toString(16); }
         if (method === 'eth_getBlockByNumber') {
             assert.deepEqual(params, [`0x${blockNumber.toString(16)}`, false]);
             return { number: `0x${blockNumber.toString(16)}`, hash: blockHash };
@@ -27,7 +27,7 @@ function fixture({ blockNumber = 100, blockHash = HASH } = {}) {
             assert.ok([CORE, NFT].includes(params[0])); return params[0] === CORE ? CORE_CODE : NFT_CODE;
         }
         assert.equal(method, 'eth_call');
-        const getter = params[0].to === CORE ? 'nftContract' : 'core';
+        const getter = params[0].to === CORE ? coreGetter : 'core';
         assert.ok([CORE, NFT].includes(params[0].to));
         assert.equal(params[0].data, abi.encodeFunctionData(getter));
         return abi.encodeFunctionResult(getter, [getter === 'core' ? CORE : NFT]);
@@ -44,7 +44,7 @@ function fixture({ blockNumber = 100, blockHash = HASH } = {}) {
     } };
     // Use the real timeout/failover implementation without constructing a live provider.
     value.listener = Object.assign(Object.create(EventListener.prototype), {
-        chainId: 84532, contractAddress: CORE, readProviders: [value.provider],
+        chainId, contractAddress: CORE, readProviders: [value.provider],
         readRpcs: ['https://rpc.invalid/first'], readRpcUnavailableUntil: [0], baseTimeout: 1000
     });
     value.run = () => readNftDeploymentProof(value.listener, value.options);
@@ -61,8 +61,138 @@ test('a reciprocal deployment proof is immutable, block-scoped and exactly eight
         'eth_getCode', 'eth_getCode', 'eth_call', 'eth_call', 'eth_getBlockByNumber', 'eth_chainId']);
 });
 
+test('the ordinary listener reads the specific auction from its pinned pair and canonical receipt', async () => {
+    const tx = OTHER_HASH, zero = '0x' + '0'.repeat(40), bidder = '0x' + '1'.repeat(40);
+    const events = new Interface([
+        'event AuctionSettled(uint256 indexed auctionId,uint256 indexed artworkId,uint256 tokenId,uint256 price)',
+        'event SettledArtworkIssued(uint256 indexed auctionId,uint256 indexed artworkId,uint256 indexed tokenId,address creator,address firstCollector)',
+        'event RunnerUpOfferAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price)',
+        'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)'
+    ]);
+    const log = (address, name, args, index) => ({ address, ...events.encodeEventLog(name, args),
+        blockHash: HASH, blockNumber: '0x64', transactionHash: tx, logIndex: '0x' + index.toString(16) });
+    const logs = [
+        log(OTHER, 'AuctionSettled', [2, 17, 19, 99], 3),
+        log(CORE, 'AuctionSettled', [1, 13, 20, 11], 4),
+        log(CORE, 'RunnerUpOfferAccepted', [2, bidder, 31], 5),
+        log(NFT, 'SettledArtworkIssued', [2, 17, 19, OTHER, bidder], 6),
+        log(NFT, 'Transfer', [zero, bidder, 19], 7),
+        log(NFT, 'Transfer', [bidder, OTHER, 19], 8),
+        log(CORE, 'AuctionSettled', [2, 17, 19, 31], 9)
+    ];
+    const check = (modifyReceipt = () => {}, configure = () => {}, chainId = 84532) => {
+        const f = fixture({ coreGetter: 'nft', chainId });
+        f.listener.nftAddress = NFT;
+        const receipt = { status: '0x1', blockHash: HASH, transactionHash: tx, blockNumber: '0x64', logs: structuredClone(logs) };
+        modifyReceipt(receipt);
+        f.replacements.set(7, { number: '0x64', hash: HASH });
+        f.replacements.set(8, receipt);
+        f.hook = (index, method, params) => {
+            if (index === 7) assert.deepEqual([method, params], ['eth_getBlockByNumber', ['finalized', false]]);
+            if (index === 8) assert.deepEqual([method, params], ['eth_getTransactionReceipt', [tx]]);
+        };
+        configure(f);
+        return f.listener.readOrdinarySettlement({ ...f.options, transactionHash: tx, auctionId: '2' });
+    };
+    const result = await check();
+    assert.equal(result.chainId, 84532);
+    assert.equal(result.coreAddress, CORE);
+    assert.equal(result.nftAddress, NFT);
+    assert.equal(result.auctionId, '2');
+    assert.equal(result.artworkId, '17');
+    assert.equal(result.tokenId, '19');
+    assert.equal(result.firstCollector, bidder);
+    assert.equal(result.priceWei, '31');
+    assert.equal(result.logIndex, 9);
+    assert.equal(result.runnerUpAccepted, true);
+    const base = await check(undefined, undefined, 8453);
+    assert.deepEqual(base, { ...result, chainId: 8453 });
+    await assert.rejects(check(undefined, f => { f.listener.chainId = 84532; }, 8453), /authority changed/);
+    await assert.rejects(check(undefined, f => { f.replacements.set(1, '0x14a34'); }, 8453), /RPC chain mismatch/);
+    await assert.rejects(check(undefined, f => { f.replacements.set(6, abi.encodeFunctionResult('core', [OTHER])); }, 8453), /reciprocal binding mismatch/);
+    await assert.rejects(check(undefined, undefined, 1), /Invalid NFT deployment proof inputs/);
+    await assert.rejects(check(r => { r.logs[3].address = OTHER; }), /Expected one SettledArtworkIssued/);
+    await assert.rejects(check(r => { r.logs[2] = log(CORE, 'RunnerUpOfferAccepted', [2, OTHER, 31], 5); }), /acceptance and settlement disagree/);
+    await assert.rejects(check(r => { r.logs[2] = log(CORE, 'RunnerUpOfferAccepted', [2, bidder, 32], 5); }), /acceptance and settlement disagree/);
+    await assert.rejects(check(r => { r.logs[4] = log(NFT, 'Transfer', [zero, OTHER, 19], 7); }), /settlement and mint disagree/);
+    await assert.rejects(check(r => { r.logs[4].blockHash = OTHER_HASH; }), /log position/);
+    await assert.rejects(check(r => { r.logs.push(r.logs[6]); }), /Expected one AuctionSettled/);
+    await assert.rejects(check(r => { r.status = '0x0'; }), /successful ordinary settlement receipt/);
+    await assert.rejects(check(undefined, f => { f.listener.nftAddress = ''; }), /authority changed/);
+    await assert.rejects(check(undefined, f => { f.replacements.set(7, { number: '0x63', hash: HASH }); }), /not finalized/);
+    await assert.rejects(check(undefined, f => { f.replacements.set(6, abi.encodeFunctionResult('core', [OTHER])); }), /reciprocal binding mismatch/);
+});
+
+const resaleGetter = new Interface(['function getActiveResale(uint256) view returns (bool, address, uint256, uint256)']);
+const maxUint = 2n ** 256n - 1n;
+const zeroAddress = '0x' + '0'.repeat(40);
+
+function resaleFixture(response, chainId = 84532) {
+    const f = fixture({ coreGetter: 'nft', chainId });
+    f.listener.nftAddress = NFT;
+    f.replacements.set(7, { number: '0x65', hash: OTHER_HASH });
+    f.replacements.set(8, response);
+    f.quote = (tokenId = maxUint.toString()) => f.listener.readOrdinaryResaleQuote({ ...f.options, tokenId });
+    return f;
+}
+
+test('a finalized ordinary resale quote returns immutable pair identity and full-width terms', async () => {
+    for (const chainId of [8453, 84532]) {
+        const f = resaleFixture(resaleGetter.encodeFunctionResult('getActiveResale', [true, OTHER, maxUint - 8n, maxUint - 4n]), chainId);
+        const quote = await f.quote();
+        assert.deepEqual(quote, { chainId, coreAddress: CORE, nftAddress: NFT, blockNumber: 100, blockHash: HASH,
+            coreCodeHash: keccak256(CORE_CODE), nftCodeHash: keccak256(NFT_CODE), tokenId: maxUint.toString(),
+            active: true, seller: OTHER, priceWei: (maxUint - 8n).toString(), version: (maxUint - 4n).toString() });
+        assert.ok(Object.isFrozen(quote));
+        assert.deepEqual(f.calls[6], { method: 'eth_getBlockByNumber', params: ['finalized', false] });
+        assert.deepEqual(f.calls[7], { method: 'eth_call', params: [{ to: CORE, data: resaleGetter.encodeFunctionData('getActiveResale', [maxUint]) },
+            { blockHash: HASH, requireCanonical: true }] });
+        assert.deepEqual(f.calls.slice(8), [{ method: 'eth_getBlockByNumber', params: ['0x64', false] }, { method: 'eth_chainId', params: [] }]);
+    }
+});
+
+test('an inactive quote discloses no executable terms and retains the current listing version', async () => {
+    for (const version of [0n, 9n]) {
+        const f = resaleFixture(resaleGetter.encodeFunctionResult('getActiveResale', [false, zeroAddress, 0n, version]));
+        const quote = await f.quote('1');
+        assert.equal(quote.active, false);
+        assert.equal(quote.seller, null);
+        assert.equal(quote.priceWei, '0');
+        assert.equal(quote.version, version.toString());
+    }
+});
+
+test('missing or malformed active-quote results never fall back to a legacy listing or an absent price', async () => {
+    const encode = args => resaleGetter.encodeFunctionResult('getActiveResale', args);
+    const valid = encode([true, OTHER, 5n, 1n]);
+    for (const answer of [new Error('method unavailable'), '0x', valid + '00', '0x' + '2'.padStart(64, '0') + valid.slice(66),
+        encode([true, zeroAddress, 1n, 1n]), encode([true, OTHER, 0n, 1n]), encode([true, OTHER, 1n, 0n]),
+        encode([false, OTHER, 0n, 1n]), encode([false, zeroAddress, 1n, 1n])]) {
+        const f = resaleFixture(answer);
+        await assert.rejects(f.quote('1'), /ordinary resale quote|method unavailable/);
+        assert.equal(f.calls.length, 8);
+        assert.equal(f.calls.at(-1).params[0].data, resaleGetter.encodeFunctionData('getActiveResale', [1]));
+    }
+});
+
+test('foreign networks, wrong immutable bindings and unfinalized blocks cannot produce ordinary quotes', async () => {
+    for (const [index, replacement, message] of [[1, '0x1', /RPC chain mismatch/],
+        [5, abi.encodeFunctionResult('nft', [OTHER]), /reciprocal binding mismatch/],
+        [6, abi.encodeFunctionResult('core', [OTHER]), /reciprocal binding mismatch/],
+        [7, { number: '0x63', hash: OTHER_HASH }, /not finalized/],
+        [7, { number: '0x64', hash: OTHER_HASH }, /not finalized/]]) {
+        const f = resaleFixture(null);
+        f.replacements.set(index, replacement);
+        await assert.rejects(f.quote('1'), message);
+        assert.equal(f.calls.length, index);
+    }
+    const f = resaleFixture(null);
+    for (const id of ['0', '01', 1, (maxUint + 1n).toString()]) await assert.rejects(f.quote(id), /Invalid ordinary resale token ID/);
+    assert.equal(f.calls.length, 0);
+});
+
 const invalidInputs = [
-    ['chainId', 1], ['chainId', 11155111], ['chainId', '84532'],
+    ['chainId', 1], ['chainId', 11155111], ['chainId', 8453], ['chainId', '84532'],
     ['blockNumber', -1], ['blockNumber', 1.5], ['blockNumber', '100'], ['blockNumber', Number.MAX_SAFE_INTEGER + 1],
     ['blockHash', null], ['blockHash', '0x12'], ['blockHash', `0x${'0'.repeat(64)}`],
     ['coreAddress', null], ['coreAddress', '0x12'], ['coreAddress', `0x${'0'.repeat(40)}`],

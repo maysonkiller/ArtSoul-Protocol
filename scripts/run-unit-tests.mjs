@@ -1,13 +1,15 @@
-import { availableParallelism } from 'node:os';
 import { readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // The Hardhat contract suite runs separately via `npm run test:contracts`
 // and must never be collected by the generic Node runner.
 export const CONTRACT_SUITE = 'ArtSoulV41.test.cjs';
-export const CONTRACT_SUITES = [CONTRACT_SUITE, 'CollectionLaunch.test.cjs', 'ArtSoulDonations.test.cjs'];
+export const CONTRACT_SUITES = [CONTRACT_SUITE, 'CollectionLaunch.test.cjs', 'MintReservationEscrow.test.cjs', 'ArtSoulDonations.test.cjs',
+    'SettledArtworkNFT.test.cjs', 'OrdinaryArtAuctions.test.cjs', 'OrdinaryArtResales.test.cjs', 'TreasuryBoundOrdinaryArt.test.cjs',
+    'OrdinaryRunnerUp.test.cjs', 'OrdinaryAuctionKeeper.test.cjs', 'OrdinaryArtDonations.test.cjs'];
 
 // Every supported Node unit-test extension. Shell globs are avoided so the
 // same rule is applied identically on Windows and Ubuntu.
@@ -27,6 +29,7 @@ function runUnitTests() {
     const unitTests = collectUnitTestFiles(readdirSync('test'))
         .map(file => join('test', file));
 
+    // Several test files start independent PostgreSQL containers on the same disk.
     const concurrency = Math.min(4, Math.max(1, availableParallelism() - 1));
     const result = spawnSync(process.execPath, ['--test', `--test-concurrency=${concurrency}`, ...unitTests], {
         stdio: 'inherit'

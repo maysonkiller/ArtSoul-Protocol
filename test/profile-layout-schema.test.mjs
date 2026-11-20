@@ -19,8 +19,8 @@ test('profile layout persistence is service-only, bounded and atomic under concu
 }, async t => {
   const container = `artsoul-layout-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   let created = false, pool;
-  t.after(async () => { await pool?.end(); if (created) docker('rm', '-f', container); });
-  docker('run', '-d', '--name', container, '-e', 'POSTGRES_PASSWORD=local-layout-fixture', '-e', 'POSTGRES_DB=artsoul',
+  t.after(async () => { await pool?.end(); if (created) docker('rm', '-f', '-v', container); });
+  docker('run', '-d', '--rm', '--name', container, '-e', 'POSTGRES_PASSWORD=local-layout-fixture', '-e', 'POSTGRES_DB=artsoul',
     '-p', '127.0.0.1::5432', 'postgres:17'); created = true;
   const endpoint = docker('port', container, '5432/tcp'); assert.match(endpoint, /^127\.0\.0\.1:\d+$/);
   pool = new pg.Pool({ host: '127.0.0.1', port: Number(endpoint.split(':')[1]), database: 'artsoul', user: 'postgres',

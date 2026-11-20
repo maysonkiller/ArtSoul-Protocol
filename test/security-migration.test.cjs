@@ -131,12 +131,12 @@ test('the credentialed standalone API uses an exact CORS allowlist', () => {
   assert.match(standaloneServer, /apiOrigins\.has\(origin\)/);
 });
 
-test('the indexer migration runner covers the complete 001 through 017 sequence', async () => {
+test('the indexer migration runner covers the complete 001 through 018 sequence', async () => {
   const { listIndexerMigrations } = await modules;
   const migrations = listIndexerMigrations();
   assert.deepEqual(
     migrations.map(migration => migration.number),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
   );
 
   const setupSql = fs.readFileSync(path.join(REPO_ROOT, 'src/indexer/setup-database.sql'), 'utf8');
@@ -200,6 +200,7 @@ test('Phase 18.7b classifies tracked public tables while private tables have the
     'artist_support_moderation.sql',
     'moderation_report_email_delivery.sql',
     'artist_support.sql',
+    '20261119150000_collection_origin_reviews.sql',
     '20261101120000_nft_transfer_coverage.sql', '20261101130000_verified_nft_owners.sql', '20261101140000_verified_nft_history.sql'
   ]);
 
@@ -222,7 +223,25 @@ test('Phase 18.7b classifies tracked public tables while private tables have the
   assert.deepEqual(missing, []);
   // New private tables require an explicit independent hardening test; they
   // must never acquire the historical public-table service grants by accident.
-  assert.deepEqual([...privateTables].sort(), ['artsoul_private.notification_reorg_identities']);
+  assert.deepEqual([...privateTables].sort(), ['artsoul_private.notification_reorg_identities',
+    'artsoul_private.ordinary_issuers', 'artsoul_private.ordinary_settlements']);
+});
+
+test('collection origin review decisions expose only a restricted read path to the server', () => {
+  const sql = fs.readFileSync(path.join(REPO_ROOT, 'sql/migrations/20261119150000_collection_origin_reviews.sql'), 'utf8')
+    .replace(/--[^\n]*/g, '').replace(/\s+/g, ' ');
+  const table = 'public.collection_origin_reviews';
+  const lookup = 'public.has_collection_origin_review(bigint, text, text)';
+  assert.ok(sql.includes(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`));
+  assert.ok(sql.includes(`ALTER TABLE ${table} FORCE ROW LEVEL SECURITY;`));
+  assert.ok(sql.includes(`REVOKE ALL ON ${table} FROM PUBLIC, anon, authenticated, service_role;`));
+  assert.ok(sql.includes(`REVOKE ALL ON FUNCTION ${lookup} FROM PUBLIC, anon, authenticated;`));
+  assert.ok(sql.includes('REVOKE ALL ON FUNCTION public.preserve_collection_origin_reviews() FROM PUBLIC, anon, authenticated, service_role;'));
+  assert.deepEqual(sql.match(/\bGRANT [^;]+;/gi), [
+    `GRANT SELECT (chain_id, collection_address, revision, creator_address, verified) ON ${table} TO service_role;`,
+    `GRANT EXECUTE ON FUNCTION ${lookup} TO service_role;`
+  ]);
+  assert.doesNotMatch(sql, /CREATE POLICY|SECURITY DEFINER/i);
 });
 
 test('notification recovery identity keeps its ledger and internal writer outside Data API access', () => {

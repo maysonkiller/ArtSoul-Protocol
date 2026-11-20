@@ -206,7 +206,7 @@ WHERE schemaname = 'storage'
      OR COALESCE(with_check, '') ILIKE '%artworks%'
   );
 
--- 9. Existing Data API tables must retain explicit server read access.
+-- 9. Existing Data API tables must retain their intended server read access.
 -- Expected: zero rows. A BYPASSRLS role still needs table privileges.
 -- Do NOT grant blanket CRUD to fix this report: staff authority, role and
 -- factor writes deliberately require protected RPCs rather than direct writes.
@@ -214,7 +214,14 @@ SELECT c.relname AS missing_service_read
 FROM pg_class c
 WHERE c.relnamespace = 'public'::regnamespace
   AND c.relkind IN ('r', 'p', 'v', 'm')
-  AND NOT has_table_privilege('service_role', c.oid, 'SELECT')
+  AND CASE WHEN c.relname = 'collection_origin_reviews' THEN
+        EXISTS (
+          SELECT 1 FROM pg_attribute a
+          WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+            AND has_column_privilege('service_role', c.oid, a.attnum, 'SELECT')
+                <> (a.attname IN ('chain_id', 'collection_address', 'revision', 'creator_address', 'verified'))
+        )
+      ELSE NOT has_table_privilege('service_role', c.oid, 'SELECT') END
 ORDER BY c.relname;
 
 -- 10. Informational only: defaults apply to FUTURE objects by their creator.

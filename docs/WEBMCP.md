@@ -2,9 +2,8 @@
 
 ArtSoul declares its own tools to an AI agent instead of leaving the agent to
 guess at the page. The implementation is one classic deferred script,
-[`webmcp-tools.js`](../webmcp-tools.js), loaded by every product page: the
-homepage, the gallery, an artwork, a profile, the publish page and the protocol
-documentation. Tools belong to the page that offers them, so they follow the
+[`webmcp-tools.js`](../webmcp-tools.js), loaded on Home, Gallery, Artwork,
+Profile, Publish, Collection Builder and the protocol guide. Tools belong to the page that offers them, so they follow the
 person as they move through the site instead of disappearing on the first
 navigation.
 
@@ -90,6 +89,7 @@ economics.
 | `get_artwork_provenance` | Creator, First Collector, Owner and the event timeline | `/api/public/artwork-provenance` |
 | `explain_settlement` | The publish → auction → settlement → mint lifecycle, and where one work sits in it | `/api/public/artworks` |
 | `open_artwork` | Opens an artwork page so the person can see it; navigates only | `/api/public/artworks` |
+| `open_page` | Opens a named page, a gallery tab, Collected ArtSoul NFTs or the enabled Wallet NFTs tab for a connected wallet | Site navigation |
 | `prepare_bid` | Live auction state, then opens the auction for the person to sign | `/api/public/artworks` (+ contract constants when available) |
 | `get_my_activity` | What the connected wallet created, owns, is leading, has won and must pay, has listed and can withdraw, and which tool handles each waiting action | `/api/public/artworks` (+ withdrawable balance from the contract) |
 | `place_bid` | Opens the connected wallet with the bid, for the person to approve | `ArtSoulContracts.placeBid` (contract computes the deposit) |
@@ -104,6 +104,9 @@ economics.
 | `withdraw_pending_funds` | Withdraws proceeds, royalties and returned deposits to the same wallet | `ArtSoulContracts.getPendingWithdrawal`, `withdraw` |
 | `revoke_wallet_access` | Takes away the agent's wallet access in this browser | — |
 | `prepare_artwork_registration` | Stages a local title, optional description and starting price for review in Publish; never uploads or signs | — |
+| `revise_publication_draft` | Checks the current or suggested title, or stages a title, description or available duration for manual review | Current Publish form |
+| `prepare_donation` | Opens the selected artwork's donation form when available. The visitor enters the amount, reviews it and approves in their wallet | Existing artwork and donation controls |
+| `prepare_artwork_report` | Opens the selected artwork's complaint form when available. The visitor provides evidence and submits | Existing artwork and reporting controls |
 | `add_to_saved` | Saves one explicitly identified artwork to the signed-in account's private list | Existing Saved store and `/api/saved` |
 | `remove_from_saved` | Removes that artwork from the same list, including an already absent item | Existing Saved store and `/api/saved` |
 
@@ -129,8 +132,9 @@ Commands: `prepare artwork titled Moonlight` or
 `подготовь работу с названием Лунный свет`. A request without a title asks for
 one. Title text is data, including words resembling commands. EN/RU command
 grammar is still bounded; this is not unrestricted conversational AI. Structured
-tools may also supply a description and exact positive ETH price. Duration,
-original-work confirmation and file selection remain manual. No AI request,
+tools may also supply a description and exact positive ETH price. Once on
+Publish, `revise_publication_draft` can suggest a duration offered by the
+form. The visitor applies it and handles original-work confirmation and file selection. No AI request,
 upload, wallet connection, signature, complaint or contract write is performed
 by this preparation path. Registration still does not mint an NFT.
 
@@ -168,21 +172,38 @@ is context and never the answer itself.
 
 ## Voice (B-09)
 
-[`voice-commands.js`](../voice-commands.js) turns one spoken sentence into one of
-these tools and says the answer. It adds no ability of its own, so the tool list
-above is also the voice command list, and the write gate above applies unchanged.
+[`voice-commands.js`](../voice-commands.js) maps supported spoken and typed
+phrases to the same tools. The write gate applies to both. Each phrase needs
+its own parser coverage. For example, `explain_settlement` is available to
+WebMCP clients, while the command grammar has no direct phrase for that tool.
 
-Speech is recognised and spoken by the browser. ArtSoul makes no request from
-that file and never receives audio; in Chrome the browser sends it to Google,
-and the person is told before the microphone first opens. The microphone opens
-only on a click, for one sentence, and closes when the tab is hidden. A wallet
-command or Saved change the recogniser hears with low confidence is not run. Browsers without
-speech recognition can use the text composer. The header launcher opens the
-panel without starting audio. Typed replies are silent. English and Russian
-remain the supported command grammars, not an unrestricted multilingual AI.
-Closing a panel stops listening, but cannot cancel an already submitted
-transaction. One pending command blocks repeat submissions; changed accounts
-cannot receive a previous account's late answer.
+The header launcher opens a text composer. A visitor can use the microphone
+for one utterance or explicitly start a voice chat. In voice chat the microphone
+waits while a tool runs and its reply plays, then listens for the next turn.
+When a voice command opens an ArtSoul page in the same tab, the destination
+restores the panel and resumes listening if the browser allows it. A browser
+requiring a gesture displays Start voice chat. Manual navigation, reload,
+Back, hiding the tab, changing accounts and explicit Stop end the session.
+Typing returns control to the composer. A protected
+command heard in chat pauses for a deliberate Send and the usual action
+confirmation. The wallet still owns the signature. ArtSoul retains the
+written answer when speech is unavailable.
+
+Speech recognition depends on the browser and can send audio to its speech
+provider, as explained before first use. Fixed responses use 18 bundled
+recordings and six short excerpts from them. Dynamic replies use device speech synthesis. Typed replies are
+silent until the visitor requests playback. The recognizer and response
+player are separate from the RU/EN command parser. See the
+[voice feasibility review](audits/VOICE_ASSISTANT_HANDOFF_2026-11-18.md).
+
+“Show my collection” opens the Collected tab for ArtSoul NFTs. “Open my
+gallery” opens Explore. “Let's create artwork” opens Publish. The visitor
+chooses the media file. On Publish they can dictate a title, description or
+supported duration, revise the suggestion and apply it with **Use these
+details**. The publication form retains its existing authorization and final
+review. “Open NFT” asks which destination or artwork number the visitor
+means. “Marketplace” then opens that gallery tab. After a search or title
+question, a bare reply supplies the value. It cannot authorize a wallet action.
 
 Examples, in English or Russian: "what auctions are open" / «какие аукционы
 открыты», "bid 0.05 on artwork 31" / «ставка 0,05 на работу 31», "my activity" /
@@ -193,6 +214,44 @@ Saved examples: "save artwork 34" / «добавь работу 34 в избра
 "remove artwork 34 from favorites" / «убери работу 34 из избранного».
 Negations, questions, multiple IDs and incomplete Saved commands never choose
 an action by extracting a phrase. Search terms remain data.
+
+## Deferred acceptance for full user journeys
+
+The November 18 founder decision sets the coverage target for future work.
+Every action offered to an ordinary visitor, artist, owner or collector should
+be reachable through speech and typing, using the same permissions, enabled
+controls, validations and results as the pointer and keyboard UI. A request
+for a private or protected action hands control to the person for wallet
+selection, signatures, passkeys, native file selection and final approvals.
+Only an authorized staff member can use administrative controls. Any future
+assistant support for staff must use the same role checks, step-up and review
+as the staff interface. Further assistant and WebMCP acceptance is deferred.
+[Phase B handoff](PHASE_B_STATUS_2026-11-02.md)
+
+| User journey | Available in the current local implementation | Work to cover in a later session |
+| --- | --- | --- |
+| Find and browse art | Catalog search, artwork by number, gallery tabs and NFT destination clarification | Gallery filter and sort, result selection, card menus, sharing, media playback and in-page guide topics |
+| Use a wallet and profile | Profile navigation, activity summary, Collected and enabled Wallet NFTs, artwork Save/Remove | Open the wallet menu or connection chooser, change network or disconnect through the existing UI, edit a profile, open notifications and manage preferences |
+| Publish a work | Open Publish, suggest or revise title, description and available auction duration, check the title | Review all enabled form fields and errors, hand off the file picker and final submission, then show the actual registration result |
+| Bid, collect and resell | Read artwork, auction and provenance data, start or end an auction, bid, settle or close after default, list, reprice, cancel, buy and withdraw | Check that each result matches the visible auction, ownership or balance after indexing. Distinguish prepared, submitted and confirmed states |
+| Support artists and report issues | Open the existing Donate or artwork Report form | Cover the other enabled form controls, community signals and profile reporting with the same review and submission steps as the UI |
+| Explore collections and site settings | Open the Collections gallery tab and the guide | Map enabled collection-builder controls and personal display settings as their respective UI journeys become available |
+
+For the first retest, record the served build, browser, wallet connection
+state and language. Start separate conversations for “open NFT” and “open my
+wallet.” The first needs a destination or artwork number. In a pending NFT
+question, “wallet” means the gated Wallet NFTs tab. A fresh request to connect
+the wallet needs the ordinary connection chooser. The current registry has
+no tool for that chooser. A generic help reply leaves the case open.
+
+Use the same starting state in local fixtures for pointer, typed command,
+spoken command and a WebMCP tool call where supported. Record the resulting
+route, visible tab, applied form values, account state or receipt as applicable.
+Include cancellation and unavailable actions. A registered tool or a spoken
+acknowledgement alone supplies no evidence of a completed journey. Append new
+user controls to this inventory as they ship. Existing [navigation checks](../test/voice-navigation-dialogue.test.cjs)
+and [device observations](audits/VOICE_ASSISTANT_HANDOFF_2026-11-18.md)
+identify which results already have local or physical-device evidence.
 
 ## Cost to an ordinary visitor
 

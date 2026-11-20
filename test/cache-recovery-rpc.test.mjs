@@ -37,11 +37,11 @@ test('recovery and entry generations fence cache refill against real Redis', {
     assert.ok(available, 'Linux CI must execute the real Redis fixture with Docker');
     const container = `artsoul-cache-recovery-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
     const clients = [];
-    let creationAttempted = false, endpoint;
+    let containerId, endpoint;
     t.after(() => {
         for (const client of clients) client.disconnect();
-        if (creationAttempted) {
-            try { docker('rm', '-f', container); }
+        if (containerId) {
+            try { docker('rm', '-f', '-v', containerId); }
             catch (error) {
                 if (!/No such container/i.test(String(error.stderr))) throw error;
             }
@@ -58,8 +58,7 @@ test('recovery and entry generations fence cache refill against real Redis', {
         instance.getRedis = async () => client;
         return instance;
     };
-    creationAttempted = true;
-    docker('run', '-d', '--name', container, '-p', '127.0.0.1::6379',
+    containerId = docker('run', '-d', '--rm', '--name', container, '-p', '127.0.0.1::6379',
         'redis:7.4-alpine', 'redis-server', '--save', '', '--appendonly', 'no');
     endpoint = docker('port', container, '6379/tcp');
     assert.match(endpoint, /^127\.0\.0\.1:\d+$/);

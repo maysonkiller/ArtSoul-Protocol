@@ -48,7 +48,7 @@ test('canonical log order preserves dependent projections and stops at the first
     process.env.REDIS_URL = ''; // No external queues/cache in this database fixture.
     t.after(async () => {
         if (pool) await pool.end();
-        if (created) docker('rm', '-f', container);
+        if (created) docker('rm', '-f', '-v', container);
         if (priorRedis === undefined) delete process.env.REDIS_URL;
         else process.env.REDIS_URL = priorRedis;
     });
@@ -56,7 +56,7 @@ test('canonical log order preserves dependent projections and stops at the first
     t.mock.method(console, 'warn', () => {});
     t.mock.method(console, 'error', () => {});
     const { default: Engine } = await import('../src/indexer/sync-engine.js');
-    docker('run', '-d', '--name', container, '-e', 'POSTGRES_PASSWORD=local-order-fixture',
+    docker('run', '-d', '--rm', '--name', container, '-e', 'POSTGRES_PASSWORD=local-order-fixture',
         '-e', 'POSTGRES_DB=artsoul', '-p', '127.0.0.1::5432', 'postgres:17');
     created = true;
     const endpoint = docker('port', container, '5432/tcp');

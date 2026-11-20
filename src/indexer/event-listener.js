@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import { V41_CORE_ABI, parseV41EventData } from './v4-1-event-schema.js';
 import { DONATION_ABI, parseDonationEvent } from './donation-events.js';
+import { readOrdinaryResaleQuote, readOrdinarySettlement } from './nft-deployment-proof.js';
 
 function redactRpcUrl(value) {
     try {
@@ -99,6 +100,14 @@ class EventListener {
         console.log('  Rate limit:', this.maxRequestsPerSecond, 'req/sec');
     }
 
+    readOrdinarySettlement(options) {
+        return readOrdinarySettlement(this, options);
+    }
+
+    readOrdinaryResaleQuote(options) {
+        return readOrdinaryResaleQuote(this, options);
+    }
+
     async _readRpcCall(operation, context) {
         let lastError = null;
         const now = Date.now();
@@ -125,7 +134,7 @@ class EventListener {
                 this.readRpcUnavailableUntil[index] = Date.now() + 60000;
                 console.warn(
                     `[EventListener] ${context} failed on read RPC[${index}] ` +
-                    `(${redactRpcUrl(this.readRpcs[index])}); trying fallback: ${error.message}`
+                    `(${redactRpcUrl(this.readRpcs[index])}); trying fallback`
                 );
             }
         }

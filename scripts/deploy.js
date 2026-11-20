@@ -1,8 +1,10 @@
 import hre from "hardhat";
 import { ethers } from "ethers";
+import { SUPPORTED_INDEXER_CHAINS } from "../src/indexer/chain-config.js";
 
 const { artifacts, network } = hre;
 const DRY_RUN = process.env.DEPLOY_DRY_RUN === "1" || process.argv.includes("--dry-run");
+const target = SUPPORTED_INDEXER_CHAINS["base-sepolia"];
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -14,8 +16,8 @@ function requireEnv(name) {
 
 function requireAddressEnv(name) {
   const value = requireEnv(name);
-  if (!ethers.isAddress(value)) {
-    throw new Error(`${name} must be a valid address`);
+  if (!ethers.isAddress(value) || value.toLowerCase() === ethers.ZeroAddress) {
+    throw new Error(`${name} must be a valid nonzero address`);
   }
   return value;
 }
@@ -30,20 +32,22 @@ function requireNetworkUrl() {
 
 async function loadArtifact(name) {
   const artifact = await artifacts.readArtifact(name);
-  if (!artifact?.abi?.length || !artifact?.bytecode || artifact.bytecode === "0x") {
+  if (artifact?.contractName !== name || !Array.isArray(artifact.abi) || !artifact.abi.length ||
+      !ethers.isHexString(artifact.bytecode, true) || artifact.bytecode === "0x") {
     throw new Error(`${name} artifact is missing ABI or bytecode`);
   }
   return artifact;
 }
 
-async function buildDeployer() {
+function buildDeployer() {
   const privateKey = requireEnv("PRIVATE_KEY");
-  const provider = new ethers.JsonRpcProvider(requireNetworkUrl());
-  return new ethers.Wallet(privateKey, provider);
+  const provider = new ethers.JsonRpcProvider(requireNetworkUrl(), target.chainId);
+  // All five transactions use this signer, including the two issuer bindings.
+  return new ethers.NonceManager(new ethers.Wallet(privateKey, provider));
 }
 
-async function deployContract(name, signer, args = []) {
-  const artifact = await loadArtifact(name);
+async function deployContract(artifact, signer, args = []) {
+  const name = artifact.contractName;
   const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, signer);
   const contract = await factory.deploy(...args);
   const deploymentTx = contract.deploymentTransaction();
@@ -77,39 +81,37 @@ async function sendAndWait(label, txPromise) {
   };
 }
 
-async function validateDryRun() {
-  requireAddressEnv("TREASURY_ADDRESS");
-  const deployer = await buildDeployer();
-
-  await Promise.all([
+async function main() {
+  if (network.name !== target.slug) {
+    throw new Error(`Prototype deployment is restricted to ${target.label} (${target.chainId})`);
+  }
+  const treasury = requireAddressEnv("TREASURY_ADDRESS");
+  const deployer = buildDeployer();
+  if (!DRY_RUN) {
+    // ethers checks the RPC-reported chain against the pinned ID on this provider.
+    try {
+      await deployer.provider.getNetwork();
+    } catch {
+      throw new Error(`RPC did not confirm ${target.label} (chain ID ${target.chainId}); deployment stopped`);
+    }
+  }
+  const [nftArtifact, projectArtifact, coreArtifact] = await Promise.all([
     loadArtifact("ArtSoulNFT"),
     loadArtifact("ArtSoulProjectNFT"),
     loadArtifact("ArtSoulCore")
   ]);
 
-  console.log("Dry deploy validation passed");
   console.log(`Network: ${network.name}`);
-  console.log(`Deployer: ${deployer.address}`);
+  console.log(`Deployer: ${await deployer.getAddress()}`);
   console.log("Treasury: configured");
-  console.log("Artifacts: ArtSoulNFT, ArtSoulProjectNFT, ArtSoulCore");
-}
-
-async function main() {
   if (DRY_RUN) {
-    await validateDryRun();
+    console.log("Dry deploy validation passed (offline). Artifacts: ArtSoulNFT, ArtSoulProjectNFT, ArtSoulCore");
     return;
   }
 
-  const treasury = requireAddressEnv("TREASURY_ADDRESS");
-  const deployer = await buildDeployer();
-
-  console.log(`Network: ${network.name}`);
-  console.log(`Deployer: ${deployer.address}`);
-  console.log("Treasury: configured");
-
-  const nft = await deployContract("ArtSoulNFT", deployer);
-  const projectNft = await deployContract("ArtSoulProjectNFT", deployer);
-  const core = await deployContract("ArtSoulCore", deployer, [
+  const nft = await deployContract(nftArtifact, deployer);
+  const projectNft = await deployContract(projectArtifact, deployer);
+  const core = await deployContract(coreArtifact, deployer, [
     nft.address,
     projectNft.address,
     treasury
@@ -139,6 +141,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(error.shortMessage || error.message);
   process.exitCode = 1;
 });

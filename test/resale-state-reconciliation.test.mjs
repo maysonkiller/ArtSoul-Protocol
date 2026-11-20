@@ -65,8 +65,8 @@ test('resale reconciliation SQL fences stale observations in disposable PostgreS
 }, async t => {
     const container = `artsoul-resale-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
     let pool, created = false;
-    t.after(async () => { await pool?.end(); if (created) docker('rm', '-f', container); });
-    docker('run', '-d', '--name', container, '-e', 'POSTGRES_PASSWORD=local-resale-fixture',
+    t.after(async () => { await pool?.end(); if (created) docker('rm', '-f', '-v', container); });
+    docker('run', '-d', '--rm', '--name', container, '-e', 'POSTGRES_PASSWORD=local-resale-fixture',
         '-e', 'POSTGRES_DB=artsoul', '-p', '127.0.0.1::5432', 'postgres:17');
     created = true;
     const endpoint = docker('port', container, '5432/tcp');

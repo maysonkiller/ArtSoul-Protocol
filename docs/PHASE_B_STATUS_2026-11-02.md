@@ -1,12 +1,110 @@
-# Phase B status — updated November 16, 2026
+# Phase B engineering closeout — November 18, 2026
 
-Phase A engineering readiness was accepted on October 24. Phase B engineering
-and interface work is active; there is no claim of a completed public beta or
-mainnet readiness. This note reconciles the recent chat histories with
-`BACKLOG.md`, the dated audits and the stabilization checkpoint. Older handoff
-snapshots are historical, not competing active versions of the product.
+The founder closed the active Phase B engineering workstream and moved development
+to Phase C. Controlled tests accepted the publish-to-resale flows, reversible
+profile moderation and iPhone layout and sign-in. Snapshot tooling passed its
+rehearsal. The following observations transfer with their original evidence.
+
+| Follow-up | When to verify |
+| --- | --- |
+| Hosted reminders and settlement UI | At an eligible Base Sepolia auction, or during C13, observe a late bid extending the deadline, the winner opening a payment reminder before paying, and the open artwork page refreshing after settlement. Local tests have passed. The November 19 rehearsal candidate is round 76 below. |
+| Supabase disk I/O and cost | Operations will recheck disk I/O, egress and billing after the provider corrects its collector and under representative traffic. Core recovery and cutover are verified. Hosted cache and NFT writer activation remain optional. |
+| Real public beta | Once the forthcoming contracts are available in C13, assign an operator and support coverage, run the cohort journeys, and triage real feedback. Public-beta acceptance and mainnet approval remain outstanding. |
+| Optional voice and WebMCP | The founder deferred further acceptance. Use the [mouse, voice and tool journey checklist](WEBMCP.md#deferred-acceptance-for-full-user-journeys). Record the tested build first. The user heard generic navigation suggestions when asking to open NFTs or open/connect the wallet. Local Chromium previously exercised NFT clarification. The version that produced the reported response is unknown. |
+
+Phase C starts with local engineering. This transition changes no deployment,
+wallet permissions, economics or launch date.
+
+## Next joint testnet session
+
+Round 76 for artwork 7 is an optional check of the running site's notification
+and artwork-page flow. Its [creation receipt and bidding window](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#november-19-artwork-7-opened-round-76)
+are recorded. Phase C work can continue outside that window. The replacement
+Core needs its own checks for bid extension, payment deadlines, deposits,
+minting and refunds. C13 will also verify the indexer and site against its
+actual events. Keep unobserved prototype steps open if the window is skipped.
+
+**Operator preflight.** Run the [read-only auction window query](../sql/verification/auction_windows.sql)
+to find candidate rounds. Record the served build, UTC time, chain ID (Base Sepolia
+`84532`), Core address, artwork and auction IDs. Confirm the deployed Core is
+unpaused and read current status, winner, original and current deadlines and
+deposit. Compare the page and indexed state. Use the existing indexer health check.
+For candidate-only changes, match the served build to the reviewed commit before
+recording UI acceptance. A local build and an older hosted page are separate results.
+Auction 75 is settled. For a waiting late-bid window use the reported UTC
+opening time. For an open payment window start at step 2. Select a
+`finalize` candidate only with the winning wallet holder present, consenting
+and ready to pay. Finalization starts their payment clock. Otherwise defer
+that round. If no round qualifies, record that observation and defer. To
+arrange a fresh round, agree on a creator and a separate bidder who can both
+return near the closing time. The shortest supported auction is 24 hours.
+Record the UTC deadline so neither participant has to stay online while it runs.
+[Indexer health check](../scripts/check-indexer-health.mjs) ·
+[Previous hosted evidence and local regression commands](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md)
+
+**Wallet holder.** Review each requested action, amount and estimated gas in
+the test wallet. For a bid, read `minimumBid(auctionId)` and
+`requiredDepositForBid(proposedBid)` and check the current test ETH balance
+covers the deposit, any remaining payment and gas. The bidder must differ
+from the creator and current highest bidder. For settlement, read the winning
+bid and locked deposit again. The payment value is
+`max(winningBid - depositLocked, 0)` plus a separate gas charge.
+Stop before signing if the account, chain, Core, round or amount differs.
+[Current prototype calculations](../contracts/ArtSoulCore.sol)
+
+| Step | What to do together | Pass evidence |
+| --- | --- | --- |
+| 1. Late bid | The creator opens the ending reminder and records its ID, deadline and read state. On the current prototype the bidder confirms a valid bid in the final ten minutes while extension capacity remains. Use a lead time covering both the original and extended deadline. | A successful receipt contains `AuctionExtended` with the old and new times. The deployed indexer processes that receipt. The creator's inbox shows the same reminder ID and read state with the new deadline and receipt. |
+| 2. Payment reminder | After bidding ends, a participating wallet can finalize an active round with a winner. The winner opens the bell on the iPhone and expands **Payment due soon** before paying. If a longer reminder lead time is needed, record the previous preference first. | The entry names the correct artwork, round and payment deadline. The winner sees **Read** and a fresh inbox read confirms the same reminder has a persisted acknowledgement before settlement. |
+| 3. Settlement in the open page | Keep the winner's artwork tab open. The winner reviews and confirms **Complete Settlement & Mint NFT** once and returns to that tab. The operator observes the page without reload. | The completed action disappears, Sold appears, and the indexed Creator, First Collector and Owner are correct. History includes the matching settlement receipt, and the payment reminder retires. Record automatic convergence or manual **Retry** separately. |
+
+Keep the settlement deadline in view. If the reminder is delayed or missing,
+record the gap and let the winner pay promptly. A confirmed payment must
+never be repeated to repair the display. Restore any temporary preference.
+Record each row as **passed**, **failed** or **unobserved**, with UTC time,
+public transaction hash and a private evidence reference. Keep wallet
+sessions and private notification details out of public reports.
+
+For the later C13 cohort, use the existing [window checklist and go/no-go
+record](testnet/CONTROLLED_BETA_ENTRY.md) and [tester journeys](testnet/TESTER_GUIDE.md)
+once the final testnet contracts, participants, operator, support channel and
+pause owner are available. For subsequent decisions use the [C1 architecture
+review](architecture/C1_DECISION_INVARIANTS_2026-11-02.md), the [C12 independent
+review and C13 Safe handover criteria](canon/12_IMPLEMENTATION_BACKLOG.md),
+and the [final Snapshot A and independent-copy runbook](SNAPSHOT_A.md).
 
 ## Current interface
+
+The November 18 [voice assistant candidate](audits/VOICE_ASSISTANT_HANDOFF_2026-11-18.md#november-18-local-candidate)
+adds opt-in conversation and reviewed dictation on Publish. The local build
+passed 4,427 Node tests and 55 contract tests. Browser checks used a simulated
+microphone and real shipped audio. A physical iPhone check of conversation
+mode and deployment of this candidate are still pending.
+
+The [subsequent local conversation check](audits/VOICE_ASSISTANT_HANDOFF_2026-11-18.md#navigation-and-spoken-follow-ups)
+confirmed continuous navigation across documents and gallery tabs in Chromium,
+including the NFT destination question. Hosted B17 eligibility was checked again
+at 13:08 UTC. No round then had an open bidding or payment window.
+
+The November 18 [operations follow-up](audits/B30_B35_OPERATIONAL_RECHECK_2026-11-16.md#november-18-provider-follow-up)
+records Supabase's confirmation of the collector issue and one bounded database
+observation. Permanent remediation and representative usage remain open.
+The [local reminder acceptance](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md)
+now exercises real auction receipts through the worker and authenticated inbox.
+Hosted acceptance still needs a payment reminder opened before settlement and
+a late bid that the deployed worker observes extending the deadline.
+
+[PR #498](https://github.com/maysonkiller/ArtSoul-Protocol/pull/498) and
+[PR #499](https://github.com/maysonkiller/ArtSoul-Protocol/pull/499) are
+merged. On November 18 Vercel resolved the production domain to READY commit
+`1382df01c21681044b1be5178d4d4d2bc82521a0`. Both PRs passed their Linux,
+Windows and static checks. The local focused card/header cache suite passed
+135 tests. A Chromium fixture used the shared header, styles and actual copy
+handler with a delayed clipboard response. Name and address copying produced
+zero movement of the four neighboring controls at 820, 1280 and 1920 CSS px
+in both themes. Menu and plaque widths matched for guest and connected
+desktop fixtures. At 390 px the account control measured 44 px and its menu
+184 px; the desktop name/address controls were hidden.
 
 The accepted redesign has been applied across Home, Gallery, Profile, Artwork,
 Publish, collection planning, Admin and Guide. Both original palettes remain.
@@ -45,7 +143,7 @@ data passes six mobile/desktop theme checks with zero measured layout shift.
 Release evidence and limitations are recorded in
 [the theme/account audit](audits/B18_THEME_ACCOUNT_2026-11-02.md).
 
-## Remaining acceptance and operational work
+## Acceptance evidence and transferred follow-ups
 
 The November 9 [confirmed purchase correction](audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
 removes obsolete post-confirmation RPC/legacy-write calls that could report a
@@ -193,8 +291,8 @@ PR472 is merged as `8edd5cb4` and deployed to the normal domain through
 `dpl_EzF6rHrj1ivAZ3pMi7Ec3kTDHB2N`. Static/Linux/Windows CI passed. Eight
 production route shells and 34 assets passed verification; the two-theme
 browser matrix also covers a short landscape viewport. These three reported
-implementation fixes are released; the operational and actual-device gates
-below remain open.
+implementation fixes were released. The November 16 device observations
+and the November 18 handoff below update the remaining verification.
 
 On November 9 the owner confirmed backup-key custody in Google Password Manager
 and access from an iPhone. The encrypted archive on the existing indexer server
@@ -228,10 +326,10 @@ for the 53 focused checks, 450 built-browser assertions and release boundary.
 
 | Gate | What remains | Boundary |
 | --- | --- | --- |
-| B17 reminder acceptance | Payment reminder read acknowledgement and live extension | The [live follow-up](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md) verifies one winner-only payment reminder after ending auction 75, its real deadline, no duplicate and owner-confirmed iPhone viewing. The owner independently settled: NFT 8 belongs to the winner, no additional ETH was sent, 0.009 test ETH is withdrawable and the one-hour reminder setting was restored. The reminder correctly disappears after settlement, but has no read marker; the separate purchase message is read. The [local receipt-refresh correction](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#local-receipt-refresh-correction) replaces the one-read/Sold polling stop with a shared seven-attempt refresh that also waits for indexed history; it cancels stale receipt/account work, pauses while hidden and exposes Retry. The history-only Retry target gap is corrected locally; final review/build/CI/release and live convergence remain unaccepted. Official broadcasts wait for the designated project publisher. |
+| B17 reminder acceptance | Payment reminder read acknowledgement and live extension | The [live follow-up](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md) verifies one winner-only payment reminder after ending auction 75, its real deadline, no duplicate and owner-confirmed iPhone viewing. The owner independently settled: NFT 8 belongs to the winner, no additional ETH was sent, 0.009 test ETH is withdrawable and the one-hour reminder setting was restored. The reminder correctly disappears after settlement, but has no read marker; the separate purchase message is read. The [receipt-refresh correction](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#released-receipt-refresh-correction) is released in PR #497, merge `f02595bf888fc9baa44e4ca9cd4057d93686fd19`, with 101 focused checks and hosted run `43926281894` green. READY production and exact apex bundle verification passed; the reloaded page shows correct ownership, seven history events and no updating notice. A new settlement's no-reload convergence was not re-exercised. Official broadcasts wait for the designated project publisher. |
 | B20 profile notice handling | **Controlled production acceptance passed November 16** | [Profile-content reports](audits/B20_PROFILE_CONTENT_REPORTS_2026-11-09.md) are released in PR #484 with PR #485 dialog geometry and PR #487 stored-profile guard. The owner-authorized lys TEST cycle passed staff passkey review, public masking, original-content restoration and both participants' notification viewing/read state. The cycle exposed omitted profile types in summary/read/remove; the [bounded database correction](audits/B20_PROFILE_NOTIFICATION_READ_STATE_2026-11-16.md) passed isolated regressions and both live owner reads. Historical cover files stay preserved as a separate retention choice, not a reporting gate. Immediate cross-client invalidation, upload deletion and broader customization are not claimed. |
 | B18 device acceptance | iPhone layout, early-return profile sign-in, voice navigation and recorded Russian-help playback accepted | After PR #492 on November 16, the owner repeated the early MetaMask return and confirmed the editor opened. The remaining window was identified as the browser's native Open/Cancel confirmation, not a site hint. The follow-up removes automatic timed app navigation; the existing explicit Open Wallet action remains. See [mobile profile follow-up](audits/B18_MOBILE_PROFILE_AUTH_2026-11-16.md) and [early-return acceptance](audits/B18_EARLY_WALLET_RETURN_2026-11-16.md). PR #495 released the page-navigation correction, and the owner subsequently confirmed that "открой галерею" opened the gallery on iPhone. Navigation acceptance is complete. PR #496 released prerecorded Russian/English replies without a per-play model call as merge `2ddb7e0fff32af918b6f7ef45dda35d4cb938f0d`; CI `43921630762` passed Linux, Windows, static and contract checks. Production `dpl_FizWTCZevZfMahFUryLZRQYpkmja` is READY; the apex served script v14 and all 18 verified audio hashes at `2026-11-16T17:50:25Z`. Chrome preview Russian help passed manual Listen → Stop → Listen without an audio error. On November 16 the owner retested the direct WAV and assistant on the physical iPhone and confirmed audible recorded Russian-help playback and a changing playback button. No code changed between the silent report and this successful retest; the initial report is retained in the linked recorded-reply audit. This accepts recorded Russian help, not all dynamic/native speech or Phase B. See [the navigation follow-up](audits/B18_VOICE_NAVIGATION_AUDIO_2026-11-16.md) and [recorded-reply scope](audits/B18_RECORDED_VOICE_PROTOTYPE_2026-11-16.md). Paid GPT-Live and user-supplied API-key integration are deferred outside Phase B. The November 9 Phantom → Disconnect → reload guest → Rabby check remains accepted; Android testing was declined. |
-| B11/B12 actual journeys | **Complete resale UI outcome accepted November 16** | Music 2/artwork 32/token 5 purchase at block 59568267 changed owner to lys, retired Buy, added the exact tenth provenance event and cleared the assistant on the same page without reload. [Receipt/UI evidence](audits/B12_RESALE_UI_ACCEPTANCE_2026-11-16.md) retains the unrecorded initial-stale/retry timing limitation. Prior default, re-auction, creation, bid, listing, withdrawal and repricing/removal acceptance remain valid. Artwork 25's in-place modal closure was not observed. Auction 75's independently signed settlement is verified, but its open-page ownership/history stayed stale; the [bounded local correction](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#local-receipt-refresh-correction) is under verification and is not yet released. Never replay completed transactions to manufacture evidence. |
+| B11/B12 actual journeys | **Complete resale UI outcome accepted November 16** | Music 2/artwork 32/token 5 purchase at block 59568267 changed owner to lys, retired Buy, added the exact tenth provenance event and cleared the assistant on the same page without reload. [Receipt/UI evidence](audits/B12_RESALE_UI_ACCEPTANCE_2026-11-16.md) retains the unrecorded initial-stale/retry timing limitation. Prior default, re-auction, creation, bid, listing, withdrawal and repricing/removal acceptance remain valid. Artwork 25's in-place modal closure was not observed. Auction 75's independently signed settlement is verified, but its open-page ownership/history stayed stale. PR #497 released the [bounded correction](audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#released-receipt-refresh-correction); automated convergence regressions and the reloaded production state pass, while a new no-reload settlement observation remains separate. Never replay completed transactions to manufacture evidence. |
 | B30/B35 operations | Provider exporter correction, representative IO/egress and optional NFT/cache activation | The newer Core worker is active on the existing host as of November 9; recovery, migrations, runtime bytes, bounded health and four populated APIs passed. Combined PostgreSQL/real-Redis recovery passes locally. Hosted cache and NFT-writer activation remain separate; the managed exporter cause is proved but its correction is pending. The [November 16 recheck](audits/B30_B35_OPERATIONAL_RECHECK_2026-11-16.md) confirms USD 25.00 current/projected dashboard costs, Spend Cap enabled and the authorized support follow-up sent; it does not close representative resource acceptance. No new server was purchased. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
 

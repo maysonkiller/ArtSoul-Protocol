@@ -1,15 +1,26 @@
 # Support the Artist — Phase C Design
 
-Status: founder-decided design. October 3 removes the message amount threshold
-under [the explicit amendment](CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md).
-September 30 implementation is authorized earlier
-by [the dated amendment](CHANGELOG_2026-09-30_ARTIST_SUPPORT.md). Historical Phase C
-scheduling below is superseded by that amendment only; delivery status is recorded
-in the stabilization checkpoint, not inferred from this design.
+## First Base mainnet release, November 19, 2026
 
-Phase: C — Mainnet Preparation, together with the final contract rework, test, Base Sepolia rehearsal, and security-review cycle.
+At launch, a supporter can copy the original creator’s address from the profile and send native ETH on Base using their own wallet. The artwork’s Creator link identifies the recipient even after resale. The supporter checks the network, address, amount and gas in the wallet. The creator receives the amount sent and the supporter pays network gas. ArtSoul charges no fee. The wallet receipt identifies the recipient and amount. A plain transfer carries no ArtSoul artwork ID, so it creates no per-artwork history entry, message or donor ranking.
 
-This document records the approved product direction without displacing Phase A stabilization. Before Solidity work begins, the Canon Bible and `CONTRACT_REWORK_PLAN.md` must receive a dated consolidation because this feature adds a separate contract to the currently proposed four-contract topology.
+The ordinary-market release needs two new application contracts, the Core and its paired NFT. The first mainnet deployment omits the donation forwarder. In a local Hardhat fixture its deployment used 778,400 gas. Sending 0.01 ETH for work 1 to an existing externally owned account used 53,362 gas through the forwarder with an empty message, 55,701 with “Thank you”, and 21,000 for a direct transfer. A recipient with contract code can consume more. The actual Base fee also depends on execution and L1 data prices. [Base transaction fees](https://docs.base.org/specifications/transactions/network-fees)
+
+At Base mainnet block 59,632,454, the execution gas price was 0.006 gwei. Using the local gas figures, conservative transaction sizes, the network's L1 fee upper estimate and its zero operator fee at that block gave approximately 0.000000131 ETH for a direct transfer, 0.000000331 ETH for an empty-message donation and 0.00000479 ETH for deployment. These estimates exclude the donation amount. [Reference block](https://basescan.org/block/59632454) · [Fee estimation](https://docs.base.org/specifications/transactions/network-fees)
+
+The Base Sepolia prototype and its event-backed history remain available under the existing testnet configuration. Two controlled transfers of one wei each on work 34 exercised that history. This sample covers one work and does not establish demand for mainnet attribution. Revisit the forwarder if artists or collectors repeatedly request public proof of support for a particular work or an attached message. Before enabling it, rehearse the full event-to-history path and review the contract, indexer and moderation costs. [Hosted history check](../audits/B22_HISTORY_LAYOUT_2026-10-26.md) · [Ordinary-market release scope](17_ROADMAP_PHASES.md#what-needs-an-address)
+
+For launch budgeting, the material cost decision is the additional independent review and maintenance of the forwarder. Obtain its incremental scope and quote alongside the required market review before making a spending decision. [Independent review scope](CONTRACT_REWORK_PLAN.md#independent-review-scope-for-the-first-base-release)
+
+## Artwork-linked support on Base Sepolia
+
+The following design applies to the Base Sepolia Donate flow and the optional replacement candidate. The September 30 amendment authorized the prototype. The October 3 amendment removed the message amount threshold. [Prototype decision](CHANGELOG_2026-09-30_ARTIST_SUPPORT.md) · [Amount amendment](CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md)
+
+### Replacement ordinary-artwork pair, November 19, 2026
+
+The local [OrdinaryArtDonations candidate](../../contracts/replacement/OrdinaryArtDonations.sol) reads the original creator from the bound engine's `works(artworkId)`. The prototype binding reads `artworks(artworkId)`. Both share the ETH forwarding, message validation, donation event and administration implementation. Each deployment fixes its registry at construction.
+
+The [Hardhat integration suite](../../test/OrdinaryArtDonations.test.cjs) exercises a registered work before minting and a settled work whose NFT ID differs from its artwork ID. It verifies full creator payment, rejects mismatched recipients and unknown works, and replays the local donation receipt through the existing parser and Sepolia projection with a recording SQL client. A future artwork-linked release would need the reviewed engine, administration Safe, forwarder address and a persisted, correctly attributed history row during rehearsal.
 
 ## Product Purpose
 
@@ -53,11 +64,11 @@ The history panel shows one compact line for the largest successful donation:
 
 `View all` opens a panel or tab with donor label, amount, optional visible message, and event time. The list supports a newest-first view and an amount-sorted view. Indexed block and log ordering provides deterministic ordering for equal values.
 
-## Why a Contract Is Required
+## How a donation is linked to an artwork
 
-A plain native-ETH transfer does not emit an application event and carries no trustworthy artwork identifier. Discovering such transfers would require transaction scanning rather than the existing `eth_getLogs` indexer path, would consume additional RPC resources, and still could not establish which artwork the sender intended to support.
+A plain native-ETH transfer pays the receiving address. Its transaction hash proves the transfer, but if an artist has several works it cannot establish which one the donor meant to support. ArtSoul therefore leaves those transfers out of per-artwork history.
 
-If donations are displayed, Phase C therefore adds a minimal event-only donations contract. The proposed external shape is:
+The Donate form calls a forwarder in a single wallet transaction. It checks the creator against the registry, sends the entire donation to that creator, and emits the event the indexer uses for the artwork’s history and optional message. The sender pays network gas separately. If the payment fails, the transaction reverts. The external interface is:
 
 ```solidity
 function donate(
@@ -128,7 +139,6 @@ This feature does not add:
 - donations to ProtocolTreasury, EcosystemTreasury, a company wallet, or a general project-development wallet;
 - custody, escrow, refunds, subscriptions, donor rewards, badges, points, tokens, airdrops, or fee privileges;
 - donation-based Trust, discovery, contest, ranking, floor, price, provenance, or settlement mechanics;
-- a Phase B or standalone early contract;
 - a non-Base deployment.
 
 ## Founder Decisions Recorded
@@ -136,15 +146,5 @@ This feature does not add:
 - On-site anonymous display: approved.
 - Amount: any non-zero value, with or without a message; no message threshold
   (amended October 3).
-- Delivery phase: Phase C with the full contract rework; no Phase B version.
+- Delivery scope: artwork-linked support on the existing testnet. The first Base mainnet release uses a direct wallet transfer.
 - Creator routing: 100% of each successful donation, with no protocol cut or custody.
-
-## Required Canon Consolidation Before Implementation
-
-The following architecture touchpoints are queued rather than changed silently:
-
-1. Canon Bible section 6 — explicitly preserve Trust and discovery neutrality.
-2. Canon Bible section 11 and `07_ADMIN_MODERATION_CANON.md` — extend complaint-driven UI moderation to donation-message visibility only.
-3. Canon Bible section 14 and `14_PROTOCOL_REVENUE_AND_TEAM.md` — state that creator donations bypass both protocol treasuries and company operating capital and are not protocol revenue.
-4. Canon Bible section 17 and `CONTRACT_REWORK_PLAN.md` Part 2 — place the work in Phase C and reconcile the additional minimal donations contract with the current four-contract target topology.
-5. `12_IMPLEMENTATION_BACKLOG.md` Phase C — schedule contract, indexer, API, moderation, test, rehearsal, and audit work only after architecture sign-off.

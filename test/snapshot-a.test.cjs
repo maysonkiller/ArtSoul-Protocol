@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
-const { spawnSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const path = require('node:path');
 const test = require('node:test');
 const { pathToFileURL } = require('node:url');
@@ -195,6 +195,30 @@ test('the cut-off excludes later rows and is recorded in the manifest', async ()
   assert.equal(JSON.parse(files['resales.json']).count, 0);
 });
 
+test('capture and offline verification agree on the inclusive fractional-second boundary', async () => {
+  const { verifySnapshot } = await snapshotModule;
+  const tables = sampleTables();
+  const row = tables.v41_bids[0];
+  const cutOff = '2026-07-04T02:00:00.123456+02:00';
+  tables.v41_bids = [
+    new Date('2026-07-04T00:00:00.123Z'),
+    '2026-07-04T00:00:00.123456Z',
+    '2026-07-04T00:00:00.123457Z',
+    new Date('2026-07-04T00:00:00.124Z')
+  ].map(indexed_at => ({ ...row, indexed_at }));
+  const { files, rootHash } = await build({ tables, cutOff });
+  const bids = JSON.parse(files['bids.json']);
+  assert.deepEqual(bids.rows.map(row => row.indexed_at).sort(),
+    ['2026-07-04T00:00:00.123456Z', '2026-07-04T00:00:00.123Z']);
+  assert.equal(verifySnapshot({ readFile: readerFor(files), hashText, expectedRootHash: rootHash }).ok, true);
+
+  bids.rows[0].indexed_at = '2026-07-04T00:00:00.123457Z';
+  files['bids.json'] = JSON.stringify(bids);
+  const result = verifySnapshot({ readFile: readerFor(await rehash(files)), hashText });
+  assert.equal(result.ok, false);
+  assert.match(result.problems.join(' '), /bids.json contains a row after the source cut-off/);
+});
+
 test('participants are every address that took part, once, and never the zero address', async () => {
   const tables = sampleTables();
   tables.v41_auctions[0].winner = ZERO;
@@ -366,7 +390,9 @@ test('invalid JSON in a correctly hashed section fails verification', async () =
 });
 
 test('CLI distinguishes consistency from a trusted copy and rejects incomplete options', async () => {
-  const { files, rootHash } = await build();
+  const tables = sampleTables();
+  tables.v41_artworks[0].metadata_uri = 'ipfs://fixture-\uFFFD';
+  const { files, rootHash } = await build({ tables });
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'artsoul-verifier-'));
   const script = path.join(__dirname, '..', 'scripts', 'verify-snapshot-a.mjs');
   try {
@@ -375,9 +401,31 @@ test('CLI distinguishes consistency from a trusted copy and rejects incomplete o
     const unanchored = run();
     assert.equal(unanchored.status, 0, unanchored.stderr);
     assert.match(unanchored.stdout, /Authenticity is NOT checked/);
-    const trusted = run('--expected-root', rootHash);
+    const readCounter = `
+      import fs from 'node:fs';
+      import path from 'node:path';
+      let reads = 0;
+      const read = fs.readFileSync;
+      fs.readFileSync = function (file, ...args) {
+        if (typeof file === 'string' && path.basename(file) === 'manifest.json') reads++;
+        return read(file, ...args);
+      };
+      process.on('exit', () => console.log('manifest reads: ' + reads));`;
+    const trusted = spawnSync(process.execPath, ['--import', 'data:text/javascript,' + encodeURIComponent(readCounter),
+      script, directory, '--expected-root', rootHash], { encoding: 'utf8' });
     assert.equal(trusted.status, 0, trusted.stderr);
     assert.match(trusted.stdout, /independently supplied trusted capture record/);
+    assert.ok(trusted.stdout.includes(`root hash: ${rootHash}`));
+    assert.match(trusted.stdout, /manifest reads: 1\b/);
+
+    // A valid replacement character and a damaged UTF-8 byte must not hash alike.
+    const artworkFile = path.join(directory, 'artworks.json');
+    const [prefix, suffix] = files['artworks.json'].split('\uFFFD');
+    fs.writeFileSync(artworkFile, Buffer.concat([Buffer.from(prefix), Buffer.from([0xff]), Buffer.from(suffix)]));
+    const damaged = run('--expected-root', rootHash);
+    assert.equal(damaged.status, 1);
+    assert.match(damaged.stdout, /artworks.json.*unreadable/);
+    fs.writeFileSync(artworkFile, files['artworks.json']);
     const mismatch = run('--expected-root', '0'.repeat(64));
     assert.equal(mismatch.status, 1);
     assert.match(mismatch.stdout, /trusted root hash/);
@@ -391,23 +439,125 @@ test('CLI distinguishes consistency from a trusted copy and rejects incomplete o
     assert.equal(invalidManifest.status, 1);
     assert.match(invalidManifest.stdout, /JSON object/);
 
-    // Archive the verifier with its one local module; no repository or npm
-    // installation is needed when a durable copy is checked after migration.
-    fs.writeFileSync(path.join(directory, 'manifest.json'), files['manifest.json']);
-    const toolsDir = path.join(directory, 'verification-tools');
-    fs.mkdirSync(path.join(toolsDir, 'scripts'), { recursive: true });
-    fs.mkdirSync(path.join(toolsDir, 'src', 'snapshot'), { recursive: true });
-    fs.writeFileSync(path.join(toolsDir, 'package.json'), '{"type":"module"}\n');
-    fs.copyFileSync(script, path.join(toolsDir, 'scripts', 'verify-snapshot-a.mjs'));
-    fs.copyFileSync(path.join(__dirname, '..', 'src', 'snapshot', 'snapshot-a.js'), path.join(toolsDir, 'src', 'snapshot', 'snapshot-a.js'));
-    const isolated = spawnSync(process.execPath, [path.join(toolsDir, 'scripts', 'verify-snapshot-a.mjs'), directory,
-      '--expected-root', rootHash], { cwd: directory, encoding: 'utf8', env: { ...process.env, DATABASE_URL: '', SUPABASE_URL: '' } });
-    assert.equal(isolated.status, 0, isolated.stderr);
-    assert.match(isolated.stdout, /trusted capture record/);
   } finally {
     assert.equal(path.dirname(directory), path.resolve(os.tmpdir()));
     assert.ok(path.basename(directory).startsWith('artsoul-verifier-'));
     fs.rmSync(directory, { recursive: true });
+  }
+});
+
+test('both independently restored directories must verify against one supplied root', async t => {
+  const { writeSnapshotFiles } = await import('../scripts/export-snapshot-a.mjs');
+  const capture = await build({ cutOff: '2026-08-27T00:00:00Z' });
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'artsoul-copy-pair-'));
+  t.after(() => {
+    assert.equal(path.dirname(tmp), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(tmp).startsWith('artsoul-copy-pair-'));
+    fs.rmSync(tmp, { recursive: true });
+  });
+  const script = path.join(__dirname, '..', 'scripts', 'verify-snapshot-a.mjs');
+  const first = path.join(tmp, 'first');
+  const second = path.join(tmp, 'second');
+  writeSnapshotFiles(first, capture.files);
+  writeSnapshotFiles(second, capture.files);
+  const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+  const pair = (a, b) => run(a, '--second-copy', b, '--expected-root', capture.rootHash);
+  const verified = pair(first, second);
+  assert.equal(verified.status, 0, verified.stdout + verified.stderr);
+  assert.equal(verified.stdout.split('root hash: ' + capture.rootHash).length - 1, 2);
+  assert.match(verified.stdout, /Both restored copies match/);
+  assert.equal(run(first, '--second-copy', second).status, 1);
+  assert.equal(run(first, '--expected-root', capture.rootHash, '--expected-root', capture.rootHash).status, 1);
+
+  // A folder restored or uploaded as a whole must contain only the approved
+  // public archive. Companion files belong alongside that folder.
+  const note = path.join(first, 'capture-notes.txt');
+  const extraFolder = path.join(second, 'working-files');
+  fs.writeFileSync(note, 'synthetic operator notes');
+  fs.mkdirSync(extraFolder);
+  const extraEntries = pair(first, second);
+  assert.equal(extraEntries.status, 1);
+  assert.equal(extraEntries.stdout.match(/unlisted archive entries/g)?.length, 2);
+  assert.doesNotMatch(extraEntries.stdout, /Both restored copies match/);
+  assert.equal(run(first, '--expected-root', capture.rootHash).status, 1);
+  assert.equal(run(first).status, 0, 'legacy consistency-only verification checks the listed files');
+  assert.equal(fs.readFileSync(note, 'utf8'), 'synthetic operator notes');
+  fs.unlinkSync(note);
+  fs.rmdirSync(extraFolder);
+  assert.equal(pair(first, second).status, 0);
+
+  // Both reads must run even when the first directory is unavailable.
+  const missing = pair(path.join(tmp, 'missing'), second);
+  assert.equal(missing.status, 1);
+  assert.ok(missing.stdout.includes('root hash: ' + capture.rootHash));
+  assert.doesNotMatch(missing.stdout, /Both restored copies match/);
+
+  const alias = path.join(tmp, 'alias');
+  fs.symlinkSync(first, alias, 'junction');
+  assert.equal(pair(first, alias).status, 1);
+  const secondBids = path.join(second, 'bids.json');
+  fs.unlinkSync(secondBids);
+  fs.linkSync(path.join(first, 'bids.json'), secondBids);
+  const linked = pair(first, second);
+  assert.equal(linked.status, 1);
+  assert.match(linked.stdout, /bids\.json points to the same file/);
+
+  fs.unlinkSync(secondBids);
+  fs.writeFileSync(secondBids, '{}');
+  const corrupt = pair(first, second);
+  assert.equal(corrupt.status, 1);
+  assert.match(corrupt.stdout, /bids\.json does not match/);
+  const other = path.join(tmp, 'another-capture');
+  writeSnapshotFiles(other, (await build({ tables: {} })).files);
+  assert.equal(run(other).status, 0);
+  const mismatch = pair(first, other);
+  assert.equal(mismatch.status, 1);
+  assert.match(mismatch.stdout, /trusted root hash/);
+});
+
+test('a reproducible verifier kit uses the reviewed commit and verifies an isolated archive', async () => {
+  const { files, rootHash } = await build();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'artsoul-kit-'));
+  const repo = path.resolve(__dirname, '..');
+  const git = (...args) => execFileSync('git', ['--no-replace-objects', ...args], { cwd: repo });
+  const revision = git('rev-parse', 'HEAD').toString().trim();
+  const packager = path.join(repo, 'scripts', 'package-snapshot-a-verifier.mjs');
+  const pack = (target, rev = revision) => spawnSync(process.execPath, [packager, rev, target], { cwd: tmp, encoding: 'utf8' });
+  try {
+    const archive = path.join(tmp, 'archive');
+    fs.mkdirSync(archive);
+    for (const [name, content] of Object.entries(files)) fs.writeFileSync(path.join(archive, name), content);
+    const rejected = pack(archive);
+    assert.equal(rejected.status, 1);
+    assert.deepEqual(fs.readdirSync(archive).sort(), Object.keys(files).sort());
+    assert.equal(pack('invalid', 'HEAD').status, 1);
+    assert.equal(fs.existsSync(path.join(tmp, 'invalid')), false);
+
+    const kit = path.join(tmp, 'verification-tools');
+    const second = path.join(tmp, 'second-kit');
+    const first = pack(kit);
+    assert.equal(first.status, 0, first.stderr);
+    const repeat = pack(second);
+    assert.equal(repeat.status, 0, repeat.stderr);
+    assert.equal(first.stdout, repeat.stdout);
+    const names = ['package.json', 'scripts/verify-snapshot-a.mjs', 'src/snapshot/snapshot-a.js'];
+    const sums = names.map(name => {
+      const bytes = fs.readFileSync(path.join(kit, name));
+      assert.deepEqual(bytes, fs.readFileSync(path.join(second, name)));
+      if (name !== 'package.json') assert.deepEqual(bytes, git('cat-file', 'blob', revision + ':' + name));
+      return hashText(bytes) + '  ' + name + '\n';
+    }).join('');
+    assert.equal(fs.readFileSync(path.join(kit, 'SHA256SUMS'), 'utf8'), sums);
+    assert.ok(first.stdout.includes('SHA256SUMS digest: ' + hashText(sums)));
+    assert.ok(first.stdout.includes('Git commit: ' + revision));
+    const isolated = spawnSync(process.execPath, [path.join(kit, 'scripts', 'verify-snapshot-a.mjs'), archive,
+      '--expected-root', rootHash], { cwd: tmp, encoding: 'utf8', env: { ...process.env, DATABASE_URL: '', SUPABASE_URL: '' } });
+    assert.equal(isolated.status, 0, isolated.stderr);
+    assert.match(isolated.stdout, /trusted capture record/);
+  } finally {
+    assert.equal(path.dirname(tmp), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(tmp).startsWith('artsoul-kit-'));
+    fs.rmSync(tmp, { recursive: true });
   }
 });
 
@@ -430,6 +580,11 @@ test('export refuses existing output and missing cut-off before any database con
     const missingCutOff = run('--out', path.join(root, 'new'));
     assert.equal(missingCutOff.status, 1);
     assert.match(missingCutOff.stderr, /explicit ISO-8601/);
+    for (const cutOff of ['2026-07-04T00:00:00', '2026-07-04T00:00:00.1234567Z']) {
+      const invalid = run('--out', path.join(root, 'new'), '--cut-off', cutOff);
+      assert.equal(invalid.status, 1);
+      assert.match(invalid.stderr, /explicit ISO-8601/);
+    }
     assert.equal(fs.existsSync(path.join(root, 'new')), false);
   } finally {
     assert.equal(path.dirname(root), path.resolve(os.tmpdir()));

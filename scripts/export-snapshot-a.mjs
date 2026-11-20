@@ -13,27 +13,38 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 import pg from 'pg';
+import { SUPPORTED_INDEXER_CHAINS } from '../src/indexer/chain-config.js';
 import { buildSnapshot, EXPORTED_TABLES, SNAPSHOT_SCHEMA_VERSION } from '../src/snapshot/snapshot-a.js';
 
-function readFlag(name, fallback = null) {
-    const index = process.argv.indexOf(`--${name}`);
-    if (index === -1) return fallback;
-    const value = process.argv[index + 1];
-    return value && !value.startsWith('--') ? value : fallback;
+function validCutOff(value) {
+    const match = /^(\d{4}-\d\d-\d\d)T(\d\d):\d\d:\d\d(?:\.(\d{1,6}))?(?:Z|[+-](\d\d):?\d\d)$/i.exec(value || '');
+    if (!match || !Number.isFinite(Date.parse(value))) return false;
+    const [, day, hour, fraction = '', offsetHour = '00'] = match;
+    // Date.parse rolls invalid month-end days forward and truncates sub-millisecond
+    // fractions. PostgreSQL also requires AD years and offsets below sixteen hours.
+    const midnight = new Date(day + 'T00:00:00Z');
+    return !day.startsWith('0000-') && midnight.toISOString().slice(0, 10) === day &&
+        Number(offsetHour) < 16 && (hour !== '24' || !/[1-9]/.test(fraction));
 }
 
 const hashText = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
-export async function readSnapshotTables(client, chainId) {
+export async function readSnapshotTables(client, chainId, cutOff = null) {
     const tables = {};
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     try {
         for (const spec of EXPORTED_TABLES) {
-            const columns = spec.columns.map(column => `"${column}"`).join(', ');
+            // Preserve the full precision of the source timestamp in the file.
+            // pg's default Date conversion would truncate the final three digits.
+            const columns = spec.columns.map(column => column === spec.timeColumn
+                ? `to_char("${column}" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "${column}"`
+                : `"${column}"`).join(', ');
+            const timeFilter = cutOff === null ? '' : ` AND "${spec.timeColumn}" <= $2::timestamptz`;
             const result = await client.query(
-                `SELECT ${columns} FROM ${spec.table} WHERE chain_id = $1`,
-                [String(chainId)]
+                `SELECT ${columns} FROM ${spec.table} WHERE chain_id = $1${timeFilter}`,
+                cutOff === null ? [String(chainId)] : [String(chainId), cutOff]
             );
             tables[spec.table] = result.rows;
         }
@@ -55,13 +66,25 @@ export function writeSnapshotFiles(outDir, files) {
 }
 
 async function main() {
-    const outDir = path.resolve(readFlag('out', path.join('..', 'snapshot-a')));
-    const cutOff = readFlag('cut-off');
-    const chainId = readFlag('chain-id', process.env.ARTSOUL_INDEXER_CHAIN_ID || '84532');
+    const { values } = parseArgs({ options: {
+        out: { type: 'string', multiple: true },
+        'cut-off': { type: 'string', multiple: true },
+        'chain-id': { type: 'string', multiple: true }
+    } });
+    for (const [name, entries] of Object.entries(values)) {
+        if (entries.length !== 1 || !entries[0]) throw new Error(`Supply --${name} once with a value`);
+    }
+    const outDir = path.resolve(values.out?.[0] ?? path.join('..', 'snapshot-a'));
+    const cutOff = values['cut-off']?.[0];
+    const baseSepolia = String(SUPPORTED_INDEXER_CHAINS['base-sepolia'].chainId);
+    const chainId = values['chain-id']?.[0] ?? (process.env.ARTSOUL_INDEXER_CHAIN_ID || baseSepolia);
     const connectionString = process.env.DATABASE_URL;
 
+    if (chainId !== baseSepolia) throw new Error(`Snapshot A capture requires Base Sepolia (chain ${baseSepolia})`);
     if (fs.existsSync(outDir)) throw new Error('Output directory already exists; choose a new directory');
-    if (!cutOff || !Number.isFinite(Date.parse(cutOff))) throw new Error('An explicit ISO-8601 --cut-off is required');
+    if (!validCutOff(cutOff)) {
+        throw new Error('An explicit ISO-8601 --cut-off with a time zone and at most six fractional digits is required');
+    }
     if (!connectionString) throw new Error('DATABASE_URL is required');
 
     const client = new pg.Client({ connectionString });
@@ -69,7 +92,7 @@ async function main() {
 
     let tables;
     try {
-        tables = await readSnapshotTables(client, chainId);
+        tables = await readSnapshotTables(client, chainId, cutOff);
     } finally {
         await client.end();
     }
@@ -81,7 +104,7 @@ async function main() {
     console.log('');
     console.log(`schema version : ${SNAPSHOT_SCHEMA_VERSION}`);
     console.log(`chain          : ${chainId}`);
-    console.log(`cut-off        : ${cutOff || 'none (everything indexed so far)'}`);
+    console.log(`cut-off        : ${cutOff}`);
     console.log(`written to     : ${outDir}`);
     console.log(`root hash      : ${rootHash}`);
     console.log('');

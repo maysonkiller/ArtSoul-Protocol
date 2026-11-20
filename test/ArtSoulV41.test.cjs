@@ -24,6 +24,7 @@ const TWO_ETH = ethers.parseEther("2");
 
 const ERROR_SIGNATURES = {
   ActiveAuctionExists: "ActiveAuctionExists()",
+  AuctionNotActive: "AuctionNotActive()",
   ArtworkAlreadyMinted: "ArtworkAlreadyMinted()",
   AuctionAlreadyFinalized: "AuctionAlreadyFinalized()",
   AuctionNotEnded: "AuctionNotEnded()",
@@ -287,6 +288,75 @@ async function settlePrimaryAuction(ctx, bidAmount = ONE_ETH) {
 }
 
 describe("ArtSoul V4.1 protocol", function () {
+  it("rehearses the prototype deployment CLI and both Core bindings on a local Base Sepolia chain", async function () {
+    this.timeout(60_000);
+    const { execFile } = require("node:child_process");
+    const { mkdtemp, writeFile, rm, rmdir } = require("node:fs/promises");
+    const { tmpdir } = require("node:os");
+    const { join, resolve } = require("node:path");
+    const { promisify } = require("node:util");
+    const { createProvider } = require("hardhat/internal/core/providers/construction");
+    const signer = ethers.Wallet.createRandom();
+    const treasury = ethers.Wallet.createRandom().address;
+    const chain = {
+      ...hre.config.networks.hardhat, chainId: 84532, forking: undefined,
+      accounts: [{ privateKey: signer.privateKey, balance: ONE_ETH.toString() }]
+    };
+    const evm = await createProvider({ ...hre.config, networks: { hardhat: chain } }, "hardhat", artifacts);
+    const reader = new ethers.BrowserProvider(evm);
+    const rpc = await hre.run("node:create-server", { provider: evm, hostname: "127.0.0.1", port: 0 });
+    const dir = await mkdtemp(join(tmpdir(), "artsoul-deployment-"));
+    const config = join(dir, "hardhat.config.cjs");
+    try {
+      const { port } = await rpc.listen();
+      const options = {
+        solidity: "0.8.24", paths: { artifacts: hre.config.paths.artifacts },
+        networks: { "base-sepolia": { url: `http://127.0.0.1:${port}` } }
+      };
+      await writeFile(config, `module.exports = ${JSON.stringify(options)}`);
+      const { stdout } = await promisify(execFile)(process.execPath, [resolve(__dirname, "../scripts/deploy.js")], {
+        cwd: dir, timeout: 40_000, windowsHide: true,
+        env: {
+          SystemRoot: process.env.SystemRoot || "", HARDHAT_CONFIG: config, HARDHAT_NETWORK: "base-sepolia",
+          PRIVATE_KEY: signer.privateKey, TREASURY_ADDRESS: treasury, DEPLOY_DRY_RUN: "0"
+        }
+      });
+      const output = Object.fromEntries(stdout.split(/\r?\n/).filter(line => line.startsWith("ARTSOUL_"))
+        .map(line => line.split("=")));
+      const address = [output.ARTSOUL_NFT_ADDRESS, output.ARTSOUL_PROJECT_NFT_ADDRESS, output.ARTSOUL_CORE_ADDRESS];
+      const actions = ["NFT_DEPLOY", "PROJECT_NFT_DEPLOY", "CORE_DEPLOY", "NFT_SET_CORE", "PROJECT_NFT_SET_CORE"];
+      for (const [nonce, action] of actions.entries()) {
+        const hash = output[`ARTSOUL_${action}_TX`];
+        const receipt = await reader.getTransactionReceipt(hash);
+        const tx = await reader.getTransaction(hash);
+        expect(receipt.status).to.equal(1);
+        expect(receipt.blockNumber).to.equal(Number(output[`ARTSOUL_${action}_BLOCK`]));
+        expect(tx.from).to.equal(signer.address);
+        expect(tx.chainId).to.equal(84532n);
+        expect(tx.nonce).to.equal(nonce);
+        if (nonce < 3) {
+          expect(receipt.contractAddress).to.equal(address[nonce]);
+          expect(await reader.getCode(address[nonce])).not.to.equal("0x");
+        } else {
+          expect(tx.to).to.equal(address[nonce - 3]);
+        }
+      }
+      expect(await reader.getTransactionCount(signer.address)).to.equal(5);
+      const [nft, projectNft, core] = await Promise.all(["ArtSoulNFT", "ArtSoulProjectNFT", "ArtSoulCore"]
+        .map(async (name, index) => new ethers.Contract(address[index], (await artifacts.readArtifact(name)).abi, reader)));
+      expect(await nft.core()).to.equal(address[2]);
+      expect(await projectNft.core()).to.equal(address[2]);
+      expect(await core.nftContract()).to.equal(address[0]);
+      expect(await core.projectNFT()).to.equal(address[1]);
+      expect(await core.treasury()).to.equal(treasury);
+    } finally {
+      reader.destroy();
+      await rpc.close();
+      await rm(config, { force: true });
+      await rmdir(dir);
+    }
+  });
+
   describe("artwork registration", function () {
     it("stores creator and metadata, and starts unminted", async function () {
       const { core, artist } = await deployProtocol();
@@ -542,6 +612,60 @@ describe("ArtSoul V4.1 protocol", function () {
   });
 
   describe("auction ending and settlement", function () {
+    it("keeps bidding and closing disjoint at the exact block timestamp", async function () {
+      const { core, artist, bidder } = await deployProtocol();
+      await registerArtwork(core, artist);
+      await createAuction(core, artist);
+      const { endTime } = await core.auctions(1);
+      const value = expectedDeposit(ONE_ETH);
+      for (const offset of [-1n, 0n, 1n]) {
+        await mineAt(endTime + offset);
+        const blockTag = await network.provider.send("eth_blockNumber");
+        const bid = () => core.connect(bidder).placeBid.staticCall(1, ONE_ETH, { value, blockTag });
+        const close = () => core.endAuction.staticCall(1, { blockTag });
+        if (offset < 0n) {
+          await bid();
+          await expectRevert(close(), "AuctionNotEnded");
+        } else {
+          await expectRevert(bid(), "AuctionNotActive");
+          await close();
+        }
+      }
+    });
+
+    it("gives a winner 24 hours from delayed finalization and accepts payment at the deadline", async function () {
+      const { core, nft, artist, bidder } = await deployProtocol();
+      await registerArtwork(core, artist);
+      await createAuction(core, artist);
+      const deposit = expectedDeposit(ONE_ETH);
+      await mine(core.connect(bidder).placeBid(1, ONE_ETH, { value: deposit }));
+      const { endTime } = await core.auctions(1);
+      await mineAt(endTime + 3600n);
+      const { timestamp: endedAt } = await txTimestamp(core.endAuction(1));
+      const deadline = (await core.auctions(1)).settlementDeadline;
+      expect(deadline).to.equal(endedAt + BigInt(SETTLEMENT_WINDOW));
+      expect(endedAt > endTime).to.equal(true);
+      const due = ONE_ETH - deposit;
+      // Observe both available actions against exactly the same pending state.
+      for (const offset of [-1n, 0n, 1n]) {
+        await mineAt(deadline + offset);
+        const blockTag = await network.provider.send("eth_blockNumber");
+        const pay = () => core.connect(bidder).settleAuction.staticCall(1, { value: due, blockTag });
+        const close = () => core.claimSettlementDefault.staticCall(1, { blockTag });
+        if (offset <= 0n) {
+          await pay();
+          await expectRevert(close(), "SettlementStillActive");
+        } else {
+          await expectRevert(pay(), "SettlementExpired");
+          await close();
+        }
+      }
+      expect(await nft.totalSupply()).to.equal(0n);
+      await mine(core.claimSettlementDefault(1));
+      expect((await core.artworks(1)).canonicalFloor).to.equal(0n);
+      expect(await nft.totalSupply()).to.equal(0n);
+    });
+
     it("creates settlement pending state and 24h deadline", async function () {
       const ctx = await deployProtocol();
       const { core } = ctx;
@@ -597,6 +721,60 @@ describe("ArtSoul V4.1 protocol", function () {
       expect(await core.pendingWithdrawals(treasuryAddress)).to.equal(
         (bidAmount * PLATFORM_FEE_BPS) / BPS
       );
+    });
+
+    it("settles three auctions against their own deposits at the one-wei boundary", async function () {
+      const { core, nft, artist, bidder, treasury } = await deployProtocol();
+      const winner = await bidder.getAddress();
+      const lots = [];
+      for (const price of [MIN_DEPOSIT - 1n, MIN_DEPOSIT, MIN_DEPOSIT + 1n]) {
+        const registered = await mine(core.connect(artist).registerArtwork(`ipfs://boundary-${price}`));
+        const { artworkId } = (await expectEvent(registered, core, "ArtworkRegistered")).args;
+        const created = await mine(core.connect(artist).createAuction(artworkId, price, DURATION_24H));
+        const { auctionId } = (await expectEvent(created, core, "AuctionCreated")).args;
+        await mine(core.connect(bidder).placeBid(auctionId, price, { value: MIN_DEPOSIT }));
+        lots.push({ artworkId, auctionId, price });
+      }
+      await increaseTime(DURATION_24H + 1);
+      for (const { auctionId } of lots) await mine(core.endAuction(auctionId));
+
+      const [below, equal, above] = lots;
+      async function settle(lot, value) {
+        const receipt = await mine(core.connect(bidder).settleAuction(lot.auctionId, { value }));
+        const { args } = await expectEvent(receipt, core, "SettlementCompleted");
+        expect(args.auctionId).to.equal(lot.auctionId);
+        expect(args.artworkId).to.equal(lot.artworkId);
+        expect(args.finalPrice).to.equal(lot.price);
+        expect(args.winner).to.equal(winner);
+        expect(await nft.ownerOf(args.tokenId)).to.equal(winner);
+        expect(await nft.artworkToToken(lot.artworkId)).to.equal(args.tokenId);
+        expect((await core.artworks(lot.artworkId)).canonicalFloor).to.equal(lot.price);
+        expect((await core.auctions(lot.auctionId)).depositLocked).to.equal(0n);
+      }
+
+      await settle(below, 0n);
+      expect(await core.pendingWithdrawals(winner)).to.equal(1n);
+
+      // The winner already has one wei in credit and a third deposit in escrow.
+      await expectRevert(core.connect(bidder).settleAuction(above.auctionId), "IncorrectSettlementPayment");
+      for (const lot of [equal, above]) {
+        expect((await core.auctions(lot.auctionId)).depositLocked).to.equal(MIN_DEPOSIT);
+        expect((await core.artworks(lot.artworkId)).canonicalFloor).to.equal(0n);
+        expect(await nft.artworkToToken(lot.artworkId)).to.equal(0n);
+      }
+      expect(await core.pendingWithdrawals(winner)).to.equal(1n);
+      expect(await nft.totalSupply()).to.equal(1n);
+      await settle(above, 1n);
+      await settle(equal, 0n);
+
+      const proceeds = await core.pendingWithdrawals(await artist.getAddress());
+      const fees = await core.pendingWithdrawals(await treasury.getAddress());
+      const excess = await core.pendingWithdrawals(winner);
+      expect(proceeds + fees).to.equal(below.price + equal.price + above.price);
+      expect(excess).to.equal(1n);
+      expect(await ethBalance(await core.getAddress())).to.equal(proceeds + fees + excess);
+      expect(await core.successfulSettlements()).to.equal(3n);
+      expect(await nft.totalSupply()).to.equal(3n);
     });
 
     it("defaults only after deadline without minting or creating floor", async function () {

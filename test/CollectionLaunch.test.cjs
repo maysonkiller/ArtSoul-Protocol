@@ -212,6 +212,93 @@ describe('Additive Collection Launch security and accounting', function () {
     await fail(c.mintPhase(1, 1, 0, [], await creator.getAddress()), 'PriceUnavailable');
   });
 
+  function firstArtworkPhases() {
+    return [
+      phase({kind: 3, allocation: 1, walletLimit: 1, price: eth('1')}),
+      phase({start: start + 100, end: start + 200, allocation: 3, price: 0, priceSource: 1})
+    ];
+  }
+
+  it('reserves token one and its metadata for the paid opening work while later buyers mint at that sale price', async () => {
+    const c = await configured(firstArtworkPhases(), 4);
+    const [bidder, winner, other] = signers.slice(2, 5);
+    await fail(c.bid(0, {value: eth('1')}), 'InvalidConfiguration');
+    await tx(c.connect(bidder).bid(0, {value: eth('1')}));
+    await tx(c.connect(winner).bid(0, {value: eth('10')}));
+    await time(start + 100);
+    await tx(c.connect(other).finalizeAuction(0));
+    assert.equal(await c.mintPrice(1), eth('10'));
+    assert.equal(await c.credits(bidder.address), eth('1'));
+    await fail(c.ownerOf(1));
+    await fail(c.connect(other).mintPhase(1, 1, 0, [], other.address, {value: eth('1')}), 'IncorrectPayment');
+    await tx(c.connect(other).mintPhase(1, 2, 0, [], other.address, {value: eth('20')}));
+    assert.equal(await c.ownerOf(2), other.address);
+    assert.equal(await c.ownerOf(3), other.address);
+    await fail(c.ownerOf(1));
+    await fail(c.connect(winner).claimAuction(0, c.target));
+    await tx(c.connect(winner).claimAuction(0, winner.address));
+    assert.equal(await c.ownerOf(1), winner.address);
+    assert.equal(await c.firstCollector(1), winner.address);
+    assert.equal(await c.tokenURI(1), 'ipfs://fixture/1');
+    await tx(c.connect(other).mintPhase(1, 1, 0, [], other.address, {value: eth('10')}));
+    assert.equal(await c.ownerOf(4), other.address);
+    assert.equal(await c.totalMinted(), 4n);
+    await fail(c.connect(winner).claimAuction(0, winner.address), 'AlreadyClaimed');
+  });
+
+  it('keeps every later price linked to a single enabled opening work with no fallback after an empty auction', async () => {
+    const [opening, fixed] = firstArtworkPhases();
+    const c = await launch(10);
+    for (const changes of [{allocation: 2}, {walletLimit: 2}, {rollover: true}, {enabled: false}]) {
+      await fail(c.addPhase({...opening, ...changes}), 'InvalidConfiguration');
+    }
+    await tx(c.addPhase(opening));
+    await fail(c.lockConfiguration(), 'InvalidConfiguration');
+    for (const changes of [{kind: 3}, {priceSource: 0}, {fallbackEnabled: true, fallbackPrice: eth('1')}]) {
+      await fail(c.addPhase({...fixed, ...changes}), 'InvalidConfiguration');
+    }
+    await tx(c.addPhase(fixed));
+    await tx(c.lockConfiguration());
+    await time(start + 100);
+    await tx(c.closePhase(0));
+    await fail(c.mintPrice(1), 'PriceUnavailable');
+    await fail(c.mintPhase(1, 1, 0, [], creator.address), 'PriceUnavailable');
+    assert.equal(await c.totalMinted(), 0n);
+  });
+
+  it('uses the lowest funded winning bid for both the auction editions and the linked public mint', async () => {
+    const collection = await configured([
+      phase({kind: 2, allocation: 2, walletLimit: 1, price: eth('0.25')}),
+      phase({start: start + 100, end: start + 200, allocation: 1, walletLimit: 1, price: 0, priceSource: 1})
+    ], 3);
+    const [highest, marginal, losing, publicBuyer, refundRecipient] = signers.slice(2, 7);
+    await tx(collection.connect(losing).bid(0, {value: eth('0.5')}));
+    await tx(collection.connect(highest).bid(0, {value: eth('10')}));
+    await tx(collection.connect(marginal).bid(0, {value: eth('1')}));
+    await time(start + 100);
+    await tx(collection.finalizeAuction(0));
+    assert.equal((await collection.phase(0))[1].clearingPrice, eth('1'));
+    assert.equal(await collection.mintPrice(1), eth('1'));
+
+    await tx(collection.connect(highest).claimAuction(0, highest.address));
+    await tx(collection.connect(marginal).claimAuction(0, marginal.address));
+    assert.equal(await collection.ownerOf(1), highest.address);
+    assert.equal(await collection.ownerOf(2), marginal.address);
+    const publicSale = collection.connect(publicBuyer);
+    await fail(publicSale.mintPhase(1, 1, 0, [], publicBuyer.address, {value: eth('10')}), 'IncorrectPayment');
+    await tx(publicSale.mintPhase(1, 1, 0, [], publicBuyer.address, {value: eth('1')}));
+    assert.equal(await collection.ownerOf(3), publicBuyer.address);
+
+    const beforeRefunds = await provider.getBalance(refundRecipient.address);
+    for (const [bidder, refund] of [[highest, eth('9')], [losing, eth('0.5')]]) {
+      assert.equal(await collection.credits(bidder.address), refund);
+      await tx(collection.connect(bidder).withdrawTo(refundRecipient.address));
+      assert.equal(await collection.credits(bidder.address), 0n);
+    }
+    assert.equal(await provider.getBalance(refundRecipient.address) - beforeRefunds, eth('9.5'));
+    assert.equal(await provider.getBalance(await collection.getAddress()), eth('3'));
+  });
+
   it('crafts ten owned tokens atomically, rejects duplicates, and emits permanent ancestry', async () => {
     const c = await launch(20);
     const f = await deploy('CollectionForge', ['Forged', 'FORGE', 'ipfs://forged/', await c.getAddress(), 10, 2, ethers.id('recipe-10'), await creator.getAddress(), await creator.getAddress(), 550]);

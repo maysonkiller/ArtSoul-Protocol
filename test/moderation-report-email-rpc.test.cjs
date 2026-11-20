@@ -15,8 +15,8 @@ let available = false;
 try { available = execFileSync('docker', ['version', '--format', '{{.Server.Os}}'], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim() === 'linux'; } catch {}
 
 test('report email claims and receipts use real PostgreSQL transactions', {skip: available ? false : 'Docker unavailable'}, async t => {
-  execFileSync('docker', ['run', '-d', '--name', container, '-e', 'POSTGRES_PASSWORD=postgres', '-e', 'POSTGRES_DB=artsoul', 'postgres:17'], {stdio: 'ignore'});
-  t.after(() => execFileSync('docker', ['rm', '-f', container], {stdio: 'ignore'}));
+  execFileSync('docker', ['run', '-d', '--rm', '--name', container, '-e', 'POSTGRES_PASSWORD=postgres', '-e', 'POSTGRES_DB=artsoul', 'postgres:17'], {stdio: 'ignore'});
+  t.after(() => execFileSync('docker', ['rm', '-f', '-v', container], {stdio: 'ignore'}));
   let ready = false;
   for (let i = 0; i < 60; i++) {
     try { sql('SELECT 1'); await new Promise(resolve => setTimeout(resolve, 500)); sql('SELECT 1'); ready = true; break; }

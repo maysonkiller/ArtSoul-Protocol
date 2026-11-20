@@ -1,9 +1,12 @@
 import { Interface, keccak256 } from 'ethers';
+import { parseOrdinarySettlement } from './ordinary-settlement.js';
 
 const getters = new Interface([
     'function nftContract() view returns (address)',
+    'function nft() view returns (address)',
     'function core() view returns (address)',
-    'function totalSupply() view returns (uint256)'
+    'function totalSupply() view returns (uint256)',
+    'function getActiveResale(uint256 tokenId) view returns (bool active, address seller, uint256 price, uint256 version)'
 ]);
 const transfers = new Interface(['event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)']);
 const transferTopic = transfers.getEvent('Transfer').topicHash;
@@ -12,6 +15,7 @@ const hashPattern = /^0x[0-9a-f]{64}$/i;
 const quantityPattern = /^0x(?:0|[1-9a-f][0-9a-f]*)$/i;
 const matches = (pattern, value) => typeof value === 'string' && pattern.test(value);
 const nonzero = value => !/^0x0+$/i.test(value);
+const positiveUint256 = value => matches(/^[1-9]\d{0,77}$/, value) && BigInt(value) < 2n ** 256n;
 
 // This proves reciprocal deployment bindings at one block, never historical
 // transfer coverage. It does not configure a listener or authorize ingestion.
@@ -19,8 +23,10 @@ export async function readNftDeploymentProof(listener, options) {
     return readAtNftDeployment(listener, options);
 }
 
-async function readAtNftDeployment(listener, options, readRange) {
-    if (!options || options.chainId !== 84532 ||
+async function readAtNftDeployment(listener, options, read, coreGetter = 'nftContract') {
+    const ordinaryPair = coreGetter === 'nft';
+    const supportedChain = options?.chainId === 84532 || (ordinaryPair && options?.chainId === 8453);
+    if (!supportedChain ||
         !Number.isSafeInteger(options.blockNumber) || options.blockNumber < 0 ||
         !matches(hashPattern, options.blockHash) || !nonzero(options.blockHash) ||
         typeof options.isCurrent !== 'function' ||
@@ -40,7 +46,7 @@ async function readAtNftDeployment(listener, options, readRange) {
         if (!active || attempt !== generation) throw new Error('NFT deployment proof superseded');
         if (snapshot.isCurrent() !== true || listener?.chainId !== snapshot.chainId ||
             typeof listener?.contractAddress !== 'string' || listener.contractAddress.toLowerCase() !== snapshot.coreAddress ||
-            (listener.nftAddress != null && listener.nftAddress !== '' &&
+            ((ordinaryPair || (listener.nftAddress != null && listener.nftAddress !== '')) &&
                 (typeof listener.nftAddress !== 'string' || listener.nftAddress.toLowerCase() !== snapshot.nftAddress)) ||
             typeof listener?._readRpcCall !== 'function') throw new Error('NFT deployment proof authority changed');
     };
@@ -77,10 +83,10 @@ async function readAtNftDeployment(listener, options, readRange) {
                     throw new Error('NFT deployment proof runtime code mismatch');
                 }
             }
-            const bindings = [[snapshot.coreAddress, 'nftContract', snapshot.nftAddress]];
-            // A later setCore cannot invalidate transfers of already minted tokens.
-            // The standalone bootstrap proof still checks the reciprocal binding.
-            if (!readRange) bindings.push([snapshot.nftAddress, 'core', snapshot.coreAddress]);
+            const bindings = [[snapshot.coreAddress, coreGetter, snapshot.nftAddress]];
+            // A later setCore on the prototype cannot invalidate transfers of tokens already minted.
+            // Bootstrap and the immutable ordinary pair both require the reciprocal binding.
+            if (!read || ordinaryPair) bindings.push([snapshot.nftAddress, 'core', snapshot.coreAddress]);
             for (const [address, getter, expectedAddress] of bindings) {
                 const result = await send('eth_call', [{ to: address, data: getters.encodeFunctionData(getter) }, block]);
                 if (!matches(hashPattern, result) ||
@@ -91,7 +97,15 @@ async function readAtNftDeployment(listener, options, readRange) {
             const identity = Object.freeze({ chainId: snapshot.chainId, coreAddress: snapshot.coreAddress,
                 nftAddress: snapshot.nftAddress, blockNumber: snapshot.blockNumber, blockHash: snapshot.blockHash,
                 coreCodeHash: snapshot.coreCodeHash, nftCodeHash: snapshot.nftCodeHash });
-            const result = readRange ? await readRange(send, identity) : identity;
+            if (ordinaryPair) {
+                const finalized = await send('eth_getBlockByNumber', ['finalized', false]);
+                if (!matches(quantityPattern, finalized?.number) || !matches(hashPattern, finalized?.hash) || !nonzero(finalized.hash) ||
+                    BigInt(finalized.number) < BigInt(identity.blockNumber) ||
+                    (BigInt(finalized.number) === BigInt(identity.blockNumber) && finalized.hash.toLowerCase() !== identity.blockHash)) {
+                    throw new Error('Ordinary deployment block is not finalized');
+                }
+            }
+            const result = read ? await read(send, identity, block) : identity;
             await checkHeader();
             await checkChain();
             return result;
@@ -101,6 +115,39 @@ async function readAtNftDeployment(listener, options, readRange) {
     } finally {
         active = false;
     }
+}
+
+// Read one sale on the reviewed replacement pair without modifying the prototype cursor.
+export async function readOrdinarySettlement(listener, options) {
+    const tx = options?.transactionHash;
+    if (!matches(hashPattern, tx) || !nonzero(tx) || !positiveUint256(options?.auctionId)) {
+        throw new Error('Invalid ordinary settlement request');
+    }
+    const transactionHash = tx.toLowerCase(), auctionId = options.auctionId;
+    return readAtNftDeployment(listener, options, async (send, proof) => {
+        const receipt = await send('eth_getTransactionReceipt', [transactionHash]);
+        return parseOrdinarySettlement(receipt, proof, transactionHash, auctionId);
+    }, 'nft');
+}
+
+// Quotes describe the requested finalized block. The Core rechecks the terms when a buyer submits.
+export async function readOrdinaryResaleQuote(listener, options) {
+    const tokenId = options?.tokenId;
+    if (!positiveUint256(tokenId)) throw new Error('Invalid ordinary resale token ID');
+    return readAtNftDeployment(listener, options, async (send, proof, block) => {
+        const method = 'getActiveResale';
+        const data = getters.encodeFunctionData(method, [tokenId]);
+        const raw = await send('eth_call', [{ to: proof.coreAddress, data }, block]);
+        if (!matches(/^0x[0-9a-f]{256}$/i, raw)) throw new Error('Invalid ordinary resale quote');
+        const quote = getters.decodeFunctionResult(method, raw);
+        const [active, seller, price, version] = quote;
+        if (getters.encodeFunctionResult(method, quote) !== raw.toLowerCase() ||
+            (active ? !nonzero(seller) || price === 0n || version === 0n : nonzero(seller) || price !== 0n)) {
+            throw new Error('Invalid ordinary resale quote');
+        }
+        return Object.freeze({ ...proof, tokenId, active, seller: active ? seller.toLowerCase() : null,
+            priceWei: price.toString(), version: version.toString() });
+    }, 'nft');
 }
 
 // A bounded, read-only batch. Persistence must independently require this range

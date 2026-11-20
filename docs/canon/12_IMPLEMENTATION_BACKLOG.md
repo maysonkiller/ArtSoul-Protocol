@@ -4,6 +4,12 @@ This backlog tracks the A–D phase model in `ARTSOUL_CANON_BIBLE_FULL.md` §17.
 
 Work proceeds one contained task at a time. One backlog item normally equals one focused PR. Contract changes require focused tests and explicit storage-layout review.
 
+**November 19 acceptance count.** The 40 numbered A–D items below carry equal weight in this count. A has 12 of 12 accepted, B has 1 of 5 (B4), C has 0 of 17 (C0 through C16), and D has 0 of 6. Overall, 13 of 40 are accepted (32.5%) and 27 remain (67.5%). The founder closed the B engineering workstream on November 18. Open public-beta journeys carry into C13. Partially implemented items stay open. These percentages measure acceptance and do not estimate remaining time or effort.
+
+The five fixes from the November 19 recording reached artsoulprotocol.com in [PR #500](https://github.com/maysonkiller/ArtSoul-Protocol/pull/500), main commit `32511226`. On November 20, guest Chromium checks on the public domain covered the Favorites entry, gallery refresh with delayed scripts, collection draft save/undo/load, and artworks 7 and 12 in Classic and Future. Artwork 12 showed its original creator value of 0.00001 test ETH separately from its auction start of 0.0005 test ETH. The real-wallet sign-in and saving a private favorite still need a connected-wallet check.
+
+The November 20 recording fixes shipped in [PR #501](https://github.com/maysonkiller/ArtSoul-Protocol/pull/501) and [PR #502](https://github.com/maysonkiller/ArtSoul-Protocol/pull/502). The production domain served main commit `805543cc`. Browser checks covered guest navigation, playback using touch, pointer and keyboard, Guide history, and the Classic and Future layouts. The audio cover dropped from 1,485,791 to 44,106 bytes. In 12 controlled mobile-network navigations the existing artwork request started about 0.2 seconds earlier, once per page. On the production domain three cold runs per page and layout put the homepage and gallery request starts 97 to 185 ms earlier. Median first-image completion improved in three of the four samples. In the 390px gallery it changed from 942 to 1,038 ms. A separate image wait timed out after 17 seconds before the repeat series. The regression suite covers signed-out, authenticated and expired Favorites sessions and retained rows when media is unavailable. Real-account private Favorites and the physical iPhone wallet round trip on this build remain open under C13. These checks contribute to C15 while preserving the acceptance count above.
+
 ## Founder-authorized takeover sequence — 2026-09-20
 
 The [development amendment](CHANGELOG_2026-09-20_COLLECTION_LAUNCH.md) permits
@@ -96,6 +102,14 @@ Phase A exit: A1–A12 accepted, the local and CI baselines are green, productio
 
 Goal: validate the product with real users without changing frozen economics.
 
+**November 18 decision.** The founder closed active B engineering and moved to
+local Phase C development. The unchecked B1/B5 cohort and B2/B3 operational
+observations below carry forward to C13 or operations. Review optional voice
+and WebMCP separately when work on those features resumes. The
+[engineering closeout](../PHASE_B_STATUS_2026-11-02.md) records the outstanding
+hosted reminder observations, provider correction and reported assistant
+fallback. Public beta acceptance and mainnet approval remain outstanding.
+
 November 16 B20 release checkpoint: [profile-content notices](../audits/B20_PROFILE_CONTENT_REPORTS_2026-11-09.md)
 have deployed intake, versioned review, reversible public masking and private
 owner editing (PR #484). CI, fresh full-data restoration, live migration and
@@ -107,10 +121,11 @@ both participants' notification viewing/read state. The live cycle exposed an
 omitted profile-notice allowlist; the [bounded correction](../audits/B20_PROFILE_NOTIFICATION_READ_STATE_2026-11-16.md)
 passed isolated PostgreSQL regressions, preserved live data/permissions and fixed
 both owner reads. Historical unused-cover files are preserved pending a
-retention decision; no cleanup is required to accept reporting. Phase B is not complete.
+retention decision. Reporting acceptance is complete.
 
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
+  Local checks now reject missing or malformed progress counters. A missing API value previously appeared as zero and could mask a degraded worker. See the [monitor runbook](../runbooks/A9_INFRA_COST_MONITORING.md) and [monitor tests](../../test/indexer-health-monitor.test.mjs).
   The November 9 [independent recovery and Core cutover](../audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md)
   verifies off-PC encrypted storage, owner key access from iPhone, fresh isolated
   restoration, five atomic migrations and the newer worker on the existing host.
@@ -127,29 +142,39 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   The [November 16 operational recheck](../audits/B30_B35_OPERATIONAL_RECHECK_2026-11-16.md)
   confirms a healthy database/indexer, fresh displayed current/projected costs
   of USD 25, enabled Spend Cap and usage within the displayed allowances. The
-  authorized support follow-up was sent; provider correction and representative
-  IO acceptance remain pending. Current readings do not guarantee future costs.
+  November 17 human reply confirmed the managed collector issue. The November
+  18 counters and the support workaround are in the same recheck. Provider
+  correction and representative IO acceptance remain pending.
   The [reminder recheck](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md)
   passes 66 tests. The owner's new ending of existing auction 75 subsequently
   opened its real payment window and produced one winner-only payment reminder.
   The owner confirmed iPhone viewing and independently settled it; NFT 8,
   zero additional payment, 0.009 test ETH withdrawable credit and restored
   one-hour preferences are verified. The payment reminder was not marked read,
-  and live-extension acceptance remains open. The stale ownership/history UI
-  observed after settlement now has a [local bounded correction](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#local-receipt-refresh-correction),
-  still under verification and not yet released. Previously accepted signed
+  and live-extension acceptance remains open. On November 18 a local EVM and
+  disposable PostgreSQL test verified extension, read acknowledgement and
+  settlement retirement through the actual worker and authenticated API.
+  The stale ownership/history UI
+  observed after settlement has a [released bounded correction](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#released-receipt-refresh-correction)
+  in PR #497. Reloaded production ownership/history pass; a new settlement's
+  no-reload convergence was not re-exercised. Previously accepted signed
   journeys are not replay prerequisites.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
   November 16: the auction receipt handler performed one indexed read, then
   Sold stopped ordinary polling while ownership/history could remain stale.
-  The [local correction](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#local-receipt-refresh-correction)
+  The [released correction](../audits/B17_REMINDERS_ACCEPTANCE_RECHECK_2026-11-16.md#released-receipt-refresh-correction)
   shares seven serial visible-only refresh attempts across auction/resale, waits
   separately for matching indexed history, cancels replaced receipt/account
   work and unmount, and exposes explicit Retry after the bounded window. The
   history-only Retry target and duplicate-event gaps found in review are fixed.
-  Independent review, 101 focused checks and the local build pass. Hosted
-  checks, release and live convergence remain pending; no completed transaction
-  is replayed.
+  Independent review, 101 focused checks and the local build pass. PR #497 merged
+  as `f02595bf888fc9baa44e4ca9cd4057d93686fd19`; hosted run `43926281894`
+  passed Linux, Windows, static and contract checks. Production is READY and its
+  apex bundle matched the local build at `2026-11-16T18:16:51.793Z`. Reloaded
+  artwork 14 shows the indexed First Collector/current owner, seven history
+  events including the exact settlement and no updating notice. A new
+  transaction's no-reload convergence remains unobserved; no completed
+  transaction is replayed.
   The November 9 [confirmed purchase fix](../audits/B11_CONFIRMED_PURCHASE_FEEDBACK_2026-11-09.md)
   prevents optional read failures from misreporting confirmed settlement/resale
   transactions and uses the receipt bridge to suppress stale purchase actions.
@@ -192,9 +217,11 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   Assistant purchase of artwork 38/token 7 succeeded at block `56637436` for
   `0.001 ETH`; Buy retired and the command cleared without reload, but ownership
   and provenance remained stale. The same audit records the bounded receipt
-  reconciliation correction, released in PR #482, and the still-open complete
-  UI acceptance. Preview inspection showed the updated owner and six provenance
-  events; delayed convergence after a new receipt was not re-exercised.
+  reconciliation correction, released in PR #482. Its later complete resale UI
+  acceptance is recorded in the [November 16 Music 2 follow-up](../audits/B12_RESALE_UI_ACCEPTANCE_2026-11-16.md):
+  owner, action and the exact tenth provenance event updated without reload.
+  This accepted resale does not substitute for a new primary-settlement
+  convergence observation after PR #497.
   Assistant bid for artwork 14 / auction 75 is accepted without reload:
   `0.001 ETH` bid, `0.01 ETH` deposit, block `56674116` at
   `2026-11-09T20:38:12Z`, successful on both RPCs. Transaction:
@@ -237,6 +264,9 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
   with the playback button changing on press. No code changed between attempts;
   the first failure's cause remains unknown in the linked audit. This accepts
   the fixed help reply, not every dynamic native-voice response or full Phase B.
+  The November 18 [local dialogue walkthrough](../audits/VOICE_ASSISTANT_HANDOFF_2026-11-18.md#navigation-and-spoken-follow-ups)
+  verifies NFT clarification and same-tab navigation with a simulated microphone.
+  This expanded flow still needs physical-device acceptance.
   Replays make no model request. API credits remain reserved for development; live
   conversation and user-supplied keys are optional assessments, not new Phase B
   exit gates. No paid public voice endpoint is active.
@@ -269,9 +299,11 @@ retention decision; no cleanup is required to accept reporting. Phase B is not c
 - [x] **B4 — Snapshot tooling readiness.** PR #386 (`cc7db8dc`) verifies the current schema, offline archive verification, no-overwrite output and concurrent PostgreSQL read consistency; two live read-only rehearsals agree. Maintain and rehearse the versioned exporter and independent verifier. The October 28 founder amendment moves actual Snapshot A capture to C16, after the full final-contract testnet. No final cut-off or export is required to close the current beta.
 - [ ] **B5 — Base go-to-market loop.** Onboard the first artist cohort personally, run themed auction drops, build in public through the official project account, and use verified cached metrics when reporting progress.
 
-Phase B exit: stable beta, feedback processed, moderation proven with real cases, snapshot tooling ready, and mainnet-preparation inputs ready. Actual Snapshot A capture is a late-C gate.
+Public-beta acceptance requires a stable real cohort, processed feedback, moderation evidence, snapshot tooling and mainnet-preparation inputs. The November 18 transition carries the unobserved public-cohort acceptance into C13. Actual Snapshot A capture remains a late-C gate.
 
 ## Phase C — Mainnet Preparation
+
+Local engineering is active as of November 18. Deployment, custody changes and mainnet activation retain their own decisions.
 
 Goal: audited, product-grade contracts and production operations.
 
@@ -280,6 +312,7 @@ ceremony back into current A8 activation. Final mainnet custody and configuratio
 still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
 
 - [ ] **C0 — Founder inputs.** Provide ProtocolTreasury and EcosystemTreasury Safe addresses (plus Base Sepolia rehearsal Safes), project domain, and required contract-design answers. These inputs are resource-gated as detailed in `docs/RESOURCE_GATED_WORK.md`: they do not block zero-incremental-spend Phase A engineering, but they remain mandatory before their activation and mainnet gates. Legal entity type and jurisdiction remain founder/counsel decisions; the roadmap must not assume a specific form such as a Polish `sp. z o.o.`.
+  **Mainnet Safe addresses and signer rotation complete, November 19.** The two treasury accounts and the entry-pause account each require two of the three intended owners. All three current addresses signed executed transactions during the rotation. The [custody procedure](../RESOURCE_GATED_WORK.md#signing-devices-and-the-completed-recovery-rehearsal) covers the private register and receipts. Backup recovery, the release rehearsal and the eventual Core bindings retain their own acceptance steps.
 - [ ] **C1 — Contract architecture sign-off.** Complete the required research, threat model, storage-layout plan, upgrade-pattern decision, and invariants before Solidity changes.
 
   October 26: [updated research and boundaries](CONTRACT_REWORK_PLAN.md) and
@@ -321,30 +354,70 @@ still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
   November 16: [minimal replacement boundaries](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md)
   propose immutable engine/NFT pairs, deployment-scoped identity, settlement-bound
   minting, isolated liabilities and bounded refunds. Existing source hashes match
-  the characterization baseline. Topology, retirement authority, pause/deadline,
-  rounding/treasury and governance choices remain explicit; no replacement
-  Solidity, deployment or new financial parameters are approved by this proposal.
+  the characterization baseline. That proposal left topology, retirement authority,
+  pause/deadline, rounding, treasuries and governance open.
   The [executable accounting model](../audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md)
   checks 1,024 abstract states and 28,672 transitions plus replays for scoped
   issuance, full refunds, failed-payment credits and per-deployment solvency.
-  Its six local tests pass; validated settlement/eligibility are input facts,
-  not payment or EVM proofs. No replacement contract or unresolved policy is
-  selected by this bounded preparation.
+  On November 18 the seven-test model added exact native-ETH winner funding
+  before issuance. Four focused prototype EVM tests passed, including three
+  simultaneous auctions at the deposit boundary. The recorded credit from one
+  purchase and the locked deposit on another remain independent. Replacement
+  bytecode and deadline rules were still open at that checkpoint.
+  November 19: the [ordinary-artwork design](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#ordinary-artworks-after-mainnet-launch)
+  selects permanently paired Core and NFT contracts. Future mainnet upgrades preserve existing tokens, their history and their claims in the issuing deployment.
+  The [entry pause](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#selected-entry-pause-and-payment-window) blocks new exposure and keeps existing obligations payable. Anyone can close an expired auction. A funded winner gets 24 hours from the closing block, including the last second. The local compiler [storage and immutable record](../architecture/C1_REPLACEMENT_STORAGE_2026-11-19.json) covers the fresh candidate. [Payout rounding](14_PROTOCOL_REVENUE_AND_TEAM.md#whole-wei-payouts-on-the-new-ordinary-market) is approved. The Admin Security Safe and the 48-hour external admission delay are selected. Refund execution limits, final treasury binding and independent review remain open.
 - [ ] **C2 — Core rework.** Implement the frozen economics, deterministic lazy/creator/keeper finalization, default handling, and the Bible §3.1 refund obligations with bounded batches and withdrawable-credit fallback. No unbounded bidder loop.
+  The new [ordinary Core](../../contracts/replacement/OrdinaryArtAuctions.sol) fixes the late-bid window and increment at ten minutes with a one-hour total cap. [Local EVM cases](../../test/OrdinaryArtAuctions.test.cjs) exercise the window boundary, cap and delayed close. The hosted C13 rehearsal still needs a late bid observed by a second participant.
+  In local Chromium, the open artwork's single countdown changed from 28 seconds to 10 minutes 28 seconds on a confirmed deadline in a 390 px Future fixture. It also recovered when the tab became visible after the old deadline and the first indexer reply was stale. A 320 px Classic homepage card showed the extended deadline without horizontal overflow. Cards use the existing list refresh. Watching an individual auction uses the live artwork page. [Clock reconciliation tests](../../test/artwork-auction-reconciliation.test.cjs).
+  The [local lifecycle specification](../audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md#november-18--closing-and-reopening-ordinary-auctions)
+  covers creator relisting after no bids and a separate permissionless close. The [ordinary auction engine](../../contracts/replacement/OrdinaryArtAuctions.sol) implements both, exact winner payments, default and minting on settlement. [Outbid refunds](../../contracts/replacement/OutbidRefunds.sol) run in bounded batches with self-withdrawable credit on delivery failure. Production policy bindings and a fresh public rehearsal remain open.
+  The candidate reports a bidless work available at the deadline from a read alone. Its next creator relist finalizes and reopens in one transaction. A ready winner may close and settle together. [Exact-boundary and transaction coverage](../../test/OrdinaryArtAuctions.test.cjs).
+  After a funded default, the new engine grants the highest distinct losing bidder 24 hours from the default transaction to buy at their own price. Their refund remains available independently. Decline or expiry releases the work for the creator. The [runner-up tests](../../test/OrdinaryRunnerUp.test.cjs) cover pause, expiry, payment and rollback. Public rehearsal, indexing of the offer and actual First Collector, notification delivery and the keeper gas budget remain open.
+  The [self-hosted keeper](../runbooks/ORDINARY_AUCTION_KEEPER.md) discovers funded deadlines from the new engine, skips empty auctions and checks current state before a zero-value lifecycle call. The [local EVM rehearsal](../../test/OrdinaryAuctionKeeper.test.cjs) covers late bids, payment races, pause, default and expiry. Testnet activation needs a fresh engine, a dedicated test gas account and operating limits. Mainnet signing remains disabled.
+  Locally verified on the client: open cards retire the bidding timer at expiry. The artwork page refreshes its available actions at that boundary. A separate payment timer requires a recorded settlement deadline and stops at that deadline. [Detail boundary tests](../../test/artwork-presentation.test.cjs) and [card clock tests](../../test/live-auction-card-countdown.test.cjs).
 - [ ] **C3 — ArtworkNFT rework.** Implement the canonical 5.5% royalty, marketplace whitelist, provenance, and migration-safe interfaces.
+  The local [paired NFT](../../contracts/replacement/SettledArtworkNFT.sol) records the creator and first collector at settlement and enforces approved marketplace operators. [Secondary sales](../../contracts/replacement/OrdinaryArtResales.sol) bind purchases to a listing version, ownership history and uninterrupted seller approval. Fresh deployment and migration evidence remain open.
+  The founder selected [future external sales with a common syndicated ask](CONTRACT_REWORK_PLAN.md#same-asking-price-across-marketplaces). Verify external metadata display independently. A sellable OpenSea listing also needs venue support, seller authorization and verified order availability. The [external operator admission policy](CONTRACT_REWORK_PLAN.md#external-marketplace-admission) is implemented locally. External fee treatment, compatibility and live sale acceptance remain open.
+  All three signer pairs exercised the [official Safe 1.4.1 implementation on a local chain](../testnet/RG05_SAFE_MULTISIG_REHEARSAL_2026-08-16.md#7-local-follow-up-for-delayed-marketplace-admission-2026-11-19-utc). The test rejected a single signature and early activation, and confirmed cancellation, activation at the deadline and immediate disabling.
 - [ ] **C4 — ArtSoulGenesis.** Build the dedicated soulbound contract and audited grant path. The numeric grant cadence is tunable operational policy, not canon or an immutable roadmap value. Grants require published categories, durable grant records, an audit log, and multisig-authorized administration.
 - [ ] **C5 — Partner Collections.** Implement the canonical first-auction, floor, attempt, cooldown, and buy-now behavior without creating separate floor economics.
+  The [collection launch plan](CONTRACT_REWORK_PLAN.md#collection-launches-on-artsoul) opens the first-work and editions formats to all authors. First-work settlement and editions clearing each have a local contract rehearsal. The partner first-auction retry and cooldown lifecycle still needs separate implementation and evidence.
+  The [auction of mint reservations](CONTRACT_REWORK_PLAN.md#auction-of-mint-reservations) has a draft with disclosed prices and a local [escrow rehearsal](../../test/MintReservationEscrow.test.cjs) covering funded bids, reserved inventory, one resale, redemption, expiry and separate refunds. The pilot applies the 2.5% rate to retained creator proceeds and credits the full place resale price to its seller. Public sales still require objective failure evidence, event indexing, independent review and testnet acceptance. Free allowlist membership and origin verification remain independent of paid reservations.
+  The builder previews the exact metadata URI for token 1 on entry and review. Local Chromium covered 375-pixel Classic and 1440-pixel Future layouts. The [draft preflight](../../scripts/check-collection-metadata.mjs) fetches the named JSON with a byte limit, validates the display name and media URLs and compares the received bytes with a previously recorded digest. [Preflight tests](../../test/collection-metadata-preflight.test.mjs). The actual collection and its deployed token URI still need release verification.
 - [ ] **C6 — Ecosystem Pool implementation.** Route the frozen 1% resale allocation and implement safe accounting. The trigger for pool-funded contests remains undecided until explicitly approved; no date, distribution count, or percentage is implied by this backlog.
+  The [resale suite](../../test/OrdinaryArtResales.test.cjs) checks the pool's separate withdrawable share against the other three recipients. Real treasury custody and allocation operations still need acceptance.
+  The [Safe binding](../../contracts/replacement/TreasuryBoundOrdinaryArt.sol) fixes both recipients and a separate pause authority at construction. [Routing tests](../../test/TreasuryBoundOrdinaryArt.test.cjs) exercise proceeds and withdrawals. All three mainnet accounts were verified before binding. C13 still needs the complete new-contract rehearsal and D3 the final on-chain binding and custody handover.
+  An isolated [Safe 1.4.1 rehearsal](../testnet/RG05_SAFE_MULTISIG_REHEARSAL_2026-08-16.md) covered a 1 ETH resale, the Ecosystem Safe's exact 0.01 ETH withdrawal and a two-owner allocation to a synthetic recipient. The Protocol Safe's separate claim was preserved.
 - [ ] **C7 — Indexer and database rework.** Project the new contracts, lifecycle, grants, pool accounting, provenance, moderation, and migration evidence.
+  The indexer can read a finalized receipt for the reviewed replacement pair and verify the [actual First Collector and price](../../src/indexer/ordinary-settlement.js) for both the original winner and a buyer accepting a runner-up offer. The [receipt intake](../../scripts/index-ordinary-settlement.mjs) stores the verified amount in wei and keys auctions by chain, Core address and auction ID. An isolated PostgreSQL 18.4 rehearsal persisted auction 1 for two different Cores, replayed concurrent receipts without duplicates and rejected conflicting evidence without a partial write. The [migration and intake](../security/MIGRATION_RUNBOOK.md) still need a deployed replacement pair and a finalized public testnet receipt.
+  The [finalized resale reader](../../src/indexer/nft-deployment-proof.js) returns the seller, exact wei price and version from the reviewed pair at a specific block. An inactive quote and an RPC error are distinct. Recheck the current version and terms when a buyer proceeds. External order availability requires its own venue read.
+  A November 19 isolated Hardhat HTTP rehearsal used chain ID 84532 with no fork. A real fixture settlement and approval produced an active listing at exactly 1 ETH in block 8, version 1. After cancellation, block 9 returned an inactive quote at version 2. Reading block 8 again returned the original seller, price and version. Public Base Sepolia still needs the release build and receipt.
+  First mainnet creator support uses the existing Creator profile and copy-address action for a direct ETH transfer. C7 and C13 require no donation forwarder or per-artwork projection for that release. Preserve the existing Base Sepolia history. If demand justifies an artwork-linked release, rehearse a separate forwarder and verify a persisted event in the site history. The replacement candidate has already passed local pre-mint and post-mint payment and event parsing tests. [Support decision](SUPPORT_THE_ARTIST_DESIGN.md) · [Local tests](../../test/OrdinaryArtDonations.test.cjs)
+  [Public history tests](../../test/artwork-provenance-timeline.test.cjs) now cover issuer-chain scope, long sale histories, capped history pages and preserved owner/First Collector identity.
+  The current [artwork and auction APIs](../../test/public-auction-eth-precision.test.cjs) and [donation history](../../test/donation-api.test.mjs) read wei as decimal strings before JavaScript parses the database response. Tests cover a one-wei difference above the safe integer range.
+  Standalone and production scanners reject an existing cursor belonging to a different Core. A fresh database includes the configured deployment block on its first scan and resumes from its saved cursor. The [PostgreSQL regression](../../test/indexer-reorg-atomicity.test.cjs) covers a registration in that first block. Simultaneous same-chain deployments and replacement-event projections remain open.
 - [ ] **C8 — Admin and eligibility controls.** Build least-privilege roles, multisig gates, grant records, audit logs, and private anti-abuse operations without publishing hidden scoring.
 - [ ] **C9 — Auras and badges.** Implement the canonical aura priority on cards and artwork pages plus separate Genesis and Top-100k profile status, with responsive Classic/Future behavior.
-- [ ] **C10 — Promoted banners canon consolidation and implementation.** First consolidate the existing v1.2 planning delta into the full Bible and explicitly decide whether any slot-auction reserve is fixed or tunable. Only then implement clearly labeled promoted slots without changing organic discovery, Trust, floor, or settlement.
+  For Platform, the local [artwork projection](../../src/api/platform-artwork-aura.js) requires a verified minted NFT and its original confirmed registration from the explicitly designated Base Sepolia Core and publisher. The shared cards and artwork detail consume the same frame status. The publisher designation still awaits an actual project decision. [Projection tests](../../test/public-nft-ownership.test.mjs) and [shared frame](../../src/ui/components/aura-frame.js).
+  Collection origin verification follows a separate manual review. A [local registry](../../sql/migrations/20261119150000_collection_origin_reviews.sql) records revisions and revocations for the chain, collection contract and named creator. The [Guide](../../src/content/protocol-docs.js) illustrates the blue check. Live reviewer authorization, collection publication, the public cover's projection and a real reviewed decision remain open. [PostgreSQL coverage](../../test/fixtures/collection-origin-reviews.sql).
+  Genesis needs a verified grant from its dedicated Base mainnet deployment and a verified link to the artwork. Partner needs approved partner status and indexed collection membership. Complete priority and rollback checks across all three sources, separate Genesis and numbered Top-100k profile eligibility, and the admin toggle for Future running border text.
+- [ ] **C10 — Promoted banners.** Consolidation is complete in [Bible §6.1](ARTSOUL_CANON_BIBLE_FULL.md#61-promoted-homepage-banners). Implementation awaits a decision on the reserve policy. Preserve organic discovery, Trust, floor and settlement.
 - [ ] **C11 — Test and invariant suites.** Cover economics, refunds, finalization, failed recipients, reentrancy, idempotency, roles, upgrade/storage layout, and migration.
+  Ten [model tests](../audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md) cover settlement funding, refund obligations, ordinary relisting after no bids and runner-up settlement. Six focused settlement tests on the local prototype EVM cover funding and exact auction and payment deadlines. The [replacement tests](../../test/OrdinaryArtAuctions.test.cjs) exercise payment at the deadline, default one second later, rollback on refused NFT delivery, independent deployments and equal closing gas for one and sixteen accepted bids.
+  The [returning-bidder acceptance case](../audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md#november-19--losing-deposits-when-an-earlier-bidder-wins) follows four accepted bids through sale and default. The primary Solidity suite covers a returning winner who previously lost a bid, a rejected refund, partial processing and default. The [resale suite](../../test/OrdinaryArtResales.test.cjs) exercises the original mint, subsequent sale and all four credits. Independent review remains open.
 - [ ] **C12 — Independent security review.** Resolve findings before deployment approval.
-- [ ] **C13 — Fresh Base Sepolia rehearsal.** Deploy the final topology, hand roles to rehearsal Safes, exercise pool operations and the full lifecycle, and prove recovery/runbooks.
+  The [review scope](CONTRACT_REWORK_PLAN.md#independent-review-scope-for-the-first-base-release) prices the Core and its NFT together and requests an optional incremental quote for artwork-linked support. Freeze the concrete build for the independent review and retain its findings and fix verification.
+- [ ] **C13 — Fresh Base Sepolia rehearsal.** Deploy the final topology, hand roles to rehearsal Safes, exercise pool operations and the full lifecycle, and prove recovery/runbooks. Run the deferred controlled artist/collector cohort with assigned support, issue triage and verified journey results. At eligible auctions, capture hosted extension, timely payment reminder acknowledgement and same-page settlement refresh as recorded in the [B handoff](../PHASE_B_STATUS_2026-11-02.md).
+  The current prototype CLI pins the signer to Base Sepolia, checks the RPC before its first transaction and preloads all three artifacts. One signer manages the nonces for the entire run. A local chain rehearsal verified five consecutive transaction receipts, both Core bindings and the treasury. This covers the existing CLI only. [Boundary tests](../../test/prototype-deployment-target.test.mjs) and [local EVM rehearsal](../../test/ArtSoulV41.test.cjs).
+  The [joint session checklist](../PHASE_B_STATUS_2026-11-02.md#next-joint-testnet-session) and [read-only candidate query](../../sql/verification/auction_windows.sql) cover the outstanding hosted observations. The current prototype has a finalizable round with a bid. Recheck the live window and the winner's availability at the session.
 - [ ] **C14 — Legal and operational readiness.** Complete counsel-approved entity, ToS, Privacy/GDPR, IP assignment, domain/email, audit, and operating procedures. Exact legal form remains undecided until counsel/founder approval.
 - [ ] **C15 — Final visual pass.** Apply premium homepage, cards, artwork, aura, accessibility, and responsive polish after functionality is stable.
+  November 20: the full auction status now shares the heading row in normal flow and wraps when necessary. [PR #500](https://github.com/maysonkiller/ArtSoul-Protocol/pull/500) resolved the overlap reported in PR #278. The deployed artwork view passed at 320, 390 and 1440 pixels. Both themes and enlarged text were also checked locally.
+  November 19: the [auction opening summary](../../src/features/auction/auction-creation.js) shows the exact starting price in test ETH and the duration beside the wallet action on Publish and Create New Auction. The assistant's confirmation uses the same terms. Local Chromium exercised a price change from 0.00001 to 0.001 and a duration change from 24 to 48 hours in both themes, including a 320px phone. The wallet call used a stub.
+  On the current prototype, the winner's page and confirmation show the payment remaining after the locked deposit. Built-route Chromium checks used a 0.001 test ETH bid and a 0.01 test ETH deposit at 390px in Classic and 1366px in Future. Both showed zero remaining payment and a separate gas charge. Cancelling returned control to the page. The [joint session](../PHASE_B_STATUS_2026-11-02.md#next-joint-testnet-session) covers the signed transaction and subsequent refresh.
 - [ ] **C16 — Final public-testnet Snapshot A.** After the final contracts complete full public-testnet validation, capture the versioned machine-readable hashed export at a final cut-off announced at least two weeks ahead. Store and verify at least two independent durable copies before any Phase D reset or mainnet launch. It is a community record only and creates no Genesis, token, points, airdrop, or other entitlement. Earlier beta rehearsals do not count as this capture.
+  The [synthetic PostgreSQL 17 rehearsal](../SNAPSHOT_A.md) includes the exact microsecond cut-off across all seven exported tables and verifies the archive offline.
 
 Phase C exit: audit passed, fresh rehearsal green, treasuries/domain/legal ready, Snapshot A independently readable, and a signed launch decision recorded.
 
@@ -353,8 +426,12 @@ Phase C exit: audit passed, fresh rehearsal green, treasuries/domain/legal ready
 Goal: launch Base mainnet without a single-day Core-plus-Genesis big bang.
 
 - [ ] **D1 — Preserve and re-verify Snapshot A.** Validate its manifest and independent copies immediately before the destructive reset.
+  The [offline verifier kit](../SNAPSHOT_A.md#verifying-a-copy-years-later) verifies both downloaded copies against the trusted capture root and detects aliases and unlisted files. New exports validate the Base Sepolia chain and exact calendar cut-off before connecting. A disposable PostgreSQL rehearsal preserved the boundary to one microsecond. The announced cut-off, actual capture, independent storage providers and retrieval evidence are still required.
 - [ ] **D2 — Execute Bible §16 migration.** Reset live product data, remove legacy addresses and networks, re-point the indexer, and prove zero stale product state.
+  The [launch presentation decision](ARTSOUL_CANON_BIBLE_FULL.md#16-pre-mainnet-migration-and-data-reset) keeps testnet works and activity out of the public mainnet catalog. Preserve the agreed testnet snapshot before retiring the old application data.
+  Before the first real publication, run `node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-mainnet-core-address> <deployment-block>` against the release candidate. The [check](../../scripts/verify-mainnet-catalog.mjs) requires the expected live indexer, an empty public catalog without a chain filter and zero mainnet activity. It has [local HTTP coverage](../../test/mainnet-catalog.test.mjs). Later real publications and sales belong in the feed. Database, browser and snapshot verification and the actual mainnet cutover remain open.
 - [ ] **D3 — Deploy and open Core operations.** Deploy audited contracts to Base, hand roles to Safes, run smoke tests, and open writes only after the checklist passes.
+  The [release verifier](../RESOURCE_GATED_WORK.md#verifying-a-deployed-account) supports a strict `--require-pair` check. Compare both reviewed runtime hashes, both directions of the Core/NFT binding and all three Safe roles on one common finalized block through two independent providers. [Regression coverage](../../test/treasury-safe-preflight.test.mjs) uses simulated providers. The public rehearsal and mainnet still require receipts and verification against actual release code.
 - [ ] **D4 — Core stability window.** Observe production through a launch-readiness window approved at the go/no-go review. The duration is operational and is not frozen canon.
 - [ ] **D5 — Separate Genesis pilot.** Activate a bounded pilot only after Core stability is demonstrated. Expand grants through the audited path; cadence remains tunable and recorded.
 - [ ] **D6 — Controlled growth.** Scale onboarding, Collections, contests, partner work, and marketing only from verified production evidence.

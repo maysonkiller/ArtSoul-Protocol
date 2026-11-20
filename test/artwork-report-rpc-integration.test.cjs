@@ -10,7 +10,7 @@ const { execSync, execFileSync, spawn } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const MIGRATION = fs.readFileSync(path.join(ROOT, 'sql/migrations/a8b_artwork_report_intake.sql'), 'utf8');
-const CONTAINER = `artsoul-a8b-pg-${process.pid}`;
+const CONTAINER = `artsoul-a8b-pg-${process.pid}-${globalThis.crypto.randomUUID()}`;
 const IMAGE = 'postgres:17';
 const REPORTER = '0x1111111111111111111111111111111111111111';
 
@@ -77,16 +77,12 @@ function submit(category = 'copyright', artworkId = 42, dailyLimit = 5) {
 }
 
 test('A8b report RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false : 'Docker is not available' }, async (t) => {
+  let containerId;
   t.before(() => {
-    try {
-      execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
-    } catch {
-      // The disposable container does not normally exist before the test.
-    }
-    execSync(
-      `docker run -d --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
-      { stdio: 'ignore' }
-    );
+    containerId = execSync(
+      `docker run -d --rm --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    ).trim();
 
     let ready = false;
     for (let attempt = 0; attempt < 60; attempt++) {
@@ -118,7 +114,7 @@ test('A8b report RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false :
   });
 
   t.after(() => {
-    execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
+    if (containerId) execFileSync('docker', ['rm', '-f', '-v', containerId], { stdio: 'ignore' });
   });
 
   t.beforeEach(() => {

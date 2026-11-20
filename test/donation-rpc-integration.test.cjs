@@ -30,13 +30,13 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
   const previousRedis = process.env.REDIS_URL;
   t.after(async () => {
     if (pool) await pool.end();
-    if (created) docker('rm', '-f', CONTAINER);
+    if (created) docker('rm', '-f', '-v', CONTAINER);
     if (previousRedis === undefined) delete process.env.REDIS_URL; else process.env.REDIS_URL = previousRedis;
   });
   // The real engine imports the repository queue module, which loads .env.
   // An explicit empty value prevents any external Redis/queue connection.
   process.env.REDIS_URL = '';
-  docker('run', '-d', '--name', CONTAINER, '-e', 'POSTGRES_PASSWORD=local-donation-only',
+  docker('run', '-d', '--rm', '--name', CONTAINER, '-e', 'POSTGRES_PASSWORD=local-donation-only',
     '-e', 'POSTGRES_DB=artsoul', '-p', '127.0.0.1::5432', 'postgres:17');
   created = true;
   const endpoint = docker('port', CONTAINER, '5432/tcp');

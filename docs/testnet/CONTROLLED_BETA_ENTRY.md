@@ -1,19 +1,20 @@
 # ArtSoul Controlled Beta Entry
 
-Last reviewed: 2026-10-24
+Window status reviewed November 18, 2026.
 
 Phase A engineering-readiness decision: **GO — accepted October 24, 2026.**
 
-Beta-window Status: **NO-GO — not scheduled.** Before invitations, assign the
-Phase B cohort, dates, operator, private support and pause responsibility and
-complete the pre-window checklist for that window.
+Beta-window Status: **NO-GO — not scheduled.** The next artist and collector
+cohort is planned for C13 on the final Base Sepolia contracts. Before opening
+invitations, assign the participants, dates, operator, private support and
+pause responsibility and complete the pre-window checklist for that window.
 
 This is the operating source of truth for entering the invite-only ArtSoul
-controlled beta. Engineering readiness closes Phase A; a specific test window
-has its own operational decision. Cohort recruitment and continuing operations
-belong to canonical B1/B2. This clarification does not waive any pre-window
-requirement or open invitations. The Canon Bible and canonical backlog remain
-authoritative; no architecture or economic rule is amended.
+controlled beta. The Phase A engineering decision and the Phase B closeout
+are recorded separately from the decision to open a cohort window. The
+[Phase B handoff](../PHASE_B_STATUS_2026-11-02.md#next-joint-testnet-session)
+lists the three remaining observations on the current prototype. The C13
+cohort will use the checklist below with its own deployment and participants.
 
 A8 operating/test evidence and the subsequent UI repair are accepted October 15
 after PR #309 / #310, the owner's single-passkey confirmation and actual apex

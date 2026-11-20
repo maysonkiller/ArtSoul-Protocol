@@ -1,4 +1,5 @@
 require("dotenv").config();
+const { solidity } = require("./hardhat.local.config.cjs");
 
 const deployerPrivateKey = process.env.PRIVATE_KEY;
 const accounts = deployerPrivateKey ? [deployerPrivateKey] : [];
@@ -14,13 +15,5 @@ module.exports = {
       accounts
     }
   },
-  solidity: {
-    version: "0.8.24",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
-      }
-    }
-  }
+  solidity
 };

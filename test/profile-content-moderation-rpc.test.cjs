@@ -19,8 +19,8 @@ test('profile complaints preserve content, privacy and atomic review (PostgreSQL
   skip: available ? false : 'Disposable PostgreSQL requires Docker', timeout:120000
 }, async t => {
   let created = false, pool;
-  t.after(async () => { if (pool) await pool.end(); if (created) docker('rm','-f',CONTAINER); });
-  docker('run','-d','--name',CONTAINER,'-e','POSTGRES_PASSWORD=local-profile-only','-e','POSTGRES_DB=artsoul',
+  t.after(async () => { if (pool) await pool.end(); if (created) docker('rm','-f','-v',CONTAINER); });
+  docker('run','-d','--rm','--name',CONTAINER,'-e','POSTGRES_PASSWORD=local-profile-only','-e','POSTGRES_DB=artsoul',
     '-p','127.0.0.1::5432','postgres:17'); created = true;
   const endpoint = docker('port',CONTAINER,'5432/tcp'); assert.match(endpoint,/^127\.0\.0\.1:\d+$/);
   pool = new Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',user:'postgres',

@@ -20,11 +20,11 @@ test('event-only backfill keeps one range boundary header for truthful reminder 
   const container=`artsoul-boundary-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   let created=false,pool;const priorRedis=process.env.REDIS_URL,priorSkip=process.env.ARTSOUL_SKIP_EMPTY_BLOCK_HASH_BACKFILL;
   process.env.REDIS_URL='';process.env.ARTSOUL_SKIP_EMPTY_BLOCK_HASH_BACKFILL='true';
-  t.after(async()=>{await pool?.end();if(created)docker('rm','-f',container);
+  t.after(async()=>{await pool?.end();if(created)docker('rm','-f','-v',container);
     if(priorRedis===undefined)delete process.env.REDIS_URL;else process.env.REDIS_URL=priorRedis;
     if(priorSkip===undefined)delete process.env.ARTSOUL_SKIP_EMPTY_BLOCK_HASH_BACKFILL;else process.env.ARTSOUL_SKIP_EMPTY_BLOCK_HASH_BACKFILL=priorSkip;});
   t.mock.method(console,'log',()=>{});t.mock.method(console,'warn',()=>{});t.mock.method(console,'error',()=>{});
-  docker('run','-d','--name',container,'-e','POSTGRES_PASSWORD=local-boundary-fixture','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
+  docker('run','-d','--rm','--name',container,'-e','POSTGRES_PASSWORD=local-boundary-fixture','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
   const endpoint=docker('port',container,'5432/tcp');assert.match(endpoint,/^127\.0\.0\.1:\d+$/);
   pool=new pg.Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',user:'postgres',password:'local-boundary-fixture',connectionTimeoutMillis:1000});
   for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');await delay(100);await pool.query('SELECT 1');break;}catch(error){if(attempt>=80)throw error;await delay(250);}}

@@ -164,12 +164,12 @@ export function resolveIndexerChainSlugs() {
     return [resolveChainSlug(singleChain || 'base-sepolia')];
 }
 
-function resolveStartBlock(chain) {
-    const chainStartBlock = readEnv([chain.startBlockEnv]);
-    if (chainStartBlock) return parseInt(chainStartBlock, 10);
-
-    const legacyStartBlock = readEnv(['INDEXER_START_BLOCK']);
-    return legacyStartBlock ? parseInt(legacyStartBlock, 10) : 0;
+export function parseIndexerStartBlock(value) {
+    const firstBlock = Number(value);
+    if (!/^\d+$/.test(String(value)) || !Number.isSafeInteger(firstBlock)) {
+        throw new Error('Invalid indexer start block');
+    }
+    return firstBlock;
 }
 
 function resolveChainId(chain) {
@@ -218,7 +218,7 @@ export function resolveIndexerChainConfig(slug) {
         nftAddress: readEnv(chain.nftAddressEnv),
         projectNFTAddress: readEnv(chain.projectNFTAddressEnv),
         donationAddress: chain.chainId === 84532 ? readEnv(['ARTSOUL_DONATIONS_ADDRESS_BASE_SEPOLIA']) : '',
-        startBlock: resolveStartBlock(chain),
+        startBlock: parseIndexerStartBlock(readEnv([chain.startBlockEnv, 'INDEXER_START_BLOCK']) || '0'),
         confirmationDepth: resolveConfirmationDepth(chain),
         lockName: `indexer_leader_${chain.slug}`
     };

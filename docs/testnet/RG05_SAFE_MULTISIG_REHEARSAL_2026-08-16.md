@@ -141,3 +141,20 @@ To re-verify:
 Do not restate this rehearsal as mainnet readiness, as a completed A8 recovery
 ceremony, or as a funded treasury topology in any public post, progress report,
 or grant material.
+
+## 7. Local follow-up for delayed marketplace admission, 2026-11-19 UTC
+
+The [rehearsal script](../../scripts/rehearse-safe-marketplace-admission.cjs) ran on disposable Hardhat chain 31337. It verified the published package's SHA-512 before reading the SafeL2 singleton, proxy factory and compatibility fallback handler. Three new proxies used three synthetic owners and a threshold of two. The local ArtSoul treasury binding fixture pointed its three roles at these proxies. All Safe calls carried zero value. A separate synthetic collector bid and settled an auction using a 0.01 ETH deposit from a disposable Hardhat account. The paired ordinary-artwork NFT minted at settlement. [Safe 1.4.1 release](https://github.com/safe-global/safe-smart-account/releases/tag/v1.4.1) · [Pinned npm package and integrity](https://registry.npmjs.org/@safe-global%2Fsafe-contracts/1.4.1)
+
+| Check | Observed |
+| --- | --- |
+| One owner signed the scheduling request | Safe rejected the signature count with `GS020`. Its nonce and the pending admission both stayed at zero. |
+| Two owners scheduled admission and a different pair cancelled | The pending deadline cleared. A second schedule set a fresh deadline exactly 48 hours after its block. |
+| Independent caller activated the operator | Activation reverted one second before the deadline and succeeded in the block at the deadline. The operator became active with generation one. |
+| The collector tried to approve the operator before and after admission | Both approval methods reverted before admission. Immediately after admission the operator still could not transfer the NFT. The collector then granted token and collection-wide approvals and a simulated operator transfer succeeded. |
+| The third distinct signer pair disabled the operator | Both approvals lost effect immediately. A simulated operator transfer reverted. |
+| The Safe scheduled readmission and the independent caller executed it | At generation two the two old approvals still had no effect and the operator could not transfer. The collector granted a fresh token approval and the operator transferred the NFT to a separate synthetic recipient. The security Safe ended at nonce five with a zero balance. |
+
+To repeat after installing the project's locked dependencies, compile with `npx --no-install hardhat --config hardhat.local.config.cjs compile`. Download the [release tarball](https://registry.npmjs.org/@safe-global/safe-contracts/-/safe-contracts-1.4.1.tgz) to a temporary directory. Run `node scripts/rehearse-safe-marketplace-admission.cjs <path-to-tarball>` from the repository with `tar` on the path. The rehearsal runs entirely on the local chain and requires no wallet setup. Base Sepolia acceptance still needs the release candidate and retained receipts.
+
+On November 20 the same fixture resold its token for 1 ETH on the disposable chain. The Ecosystem Safe received exactly 0.01 ETH when two owners signed its withdrawal. A single signature failed. A different pair then transferred those funds to the synthetic grant recipient. The Protocol Safe retained its separate withdrawable balance of 0.01025 ETH from the primary and secondary sales. This exercises custody with the released Safe bytecode. Actual grant eligibility and an allocation decision belong to the separate quarterly process.

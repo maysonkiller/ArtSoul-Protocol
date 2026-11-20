@@ -43,13 +43,17 @@ The internal codename is V4.1. Do not expose the version label in user-facing UI
 1. Creator uploads media and metadata.
 2. Creator registers artwork on-chain.
 3. Creator starts a primary auction.
-4. Community can bid during the selected duration.
+4. Community can bid during the selected duration. In a new ordinary auction, an accepted bid with at most 10 minutes remaining adds 10 minutes to the current end, capped at one hour past the original end. A bid arriving at the closing timestamp is too late. The bidding countdown follows the confirmed end throughout.
 5. If the auction ends with no bids, no NFT is minted and no floor is created.
 6. If the auction ends with a winner, the settlement window opens.
 7. Successful settlement lazily mints the NFT to the first collector and creates the canonical floor.
 8. If settlement is missed, the auction defaults according to the deposit split rules.
 9. Minted NFTs can later be listed on the whitelisted marketplace.
 10. Resales update current owner and preserve provenance.
+
+**New native ordinary-work pair, selected November 19, 2026.** Once bidding expires, anyone can close the auction. If it has a winner, the closing block starts a full 24-hour payment window. The winner can pay through the exact deadline. Only afterward may anyone finalize an unpaid default. A pause blocks new registration, auction creation, bids, resale listings and purchases. Closing, settlement and mint, default, cancellation of existing listings, processing refunds and withdrawing credit remain available under their usual conditions. The clock continues during a pause. The current Base Sepolia prototype retains its deployed behavior. [Decision, implementation scope and tests](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md#selected-entry-pause-and-payment-window)
+
+**Second-highest bidder after default.** For new ordinary auctions, recording the original winner's default automatically opens one voluntary offer to the highest distinct losing bidder, if one exists. That bidder has 24 hours from the default block to pay their own last accepted bid in full, through the exact deadline. Their displaced deposit remains independently refundable in full. The defaulted winner's deposit still credits 80% to the creator and 20% to the protocol. The offer carries no bonus, acceptance charge beyond the purchase price, or penalty for declining. Network gas applies to transactions. The work becomes available for a new auction on decline or expiry, or immediately at default if there was no second bidder. There is no third offer. Only a successful purchase mints the NFT and establishes the floor at the amount actually paid. This decision covers ordinary auctions and leaves Partner Collection first-auction rules separate.
 
 ### Future Contract Requirement: Automatic No-Bid Finalization
 
@@ -58,6 +62,8 @@ The internal codename is V4.1. Do not expose the version label in user-facing UI
 Expired auctions that received NO bids must become re-auctionable without a user-facing "End Expired Auction" step. A contract cannot execute itself on a timer, so the next contract version must expose deterministic, permissionless finalization that can be triggered lazily by the next interaction, by a motivated creator, or by keeper infrastructure. The caller can trigger the transition but cannot choose its outcome. The current testnet contract's manual user workflow is not the target behavior.
 
 This requirement does not change the no-bid economic outcome: no NFT is minted and no floor is created. It is a contract-state transition requirement for the next mainnet contract version, not a description of the deployed testnet contract.
+
+In the local ordinary-work replacement, `currentAuctionForWork` returns zero at the bidless deadline using a read. The creator's next auction records the old close and opens the new round in one signed transaction. A winner who is ready to pay may also close and settle together. Anyone can still open the full payment window separately. A standalone close costs the submitting wallet network gas. No keeper subsidy or additional creator charge is configured.
 
 ## 3. Frozen Economics
 
@@ -117,6 +123,19 @@ Use the highest applicable weight, capped at 5x.
 
 Hidden anti-sybil implementation details, private scoring, operational review rules, and abuse heuristics are intentionally excluded from this public repository.
 
+### 6.1 Promoted homepage banners
+
+The approved v1.2 design provides 12 homepage banner slots. Community signals
+rank at least nine of them on merit. Up to three may be sold by slot auction,
+each visibly labeled **Promoted**. Slot-auction proceeds go to ProtocolTreasury.
+Buying placement affects only the designated banner. Organic discovery rankings,
+Trust, artwork price, canonical floor and settlement are independent of that payment.
+
+The November 18 consolidation records the design for C10. Approximately
+0.05 ETH per day is a planning estimate. The reserve amount remains undecided.
+C10 implementation awaits the founder's decision on whether the reserve is
+fixed or tunable. Activation remains pending.
+
 ## 7. Genesis And Top-100k
 
 *Section rewritten — Amended 2026-07-13 by founder decision (final Genesis spec). The prior text is preserved as "Superseded" at the end of this section.*
@@ -168,6 +187,8 @@ Genesis confers status and belonging, never an economic edge:
 
 ## 8. Partner Collections
 
+Any individual author or project may create an ordinary artwork or design a collection. Authors may base the sale on a distinctive first work or a uniform-price auction of comparable editions. Free allowlist membership and a separate auction of mint reservations with public terms serve different purposes. Identity review and curated Partner status are independent of authoring eligibility. [Collection launch scope and implementation status](CONTRACT_REWORK_PLAN.md#collection-launches-on-artsoul)
+
 Partner collections use the same per-artwork floor system as normal artworks.
 
 - One genesis auction at a time for the first item.
@@ -180,8 +201,10 @@ Partner collections use the same per-artwork floor system as normal artworks.
 ## 9. Marketplace Enforcement
 
 - NFT approvals are restricted to whitelisted marketplaces.
+- For the new ordinary-artwork pair, the ArtSoul Admin Security Safe (2 of 3) publicly schedules the specific Base operator. Admission and readmission require a 48-hour delay. The Safe may cancel a pending admission or disable an active operator immediately. Each NFT owner decides whether to grant operator approval. Readmission requires fresh consent. [Operator admission](CONTRACT_REWORK_PLAN.md#external-marketplace-admission)
 - Wallet-to-wallet movement is a non-sale event.
 - Resale economics apply only to marketplace sales.
+- Initial auctions, primary mint and the launch price history belong on ArtSoul. External display should direct collectors to the ArtSoul work or collection page when available. A compatible external marketplace may later be admitted for optional resale. If ArtSoul distributes the same fixed-price order, both venues should show the same gross asking price and identify fees and seller proceeds. [Collection launch plan](CONTRACT_REWORK_PLAN.md#collection-launches-on-artsoul) · [External sale conditions](CONTRACT_REWORK_PLAN.md#same-asking-price-across-marketplaces)
 
 ## 10. Token Policy
 
@@ -272,8 +295,7 @@ Classic and Future themes are strictly separated.
 
 Artist donations route 100% to the canonical creator and bypass both protocol
 treasuries and company capital. They are not protocol revenue or artwork payments.
-Any non-zero donation is permitted with or without a message; there is no message
-amount threshold (founder amendment, October 3).
+For the first Base mainnet release, supporters copy the original creator’s address and send ETH directly from their wallet. Per-artwork history and optional messages belong to the Base Sepolia forwarder, which accepts any non-zero amount with or without a message. [Creator support decision, November 19](SUPPORT_THE_ARTIST_DESIGN.md)
 
 ProtocolTreasury and EcosystemTreasury are separate from company operating capital.
 
@@ -297,11 +319,14 @@ The activation threshold for pool-funded contests is not frozen canon. A numeric
 
 The deployed Base Sepolia testnet contracts implement resale as **90% seller / 7.5% creator / 2.5% protocol with no Ecosystem Pool split**, and the NFT stores a **7.5%** royalty. This is a **known prototype deviation** from frozen canon (92.5 / 5.5 / 1 / 1, creator royalty 5.5%), to be corrected in the mainnet contract rework. The deployed testnet contracts are non-canonical prototypes and must not be promoted to mainnet.
 
+The new ordinary market allocates indivisible wei by largest fractional remainder. Ties favor the creator before the protocol for primary sales and defaults. Resale ties follow seller, creator, protocol, ecosystem order. The paired NFT quotes the 5.5% creator royalty. The final deployment and independent review remain open. [Approved payout rule and examples](14_PROTOCOL_REVENUE_AND_TEAM.md#whole-wei-payouts-on-the-new-ordinary-market)
+
 ## 15. Public Beta And Mainnet
 
 Public beta may use testnet infrastructure and local or hosted indexers. Mainnet requires persistent indexer operations, monitored infrastructure, RLS-secured data access, and completed legal/founder tasks.
 
-Follow `17_ROADMAP_PHASES.md` and `12_IMPLEMENTATION_BACKLOG.md` in order.
+The [roadmap](17_ROADMAP_PHASES.md) and [implementation backlog](12_IMPLEMENTATION_BACKLOG.md)
+record the dependencies and acceptance criteria for each phase.
 
 ## 16. Pre-Mainnet Migration And Data Reset
 
@@ -329,6 +354,19 @@ keep the exporter and verifier ready meanwhile. No cut-off is assigned now.
 This changes timing only: the two independent verified durable copies,
 post-reset readability and absence of entitlement above remain mandatory.
 
+*Launch presentation clarification — November 19, 2026.* ArtSoul opens its
+Base mainnet catalog with works published on that deployment. Before the first
+publication, the gallery can show its empty state and publishing action. The
+homepage, gallery, ArtSoul profile collections, artwork histories and protocol
+metrics use mainnet records from launch, including genuine early activity.
+Testnet examples, owners, prices, sales and volume stay out of those surfaces.
+A creator may publish their own work afresh on mainnet with the ordinary
+publication flow. Testnet ownership and floor history do not transfer with it.
+Snapshot A preserves the approved testnet record; the application cutover
+cannot erase transactions or NFTs already recorded on a test blockchain.
+Retiring this testnet is a separate decision from upgrading a future mainnet
+deployment with outstanding payouts and NFTs.
+
 ## 17. Phase Status And Canonical Phase Model
 
 September 30 scheduling amendment: the founder requests implementation of the
@@ -343,9 +381,12 @@ or authorize mainnet deployment.
 - **Phase C: Mainnet Preparation**.
 - **Phase D: Staged Mainnet Launch**.
 
-Phase A acceptance does not open a beta invitation window. The Phase B cohort,
-dates, operator and support/pause responsibility remain unassigned; the window
-stays NO-GO until its pre-window checklist is complete.
+On November 18 the founder closed active Phase B engineering and started local
+Phase C development. The [engineering closeout](../PHASE_B_STATUS_2026-11-02.md)
+records the controlled journeys and the hosted observations that carry forward.
+The public cohort, operator and support coverage, and feedback triage move to
+the C13 rehearsal with the replacement contracts. The invitation window remains
+closed until the entry checklist is complete. Mainnet has its own approval.
 
 The 2026-10-03 founder amendment brings real passkey setup and its operator
 ceremony into current Phase A activation, superseding the September 29 deferral

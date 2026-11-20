@@ -21,10 +21,10 @@ test('recipient inbox removal preserves protocol and complaint records in Postgr
 },async t=>{
   const container=`artsoul-inbox-removal-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   let created=false,pool;const priorRedis=process.env.REDIS_URL;process.env.REDIS_URL='';
-  t.after(async()=>{await pool?.end();if(created)docker('rm','-f',container);
+  t.after(async()=>{await pool?.end();if(created)docker('rm','-f','-v',container);
     if(priorRedis===undefined)delete process.env.REDIS_URL;else process.env.REDIS_URL=priorRedis;});
   t.mock.method(console,'log',()=>{});t.mock.method(console,'warn',()=>{});t.mock.method(console,'error',()=>{});
-  docker('run','-d','--name',container,'-e','POSTGRES_PASSWORD=local-summary-fixture','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
+  docker('run','-d','--rm','--name',container,'-e','POSTGRES_PASSWORD=local-summary-fixture','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');created=true;
   const endpoint=docker('port',container,'5432/tcp');assert.match(endpoint,/^127\.0\.0\.1:\d+$/);
   pool=new pg.Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',user:'postgres',password:'local-summary-fixture',connectionTimeoutMillis:1000});
   for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');await delay(100);await pool.query('SELECT 1');break;}catch(error){if(attempt>=80)throw error;await delay(250);}}

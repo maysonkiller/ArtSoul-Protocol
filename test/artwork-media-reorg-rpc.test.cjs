@@ -63,9 +63,9 @@ test('media registration and indexer rollback share an atomic revision fence (Po
   let created = false, pool;
   t.after(async () => {
     if (pool) await pool.end();
-    if (created) docker('rm','-f',container);
+    if (created) docker('rm','-f','-v',container);
   });
-  docker('run','-d','--name',container,'-e','POSTGRES_PASSWORD=local-media-reorg-only',
+  docker('run','-d','--rm','--name',container,'-e','POSTGRES_PASSWORD=local-media-reorg-only',
     '-e','POSTGRES_USER=media_fixture_admin','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');
   created = true;
   const endpoint = docker('port',container,'5432/tcp');
