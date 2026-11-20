@@ -99,6 +99,20 @@ const sections = [
         ]
     },
     {
+        id: "genesis-grants",
+        title: "Genesis eligibility and grants",
+        blocks: [
+            { type: "paragraph", text: "Genesis is a planned series of 10,000 non-transferable art NFTs on Base mainnet. Grants will begin with a separate pilot after ordinary trading is stable. There is no sale or public claim." },
+            { type: "table", headings: ["Category", "Who can receive a grant"], rows: [
+                ["Founder", "Serial 0 is reserved for the founder."],
+                ["Team and contributors", "Serials 1 through 200 are reserved for team members, contributors and developers."],
+                ["Mainnet activity", "Participants with qualifying on-chain activity on Base mainnet. Testnet activity does not qualify."],
+                ["Community", "Recipients selected through published contests and community rewards."]
+            ] },
+            { type: "paragraph", text: "Each grant requires multisig approval. Its public record will identify the recipient, serial, category and a hash of the reviewed decision. Genesis holders pay the same protocol fees as other participants." }
+        ]
+    },
+    {
         id: "settlement",
         title: "Settlement and Lazy Minting",
         blocks: [

@@ -226,7 +226,8 @@ test('overlapping command searches and a separate UI state complete independentl
 
 test('a concurrent failed command cannot discard another command result', async () => {
   const pending = deferred();
-  const old = searchCatalog({ query: 'Older' }, { request: () => pending.promise });
+  // Artwork-only searches have no local page or Guide matches to return during an outage.
+  const old = searchCatalog({ query: 'Older', category: 'artworks' }, { request: () => pending.promise });
   const current = await searchCatalog({ query: 'Current' }, {
     request: async () => response(body('Current', 'all', { artworks: group([card('34')]) }))
   });

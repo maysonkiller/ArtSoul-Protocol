@@ -572,13 +572,13 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=95">/, `${page} stylesheet pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=97">/, `${page} stylesheet pin`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=12"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=73" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=74" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=95');
+    const stylesheet = html.indexOf('unified-styles.css?v=97');
     const prepaint = html.indexOf('header-prepaint.js?v=12');
-    const component = html.indexOf('avatar-dropdown.js?v=73');
+    const component = html.indexOf('avatar-dropdown.js?v=74');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is
     // wallet-runtime-loader.js and appkit-init is imported from inside it. The
     // ordering this guard protects is unchanged: the header component still has
@@ -1605,6 +1605,14 @@ test('same-tab navigation retains only the decorative logo until the wallet conf
   next.context.window.currentWalletAddress = WALLET_A;
   next.dropdown.beginIdentityTransition(WALLET_A);
   assert.equal(next.button().dataset.providerPreview, 'rabby', 'keep the mark while identifying the provider');
+  const unconfirmed = await next.dropdown.getCurrentNetworkInfo({ walletAddress: WALLET_A, includeBalance: false });
+  assert.equal(unconfirmed.walletProvider, undefined, 'restoration has not produced a provider');
+  next.dropdown.updateStableMenu('', 'pending-provider', unconfirmed.walletProvider);
+  assert.equal(next.button().dataset.providerPreview, 'rabby');
+  assert.doesNotMatch(next.button().getAttribute('aria-label'), /connected wallet/i);
+  next.dropdown.updateStableMenu('', 'confirmed-provider', { name: 'Rabby', mark: 'rabby' });
+  assert.equal(next.button().dataset.providerPreview, 'rabby', 'the painted image survives confirmation of the same mark');
+  assert.match(next.button().getAttribute('aria-label'), /connected wallet: Rabby/);
   next.dropdown.rememberWalletProvider({ name: 'MetaMask', mark: 'metamask' }, WALLET_A);
   next.dropdown.syncAccountWalletProvider(next.dropdown.getRememberedWalletProvider(WALLET_A));
   const slot = next.button().querySelector('[data-avatar-wallet-provider]');

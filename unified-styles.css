@@ -5109,6 +5109,13 @@ body {
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
 }
 
+.site-header .site-wordmark,
+.site-header .site-wordmark span,
+.site-header .site-primary-nav a,
+.site-header .site-primary-nav a span {
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
+}
+
 html.classic .site-header,
 body.classic .site-header {
     box-shadow: none !important;
@@ -7688,6 +7695,9 @@ body:is(.classic, .future) .artwork-page-left .artwork-detail-stage {
     max-height: none;
 }
 body:is(.classic, .future) .artwork-mobile-media { grid-area: media; }
+.artwork-loading-frame { display: grid; place-items: center; }
+.artwork-loading-frame .artsoul-wait-mark { font-size: clamp(1.25rem, 2vw, 1.75rem); gap: .35em; }
+.artwork-loading-frame .artsoul-wait-dots { gap: .2em; }
 body:is(.classic, .future) .artwork-mobile-context { grid-area: context; }
 body:is(.classic, .future) .artwork-mobile-people { grid-area: people; }
 body:is(.classic, .future) .artwork-mobile-auction { grid-area: auction; }

@@ -40,7 +40,7 @@ async function components(runtime = React, bindings = {}) {
 
 test('shared documentation preserves every section ID, title and its original order', async () => {
   const {sections} = await components();
-  assert.deepEqual(sections.filter(section => !['collection-verification', 'nft-frames', 'roadmap'].includes(section.id))
+  assert.deepEqual(sections.filter(section => !['collection-verification', 'nft-frames', 'roadmap', 'genesis-grants'].includes(section.id))
     .map(section => [section.id, section.title]), original.map(([id, title]) => [id, title]));
   assert.equal(new Set(sections.map(section => section.id)).size, sections.length);
   const data = fs.readFileSync('src/content/protocol-docs.js', 'utf8');
@@ -75,6 +75,21 @@ test('the public roadmap opens from search and contents at the same accessible G
   h.selectTopic('faq'); h.render();
   h.selectTopic('roadmap'); h.render();
   assert.equal(h.window.location.hash, '#roadmap');
+});
+
+test('Genesis eligibility is discoverable in search and linked from profile help before the pilot', async () => {
+  const {searchSiteContent} = await import('../src/features/search/site-content-search.js');
+  const {sections, Section} = await components();
+  const section = sections.find(item => item.id === 'genesis-grants');
+  const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
+  assert.match(html, /separate pilot after ordinary trading is stable/);
+  assert.match(html, /Testnet activity does not qualify/);
+  assert.deepEqual(section.blocks.find(block => block.type === 'table').rows.map(([category]) => category),
+    ['Founder', 'Team and contributors', 'Mainnet activity', 'Community']);
+  const query = searchSiteContent('Genesis eligibility', 'docs').docs.items;
+  assert.ok(query.some(item => item.url === '/docs-protocol#genesis-grants'));
+  assert.match(fs.readFileSync('src/entries/profile.jsx', 'utf8'), /ContextHelp topic="genesis"/);
+  assert.match(fs.readFileSync('src/ui/context-help.jsx', 'utf8'), /\/docs-protocol#genesis-grants/);
 });
 
 test('the collection gallery links to a readable key for the origin mark', async () => {

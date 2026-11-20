@@ -1,5 +1,6 @@
 import { React, createRoot } from './react-runtime.js';
 import { CardGridSkeleton } from './loading-skeletons.jsx';
+import '../ui/components/artwork-player.js';
 import { useAuctionExpiry } from '../features/auction/use-auction-expiry.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
@@ -692,21 +693,19 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                                        (!fileType && (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')));
                                                         return isVideo;
                                                     })() ? (
-                                                        <>
+                                                        <artsoul-media-player key={artwork.file_url}>
                                                             <video
-                                                                src={artwork.file_url}
+                                                                src={window.ArtSoulArtworkCard?.videoPreviewSource?.(artwork.file_url) || artwork.file_url}
                                                                 onError={() => hideFailedPreview(artwork)}
                                                                 className="w-full h-full object-contain"
                                                                 preload="metadata"
-                                                                poster="/ARTSOULlogo-clean.png"
                                                                 muted
                                                                 playsInline
-                                                                controls
-                                                                onLoadedMetadata={(e) => window.ArtSoulArtworkCard?.prepareVideoPreview?.(e.currentTarget)}
+                                                                onPlay={(e) => window.ArtSoulArtworkCard?.startVideoFromPreview?.(e.currentTarget, artwork.file_url)}
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 style={{position: 'relative', zIndex: 10}}
                                                             />
-                                                        </>
+                                                        </artsoul-media-player>
                                                     ) : (() => {
                                                         const fileType = artwork.file_type?.toLowerCase() || '';
                                                         const url = artwork.file_url?.toLowerCase() || '';
@@ -731,11 +730,11 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                                     marginBottom: '1rem'
                                                                 }}
                                                             />
+                                                            <artsoul-media-player key={artwork.file_url}>
                                                             <audio
                                                                 src={artwork.file_url}
                                                                 preload="none"
                                                                 onError={() => hideFailedPreview(artwork)}
-                                                                controls
                                                                 crossOrigin="anonymous"
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 onTouchStart={(e) => e.stopPropagation()}
@@ -753,6 +752,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                                 }}
                                                                 style={{width: '90%', maxWidth: '300px'}}
                                                             />
+                                                            </artsoul-media-player>
                                                         </div>
                                                     ) : (
                                                         <img

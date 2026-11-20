@@ -1823,7 +1823,7 @@ const { useState, useEffect, useRef } = React;
                                                     <div className={`profile-stat-card p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-purple-900/20 border border-purple-500/30'
                                                     }`}>
-                                                        <div className="opacity-70 mb-1">Genesis</div>
+                                                        <div className="context-help-label"><span>Genesis</span><ContextHelp topic="genesis" /></div>
                                                         <div className="text-lg font-bold">
                                                             Mainnet only
                                                         </div>

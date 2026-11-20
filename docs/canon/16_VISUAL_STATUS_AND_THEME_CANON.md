@@ -17,6 +17,8 @@ Classic and Future are separate themes.
 
 ## Artwork Media
 
+The interface, playback controls, help text and assistant replies use English in both themes, including when a visitor's browser uses another language. Preserve names, descriptions and other original artwork content in the language its author supplied. Input recognition can understand another language without changing the interface language.
+
 Artwork media is contained, OpenSea-style. It is not full-bleed on detail pages unless a future canon update explicitly changes that.
 
 Card network identity sits beside the title below the media, consistently for image, audio, video and external wallet NFTs (founder amendment, 2026-11-16). It must not overlap playback or Saved controls. The icon retains its original brand colors and an accessible network name.

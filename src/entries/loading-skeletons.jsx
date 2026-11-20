@@ -45,8 +45,16 @@ export function CardGridSkeleton({
 export function ArtworkPageSkeleton({ immediate = false, artworkId = '' }) {
     const placeholder = usePlaceholderClass(immediate);
     return (
-        <main className={`artsoul-wait-stage ${placeholder}`.trim()}>
-            <LoadingMark label={artworkId ? `Loading artwork ${artworkId}` : 'Loading artwork'} />
+        <main className={`artwork-page-shell site-page-container ${placeholder}`.trim()}>
+            <div className="artwork-page-layout">
+                <div className="artwork-page-left">
+                    <div className="artwork-detail-stage artwork-mobile-media">
+                        <div className="artwork-detail-frame artwork-loading-frame">
+                            <LoadingMark label={artworkId ? `Loading artwork ${artworkId}` : 'Loading artwork'} />
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     );
 }

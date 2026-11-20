@@ -129,7 +129,7 @@ function resultLink(item, key) {
         text.append(element('strong', '', item.title || `Artwork #${id}`), element('span', '', `Creator: ${creator}`), lifecycleLabel);
         const countdown = card.countdownInfo(item);
         if (countdown) {
-            const deadline = element('span', '', 'Ends ' + new Date(countdown.endTime).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }));
+            const deadline = element('span', '', 'Ends ' + new Date(countdown.endTime).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }));
             text.append(deadline);
             deadlineUpdates.push(() => { if (Date.now() >= countdown.endTime) { lifecycleLabel.textContent = ['Auction ended', price].filter(Boolean).join(' · '); deadline.textContent = 'Bidding is closed.'; } });
         }

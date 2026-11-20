@@ -70,15 +70,14 @@ test('page names in search terms stay data instead of becoming navigation', () =
   ]) assert.deepEqual(parse(prefix + query, lang), { tool: 'search_catalog', input: { query } });
 });
 
-test('page results give a concise localized acknowledgement without claiming a write', () => {
-  for (const [page, title, ru] of [
-    ['home', 'Home', 'главную'], ['gallery', 'Explore', 'галерею'], ['profile', 'Profile', 'профиль'],
-    ['create', 'Create', 'создание работы'], ['guide', 'How it works', 'руководство'],
-    ['collected', 'Collected ArtSoul NFTs', 'вашу коллекцию ArtSoul']
+test('page results give the same concise English acknowledgement for both command languages without claiming a write', () => {
+  for (const [page, title] of [
+    ['home', 'Home'], ['gallery', 'Explore'], ['profile', 'Profile'],
+    ['create', 'Create'], ['guide', 'How it works'], ['collected', 'Collected ArtSoul NFTs']
   ]) {
     const result = { opened: true, page, title, url: '/' };
     assert.deepEqual(voice.describeResult('open_page', result, 'en'), { say: `Opening ${title}.`, show: `Opening ${title}.` });
-    assert.deepEqual(voice.describeResult('open_page', result, 'ru'), { say: `Открываю ${ru}.`, show: `Открываю ${ru}.` });
+    assert.deepEqual(voice.describeResult('open_page', result, 'ru'), { say: `Opening ${title}.`, show: `Opening ${title}.` });
   }
   for (const lang of ['en', 'ru']) {
     const reply = voice.describeResult('open_page', { opened: false, reason: 'Choose a supported page.' }, lang);
@@ -171,7 +170,7 @@ test('global search distinguishes grouped matches shown from totals and does not
   assert.doesNotMatch(reply.say, /Vera|0x|img/);
   assert.equal(reply.links.length, 2);
   assert.match(reply.links[1].label, /0xaaaa/);
-  assert.match(voice.describeResult('search_catalog', result, 'ru').show, /Показано: Работы: 1/);
+  assert.match(voice.describeResult('search_catalog', result, 'ru').show, /Shown: Artworks: 1/);
   for (const group of Object.values(result.groups)) {group.items = []; group.hasMore = false;}
   assert.match(voice.describeResult('search_catalog', result, 'en').show, /No matches/);
   assert.match(voice.describeResult('search_catalog', {error: 'Search unavailable'}, 'en').show, /unavailable/);
@@ -190,9 +189,9 @@ test('public page and documentation replies label partial results without speaki
     assert.match(reply.links[1].label, /<img src=x> Fees/);
     assert.doesNotMatch(reply.links[1].label, /undefined|#fees/);
     assert.doesNotMatch(reply.say, /Explore Art|<img|Fees/);
-    assert.match(reply.show, language === 'en' ? /Pages: 1 · Documentation: 1/ : /Страницы: 1 · Документация: 1/);
-    assert.match(reply.show, language === 'en' ? /Only matching pages and documentation/ : /только найденные страницы и документация/);
-    assert.match(reply.show, language === 'en' ? /More matches/ : /Есть ещё результаты/);
+    assert.match(reply.show, /Pages: 1 · Documentation: 1/);
+    assert.match(reply.show, /Only matching pages and documentation/);
+    assert.match(reply.show, /More matches/);
   }
   delete result.warning;
   assert.doesNotMatch(voice.describeResult('search_catalog', result, 'en').show, /unavailable/);
@@ -362,9 +361,9 @@ test('no audio reaches ArtSoul, and nothing listens without a click', () => {
 
 test('the person is told where the audio goes before the microphone first opens', () => {
   assert.match(source, /Your browser may send microphone audio to its speech service for transcription\. ArtSoul receives no microphone audio\./);
-  assert.match(source, /Браузер может отправлять звук с микрофона в свой сервис распознавания речи\. ArtSoul не получает звук с микрофона\./);
   const start = source.slice(source.indexOf('async function start('));
-  assert.ok(start.indexOf('TEXT[lang].notice') < start.indexOf('new Recognition()'), 'notice before recognition');
+  const notice = start.indexOf('TEXT.notice');
+  assert.ok(notice >= 0 && notice < start.indexOf('new Recognition()'), 'notice before recognition');
 });
 
 test('text commands do not require speech recognition', () => {
@@ -384,7 +383,7 @@ test('what was heard and the answer are shown, not only spoken', () => {
   assert.doesNotMatch(source, /innerHTML\s*=\s*[^'"]*(transcript|heard|answer|reply)/);
 });
 
-test('spoken replies are short, and Russian does not read English out loud', () => {
+test('spoken replies are short and include the English reason for refused actions', () => {
   const auctions = voice.describeResult('find_active_auctions', {
     count: 5,
     auctions: [
@@ -398,7 +397,7 @@ test('spoken replies are short, and Russian does not read English out loud', () 
   assert.doesNotMatch(auctions.say, /Fourth/, 'three is enough to say aloud');
 
   const refusal = voice.describeResult('place_bid', { submitted: false, reason: 'You created this artwork.' }, 'ru');
-  assert.doesNotMatch(refusal.say, /created/, 'the English reason is shown, not read with a Russian voice');
+  assert.match(refusal.say, /You created this artwork/);
   assert.equal(refusal.show, 'You created this artwork.');
 
   const provenance = voice.describeResult('get_artwork_provenance', {
@@ -415,7 +414,7 @@ test('confirmed settlement presents a result and safe navigation, never another 
     assert.equal(answer.links[0].url, '/artwork/38');
     assert.match(answer.links[1].url, /^https:\/\/sepolia.basescan.org\/tx\/0x/);
     assert.doesNotMatch(answer.say, /0x|sent|отправлена/);
-    assert.match(answer.show, lang === 'en' ? /confirmed.*NFT[\s\S]*next/ : /подтверждён.*NFT[\s\S]*дальше/);
+    assert.match(answer.show, /confirmed.*NFT[\s\S]*next/);
   }
   const pending = voice.describeResult('complete_settlement', {...result, confirmed: false}, 'en');
   assert.doesNotMatch(pending.show, /NFT is yours/);
@@ -427,7 +426,7 @@ test('Russian activity uses understandable action descriptions instead of Englis
     {tool: 'start_auction', artwork_id: '16', why: 'No auction running'}
   ]}, 'ru');
   assert.doesNotMatch(answer.show, /Your bid|No auction|end_expired_auction|start_auction|Требует внимания/);
-  assert.match(answer.show, /Работа #38: Подтвердите/);
+  assert.match(answer.show, /Artwork #38: Confirm/);
   assert.deepEqual(answer.links.map(link => link.url), ['/artwork/38', '/artwork/16']);
 });
 

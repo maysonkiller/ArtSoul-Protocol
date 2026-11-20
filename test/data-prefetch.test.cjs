@@ -242,7 +242,7 @@ test('every shared-header page loads it, and the build ships it', () => {
     // request at 3.3 seconds.
     assert.match(html, /<script src="\/data-prefetch\.js\?v=7" async><\/script>/, `${page} must load the prefetch asynchronously`);
     const prefetch = html.indexOf('data-prefetch.js');
-    if (page === 'index.html' || page === 'gallery.html') {
+    if (page === 'index.html' || page === 'gallery.html' || page === 'artwork.html') {
       assert.equal(html.lastIndexOf('data-prefetch.js'), prefetch, `${page}: one projection handoff`);
       const charset = html.indexOf('<meta charset=');
       const viewport = html.indexOf('<meta name="viewport"');

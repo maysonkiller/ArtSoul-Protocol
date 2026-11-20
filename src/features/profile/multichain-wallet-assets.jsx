@@ -182,7 +182,7 @@ export function MultiChainWalletAssets({ wallet }) {
       <button type="button" className="btn-secondary" onClick={() => void signIn()}>Sign in</button></p>}
     {state.message && <p role="status" className="wallet-asset-error">{state.message}</p>}
     {page && <>
-      <p className="wallet-assets-note">{page.items.length} displayed · indexed by Alchemy · fetched {new Date(page.fetchedAt).toLocaleString()}
+      <p className="wallet-assets-note">{page.items.length} displayed · indexed by Alchemy · fetched {new Date(page.fetchedAt).toLocaleString('en-US')}
         {page.omittedCount > 0 ? ' · ' + page.omittedCount + ' unsupported items omitted' : ''}</p>
       {page.partialNetworks.length > 0 && <p role="status" className="wallet-asset-warning">
         Some networks did not respond: {page.partialNetworks.map(networkName).join(', ')}.

@@ -1399,10 +1399,12 @@
             ).toLowerCase();
             const cachedNetwork = this.getCachedHeaderNetwork(walletAddress);
             let provider = null;
-            let walletProvider = null;
+            // An account can be restored before the connector supplies its provider.
+            // Only an actual provider can confirm or replace the last brand.
+            let walletProvider;
             try {
                 provider = await window.web3Modal?.getWalletProvider?.();
-                walletProvider = this.getWalletProviderIdentity(provider);
+                if (provider) walletProvider = this.getWalletProviderIdentity(provider);
                 if (walletProvider) options.onWalletProvider?.(walletProvider);
                 const providerChainId = await window.getArtSoulProviderChainId?.(provider);
                 if (provider) chainId = this.parseChainId(providerChainId);
@@ -1566,7 +1568,8 @@
             const buttonSlot = container?.querySelector('[data-avatar-wallet-provider]');
             if (!buttonSlot) return;
             const button = container.querySelector('.avatar-button');
-            if (walletProvider || !restoringWallet || restoringWallet !== window.ArtSoulHeaderPrepaint?.boot.notificationWallet) {
+            const sameMark = walletProvider?.mark && walletProvider.mark === button.dataset.providerPreview;
+            if (!sameMark && (walletProvider || !restoringWallet || restoringWallet !== window.ArtSoulHeaderPrepaint?.boot.notificationWallet)) {
                 delete button.dataset.providerPreview;
             }
             const html = this.renderWalletProvider(walletProvider, true);
@@ -1734,9 +1737,11 @@
                         if (name) name.textContent = networkInfo.name;
                         if (balance) balance.innerHTML = this.renderNetworkBalance(networkInfo);
                         const providerSlot = document.querySelector('[data-wallet-provider]');
-                        if (providerSlot) providerSlot.innerHTML = this.renderWalletProvider(networkInfo.walletProvider);
-                        this.rememberWalletProvider(networkInfo.walletProvider, walletAddress);
-                        this.syncAccountWalletProvider(networkInfo.walletProvider);
+                        if (networkInfo.walletProvider !== undefined) {
+                            if (providerSlot) providerSlot.innerHTML = this.renderWalletProvider(networkInfo.walletProvider);
+                            this.rememberWalletProvider(networkInfo.walletProvider, walletAddress);
+                            this.syncAccountWalletProvider(networkInfo.walletProvider);
+                        }
                     }
                 } finally {
                     if (this.networkDisplayRequest === request) this.networkDisplayRequest = null;

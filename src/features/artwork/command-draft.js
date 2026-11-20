@@ -38,7 +38,7 @@ export function parsePublicationTurn(transcript, lang, pendingField) {
     const ru = lang === 'ru';
     const revise = (field, value) => ({ tool: 'revise_publication_draft', input: { field, value } });
     if (pendingField && /^(cancel|i.ll type it|отмена|(?:я )?сам(?:а)? (?:введу|впишу))[.!]?$/i.test(text)) {
-        return { message: ru ? 'Можно заполнить поле вручную.' : 'You can type directly in the form.' };
+        return { message: 'You can type directly in the form.' };
     }
     if (pendingField) return revise(pendingField, text);
     if (/^(check (?:my |the )?title|проверь (?:мо[её] )?название)[.!?]?$/i.test(text)) {
@@ -50,8 +50,7 @@ export function parsePublicationTurn(transcript, lang, pendingField) {
     if (edit) {
         const field = /^(название|title)$/i.test(edit[1]) ? 'title' : 'description';
         if (edit[2]) return revise(field, edit[2]);
-        return { nextField: field, message: ru
-            ? 'Продиктуйте значение, введите его здесь или скажите «отмена».' : 'Say the wording, type it here, or say “cancel”.' };
+        return { nextField: field, message: 'Say the wording, type it here, or say “cancel”.' };
     }
     const duration = ru ? /^(?:(?:давай|поставь|выбери|измени длительность)\s+)?(?:на\s+)?(\d+)\s*час(?:а|ов)?[.!]?$/iu.exec(text)
         : /^(?:(?:set|choose|change)\s+)?(?:duration\s+(?:to\s+)?)?(\d+)\s*hours?[.!]?$/i.exec(text);

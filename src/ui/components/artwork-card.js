@@ -688,31 +688,27 @@
         return React.createElement('span', { ref, className: 'artsoul-card-menu-host' });
     }
 
-    function prepareVideoPreview(video, artwork = {}, options = {}) {
-        if (!video || (video.dataset.artsoulPreviewPrepared === 'true' && !options.force)) return;
-        video.dataset.artsoulPreviewPrepared = 'true';
+    function videoPreviewSource(url, poster) {
+        // Request the preview frame as part of the initial load. Seeking after
+        // metadata made the browser paint a black frame and a second spinner.
+        return url && !poster && !url.includes('#') ? url + '#t=0.1' : url;
+    }
 
-        const poster = posterUrl(artwork);
-        if (poster) video.poster = poster;
+    function startVideoFromPreview(video, url, poster) {
+        if (video.dataset.artsoulPlayedSource === url || videoPreviewSource(url, poster) === url) return;
+        video.dataset.artsoulPlayedSource = url;
+        // Preserve the very start of the soundtrack. An explicit scrub to a
+        // different time before the first Play takes precedence.
+        if (Math.abs(video.currentTime - Math.min(0.1, video.duration || 0.1)) <= 0.02) video.currentTime = 0;
+    }
 
-        const renderFirstFrame = () => {
-            const duration = Number(video.duration);
-            if (!Number.isFinite(duration) || duration <= 0) return;
-            const target = Math.min(0.1, Math.max(0, duration - 0.05));
-            if (Math.abs(video.currentTime - target) < 0.01) return;
-            try {
-                video.currentTime = target;
-            } catch {
-                // The poster remains visible when a browser cannot seek before playback.
-            }
-        };
-
-        if (video.readyState >= 1) renderFirstFrame();
-        video.addEventListener('loadedmetadata', renderFirstFrame, { once: true });
-        video.addEventListener('loadeddata', renderFirstFrame, { once: true });
-        video.addEventListener('seeked', () => {
-            video.closest('.artsoul-card-media')?.querySelector('.artsoul-media-loading')?.remove();
-        }, { once: true });
+    function restoreVideoPreview(video) {
+        if (!video.readyState) return;
+        const generatedPreview = Boolean(video.dataset.artsoulPlayedSource);
+        delete video.dataset.artsoulPlayedSource;
+        if (!generatedPreview && video.src?.includes('#')) return;
+        const previewTime = generatedPreview ? Math.min(0.1, video.duration || 0.1) : 0;
+        if (video.currentTime > previewTime + 0.02) video.currentTime = previewTime;
     }
 
     function createMediaLoadingElement() {
@@ -761,7 +757,7 @@
             if (container) container.dataset.playing = 'false';
             const toggle = container?.querySelector('.artsoul-media-toggle');
             if (toggle) syncPlaybackButton(toggle, video, 'video preview');
-            prepareVideoPreview(video, {}, { force: true });
+            restoreVideoPreview(video);
         });
 
         root.querySelectorAll('.artsoul-card-audio-element').forEach((audio) => {
@@ -797,14 +793,13 @@
             container.classList.add('artsoul-card-media-video');
             container.dataset.playing = 'false';
             const video = document.createElement('video');
-            video.src = url;
+            video.src = videoPreviewSource(url, descriptor.poster);
             video.className = 'artsoul-card-media-object';
             video.preload = 'metadata';
             video.poster = descriptor.poster;
             video.playsInline = true;
             video.muted = true;
             video.style.pointerEvents = 'none';
-            prepareVideoPreview(video, artwork);
             const badge = document.createElement('span');
             badge.className = 'artsoul-card-media-badge';
             badge.textContent = 'VIDEO';
@@ -817,7 +812,11 @@
                 container.dataset.playing = String(!video.paused && !video.ended);
                 syncPlaybackButton(toggle, video, 'video preview');
             };
-            video.addEventListener('play', () => { pauseOtherMedia(video); sync(); });
+            video.addEventListener('play', () => {
+                startVideoFromPreview(video, url, descriptor.poster);
+                pauseOtherMedia(video);
+                sync();
+            });
             video.addEventListener('pause', sync);
             video.addEventListener('ended', sync);
             video.addEventListener('error', () => onUnavailable?.());
@@ -1041,7 +1040,7 @@
                 setPlaying(false);
                 setStarted(false);
                 setLoaded(video.readyState >= 1);
-                prepareVideoPreview(video, artwork, { force: true });
+                restoreVideoPreview(video);
             };
             window.addEventListener('artsoul:media-previews-restored', restore);
             return () => window.removeEventListener('artsoul:media-previews-restored', restore);
@@ -1059,11 +1058,14 @@
             setMuted(video.muted);
         };
         return h('div', { className: 'artsoul-card-media artsoul-card-media-video', 'data-playing': String(playing) },
-            h('video', { ref, src: url, className: 'artsoul-card-media-object', preload: 'metadata', playsInline: true,
+            h('video', { ref, src: videoPreviewSource(url, poster), className: 'artsoul-card-media-object', preload: 'metadata', playsInline: true,
                 poster: posterFailed ? '' : poster, muted, style: { pointerEvents: 'none' },
-                onLoadedMetadata: event => { prepareVideoPreview(event.currentTarget, artwork); setLoaded(true); },
+                onLoadedMetadata: () => setLoaded(true),
                 onLoadedData: () => setLoaded(true),
-                onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); setStarted(true); },
+                onPlay: event => {
+                    startVideoFromPreview(event.currentTarget, url, poster);
+                    pauseOtherMedia(event.currentTarget); setPlaying(true); setStarted(true);
+                },
                 onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
                 onError: onUnavailable || undefined,
                 onVolumeChange: event => setMuted(event.currentTarget.muted) }),
@@ -1281,7 +1283,8 @@
         mediaDescriptor,
         hasSafeMedia,
         detailHref,
-        prepareVideoPreview,
+        videoPreviewSource,
+        startVideoFromPreview,
         reviveMediaPreviews,
         signalsText,
         toTimestamp

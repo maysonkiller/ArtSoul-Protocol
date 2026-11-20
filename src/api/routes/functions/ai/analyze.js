@@ -127,6 +127,7 @@ function buildPrompt(payload, wallet) {
 
   return [
     'You are ArtSoul Value Guidance, a conservative NFT art appraisal assistant.',
+    'Write all explanations, factors and risk flags in English, regardless of the language used in the artwork metadata.',
     'This is guidance only. It must not claim to set floor, settlement, royalty, ownership, or protocol truth.',
     'Return strict JSON only, with no markdown.',
     'Schema:',

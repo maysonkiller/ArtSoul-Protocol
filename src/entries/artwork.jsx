@@ -6,6 +6,7 @@ import { parseUserEthAmount } from '../features/auction/eth-amount.js';
 import { formatAuctionOpeningTerms, inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import { ArtistSupport } from '../features/artwork/artist-support.jsx';
 import '../features/artwork/artwork-dialogs.css';
+import '../ui/components/artwork-player.js';
 import { artworkShareIntent } from '../features/artwork/artwork-sharing.js';
 import { readRecordedNftSale } from '../features/artwork/nft-sale-record.js';
 import { projectedArtworkAura } from '../ui/components/aura-frame.js';
@@ -206,19 +207,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 </div>
             );
 
-            const renderFirstVideoFrame = (event) => {
-                const video = event.currentTarget;
-                const duration = Number(video.duration);
-                if (!Number.isFinite(duration) || duration <= 0) return;
-                const target = Math.min(0.1, Math.max(0, duration - 0.05));
-                if (Math.abs(video.currentTime - target) < 0.01) return;
-                try {
-                    video.currentTime = target;
-                } catch {
-                    // The poster remains visible when early seeking is unavailable.
-                }
-            };
-
             if (!isSafeMediaUrl || mediaError || decodedImage.failed) {
                 return renderMediaFallback();
             }
@@ -229,21 +217,16 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             if (mediaType === 'video') {
                 return (
-                    <div className="artwork-detail-video-shell">
+                    <artsoul-media-player class="artwork-detail-video-shell" key={url}>
                         <video
-                            src={url}
-                            controls
+                            src={window.ArtSoulArtworkCard?.videoPreviewSource?.(url, poster) || url}
                             loop
                             playsInline
                             preload="metadata"
                             poster={poster || undefined}
                             className="artwork-detail-media-object artwork-detail-video"
-                            onLoadedMetadata={(event) => {
-                                renderFirstVideoFrame(event);
-                            }}
-                            onLoadedData={(event) => {
-                                if (!event.currentTarget.seeking) setVideoLoaded(true);
-                            }}
+                            onLoadedData={() => setVideoLoaded(true)}
+                            onPlay={(event) => window.ArtSoulArtworkCard?.startVideoFromPreview?.(event.currentTarget, url, poster)}
                             onSeeked={() => setVideoLoaded(true)}
                             onPlaying={() => setVideoLoaded(true)}
                             onError={() => setMediaError(true)}
@@ -253,7 +236,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         {!videoLoaded && !poster && (
                             <span className="artwork-video-loading-label" role="status">Loading video…</span>
                         )}
-                    </div>
+                    </artsoul-media-player>
                 );
             }
 
@@ -270,9 +253,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             </div>
                         </div>
                         <div className="artwork-detail-audio-controls">
+                            <artsoul-media-player key={url}>
                             <audio
                                 src={url}
-                                controls
                                 preload="metadata"
                                 crossOrigin="anonymous"
                                 onPlay={() => setIsPlaying(true)}
@@ -283,6 +266,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             >
                                 Your browser does not support audio playback.
                             </audio>
+                            </artsoul-media-player>
                         </div>
                     </div>
                 );
@@ -3434,7 +3418,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         <AuctionPhaseCountdown deadline={settlementDeadlineMs} graceMs={SETTLEMENT_CLOCK_MARGIN_MS} onBoundary={refreshAuctionPhase} />
                                     </div>}
                                     <div className="text-xs opacity-70 text-center mt-2">
-                                        Deadline: {new Date(settlementDeadlineMs).toLocaleString()}
+                                        Deadline: {new Date(settlementDeadlineMs).toLocaleString('en-US')}
                                     </div>
                                     {settlementExpired && (
                                         <p className="text-xs opacity-70 text-center mt-2" role="status">

@@ -121,9 +121,9 @@ test('account menu has one stylesheet source and a full-width compact network ro
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=95/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /unified-styles\.css\?v=97/, `${page} must use the shared stylesheet cache version`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=12"><\/script>/, `${page} must load the first-frame bridge`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=73" defer><\/script>/, `${page} must load the deferred account menu`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=74" defer><\/script>/, `${page} must load the deferred account menu`);
     assert.match(
       html,
       /<\/header>\s*<script>window\.ArtSoulHeaderPrepaint\?\.hydrate\(document\.getElementById\('navButtons'\)\);<\/script>/,
@@ -155,6 +155,7 @@ test('the account button commits identity as one atomic snapshot', () => {
 
 test('header typography and menu interaction geometry are shared across pages', () => {
   assert.match(unifiedStyles, /\.site-header \{[\s\S]*?font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;/);
+  assert.match(unifiedStyles, /\.site-header \.site-primary-nav a span \{\s*font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;/);
   assert.match(unifiedStyles, /\.site-header #navButtons \.avatar-info \{[\s\S]*?text-align: center;/);
   assert.match(unifiedStyles, /\[data-avatar-name\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 600 !important;/);
   assert.doesNotMatch(unifiedStyles, /\.site-header[\s\S]{0,500}?font-family: Inter/);

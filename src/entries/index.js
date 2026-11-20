@@ -1,5 +1,6 @@
 import '../../supabase-client.js';
 import { renderHomeShowcase } from '../ui/home-showcase.js';
+import { wrapArtworkMedia } from '../ui/components/artwork-player.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
 import { projectedArtworkAura } from '../ui/components/aura-frame.js';
@@ -384,7 +385,6 @@ let morphActive = false;
 
                     const audioPlayer = document.createElement('audio');
                     audioPlayer.src = art.file_url;
-                    audioPlayer.controls = true;
                     audioPlayer.crossOrigin = 'anonymous';
                     audioPlayer.style.cssText = 'width: 90%; max-width: 300px; position: relative; z-index: 10;';
 
@@ -408,7 +408,7 @@ let morphActive = false;
                         console.warn('Audio failed to load:', art.file_url);
                     };
 
-                    audioPreview.appendChild(audioPlayer);
+                    audioPreview.appendChild(wrapArtworkMedia(audioPlayer));
 
                     imgContainer.appendChild(audioPreview);
                 } else if (hasSafeMedia) {
@@ -779,14 +779,13 @@ let morphActive = false;
                                 const video = document.createElement('video');
                                 video.src = art.file_url;
                                 video.className = 'w-full h-full object-contain';
-                                video.controls = true;
                                 video.preload = 'metadata';
                                 video.onclick = (e) => e.stopPropagation();
                                 video.onerror = () => {
                                     console.warn('Video failed to load:', art.file_url);
                                     showMediaUnavailable(imageContainer);
                                 };
-                                imageContainer.appendChild(video);
+                                imageContainer.appendChild(wrapArtworkMedia(video));
                             }
                             // Check if audio/music
                             else if (fileType === 'audio' || fileType === 'music' || ['mp3', 'wav', 'ogg', 'aac', 'm4a'].includes(fileType)) {
@@ -806,7 +805,6 @@ let morphActive = false;
                                 const audio = document.createElement('audio');
                                 audio.src = art.file_url;
                                 audio.className = 'w-full px-4';
-                                audio.controls = true;
                                 audio.crossOrigin = 'anonymous';
                                 audio.preload = 'none';
                                 audio.onclick = (e) => e.stopPropagation();
@@ -828,7 +826,7 @@ let morphActive = false;
                                 };
 
                                 audioContainer.appendChild(logoImg);
-                                audioContainer.appendChild(audio);
+                                audioContainer.appendChild(wrapArtworkMedia(audio));
                                 imageContainer.appendChild(audioContainer);
                             }
                             // Default: image
