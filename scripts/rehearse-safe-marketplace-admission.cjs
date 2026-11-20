@@ -8,7 +8,8 @@ const { ethers } = require('ethers');
 
 process.env.HARDHAT_CONFIG = path.join(__dirname, '../hardhat.local.config.cjs');
 process.env.HARDHAT_NETWORK = 'hardhat';
-const { artifacts, network } = require('hardhat');
+const { artifacts, config } = require('hardhat');
+const { createProvider } = require('hardhat/internal/core/providers/construction');
 
 const archiveHash = 'fP1jewywSwsIniM04NsqPyVRFKPMAuirC3ftA/TA4X3Zc5EnwQp/UCJUU2PL/37/z/jMo8UUaJ+pnFNWmMU7dQ==';
 const zero = ethers.ZeroAddress;
@@ -24,9 +25,11 @@ async function main() {
         return JSON.parse(execFileSync('tar', ['-xzOf', '-', member], { input: archive }));
     }
 
-    const provider = new ethers.BrowserProvider(network.provider, undefined, { cacheTimeout: -1 });
+    const chain = { ...config.networks.hardhat, chainId: 84532, forking: undefined };
+    const evm = await createProvider({ ...config, networks: { hardhat: chain } }, 'hardhat', artifacts);
+    const provider = new ethers.BrowserProvider(evm, undefined, { cacheTimeout: -1 });
     provider.pollingInterval = 10;
-    assert.equal((await provider.getNetwork()).chainId, 31337n);
+    assert.equal((await provider.getNetwork()).chainId, 84532n);
     const [relayer, ...accounts] = await provider.listAccounts();
     const owners = accounts.slice(0, 3);
     const addresses = owners.map(owner => owner.address);
@@ -48,16 +51,44 @@ async function main() {
         safes.push(safe);
     }
     const security = safes[2];
-    const engine = await deploy(await artifacts.readArtifact('TreasuryBindingFixture'), ...safes.map(safe => safe.target));
+    const coreArtifact = await artifacts.readArtifact('OrdinaryMarket');
+    const factoryCore = new ethers.ContractFactory(coreArtifact.abi, coreArtifact.bytecode);
+    const nonce = await provider.getTransactionCount(relayer.address);
+    const expectedCore = ethers.getCreateAddress({ from: relayer.address, nonce });
+    const expectedNFT = ethers.getCreateAddress({ from: expectedCore, nonce: 1 });
+    const roleNames = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
+    const custody = { chainId: 84532 };
+    for (const [i, role] of roleNames.entries()) {
+        custody[role] = { address: safes[i].target, owners: addresses, threshold: 2 };
+    }
+    // The independent encoder and the local signer use rehearsal-only refund limits.
+    const limits = [2, 30_000];
+    const creation = await factoryCore.getDeployTransaction(...safes.map(safe => safe.target), ...limits);
+    const { prepareOrdinaryDeployment } = await import('./prepare-ordinary-deployment.mjs');
+    const plan = prepareOrdinaryDeployment(coreArtifact, {
+        chainId: 84532, payer: relayer.address, nonce, expectedCore, expectedNFT,
+        contract: coreArtifact.sourceName + ':' + coreArtifact.contractName,
+        constructorArgs: [...roleNames.map(role => '$' + role), ...limits],
+        initCodeHash: ethers.keccak256(creation.data)
+    }, custody);
+    const deployment = await mine(relayer.sendTransaction(plan.transaction));
+    assert.equal(deployment.contractAddress, plan.core);
+    const engine = new ethers.Contract(plan.core, coreArtifact.abi, relayer);
+    assert.equal(await engine.nft(), plan.nft);
+    assert.equal(await engine.refundBatchLimit(), BigInt(limits[0]));
+    assert.equal(await engine.refundTransferGas(), BigInt(limits[1]));
+    assert.deepEqual(await Promise.all(roleNames.map(role => engine[role]())), safes.map(safe => safe.target));
+    console.log('PASS: unsigned OrdinaryMarket creation produced the reviewed pair and three Safe bindings on an isolated EVM.');
     const market = await deploy(await artifacts.readArtifact('SettledArtworkSourceFixture'));
     const [artist, collector, buyer] = accounts.slice(3);
     const nft = new ethers.Contract(await engine.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, collector);
+    assert.equal(await nft.core(), engine.target);
     const bid = ethers.parseEther('0.01');
     await mine(engine.connect(artist).registerArtwork('ipfs://local-safe-rehearsal'));
     await mine(engine.connect(artist).createAuction(1, bid, 86400));
     await mine(engine.connect(collector).placeBid(1, bid, { value: await engine.requiredDepositForBid(bid) }));
     assert.equal(await nft.totalSupply(), 0n);
-    await network.provider.send('evm_setNextBlockTimestamp', [Number((await engine.auctions(1)).end)]);
+    await evm.send('evm_setNextBlockTimestamp', [Number((await engine.auctions(1)).end)]);
     await mine(engine.connect(collector).settleAuction(1));
     const tokenId = await nft.auctionToToken(1);
     assert.equal(await nft.ownerOf(tokenId), collector.address);
@@ -105,8 +136,8 @@ async function main() {
     const scheduled = await execute(schedule, firstPair);
     const readyAt = (await scheduled.getBlock()).timestamp + 48 * 3600;
     assert.equal(await engine.marketplaceAdmissionReadyAt(market.target), BigInt(readyAt));
-    await network.provider.send('evm_setNextBlockTimestamp', [readyAt - 1]);
-    await network.provider.send('evm_mine');
+    await evm.send('evm_setNextBlockTimestamp', [readyAt - 1]);
+    await evm.send('evm_mine');
     await assert.rejects(engine.executeMarketplaceAdmission.staticCall(market.target), error =>
         error.data === engine.interface.getError('InvalidMarketplaceChange').selector);
     assert.equal(await engine.isMarketplaceAllowed(market.target), false);
@@ -115,7 +146,7 @@ async function main() {
     await assert.rejects(nft.setApprovalForAll.staticCall(market.target, true), error =>
         error.data === nft.interface.encodeErrorResult('MarketplaceNotAllowed', [market.target]));
 
-    await network.provider.send('evm_setNextBlockTimestamp', [readyAt]);
+    await evm.send('evm_setNextBlockTimestamp', [readyAt]);
     const activated = await mine(engine.executeMarketplaceAdmission(market.target, { gasLimit: 500000 }));
     assert.equal((await activated.getBlock()).timestamp, readyAt);
     assert.equal(await engine.marketplaceApprovalGeneration(market.target), 1n);
@@ -131,7 +162,7 @@ async function main() {
 
     await execute(schedule, firstPair);
     const readmission = await engine.marketplaceAdmissionReadyAt(market.target);
-    await network.provider.send('evm_setNextBlockTimestamp', [Number(readmission)]);
+    await evm.send('evm_setNextBlockTimestamp', [Number(readmission)]);
     await mine(engine.executeMarketplaceAdmission(market.target, { gasLimit: 500000 }));
     assert.equal(await engine.marketplaceApprovalGeneration(market.target), 2n);
     await requireFreshConsent();

@@ -150,6 +150,19 @@ function timestampMicros(value) {
     return BigInt(ms) * 1000n + BigInt((fraction || '').padEnd(6, '0').slice(3, 6));
 }
 
+// New capture and final-cutover checks compare explicit instants at PostgreSQL precision.
+// Date.parse normalizes invalid month-end dates and rounds sub-millisecond fractions down.
+export function captureCutOffMicros(value) {
+    if (typeof value !== 'string') return null;
+    const match = /^(\d{4}-\d\d-\d\d)T(\d\d):\d\d:\d\d(?:\.(\d{1,6}))?(?:Z|[+-](\d\d):?\d\d)$/i.exec(value);
+    if (!match || !Number.isFinite(Date.parse(value))) return null;
+    const [, day, hour, fraction = '', offsetHour = '00'] = match;
+    const midnight = new Date(day + 'T00:00:00Z');
+    if (day.startsWith('0000-') || midnight.toISOString().slice(0, 10) !== day ||
+        Number(offsetHour) >= 16 || (hour === '24' && /[1-9]/.test(fraction))) return null;
+    return timestampMicros(value);
+}
+
 function withinCutOff(row, timeColumn, cutOffMicros) {
     if (cutOffMicros === null) return true;
     const stamp = timestampMicros(row[timeColumn]);

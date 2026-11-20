@@ -16,15 +16,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseArgs } from 'node:util';
-import { verifySnapshot } from '../src/snapshot/snapshot-a.js';
+import { captureCutOffMicros, verifySnapshot } from '../src/snapshot/snapshot-a.js';
 
 const hashText = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
-const usage = 'Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256> [--second-copy <directory>]]';
+const usage = 'Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256> [--second-copy <directory>] [--announced-cut-off <ISO-8601>]]';
 let args;
 try {
     args = parseArgs({ allowPositionals: true, options: {
-        'expected-root': { type: 'string', multiple: true }, 'second-copy': { type: 'string', multiple: true }
+        'expected-root': { type: 'string', multiple: true }, 'second-copy': { type: 'string', multiple: true },
+        'announced-cut-off': { type: 'string', multiple: true }
     } });
 } catch {
     console.error(usage);
@@ -32,11 +33,18 @@ try {
 }
 const roots = args.values['expected-root'] ?? [];
 const copies = args.values['second-copy'] ?? [];
+const cutOffs = args.values['announced-cut-off'] ?? [];
+const announcedMicros = captureCutOffMicros(cutOffs[0]);
 const [expectedRootHash] = roots;
-if (args.positionals.length > 1 || roots.length > 1 || copies.length > 1 ||
+if (args.positionals.length > 1 || roots.length > 1 || copies.length > 1 || cutOffs.length > 1 ||
     (roots.length && !/^[0-9a-f]{64}$/i.test(expectedRootHash)) ||
+    (cutOffs.length && (!expectedRootHash || announcedMicros === null)) ||
     (copies.length && (!copies[0] || !args.positionals[0] || !expectedRootHash))) {
     console.error(usage);
+    process.exit(1);
+}
+if (announcedMicros !== null && announcedMicros > BigInt(Date.now()) * 1000n) {
+    console.error('The announced cut-off has not occurred yet.');
     process.exit(1);
 }
 const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -71,6 +79,10 @@ function verifyDirectory(dir, second) {
     };
     const result = verifySnapshot({ readFile, hashText, expectedRootHash });
     problems.push(...result.problems);
+    if (result.ok && announcedMicros !== null &&
+        (result.manifest.chain_id !== '84532' || captureCutOffMicros(result.manifest.source_cut_off) !== announcedMicros)) {
+        problems.push('Archive does not match the announced Base Sepolia cut-off.');
+    }
     if (expectedRootHash && result.ok) {
         try {
             const extras = fs.readdirSync(dir).filter(name =>

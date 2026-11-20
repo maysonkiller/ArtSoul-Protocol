@@ -466,6 +466,27 @@ test('both independently restored directories must verify against one supplied r
   assert.equal(verified.status, 0, verified.stdout + verified.stderr);
   assert.equal(verified.stdout.split('root hash: ' + capture.rootHash).length - 1, 2);
   assert.match(verified.stdout, /Both restored copies match/);
+  const announced = path.join(tmp, 'announced');
+  const announcedCopy = path.join(tmp, 'announced-copy');
+  const archive = await build({ tables: {}, cutOff: '2001-01-02T00:00:00.123456Z' });
+  writeSnapshotFiles(announced, archive.files);
+  writeSnapshotFiles(announcedCopy, archive.files);
+  const at = (...extra) => run(announced, '--second-copy', announcedCopy, '--expected-root', archive.rootHash,
+    '--announced-cut-off', ...extra);
+  assert.equal(at('2001-01-02T01:00:00.123456+01:00').status, 0);
+  const wrongInstant = at('2001-01-02T00:00:00.123455Z');
+  assert.equal(wrongInstant.status, 1);
+  assert.equal(wrongInstant.stdout.match(/does not match the announced Base Sepolia cut-off/g).length, 2);
+  assert.equal(at('2001-02-29T00:00:00Z').status, 1);
+  assert.equal(at('2001-01-02T00:00:00Z', '--announced-cut-off', '2001-01-02T00:00:00Z').status, 1);
+  assert.equal(run(announced, '--announced-cut-off', '2001-01-02T00:00:00.123456Z').status, 1);
+  assert.match(at('9999-01-01T00:00:00Z').stderr, /has not occurred/);
+  const retired = await build({ tables: {}, chainId: '11155111', cutOff: '2001-01-02T00:00:00.123456Z' });
+  const retiredDir = path.join(tmp, 'retired');
+  writeSnapshotFiles(retiredDir, retired.files);
+  const wrongChain = run(retiredDir, '--expected-root', retired.rootHash, '--announced-cut-off', '2001-01-02T00:00:00.123456Z');
+  assert.equal(wrongChain.status, 1);
+  assert.match(wrongChain.stdout, /does not match the announced Base Sepolia cut-off/);
   assert.equal(run(first, '--second-copy', second).status, 1);
   assert.equal(run(first, '--expected-root', capture.rootHash, '--expected-root', capture.rootHash).status, 1);
 

@@ -9,6 +9,44 @@ const catalogTables = ['v41_artworks', 'v41_auctions', 'v41_bids', 'v41_settleme
     'v41_resale_listings', 'v41_resale_history', 'v41_floor_history', 'v41_trust_signals',
     'artwork_social_signals', 'artwork_moderation_visibility'];
 
+// The public projection can omit retired chains, hidden works or private evidence.
+// Check the indexer's actual product tables before the first mainnet publication.
+const emptyIndexerTables = [
+    'public.indexed_auctions', 'public.indexed_bids', 'public.indexed_withdrawals',
+    'public.v41_artworks', 'public.v41_auctions', 'public.v41_bids', 'public.v41_settlements',
+    'public.v41_bid_withdrawals', 'public.v41_auction_extensions', 'public.v41_auction_endings',
+    'public.v41_resale_listings', 'public.v41_resale_history', 'public.v41_floor_history',
+    'public.v41_genesis_holders', 'public.v41_project_eligibility', 'public.v41_trust_signals',
+    'public.artwork_social_signals', 'public.v41_public_metric_participants', 'public.v41_public_metric_events',
+    'artsoul_private.ordinary_settlements'
+];
+
+export async function verifyMainnetProjectionRows(client, expectedCore, deploymentBlock) {
+    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    try {
+        // A role subject to a row policy must fail rather than certify an apparently empty table.
+        await client.query('SET LOCAL row_security = off');
+        await client.query("SET LOCAL statement_timeout = '10s'");
+        const {rows: [state]} = await client.query(`
+            SELECT count(*) = 1 AND count(*) FILTER (WHERE chain_id = 8453 AND lower(contract_address) = lower($1)
+                AND last_confirmed_block >= $2 AND last_indexed_block >= last_confirmed_block) = 1 AS valid
+            FROM public.indexer_state`, [expectedCore, deploymentBlock]);
+        assert.equal(state.valid, true, 'The database cursor must identify the same reviewed Base mainnet deployment');
+        const conditions = emptyIndexerTables.map(table => [table, 'true']);
+        conditions.push(['public.contract_events', 'chain_id IS DISTINCT FROM 8453 OR block_number < $1'],
+            ['public.v41_public_metrics', 'chain_id IS DISTINCT FROM 8453 OR artists_onboarded <> 0 OR auctions_completed <> 0 OR unique_collectors <> 0 OR settled_volume_wei <> 0'],
+            ['artsoul_private.ordinary_issuers', 'chain_id IS DISTINCT FROM 8453 OR core_address IS DISTINCT FROM lower($2)']);
+        // Identifiers and predicates above are fixed here. Addresses and blocks are bound values.
+        const sql = conditions.map(([table, where]) =>
+            `SELECT '${table}' AS relation WHERE EXISTS (SELECT 1 FROM ${table} WHERE ${where})`).join(' UNION ALL ');
+        const {rows} = await client.query(sql, [deploymentBlock, expectedCore]);
+        assert.equal(rows.length, 0, 'Residual indexer data in ' + rows.map(row => row.relation).join(', '));
+        return conditions.length;
+    } finally {
+        await client.query('ROLLBACK');
+    }
+}
+
 export async function verifyMainnetCatalog(site, expectedCore, deploymentBlock) {
     const origin = new URL(site);
     assert.ok(['https:', 'http:'].includes(origin.protocol) && !origin.username && !origin.password &&
@@ -66,9 +104,24 @@ export async function verifyMainnetCatalog(site, expectedCore, deploymentBlock) 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     try {
         const [site, core, block, ...extra] = process.argv.slice(2);
-        assert.ok(site && core && /^[1-9]\d*$/.test(block) && !extra.length,
-            'Usage: verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block>');
+        const withDatabase = extra.length === 1 && extra[0] === '--database';
+        assert.ok(site && core && /^[1-9]\d*$/.test(block) && (!extra.length || withDatabase),
+            'Usage: verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block> [--database]');
+        if (withDatabase) assert.ok(process.env.ARTSOUL_CUTOVER_DATABASE_URL, 'Supply ARTSOUL_CUTOVER_DATABASE_URL for --database');
         const checked = await verifyMainnetCatalog(site, core, Number(block));
+        if (withDatabase) {
+            const {Client} = (await import('pg')).default;
+            const client = new Client({connectionString: process.env.ARTSOUL_CUTOVER_DATABASE_URL, connectionTimeoutMillis: 10000});
+            try {
+                await client.connect();
+                checked.databaseRelationsChecked = await verifyMainnetProjectionRows(client, core, Number(block));
+            } catch (error) {
+                if (error instanceof assert.AssertionError) throw error;
+                throw new Error('Could not verify the cutover database. Check access, schema, and unfiltered read permissions.');
+            } finally {
+                await client.end();
+            }
+        }
         console.log('Verified empty pre-smoke public catalog', checked);
     } catch (error) {
         console.error(error.message);

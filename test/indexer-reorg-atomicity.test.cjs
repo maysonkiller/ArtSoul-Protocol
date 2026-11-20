@@ -124,6 +124,41 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   await pool.query('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE EXTENSION pgcrypto');
   const migrations = [...read('src/indexer/setup-database.sql').matchAll(/^\\i (.+)$/gm)].map(match => match[1].trim());
   for (const migration of migrations) await pool.query(read(migration));
+  await t.test('pre-smoke database check detects residual projections and refuses row-filtered evidence', async () => {
+    const {verifyMainnetProjectionRows} = await import('../scripts/verify-mainnet-catalog.mjs');
+    const reader = await pool.connect();
+    const verify = () => verifyMainnetProjectionRows(reader, CORE, 160);
+    try {
+      await assert.rejects(verify(), /database cursor/);
+      // Migration 001 supplies a legacy cursor. Simulate the isolated cutover.
+      await pool.query('DELETE FROM public.indexer_state');
+      const seedCursor = (chain, address) => pool.query(`INSERT INTO public.indexer_state
+        (chain_id,contract_address,last_indexed_block,last_confirmed_block,started_at,last_indexed_at,status)
+        VALUES ($1,$2,172,170,now(),now(),'running')`, [chain,address]);
+      await seedCursor(8453,CORE);
+      assert.ok(await verify() > 20);
+      await seedCursor(CHAIN,CORE);
+      await assert.rejects(verify(), /database cursor/);
+      await pool.query('DELETE FROM public.indexer_state WHERE chain_id=$1',[CHAIN]);
+      await pool.query('INSERT INTO public.v41_trust_signals(user_address,chain_id) VALUES ($1,$2)',[WINNER,CHAIN]);
+      await assert.rejects(verify(), /public.v41_trust_signals/);
+      assert.equal((await pool.query('SELECT count(*) FROM public.v41_trust_signals')).rows[0].count,'1');
+      await pool.query('DELETE FROM public.v41_trust_signals WHERE chain_id=$1',[CHAIN]);
+      await pool.query('INSERT INTO public.v41_public_metrics(chain_id) VALUES (8453),(84532)');
+      await assert.rejects(verify(), /public.v41_public_metrics/);
+      await pool.query('DELETE FROM public.v41_public_metrics WHERE chain_id=$1',[CHAIN]);
+      assert.ok(await verify() > 20);
+      await reader.query('CREATE ROLE cutover_fixture; GRANT USAGE ON SCHEMA artsoul_private TO cutover_fixture; GRANT SELECT ON ALL TABLES IN SCHEMA public, artsoul_private TO cutover_fixture');
+      await reader.query('SET ROLE cutover_fixture');
+      await assert.rejects(verify(), error => error.code === '42501');
+      await reader.query('RESET ROLE');
+      assert.ok(await verify() > 20, 'a failed check ends its read-only transaction');
+    } finally {
+      await reader.query('RESET ROLE');
+      reader.release();
+      await pool.query('DELETE FROM public.indexer_state; DELETE FROM public.v41_public_metrics; DELETE FROM public.v41_trust_signals');
+    }
+  });
   await t.test('finalized settlement intake isolates issuers, accepts identical concurrent receipts and rejects contradictions', async () => {
     const { checkOrdinaryIntake } = await import('./helpers/ordinary-settlement-postgres.mjs');
     await checkOrdinaryIntake(pool);

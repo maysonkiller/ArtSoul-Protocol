@@ -142,13 +142,16 @@ Immediately before cutover, retrieve the complete export from each provider into
 its own new directory. Use the offline verifier from the reviewed kit.
 
 ```bash
-node scripts/verify-snapshot-a.mjs /restore/provider-a --second-copy /restore/provider-b --expected-root TRUSTED_CAPTURE_ROOT
+node scripts/verify-snapshot-a.mjs /restore/provider-a --second-copy /restore/provider-b --expected-root TRUSTED_CAPTURE_ROOT --announced-cut-off ANNOUNCED_ISO_TIMESTAMP
 ```
 
 The command reads both restores and succeeds only when each matches the trusted
 root. It reports the chain, cut-off, counts and root for each valid copy, and
 rejects reused files, including directory aliases and detectable hard links.
-Compare the chain and cut-off with the announced capture record. Save the
+Supply the cut-off from the original public announcement. The verifier checks
+that the time has arrived and that both archives identify Base Sepolia and
+the same instant down to one microsecond. Equivalent time-zone offsets match.
+This also catches an earlier rehearsal archived together with its own root. Save the
 command, exit status, output and the provider's object or version identifier
 for each retrieval. Two local directories alone cannot establish independent
 remote custody. On separate recovery machines, run the single-copy command
@@ -160,6 +163,32 @@ for the verification result and the export schema, and this file is the schema.
 
 **7. Only then** does the destructive reset proceed. Snapshot A is never
 re-imported as live product state.
+
+## Verify the product database before the first mainnet publication
+
+After the reviewed cutover, check both the candidate site's public responses
+and its indexer database from the same operator session. Set
+`ARTSOUL_CUTOVER_DATABASE_URL` privately to the intended database connection.
+Use an existing operator role with unfiltered read access. Keep credentials
+out of command arguments and verification records.
+
+```bash
+node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-address> <deployment-block> --database
+```
+
+The command compares the database cursor with the reviewed Base mainnet Core
+and deployment block, then checks for residual product rows, including retired
+auction tables, bids, withdrawals, floor history, trust signals, eligibility,
+settlement evidence and the counters backing public metrics. A mainnet metrics
+row containing zero activity is permitted. Unrelated or pre-deployment chain
+events fail the check. The database reads use one read-only, repeatable-read
+transaction. Insufficient visibility, missing tables and unavailable services
+cause the command to fail. It reports table names without printing row data.
+
+Retain the result with the public catalog check and verify both restored
+Snapshot A copies again after the cutover. Also verify browser configuration,
+legacy media storage and cache behavior against the release candidate. A quiet
+database sampled before writers are switched does not prove the launch state.
 
 ## Verifying a copy years later
 

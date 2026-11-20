@@ -24,6 +24,15 @@ Core needs its own checks for bid extension, payment deadlines, deposits,
 minting and refunds. C13 will also verify the indexer and site against its
 actual events. Keep unobserved prototype steps open if the window is skipped.
 
+On November 20 at 00:05 UTC, the public auction feed showed one bid of
+0.00001 test ETH on round 76. Two Base Sepolia RPC endpoints confirmed the
+[successful bid](https://sepolia.basescan.org/tx/0x054e2c4ced90c535b732d701489671e9f92a8781040caac732d1583456fdef4e)
+at block 60,862,013. The original and current deadlines still matched at
+13:00:57 UTC (14:00:57 Warsaw). A late-bid check would need a different
+eligible bidder and the minimum bid returned by the contract at that time.
+The feed showed round 75 as sold. The public Favorites endpoint returned
+HTTP 401 with `private, no-store` for a guest.
+
 **Operator preflight.** Run the [read-only auction window query](../sql/verification/auction_windows.sql)
 to find candidate rounds. Record the served build, UTC time, chain ID (Base Sepolia
 `84532`), Core address, artwork and auction IDs. Confirm the deployed Core is
@@ -74,6 +83,15 @@ review and C13 Safe handover criteria](canon/12_IMPLEMENTATION_BACKLOG.md),
 and the [final Snapshot A and independent-copy runbook](SNAPSHOT_A.md).
 
 ## Current interface
+
+The November 20 [published interface](https://github.com/maysonkiller/ArtSoul-Protocol/pull/502)
+passed guest navigation and preview playback checks. Follow-up tests of the
+[Favorites controls](../test/saved-commands.test.mjs) found that connecting
+from a guest released the pending button before sign-in finished. The fix
+keeps the button locked through the server acknowledgement and cancels the
+pending gesture if the first connected wallet is replaced. The remaining
+real-account check covers sign-in, save, reload and removal on a private
+profile. The physical iPhone wallet round trip stays with C13.
 
 The November 18 [voice assistant candidate](audits/VOICE_ASSISTANT_HANDOFF_2026-11-18.md#november-18-local-candidate)
 adds opt-in conversation and reviewed dictation on Publish. The local build
