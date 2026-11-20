@@ -236,6 +236,75 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         }
     });
 
+    it('conserves a pending refund and both creator roles through reacquisition, resale and final withdrawals', async () => {
+        const price = ethers.parseEther('0.02');
+        const deposit = ethers.parseEther('0.01');
+        const nft = new ethers.Contract(await engine.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, provider);
+        const layout = require('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json');
+        const marketLayout = layout.contracts['contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket'];
+        const guardSlot = BigInt(marketLayout.storage.find(field => field.label === '_status').slot);
+
+        // Observe ordinary successful transfers on the local EVM. Every outgoing call
+        // made by the market must run inside its lock, and the lock must be released.
+        async function checkGuard(receipt) {
+            const { structLogs } = await network.provider.send('debug_traceTransaction',
+                [receipt.hash, { disableStorage: true, disableMemory: true }]);
+            let lock = 1n;
+            let calls = 0;
+            for (const { depth, op, stack } of structLogs) {
+                if (depth !== 1) continue;
+                if (op === 'SSTORE' && BigInt('0x' + stack.at(-1)) === guardSlot) lock = BigInt('0x' + stack.at(-2));
+                if (op === 'CALL') {
+                    assert.equal(lock, 2n);
+                    calls++;
+                }
+            }
+            assert.ok(calls > 0);
+            assert.equal(lock, 1n);
+        }
+        async function checkLiabilities(pendingRefund) {
+            const credits = await Promise.all([artist.address, buyer.address, collector.address, protocol.target, ecosystem.target]
+                .map(address => engine.credits(address)));
+            assert.equal(await provider.getBalance(engine.target), credits.reduce((sum, amount) => sum + amount, pendingRefund));
+        }
+
+        await mine(engine.connect(artist).registerArtwork('ipfs://reacquired-work'));
+        await mine(engine.connect(artist).createAuction(1, deposit, day));
+        await mine(engine.connect(collector).placeBid(1, deposit, { value: deposit }));
+        await mine(engine.connect(buyer).placeBid(1, price, { value: deposit }));
+        await network.provider.send('evm_setNextBlockTimestamp', [Number((await engine.auctions(1)).end)]);
+        await checkGuard(await mine(engine.connect(buyer).settleAuction(1, { value: price - deposit })));
+        await checkLiabilities(deposit);
+
+        const secondPrice = price + 399n;
+        await mine(nft.connect(buyer).approve(engine.target, 1));
+        await mine(engine.connect(buyer).listResale(1, 0, price));
+        await checkGuard(await mine(engine.connect(artist).buyResale(1, 1, { value: price })));
+        const priorCreatorCredit = await engine.credits(artist.address);
+        await mine(nft.connect(artist).approve(engine.target, 1));
+        await mine(engine.connect(artist).listResale(1, 2, secondPrice));
+        await checkGuard(await mine(engine.connect(collector).buyResale(1, 3, { value: secondPrice })));
+        // The extra 399 wei allocate 369 to the seller, 22 to the creator and 4 to each treasury.
+        assert.equal(await engine.credits(artist.address) - priorCreatorCredit, price * 98n / 100n + 391n);
+        assert.equal(await nft.ownerOf(1), collector.address);
+        assert.equal(await nft.firstCollector(1), buyer.address);
+        assert.equal(await nft.tokenCreator(1), artist.address);
+        await checkLiabilities(deposit);
+
+        await mine(security.setPause(engine.target, true));
+        await checkGuard(await mine(engine.processRefunds(1, 1)));
+        await mine(engine.processRefunds(1, 1));
+        assert.deepEqual(Array.from(await engine.refundProgress(1)), [1n, 1n]);
+        await checkLiabilities(0n);
+        for (const account of [artist, buyer]) {
+            await checkGuard(await mine(engine.connect(account).withdraw()));
+            await rejects(engine.connect(account).withdraw.staticCall(), 'NoCredit');
+            await checkLiabilities(0n);
+        }
+        for (const treasury of [protocol, ecosystem]) await mine(treasury.claim(engine.target));
+        assert.equal(await provider.getBalance(engine.target), 0n);
+    });
+
     it('routes indivisible primary, default and resale proceeds to their exact recipients with withdrawals during pause', async () => {
         const primaryPrice = 10020n; // The protocol and creator both have a half-wei remainder.
         const defaultDeposit = ethers.parseEther('0.01') + 3n;
