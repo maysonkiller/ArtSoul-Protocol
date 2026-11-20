@@ -1,10 +1,11 @@
 import { React, createRoot } from './react-runtime.js';
 import { Field, LocalDraftNotice, NetworkLabel, PanelTitle, PhaseTable, UtilityList } from './collection-components.jsx';
 import { MintReservationTerms } from './mint-reservation-terms.jsx';
+import { CollectionScheduleField } from './collection-schedule-field.jsx';
 import { COLLECTION_NETWORKS } from '../config/collection-networks.js';
 import {
     createAuctionMintDraft, createDraft, createFirstArtworkDraft, createMintReservationDraft, createOriginDraft, createPhase, ELIGIBILITY, loadDraft,
-    MAX_DRAFT_ITEMS, MECHANISMS, parseDraft, reservationPublicMint, reviewConfig, saveDraft, scheduleTimestamp, setsMintPrice, UNUSED_SUPPLY
+    MAX_DRAFT_ITEMS, MECHANISMS, parseDraft, reservationPublicMint, reviewConfig, saveDraft, setsMintPrice, UNUSED_SUPPLY
 } from '../features/collections/launch-config.js';
 import '../features/collections/collections.css';
 import { ExplainedAction } from '../ui/explained-action.jsx';
@@ -19,11 +20,6 @@ function initialDraft() {
     } catch {
         return { draft: createDraft(), message: 'The saved draft could not be loaded. Existing storage has not been changed; you can import a valid copy or start a new draft.' };
     }
-}
-
-function utcInput(value) {
-    const timestamp = scheduleTimestamp(value);
-    return Number.isFinite(timestamp) ? new Date(timestamp).toISOString().slice(0, 16) : '';
 }
 
 function Builder() {
@@ -201,7 +197,8 @@ function Builder() {
                             <Field label="Mechanism"><select value={phase.mechanism} onChange={event => changeMechanism(index, event.target.value)}>{!Object.hasOwn(MECHANISMS, phase.mechanism) && <option value={phase.mechanism}>Unsupported imported mechanism</option>}{Object.entries(MECHANISMS).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></Field>
                             {phaseInput(phase, index, 'allocation', 'Allocation', { inputMode: 'numeric' })}
                             {phaseInput(phase, index, 'walletLimit', 'Per-wallet limit', { inputMode: 'numeric' })}
-                            {['startAt', 'endAt'].map(key => <Field key={key} label={key === 'startAt' ? 'Starts (UTC)' : 'Ends (UTC)'} type="datetime-local" value={utcInput(phase[key])} onChange={event => updatePhase(index, key, event.target.value ? new Date(`${event.target.value}Z`).toISOString() : '')} />)}
+                            {['startAt', 'endAt'].map(key => <CollectionScheduleField key={key} label={key === 'startAt' ? 'Starts (UTC)' : 'Ends (UTC)'}
+                                value={phase[key]} onChange={value => updatePhase(index, key, value)} />)}
                             {phaseInput(phase, index, 'priceEth', phase.mechanism === 'mint-reservation' ? 'Minimum bid for a place (ETH)' : setsMintPrice(phase) ? 'Auction reserve (ETH)' : 'Price (ETH)', { inputMode: 'decimal', hint: 'Exact decimal ETH, up to 18 places.' }, 'pricing')}
                             <Field label="Or reference a previous auction"><select value={phase.pricing.sourcePhaseId} onChange={event => updatePhase(index, 'sourcePhaseId', event.target.value, 'pricing')}>
                                 <option value="">No price reference</option>

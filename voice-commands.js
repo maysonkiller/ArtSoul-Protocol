@@ -34,6 +34,7 @@
 (function () {
     'use strict';
 
+    // Existing language preferences select command recognition only.
     const LANG_KEY = 'artsoul.voice.lang';
     // Older clients could persist consent before an asynchronous dialog resolved.
     const NOTICE_KEY = 'artsoul.voice.notice.v2';
@@ -168,10 +169,10 @@
             .replace(/ (?:tab|вкладку)$/u, '');
         const open = page => ({ tool: 'open_page', input: { page } });
         if (pendingNft && /^(?:нет|отмена|не надо|отмени|no|cancel|never mind|nevermind)$/u.test(text)) {
-            return { message: ru ? 'Хорошо. Что открыть дальше?' : 'Okay. What would you like to open?' };
+            return { message: 'Okay. What would you like to open?' };
         }
         if (pendingNft && /^(?:да|ага|хочу|yes|yeah|sure)$/u.test(text)) {
-            return { nftPrompt: true, message: ru ? 'Какой раздел или номер работы?' : 'Which section or artwork number?' };
+            return { nftPrompt: true, message: 'Which section or artwork number?' };
         }
         const id = /^(?:(?:nfts?|artwork|work|работ[ауеы]|артворк)\s*)?(?:(?:номер|number|no\.?|№|#)\s*)?([1-9]\d{0,77})$/u.exec(target);
         if (id && BigInt(id[1]) < 2n ** 256n) return { tool: 'open_artwork', input: { artwork_id: id[1] } };
@@ -181,9 +182,7 @@
         if (pendingNft && /^(?:mine|my profile|profile|(?:my )?collection|мои|(?:моем |мой )?профил[ье]|(?:моей |мою )?коллекци[июя])$/u.test(target)) return open('collected');
         if (/^nfts? (?:в (?:моем )?профиле|in (?:my |the )?profile)$/u.test(target)) return open('collected');
         if (/^(?:(?:мои |мой |какой-нибудь |любой |my |any )?nfts?)$/u.test(target)) {
-            return { nftPrompt: true, message: ru
-                ? 'Где открыть NFT — в галерее, на маркетплейсе, в вашей коллекции или в кошельке? Можно назвать номер работы ArtSoul.'
-                : 'Where should I open NFTs — the gallery, marketplace, your collection or your wallet? You can also say an ArtSoul artwork number.' };
+            return { nftPrompt: true, message: 'Where should I open NFTs — the gallery, marketplace, your collection or your wallet? You can also say an ArtSoul artwork number.' };
         }
         const page = NAVIGATION_PAGES.find(([, names]) => names.test(target));
         if (page) return open(page[0]);
@@ -191,7 +190,7 @@
         // A compound NFT navigation request must never pass a trailing action to
         // a different command. Unrelated turns still reach the usual parser.
         if (prefix && /^(?:мои |мой |my )?(?:nfts?|marketplace|маркетплейс)(?![\p{L}\p{N}_])/u.test(target)) {
-            return { message: ru ? 'Назовите один раздел или номер работы ArtSoul.' : 'Name one section or one ArtSoul artwork number.' };
+            return { message: 'Name one section or one ArtSoul artwork number.' };
         }
         return null;
     }
@@ -275,115 +274,69 @@
     }
 
     const TEXT = {
-        en: {
-            title: 'ArtSoul commands',
-            hint: 'Type or speak one command in English or Russian. Wallet actions still need your review and signature.',
-            input: 'Your command', placeholder: 'Open gallery, search moon…',
-            send: 'Send', microphone: 'Use microphone', stop: 'Stop listening',
-            conversation: 'Start voice chat', endConversation: 'End voice chat',
-            conversationHint: 'Voice chat continues after each answer and on pages you ask me to open in this tab. Your browser may send each turn to its speech service.',
-            resumeMic: 'Page opened. Tap Start voice chat to continue, or type your next request.',
-            arrival: 'Page opened. Listening for your next request.',
-            navigationWait: 'Navigation is taking longer than expected. Voice chat is paused.',
-            reviewCommand: 'Voice chat paused. Check the command and press Send to review this action.',
-            listenReply: 'Listen to answer', stopReply: 'Stop audio',
-            audioUnavailable: 'Audio could not play in this browser. The answer is available as text.',
-            audioBlocked: 'Tap Listen to answer to play the audio.',
-            audioNotice: 'AI-generated voice.',
-            helpSpeech: 'You can open the gallery, find artwork, or ask about your activity. The examples below show the available commands. Wallet actions always need your review and signature.',
-            close: 'Close commands', examples: 'Examples',
-            noSpeech: 'Voice is unavailable in this browser. You can type instead.',
-            working: 'Working… If your wallet opens, review the request there. Closing this panel does not cancel a submitted transaction.',
-            empty: 'Enter a command first.', changed: 'Wallet changed. Enter a new command for this account.',
-            searchPrompt: 'What would you like to find? Try "search moon", "find artists Vera" or "search docs fees".',
-            publicationPrompt: 'What is the title? Try "prepare artwork titled Moonlight". You will review the draft on Publish; nothing is uploaded or signed.',
-            tooLong: 'Use one command of up to 300 characters.',
-            listening: 'Listening… say one command.',
-            notHeard: 'Nothing was heard. Press the microphone and try again.',
-            options: 'You can open the gallery, find artwork, or ask about your activity.',
-            askSearch: 'What would you like to find?', askTitle: 'What is the title?',
-            otherRequest: 'Try “open NFTs”, “search moon”, or “my activity”.',
-            unsure: heard => `I am not sure I heard "${heard}" correctly. Please repeat the action.`,
-            heard: heard => `Heard: "${heard}"`,
-            unavailable: 'Commands are not available on this page.',
-            notice: 'Your browser may send microphone audio to its speech service for transcription. ArtSoul receives no microphone audio.\n\nTurn on the microphone?',
-            micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
-            help: 'Try: "open gallery", "open NFTs", "open home", "open my profile", "open create", "open guide", "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
-                '"prepare artwork titled Moonlight", "donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
-                '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
-                '"change price of artwork 19 to 0.003", "remove artwork 19 from sale", ' +
-                '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
-            submitted: 'Done. The wallet approved it and the transaction was sent.',
-            settled: 'Settlement confirmed. The NFT is yours. Artwork details are updating.',
-            next: 'What would you like to do next?',
-            refused: reason => `Not done. ${reason}`,
-            noWallet: 'No wallet is connected. Connect one first.',
-            error: message => `That did not work: ${message}`
-        },
-        ru: {
-            title: 'Команды ArtSoul',
-            hint: 'Напишите или произнесите одну команду по-русски или по-английски. Действия с кошельком требуют вашей проверки и подписи.',
-            input: 'Ваша команда', placeholder: 'Открой галерею, найди луна…',
-            send: 'Отправить', microphone: 'Включить микрофон', stop: 'Остановить запись',
-            conversation: 'Начать диалог', endConversation: 'Завершить диалог',
-            conversationHint: 'Диалог продолжается после ответа и на страницах, которые вы просите открыть в этой вкладке. Браузер может отправлять реплики в свой сервис распознавания.',
-            resumeMic: 'Страница открыта. Нажмите «Начать диалог» или введите следующую просьбу.',
-            arrival: 'Страница открыта. Слушаю.',
-            navigationWait: 'Переход затянулся. Диалог приостановлен.',
-            reviewCommand: 'Диалог приостановлен. Проверьте команду и нажмите «Отправить», чтобы перейти к проверке действия.',
-            listenReply: 'Прослушать ответ', stopReply: 'Остановить звук',
-            audioUnavailable: 'Браузер не смог воспроизвести звук. Ответ доступен текстом.',
-            audioBlocked: 'Нажмите «Прослушать ответ», чтобы включить звук.',
-            audioNotice: 'Голос создан искусственным интеллектом.',
-            helpSpeech: 'Можно открыть галерею, найти работу или узнать о своей активности. Доступные команды показаны в примерах ниже. Действия с кошельком всегда требуют вашей проверки и подписи.',
-            close: 'Закрыть команды', examples: 'Примеры',
-            noSpeech: 'Голос недоступен в этом браузере. Можно написать команду.',
-            working: 'Выполняется… Если откроется кошелёк, проверьте запрос в нём. Закрытие этого окна не отменяет отправленную транзакцию.',
-            empty: 'Сначала введите команду.', changed: 'Кошелёк изменён. Введите новую команду для этого аккаунта.',
-            searchPrompt: 'Что найти? Например: «найди луна», «найди автора Vera» или «найди в документации fees».',
-            publicationPrompt: 'Как назвать работу? Например: «подготовь работу с названием Лунный свет». На Publish вы проверите черновик; файл не загружается, подпись не запрашивается.',
-            tooLong: 'Введите одну команду длиной до 300 символов.',
-            listening: 'Слушаю… скажите одну команду.',
-            notHeard: 'Ничего не услышано. Нажмите микрофон и попробуйте снова.',
-            options: 'Можно открыть галерею, найти работу или узнать о своей активности.',
-            askSearch: 'Что найти?', askTitle: 'Как назвать работу?',
-            otherRequest: 'Попробуйте «открой NFT», «найди луну» или «моя активность».',
-            unsure: heard => `Не уверен, что расслышал «${heard}». Повторите действие, пожалуйста.`,
-            heard: heard => `Услышано: «${heard}»`,
-            unavailable: 'Команды недоступны на этой странице.',
-            notice: 'Браузер может отправлять звук с микрофона в свой сервис распознавания речи. ArtSoul не получает звук с микрофона.\n\nВключить микрофон?',
-            micBlocked: 'Микрофон для этого сайта заблокирован. Разрешите его в настройках браузера.',
-            help: 'Скажите: «открой галерею», «открой NFT», «открой главную», «открой мой профиль», «открой создание работы», «открой руководство», «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
-                '«подготовь работу с названием Лунный свет», «донат автору работы 31», «пожаловаться на работу 31» (только открывает форму; ничего не отправляет), ' +
-                '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
-                '«измени цену работы 19 на 0,003», «сними работу 19 с продажи», ' +
-                '«запусти аукцион на работу 31 за 0,005 на 36 часов», «выведи деньги», «стоп, не трогай кошелёк».',
-            submitted: 'Готово. Кошелёк подтвердил, транзакция отправлена.',
-            settled: 'Расчёт подтверждён. NFT теперь ваша. Данные работы обновляются.',
-            next: 'Что хотите сделать дальше?',
-            refused: () => 'Не выполнено. Причина показана на экране.',
-            noWallet: 'Кошелёк не подключён. Сначала подключите его.',
-            error: () => 'Не получилось. Подробности на экране.'
-        }
+        title: 'ArtSoul commands',
+        hint: 'Choose the language you speak. Replies are in English. Wallet actions need your review and signature.',
+        input: 'Your command', placeholder: 'Open gallery, search moon…',
+        send: 'Send', microphone: 'Use microphone', stop: 'Stop listening',
+        conversation: 'Start voice chat', endConversation: 'End voice chat',
+        conversationHint: 'Voice chat continues after each answer and on pages you ask me to open in this tab. Your browser may send each turn to its speech service.',
+        resumeMic: 'Page opened. Tap Start voice chat to continue, or type your next request.',
+        arrival: 'Page opened. Listening for your next request.',
+        navigationWait: 'Navigation is taking longer than expected. Voice chat is paused.',
+        reviewCommand: 'Voice chat paused. Check the command and press Send to review this action.',
+        listenReply: 'Listen to answer', stopReply: 'Stop audio',
+        audioUnavailable: 'Audio could not play in this browser. The answer is available as text.',
+        audioBlocked: 'Tap Listen to answer to play the audio.',
+        audioNotice: 'AI-generated voice.',
+        helpSpeech: 'You can open the gallery, find artwork, or ask about your activity. The examples below show the available commands. Wallet actions always need your review and signature.',
+        close: 'Close commands', examples: 'Examples',
+        noSpeech: 'Voice is unavailable in this browser. You can type instead.',
+        working: 'Working… If your wallet opens, review the request there. Closing this panel does not cancel a submitted transaction.',
+        empty: 'Enter a command first.', changed: 'Wallet changed. Enter a new command for this account.',
+        searchPrompt: 'What would you like to find? Try "search moon", "find artists Vera" or "search docs fees".',
+        publicationPrompt: 'What is the title? Try "prepare artwork titled Moonlight". You will review the draft on Publish; nothing is uploaded or signed.',
+        tooLong: 'Use one command of up to 300 characters.',
+        listening: 'Listening… say one command.',
+        notHeard: 'Nothing was heard. Press the microphone and try again.',
+        options: 'You can open the gallery, find artwork, or ask about your activity.',
+        askSearch: 'What would you like to find?', askTitle: 'What is the title?',
+        otherRequest: 'Try “open NFTs”, “search moon”, or “my activity”.',
+        unsure: heard => `I am not sure I heard "${heard}" correctly. Please repeat the action.`,
+        heard: heard => `Heard: "${heard}"`,
+        unavailable: 'Commands are not available on this page.',
+        notice: 'Your browser may send microphone audio to its speech service for transcription. ArtSoul receives no microphone audio.\n\nTurn on the microphone?',
+        micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
+        help: 'Try: "open gallery", "open NFTs", "open home", "open my profile", "open create", "open guide", "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
+            '"prepare artwork titled Moonlight", "donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
+            '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
+            '"change price of artwork 19 to 0.003", "remove artwork 19 from sale", ' +
+            '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
+        submitted: 'Done. The wallet approved it and the transaction was sent.',
+        settled: 'Settlement confirmed. The NFT is yours. Artwork details are updating.',
+        next: 'What would you like to do next?',
+        refused: reason => `Not done. ${reason}`,
+        noWallet: 'No wallet is connected. Connect one first.',
+        error: message => `That did not work: ${message}`
     };
 
     // Only reviewed, fixed public copy has a prerecorded voice. Exact matching
     // keeps dynamic amounts and refused/submitted/confirmed states distinct.
-    const replyClips = Object.freeze(['en', 'ru'].flatMap(lang =>
+    const replyClips = Object.freeze(
         ['helpSpeech', 'searchPrompt', 'publicationPrompt', 'tooLong', 'empty', 'unavailable', 'noWallet', 'submitted', 'settled']
-            .map(id => Object.freeze({lang, id, text: TEXT[lang][id], url: `/audio/assistant/v1/${lang}-${id}.wav`}))));
+            .map(id => Object.freeze({lang: 'en', id, text: TEXT[id], url: `/audio/assistant/v1/en-${id}.wav`}))
+    );
 
-    function getReplyAudio(text, lang) {
-        const phrase = ['options', 'askSearch', 'askTitle'].find(id => TEXT[lang]?.[id] === text);
-        if (phrase) return `/audio/assistant/v1/phrases/${lang}-${phrase}.wav`;
-        return replyClips.find(clip => clip.lang === lang && clip.text === text)?.url || '';
+    function getReplyAudio(text) {
+        const phrase = ['options', 'askSearch', 'askTitle'].find(id => TEXT[id] === text);
+        if (phrase) return `/audio/assistant/v1/phrases/en-${phrase}.wav`;
+        return replyClips.find(clip => clip.text === text)?.url || '';
     }
 
-    function hoursText(value, lang) {
+    function hoursText(value) {
         const hours = Number(value);
         if (!Number.isFinite(hours)) return '';
         const rounded = hours >= 10 ? Math.round(hours) : Math.round(hours * 10) / 10;
-        return lang === 'ru' ? `${rounded} ч` : `${rounded} hours`;
+        return `${rounded} hours`;
     }
 
     /**
@@ -391,22 +344,21 @@
      * the panel carries the detail, so a person who cannot hear the reply still
      * gets all of it.
      */
-    function describeResult(tool, result, lang) {
-        const t = TEXT[lang === 'ru' ? 'ru' : 'en'];
-        const ru = lang === 'ru';
+    function describeResult(tool, result) {
+        const t = TEXT;
         const data = result || {};
         if (data.error) return { say: t.error(data.error), show: data.error };
         if (data.opened === false && data.code === 'wallet_required') return { say: t.noWallet, show: t.noWallet };
         if (data.opened === false && data.code === 'wallet_nfts_unavailable') {
-            const message = ru ? 'Раздел NFT кошелька сейчас недоступен.' : 'Wallet NFTs are currently unavailable.';
+            const message = 'Wallet NFTs are currently unavailable.';
             return { say: message, show: message };
         }
         if (data.connected === false) return { say: t.noWallet, show: data.reason || t.noWallet };
         if (data.submitted === true) {
             const message = tool === 'complete_settlement' && data.confirmed === true ? t.settled : t.submitted;
-            const links = [{url: data.url || '/profile', label: ru ? (data.url ? 'Открыть работу' : 'Открыть профиль') : (data.url ? 'View artwork' : 'View profile')}];
+            const links = [{url: data.url || '/profile', label: data.url ? 'View artwork' : 'View profile'}];
             if (/^0x[0-9a-f]{64}$/i.test(data.transaction_hash || '')) {
-                links.push({url: `https://sepolia.basescan.org/tx/${data.transaction_hash}`, label: ru ? 'Посмотреть транзакцию' : 'View transaction'});
+                links.push({url: `https://sepolia.basescan.org/tx/${data.transaction_hash}`, label: 'View transaction'});
             }
             return { say: message, show: `${message}\n${t.next}`, links };
         }
@@ -417,31 +369,22 @@
 
         switch (tool) {
         case 'revise_publication_draft': {
-            const name = (ru ? { title: 'Название', description: 'Описание', duration_hours: 'Часы' }
-                : { title: 'Title', description: 'Description', duration_hours: 'Hours' })[data.field];
+            const name = ({ title: 'Title', description: 'Description', duration_hours: 'Hours' })[data.field];
             if (!name || (!data.checked && !data.review_required)) return { say: t.unavailable, show: t.unavailable };
             const message = data.checked ? (data.pending
-                ? (ru ? 'Предложенное название' : 'Suggested title') : (ru ? 'Название в форме' : 'Title in the form'))
-                : (ru ? 'Проверьте предложение и нажмите Use these details.' : 'Review this suggestion and choose Use these details.');
+                ? 'Suggested title' : 'Title in the form')
+                : 'Review this suggestion and choose Use these details.';
             const line = data.checked ? `${message}: ${data.value}` : `${name}: ${data.value}\n${message}`;
             return { say: line, show: line };
         }
-        case 'prepare_artwork_registration': {
-            const message = ru ? 'Черновик готов к проверке на Publish. Нажмите Use these details, чтобы заполнить форму. Ничего не загружено и не отправлено. Затем выберите файл и проверьте остальные поля.' : data.instruction;
-            return { say: message, show: message };
-        }
+        case 'prepare_artwork_registration':
         case 'prepare_donation':
         case 'prepare_artwork_report': {
-            const message = ru
-                ? (tool === 'prepare_donation'
-                    ? 'Открываю Donate. Проверьте автора и введите сумму в форме. Ничего не отправлено; подпись в кошельке потребуется только после вашего подтверждения.'
-                    : 'Открываю Report. Выберите причину и заполните жалобу самостоятельно. Ничего не отправлено; сначала проверьте форму.')
-                : data.instruction;
+            const message = data.instruction;
             return { say: message, show: message };
         }
         case 'search_catalog': {
-            const labels = ru ? { artworks: 'Работы', auctions: 'Аукционы', artists: 'Авторы', pages: 'Страницы', docs: 'Документация' }
-                : { artworks: 'Artworks', auctions: 'Auctions', artists: 'Artists', pages: 'Pages', docs: 'Documentation' };
+            const labels = { artworks: 'Artworks', auctions: 'Auctions', artists: 'Artists', pages: 'Pages', docs: 'Documentation' };
             const lines = [], links = [];
             let more = false;
             for (const key of ['artworks', 'auctions', 'artists', 'pages', 'docs']) {
@@ -459,88 +402,77 @@
                         : `${labels[key]} · ${item.title} (#${item.artwork_id}) · ${item.creator}` });
                 }
             }
-            const head = lines.length ? `${ru ? 'Показано' : 'Shown'}: ${lines.join(' · ')}.`
-                : (ru ? 'Совпадений нет. Попробуйте другое название, имя или номер работы.' : 'No matches. Try another title, artist or artwork number.');
-            const tail = more ? (ru ? 'Есть ещё результаты. Откройте поиск через лупу и выберите категорию.' : 'More matches are available. Open Search ArtSoul and choose a category.') : '';
+            const head = lines.length ? `Shown: ${lines.join(' · ')}.`
+                : 'No matches. Try another title, artist or artwork number.';
+            const tail = more ? 'More matches are available. Open Search ArtSoul and choose a category.' : '';
             const warning = typeof data.warning === 'string' && data.warning.trim()
-                ? (ru ? 'Результаты по работам, аукционам и авторам недоступны. Показаны только найденные страницы и документация.'
-                    : 'Artwork, auction and artist results are unavailable. Only matching pages and documentation are shown.') : '';
+                ? 'Artwork, auction and artist results are unavailable. Only matching pages and documentation are shown.' : '';
             return { say: [head, warning, tail].filter(Boolean).join(' '), show: [head, warning, tail].filter(Boolean).join('\n'), links };
         }
         case 'add_to_saved':
         case 'remove_from_saved': {
             if (data.updated !== true || typeof data.saved !== 'boolean') return { say: t.error('The change to Favorites could not be confirmed.'), show: 'The change to Favorites could not be confirmed. Please try again.' };
-            const text = ru
-                ? `Работа ${data.artwork_id} ${data.saved ? 'в избранном' : 'убрана из избранного'}.`
-                : `Artwork ${data.artwork_id} ${data.saved ? 'is in Favorites' : 'was removed from Favorites'}.`;
+            const text = `Artwork ${data.artwork_id} ${data.saved ? 'is in Favorites' : 'was removed from Favorites'}.`;
             return { say: text, show: text };
         }
         case 'find_active_auctions': {
             const items = Array.isArray(data.auctions) ? data.auctions : [];
             const top = items.slice(0, 3).map(item =>
-                ru ? `${item.title}, до конца ${hoursText(item.hours_remaining, lang)}` : `${item.title}, ends in ${hoursText(item.hours_remaining, lang)}`);
-            const head = ru ? `Открыто аукционов: ${data.count || 0}.` : `${data.count || 0} auctions are open.`;
+                `${item.title}, ends in ${hoursText(item.hours_remaining)}`);
+            const head = `${data.count || 0} auctions are open.`;
             const text = [head, ...top].join(' ');
             return { say: text, show: text };
         }
         case 'search_artworks': {
             const items = Array.isArray(data.results) ? data.results : [];
-            const head = ru ? `Найдено: ${data.count || 0}.` : `Found ${data.count || 0}.`;
+            const head = `Found ${data.count || 0}.`;
             const text = [head, items.slice(0, 3).map(item => `${item.title} (#${item.artwork_id})`).join(', ')].join(' ');
             return { say: text, show: text };
         }
         case 'get_artwork':
         case 'get_auction_state': {
-            const text = ru
-                ? `${data.title}. Статус: ${data.status}. Текущая ставка: ${data.current_bid_eth} ETH.`
-                : `${data.title}. Status: ${data.status}. Current bid: ${data.current_bid_eth} ETH.`;
+            const text = `${data.title}. Status: ${data.status}. Current bid: ${data.current_bid_eth} ETH.`;
             return { say: text, show: text };
         }
         case 'get_artwork_provenance': {
             const short = value => (value ? `${String(value).slice(0, 6)}…${String(value).slice(-4)}` : '—');
             const show = `Creator ${short(data.creator)} · First Collector ${short(data.first_collector)} · Owner ${short(data.owner)}`;
-            return { say: ru ? 'Создатель, первый коллекционер и владелец показаны на экране.' : 'Creator, First Collector and Owner are shown on screen.', show };
+            return { say: 'Creator, First Collector and Owner are shown on screen.', show };
         }
         case 'get_my_activity': {
             const needs = Array.isArray(data.needs_attention) ? data.needs_attention : [];
             const total = Number(data.needs_attention_count ?? needs.length) || 0;
-            const head = ru
-                ? `Создано: ${data.created?.count || 0}. Во владении: ${data.owned?.count || 0}. На продаже: ${data.resale_listings?.count || 0}. Доступных действий: ${total}.`
-                : `You created ${data.created?.count || 0}, own ${data.owned?.count || 0}, and have ${data.resale_listings?.count || 0} listings. ${total} available actions.`;
+            const head = `You created ${data.created?.count || 0}, own ${data.owned?.count || 0}, and have ${data.resale_listings?.count || 0} listings. ${total} available actions.`;
             const labels = {
-                complete_settlement: ['Complete payment before the deadline to receive your NFT.', 'Завершите расчёт до срока оплаты, чтобы получить NFT.'],
-                end_expired_auction: ['Confirm the auction end to record its result.', 'Подтвердите завершение аукциона, чтобы зафиксировать результат.'],
-                close_expired_settlement: ['Close the unpaid settlement to allow a new auction.', 'Закройте неоплаченный аукцион, чтобы автор мог начать новый.'],
-                start_auction: ['You can start an auction when you are ready.', 'Можно начать аукцион, когда будете готовы.'],
-                withdraw_pending_funds: ['Funds are available to withdraw to your wallet.', 'Есть средства, доступные для вывода на ваш кошелёк.']
+                complete_settlement: 'Complete payment before the deadline to receive your NFT.',
+                end_expired_auction: 'Confirm the auction end to record its result.',
+                close_expired_settlement: 'Close the unpaid settlement to allow a new auction.',
+                start_auction: 'You can start an auction when you are ready.',
+                withdraw_pending_funds: 'Funds are available to withdraw to your wallet.'
             };
             const items = needs.slice(0, 5);
-            const show = [head, ...items.map(entry => `• ${entry.artwork_id ? `${ru ? 'Работа' : 'Artwork'} #${entry.artwork_id}: ` : ''}${labels[entry.tool]?.[ru ? 1 : 0] || (ru ? 'Подробности доступны в профиле.' : entry.why)}`)].join('\n');
+            const show = [head, ...items.map(entry => `• ${entry.artwork_id ? `Artwork #${entry.artwork_id}: ` : ''}${labels[entry.tool] || entry.why}`)].join('\n');
             return { say: head, show, links: items.filter(entry => entry.artwork_id).map(entry => ({
-                url: `/artwork/${entry.artwork_id}`, label: `${ru ? 'Открыть работу' : 'View artwork'} #${entry.artwork_id}`
+                url: `/artwork/${entry.artwork_id}`, label: `View artwork #${entry.artwork_id}`
             })) };
         }
         case 'open_page': {
-            const names = { home: 'главную', gallery: 'галерею', profile: 'профиль', collected: 'вашу коллекцию ArtSoul', create: 'создание работы', guide: 'руководство',
-                nfts: 'галерею NFT', walletNfts: 'NFT кошелька', marketplace: 'маркетплейс', auctions: 'аукционы', collections: 'коллекции' };
-            const text = data.opened
-                ? (ru ? 'Открываю ' + (names[data.page] || 'страницу') + '.' : 'Opening ' + data.title + '.')
-                : (ru ? 'Страница не открыта.' : 'Page was not opened.');
+            const text = data.opened ? `Opening ${data.title}.` : 'Page was not opened.';
             return { say: text, show: text };
         }
         case 'open_artwork': {
-            const text = ru ? `Открываю ${data.title}.` : `Opening ${data.title}.`;
+            const text = `Opening ${data.title}.`;
             return { say: text, show: text };
         }
         case 'revoke_wallet_access': {
             const text = data.revoked
-                ? (ru ? 'Доступ агента к кошельку убран.' : 'The agent can no longer open your wallet.')
+                ? 'The agent can no longer open your wallet.'
                 : (data.note || '');
             return { say: text, show: text };
         }
         default: {
             const text = data.instruction || data.note || JSON.stringify(data);
-            return { say: ru ? 'Готово. Подробности на экране.' : 'Done. Details are on screen.', show: text };
+            return { say: 'Done. Details are on screen.', show: text };
         }
         }
     }
@@ -610,9 +542,7 @@
         const agent = window.ArtSoulWebMCP;
         const tools = new Map(agent.createTools(agent.browserDependencies()).map(tool => [tool.name, tool]));
 
-        let lang = readStored(LANG_KEY) === 'ru' ? 'ru'
-            : readStored(LANG_KEY) === 'en' ? 'en'
-                : (String(navigator.language || '').toLowerCase().startsWith('ru') ? 'ru' : 'en');
+        let inputLanguage = readStored(LANG_KEY) === 'ru' ? 'ru' : 'en';
         let recognition = null;
         let handsFree = false;
         let leavingFor = null;
@@ -655,8 +585,8 @@
         panel.innerHTML =
             '<div class="artsoul-voice-panel-head">' +
             '<h2 id="artsoulVoiceTitle"></h2>' +
-            '<button type="button" class="artsoul-voice-lang" data-lang="en">EN</button>' +
-            '<button type="button" class="artsoul-voice-lang" data-lang="ru">RU</button>' +
+            '<button type="button" class="artsoul-voice-lang" data-lang="en" aria-label="Recognize English commands" title="Recognize English commands">EN</button>' +
+            '<button type="button" class="artsoul-voice-lang" data-lang="ru" aria-label="Recognize Russian commands" title="Recognize Russian commands">RU</button>' +
             '<button type="button" class="artsoul-voice-close">×</button>' +
             '</div>' +
             '<p class="artsoul-voice-hint" id="artsoulVoiceHint"></p>' +
@@ -693,16 +623,14 @@
         const close = panel.querySelector('.artsoul-voice-close');
 
         function label() {
-            const t = TEXT[lang];
+            const t = TEXT;
             button.setAttribute('aria-label', t.title);
-            panel.setAttribute('lang', lang);
+            panel.setAttribute('lang', 'en');
             panel.querySelector('h2').textContent = t.title;
             panel.querySelector('.artsoul-voice-hint').textContent = typeof Recognition === 'function'
                 ? t.hint + ' ' + t.conversationHint : t.hint;
             if (/^\/upload(?:\.html)?\/?$/.test(window.location?.pathname || '')) {
-                panel.querySelector('.artsoul-voice-hint').textContent += lang === 'ru'
-                    ? ' Для черновика скажите «название», затем продиктуйте его, или скажите «давай на 48 часов».'
-                    : ' For a draft, say “title” and dictate it, or say “choose 48 hours”.';
+                panel.querySelector('.artsoul-voice-hint').textContent += ' For a draft, say “title” and dictate it, or say “choose 48 hours”.';
             }
             panel.querySelector('label').textContent = t.input;
             input.placeholder = t.placeholder;
@@ -715,7 +643,7 @@
             panel.querySelector('summary').textContent = t.examples;
             panel.querySelector('.artsoul-voice-examples p').textContent = t.help;
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => {
-                el.setAttribute('aria-pressed', String(el.dataset.lang === lang));
+                el.setAttribute('aria-pressed', String(el.dataset.lang === inputLanguage));
             });
             controls();
         }
@@ -754,20 +682,20 @@
             mic.hidden = handsFree;
             chat.hidden = typeof Recognition !== 'function';
             chat.disabled = !handsFree && (busy || noticePending || Boolean(recognition));
-            chat.textContent = handsFree ? TEXT[lang].endConversation : TEXT[lang].conversation;
-            chat.title = TEXT[lang].conversationHint;
+            chat.textContent = handsFree ? TEXT.endConversation : TEXT.conversation;
+            chat.title = TEXT.conversationHint;
             chat.setAttribute('aria-pressed', String(handsFree));
             chat.dataset.listening = String(handsFree && Boolean(recognition));
-            const hasClip = Boolean(getReplyAudio(answerToRead, lang)) && typeof window.Audio === 'function';
+            const hasClip = Boolean(getReplyAudio(answerToRead)) && typeof window.Audio === 'function';
             const supportsAudio = hasClip || (typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function');
-            audioNotice.textContent = TEXT[lang].audioNotice;
+            audioNotice.textContent = TEXT.audioNotice;
             audioNotice.hidden = !hasClip;
             replay.hidden = !answerToRead;
             replay.disabled = busy || noticePending || Boolean(recognition) || !supportsAudio;
-            replay.textContent = speaking ? TEXT[lang].stopReply : TEXT[lang].listenReply;
+            replay.textContent = speaking ? TEXT.stopReply : TEXT.listenReply;
             replay.setAttribute('aria-pressed', String(speaking));
             if (answerToRead && !supportsAudio) {
-                audioStatus.textContent = TEXT[lang].audioUnavailable;
+                audioStatus.textContent = TEXT.audioUnavailable;
                 audioStatus.hidden = false;
             }
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => { el.disabled = busy || noticePending; });
@@ -831,7 +759,7 @@
                 if (!textToSay || panel.hidden || document.visibilityState === 'hidden') return;
                 silence();
                 audioStatus.hidden = true;
-                const clip = getReplyAudio(textToSay, lang);
+                const clip = getReplyAudio(textToSay);
                 if (clip && typeof window.Audio === 'function') {
                     if (!clipAudio) {
                         clipAudio = new window.Audio();
@@ -848,7 +776,7 @@
                         clipAudio.pause();
                         speaking = false;
                         if (error) {
-                            audioStatus.textContent = error.name === 'NotAllowedError' ? TEXT[lang].audioBlocked : TEXT[lang].audioUnavailable;
+                            audioStatus.textContent = error.name === 'NotAllowedError' ? TEXT.audioBlocked : TEXT.audioUnavailable;
                             audioStatus.hidden = false;
                         }
                         afterPlayback(Boolean(error));
@@ -879,7 +807,7 @@
                 const current = new SpeechSynthesisUtterance(textToSay);
                 let started = false;
                 utterance = current;
-                current.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
+                current.lang = 'en-US';
                 current.onstart = () => {
                     if (utterance !== current) return;
                     started = true;
@@ -893,7 +821,7 @@
                     utterance = null;
                     speaking = false;
                     if (failed) {
-                        audioStatus.textContent = TEXT[lang].audioUnavailable;
+                        audioStatus.textContent = TEXT.audioUnavailable;
                         audioStatus.hidden = false;
                     }
                     afterPlayback(failed);
@@ -910,14 +838,14 @@
                 window.speechSynthesis.speak(current);
             } catch {
                 stopVoice();
-                audioStatus.textContent = TEXT[lang].audioUnavailable;
+                audioStatus.textContent = TEXT.audioUnavailable;
                 audioStatus.hidden = false;
             }
         }
 
         function setListening(on) {
             mic.setAttribute('aria-pressed', String(on));
-            mic.textContent = on ? TEXT[lang].stop : TEXT[lang].microphone;
+            mic.textContent = on ? TEXT.stop : TEXT.microphone;
             button.classList.toggle('is-listening', on);
             controls();
         }
@@ -935,13 +863,13 @@
                 }
             }
             setListening(false);
-            if (answerEl.textContent === TEXT[lang].listening) show('', '');
+            if (answerEl.textContent === TEXT.listening) show('', '');
         }
 
         async function handle(transcript, confidence, spoken = false) {
             if (busy || noticePending) return;
             silence();
-            const t = TEXT[lang];
+            const t = TEXT;
             const audio = audioGeneration;
             const reply = (heard, answer, say = answer, links = []) => {
                 show(heard, answer, links, say);
@@ -961,13 +889,13 @@
                 reply(transcript, t.next);
                 return;
             }
-            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, lang, pendingDraftField);
+            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, inputLanguage, pendingDraftField);
             pendingDraftField = draftTurn?.nextField || null;
             if (draftTurn?.message) {
                 reply(transcript, draftTurn.message, pendingDraftField === 'title' ? t.askTitle : draftTurn.message);
                 return;
             }
-            let command = draftTurn || parseCommand(transcript, lang, previousPrompt === 'nft');
+            let command = draftTurn || parseCommand(transcript, inputLanguage, previousPrompt === 'nft');
             // The answer to a search/title question is data, even when it sounds like a wallet command.
             if (previousPrompt === 'search' && command?.tool !== 'search_catalog' && !command?.searchPrompt && !command?.help) {
                 command = { tool: 'search_catalog', input: { query: transcript.trim() } };
@@ -1023,7 +951,7 @@
                     input.value = '';
                     input.placeholder = t.next;
                 }
-                const resultText = describeResult(command.tool, result, lang);
+                const resultText = describeResult(command.tool, result);
                 if (spoken && handsFree && audio === audioGeneration && result.opened === true && sourcePage &&
                     (command.tool === 'open_page' || command.tool === 'open_artwork')) {
                     const from = new URL(sourcePage);
@@ -1074,7 +1002,7 @@
                 controls();
                 let approved = false;
                 try {
-                    approved = await window.confirm(TEXT[lang].notice);
+                    approved = await window.confirm(TEXT.notice);
                 } catch {
                     // A failed or dismissed consent dialog never starts audio.
                 } finally {
@@ -1096,11 +1024,11 @@
                 session = new Recognition();
             } catch {
                 handsFree = false;
-                show('', TEXT[lang].notHeard);
+                show('', TEXT.notHeard);
                 return;
             }
             recognition = session;
-            session.lang = lang === 'ru' ? 'ru-RU' : 'en-US';
+            session.lang = inputLanguage === 'ru' ? 'ru-RU' : 'en-US';
             session.continuous = false;
             session.interimResults = false;
             session.maxAlternatives = 1;
@@ -1123,23 +1051,23 @@
                 stopListening();
                 const code = event && event.error;
                 show('', code === 'not-allowed' || code === 'service-not-allowed'
-                    ? (arrival ? TEXT[lang].resumeMic : TEXT[lang].micBlocked) : TEXT[lang].notHeard);
+                    ? (arrival ? TEXT.resumeMic : TEXT.micBlocked) : TEXT.notHeard);
             };
             session.onend = () => {
                 if (recognition !== session || panel.hidden) return;
                 handsFree = false;
                 stopListening();
-                if (!answered) show('', TEXT[lang].notHeard);
+                if (!answered) show('', TEXT.notHeard);
             };
 
             setListening(true);
-            if (!resume) show('', TEXT[lang].listening);
+            if (!resume) show('', TEXT.listening);
             try {
                 session.start();
             } catch {
                 handsFree = false;
                 stopListening();
-                show('', arrival ? TEXT[lang].resumeMic : TEXT[lang].notHeard);
+                show('', arrival ? TEXT.resumeMic : TEXT.notHeard);
             }
         }
 
@@ -1182,8 +1110,8 @@
             el.addEventListener('click', () => {
                 if (busy) return;
                 stopVoice();
-                lang = el.dataset.lang === 'ru' ? 'ru' : 'en';
-                writeStored(LANG_KEY, lang);
+                inputLanguage = el.dataset.lang === 'ru' ? 'ru' : 'en';
+                writeStored(LANG_KEY, inputLanguage);
                 label();
                 show('', '');
             });
@@ -1196,7 +1124,7 @@
             generation++;
             stopVoice();
             input.value = '';
-            show('', TEXT[lang].changed);
+            show('', TEXT.changed);
         }
         function resumeOnArrival() {
             if (!arrivingFrom) return;
@@ -1207,7 +1135,7 @@
             if (nav.wallet !== walletIdentity() || Date.now() - nav.at >= NAVIGATION_TTL ||
                 !voiceConsent || typeof Recognition !== 'function' || document.visibilityState !== 'visible' || panel.hidden) return;
             handsFree = true;
-            show('', TEXT[lang].arrival, [], '');
+            show('', TEXT.arrival, [], '');
             void start({ resume: true, arrival: true });
         }
         window.addEventListener('artsoul:wallet-state-changed', () => {
@@ -1233,7 +1161,7 @@
         if (arrivingFrom && voiceConsent && document.visibilityState === 'visible' && typeof Recognition === 'function') {
             panel.hidden = false;
             button.setAttribute('aria-expanded', 'true');
-            show('', TEXT[lang].resumeMic);
+            show('', TEXT.resumeMic);
             resumeOnArrival();
         } else arrivingFrom = null;
     }

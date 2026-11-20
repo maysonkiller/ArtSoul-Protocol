@@ -202,7 +202,7 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged, readOnly =
             </>}
             <button type="submit" disabled={busy || (action === 'rotate_authority' ? !ADDRESS.test(nextA) || !ADDRESS.test(nextB) : !ADDRESS.test(target))}>Review request</button>
         </form> : <>
-            <p>Expires at {new Date(request.proposal.expiresAt).toLocaleTimeString()}. Review the complete request before signing.</p>
+            <p>Expires at {new Date(request.proposal.expiresAt).toLocaleTimeString('en-US')}. Review the complete request before signing.</p>
             <pre className="protocol-admin-approval-message">{request.message}</pre>
             <ul>{request.proposal.authorities.map(address => <li key={address}>{address}: {signed.has(address) ? 'Signed' : 'Signature needed'}</li>)}</ul>
             <button type="button" onClick={sign} disabled={busy || signed.has(wallet)}>Sign with connected wallet</button>

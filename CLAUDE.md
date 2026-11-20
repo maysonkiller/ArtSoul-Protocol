@@ -59,6 +59,7 @@ When you notice an obvious closely-related bug in the same area you are editing,
 - Before coding: identify the current request, affected layers and relevant baseline sections; flag any superseded decision being changed.
 - After coding: record material interpretations, implementation evidence and documentation updates; distinguish delegated technical choices from still-unapproved product decisions.
 - Everything committed to the public repository — branch names, commit messages, PR title/body, code comments, test names/comments, and docs — is English. User-facing chat reports may follow the user's language.
+- First-party product controls, help, dates and assistant replies use English in both themes regardless of browser locale. Preserve creator-authored text and permit multilingual input recognition.
 
 ## v1.2 DELTAS (read in addition to above)
 - Moderation is SIMPLIFIED as summarized in rule 12. Do not reintroduce the superseded 3-factor social-login gate or upload fingerprinting plan.

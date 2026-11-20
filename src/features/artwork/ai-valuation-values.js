@@ -24,7 +24,7 @@ export function readAIValuation(value) {
     };
 }
 
-export function formatAIPrice(value, locale) {
+export function formatAIPrice(value, locale = 'en-US') {
     const price = parseAIPrice(value);
     return price === null ? 'Unavailable' : price.toLocaleString(locale, {
         useGrouping: false,

@@ -191,7 +191,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
                     {donation.message && <p className="artist-support-message">{donation.message}</p>}
                     {donation.message && onReportDonation && <button type="button" data-allow-rapid="true" className="btn-secondary"
                         onClick={() => onReportDonation({transaction_hash: donation.transaction_hash, log_index: donation.log_index})}>Report message</button>}
-                    <time dateTime={donation.recorded_at}>{new Date(donation.recorded_at).toLocaleString()}</time>
+                    <time dateTime={donation.recorded_at}>{new Date(donation.recorded_at).toLocaleString('en-US')}</time>
                 </article>)}
                 {(offset > 0 || feed?.next_offset != null) && <nav className="artist-support-pagination" aria-label="Donation history pages">
                     <button type="button" className="btn-secondary" data-allow-rapid="true" disabled={!offset}

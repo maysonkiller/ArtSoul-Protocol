@@ -649,7 +649,7 @@ function ProtocolAdminPage() {
                                     <section key={report.id} className="protocol-admin-report-card">
                                         <div className="protocol-admin-card-meta">
                                             <span>{report.category.replace('_', ' ')}</span>
-                                            <span>{new Date(report.created_at).toLocaleString()}</span>
+                                            <span>{new Date(report.created_at).toLocaleString('en-US')}</span>
                                         </div>
                                         <p className="protocol-admin-report-text">{report.details}</p>
                                         {report.target_type === 'profile_content' && <ProfileReportSnapshot report={report} />}
@@ -716,7 +716,7 @@ function ProtocolAdminPage() {
                                 <div key={`${item.action || item.event_type}:${item.id}`}>
                                     <strong>{item.action || item.event_type}</strong>
                                     <span>{item.report_id ? `Report ${item.report_id}` : `Artwork ${item.artwork_id}`}</span>
-                                    <span>{new Date(item.created_at).toLocaleString()} · {item.actor_wallet ? shortWallet(item.actor_wallet) : 'Identity private'}{item.reason ? ` · ${item.reason}` : ''}</span>
+                                    <span>{new Date(item.created_at).toLocaleString('en-US')} · {item.actor_wallet ? shortWallet(item.actor_wallet) : 'Identity private'}{item.reason ? ` · ${item.reason}` : ''}</span>
                                 </div>
                             ))}
                     </div>
@@ -732,7 +732,7 @@ function ProtocolAdminPage() {
                             <div key={item.id}>
                                 <strong>{item.notification_type}</strong>
                                 <span>Recipient {shortWallet(item.recipient_wallet)}</span>
-                                <span>{new Date(item.created_at).toLocaleString()}</span>
+                                <span>{new Date(item.created_at).toLocaleString('en-US')}</span>
                             </div>
                         ))}
                     </div>

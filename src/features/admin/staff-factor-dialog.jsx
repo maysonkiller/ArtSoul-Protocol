@@ -139,7 +139,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
             {status?.passkeyAvailable && <button type="button" disabled={busy} onClick={() => passkey(false)}>Verify passkey</button>}
             {status?.setup && <section aria-label="Approved sign-in setup">
                 <h3>Choose your sign-in method</h3>
-                <p>Both authority wallets approved setup until {new Date(status.setup.expiresAt).toLocaleTimeString()}. Choose one method.</p>
+                <p>Both authority wallets approved setup until {new Date(status.setup.expiresAt).toLocaleTimeString('en-US')}. Choose one method.</p>
                 <button type="button" disabled={busy} onClick={() => passkey(true)}>Set up passkey</button>
                 {status.totpAvailable && <button type="button" disabled={busy} onClick={prepareApp}>Set up authenticator app</button>}
             </section>}

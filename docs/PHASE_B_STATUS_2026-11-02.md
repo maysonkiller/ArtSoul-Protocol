@@ -5,6 +5,8 @@ to Phase C. Controlled tests accepted the publish-to-resale flows, reversible
 profile moderation and iPhone layout and sign-in. Snapshot tooling passed its
 rehearsal. The following observations transfer with their original evidence.
 
+On November 20 the founder chose English for all ArtSoul interface copy and assistant replies. The recorder can still recognize English or Russian input. Existing input preferences affect recognition only. English recordings and English browser speech serve replies in either input mode. The November 16 Russian playback result below records an earlier release.
+
 | Follow-up | When to verify |
 | --- | --- |
 | Hosted reminders and settlement UI | At an eligible Base Sepolia auction, or during C13, observe a late bid extending the deadline, the winner opening a payment reminder before paying, and the open artwork page refreshing after settlement. Local tests have passed. The November 19 rehearsal candidate is round 76 below. |

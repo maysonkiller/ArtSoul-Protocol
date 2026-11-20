@@ -18,6 +18,11 @@ const topics = {
         ],
         links: [['Read the guide', '/docs-protocol#trust-community']]
     },
+    genesis: {
+        title: 'Genesis grants', label: 'About Genesis eligibility',
+        paragraphs: ['Genesis grants are planned for Base mainnet. The activity category considers Base mainnet transactions. Every grant requires multisig approval.'],
+        links: [['View eligibility and grant categories', '/docs-protocol#genesis-grants']]
+    },
     auction: {
         title: 'Before you bid', label: 'About bids, payment and floor',
         paragraphs: [

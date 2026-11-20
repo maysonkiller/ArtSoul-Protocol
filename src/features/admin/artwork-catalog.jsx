@@ -1,4 +1,5 @@
 import { React } from '../../entries/react-runtime.js';
+import '../../ui/components/artwork-player.js';
 const { useEffect, useRef, useState } = React;
 
 export function AdminArtworkPreview({ artwork }) {
@@ -8,9 +9,9 @@ export function AdminArtworkPreview({ artwork }) {
     useEffect(() => setFailed(false), [source]);
     return <div className="protocol-admin-artwork-preview">
         {artwork?.media_type === 'video' && artwork.media_url
-            ? <video src={artwork.media_url} poster={source || undefined} controls playsInline preload="none" aria-label={artwork.title || 'Video artwork'} />
+            ? <artsoul-media-player key={'video-' + artwork.media_url}><video src={artwork.media_url} poster={source || undefined} playsInline preload="none" aria-label={artwork.title || 'Video artwork'} /></artsoul-media-player>
             : artwork?.media_type === 'audio' && artwork.media_url
-            ? <audio src={artwork.media_url} controls preload="none" aria-label={artwork.title || 'Audio artwork'} />
+            ? <artsoul-media-player key={'audio-' + artwork.media_url}><audio src={artwork.media_url} preload="none" aria-label={artwork.title || 'Audio artwork'} /></artsoul-media-player>
             : source && !failed
             ? <img src={source} alt={artwork?.title || 'Artwork preview'} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
             : <span>{artwork?.media_type === 'audio' ? 'Audio artwork' : artwork?.media_type === 'video' ? 'Video artwork' : 'Preview unavailable'}</span>}

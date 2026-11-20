@@ -11,7 +11,7 @@ function hooks(){const values=[],refs=[],effects=[];let si,ri,ei,pending;return 
 function descendants(node){return !node||typeof node!=='object'?[]:[node,...[node.props?.children].flat(Infinity).flatMap(descendants)];}
 const text=node=>typeof node==='string'?node:node&&typeof node==='object'?[node.props?.children].flat(Infinity).map(text).join(''):'';
 const row=overrides=>({chain_id:84532,artwork_id:'34',title:'Review artwork',hidden:false,report_count:3,pending_count:0,actioned_count:0,donation_report_count:1,visibility_updated_at:'2026-10-26T10:00:00.123456Z',...overrides});
-async function harness(api){const {transformWithOxc}=await import('vite');const compiled=await transformWithOxc(source.replace(/^import .*;\s*/,'').replaceAll('export function','function'),'catalog.jsx',{jsx:{runtime:'classic'}});
+async function harness(api){const {transformWithOxc}=await import('vite');const compiled=await transformWithOxc(source.replace(/^import [^\n]+;\r?\n/gm,'').replaceAll('export function','function'),'catalog.jsx',{jsx:{runtime:'classic'}});
   const h=hooks(),calls=[],reviews=[],errors=[];let current=true,changed=0;
   const React={...h,createElement:(type,props,...children)=>({type,props:{...props,children}})};
   const render=vm.runInNewContext(compiled.code+'\nAdminArtworkCatalog;',{React,document:{activeElement:null}});

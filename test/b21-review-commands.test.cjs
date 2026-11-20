@@ -179,7 +179,7 @@ test('review replies say nothing was submitted and preserve explicit failure rea
         assert.equal(result.prepared, true, 'safe small numeric response IDs may match the canonical string input');
         for (const lang of ['en', 'ru']) {
             const reply = voice.describeResult(name, result, lang);
-            assert.match(reply.show, lang === 'ru' ? /Ничего не отправлено/ : /Nothing has been (?:sent|submitted)/);
+            assert.match(reply.show, /Nothing has been (?:sent|submitted)/);
             assert.doesNotMatch(reply.say, /Your donation was sent successfully/, 'metadata is not a preparation outcome');
             assert.equal(typeof reply.say, 'string');
             const refused = voice.describeResult(name, {prepared: false, reason: 'Review is unavailable.'}, lang);

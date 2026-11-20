@@ -19,6 +19,23 @@ vm.runInNewContext(
 vm.runInNewContext(source, { window, document: {} });
 const { mediaType, mediaUrl, posterUrl, mediaDescriptor } = window.ArtSoulArtworkCard;
 
+test('a posterless preview requests one frame and first playback includes the opening soundtrack', () => {
+    const { videoPreviewSource, startVideoFromPreview } = window.ArtSoulArtworkCard;
+    const url = 'https://cdn.example.test/work.mp4?quality=source';
+    assert.equal(videoPreviewSource(url, ''), url + '#t=0.1');
+    assert.equal(videoPreviewSource(url, 'poster.png'), url);
+    assert.equal(videoPreviewSource(url + '#t=3', ''), url + '#t=3');
+    const video = { currentTime: 0.1, dataset: {} };
+    startVideoFromPreview(video, url, '');
+    assert.equal(video.currentTime, 0);
+    video.currentTime = 0.1;
+    startVideoFromPreview(video, url, '');
+    assert.equal(video.currentTime, 0.1, 'resume preserves position');
+    const scrubbed = { currentTime: 3.5, dataset: {} };
+    startVideoFromPreview(scrubbed, url, '');
+    assert.equal(scrubbed.currentTime, 3.5);
+});
+
 test('video evidence wins over stale audio metadata without selecting the audio URL', () => {
     const artwork = {
         media_type: 'audio',

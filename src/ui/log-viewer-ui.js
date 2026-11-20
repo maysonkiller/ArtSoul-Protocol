@@ -394,7 +394,7 @@ class LogViewerUI {
 
         const timestamp = document.createElement('span');
         timestamp.style.cssText = 'color: #888; margin-right: 10px;';
-        timestamp.textContent = new Date(log.timestamp).toLocaleTimeString();
+        timestamp.textContent = new Date(log.timestamp).toLocaleTimeString('en-US');
 
         const level = document.createElement('span');
         level.style.cssText = `

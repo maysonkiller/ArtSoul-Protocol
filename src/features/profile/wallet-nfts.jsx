@@ -53,8 +53,8 @@ function NftDetails({ item, quote, onClose }) {
           <p className="wallet-nfts-note">This inventory confirms ownership, not a purchase. Transfers, gifts and collection floors are not a price paid by you.</p>
           <div className="wallet-nft-quote" role="status">
             <span>ETH / USD reference rate</span>
-            <strong>{quote?.data ? `1 ETH ≈ ${new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(quote.data.amount))}` : quote?.status === 'loading' ? 'Loading rate…' : 'Rate unavailable'}</strong>
-            {quote?.data && <small>Coinbase · retrieved <time dateTime={quote.data.fetchedAt}>{new Date(quote.data.fetchedAt).toLocaleString()}</time></small>}
+            <strong>{quote?.data ? `1 ETH ≈ ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(quote.data.amount))}` : quote?.status === 'loading' ? 'Loading rate…' : 'Rate unavailable'}</strong>
+            {quote?.data && <small>Coinbase · retrieved <time dateTime={quote.data.fetchedAt}>{new Date(quote.data.fetchedAt).toLocaleString('en-US')}</time></small>}
           </div>
           <p className="wallet-nfts-note">The token rate is not a valuation or offer for this NFT.</p>
         </div>

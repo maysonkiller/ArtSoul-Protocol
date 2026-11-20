@@ -88,7 +88,7 @@ function AdditionalPasskeyGrant({walletAddress, api, onStepUpRequired}) {
                 <label className="block text-sm">One-time enrollment code
                     <input readOnly autoComplete="off" spellCheck={false} value={grant.token} className="w-full px-3 py-2 rounded-lg" style={{background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)'}} />
                 </label>
-                <p className="text-xs">Expires at {new Date(grant.expiresAt).toLocaleTimeString()}. Keep it private. Clearing this page does not revoke a copied code.</p>
+                <p className="text-xs">Expires at {new Date(grant.expiresAt).toLocaleTimeString('en-US')}. Keep it private. Clearing this page does not revoke a copied code.</p>
                 <button type="button" className="btn-secondary" data-allow-rapid="true" onClick={copyGrant}>Copy code</button>
             </>}
             {(grant || busy) && <button type="button" className="btn-secondary" data-allow-rapid="true" onClick={clearGrant}>{busy ? 'Cancel' : 'Clear code'}</button>}
