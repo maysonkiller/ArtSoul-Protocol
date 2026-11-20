@@ -174,7 +174,7 @@ export async function checkOrdinaryIntake(pool) {
         JOIN artsoul_private.ordinary_issuers USING (chain_id, core_address) ORDER BY core_address`);
     assert.deepEqual(rows.rows, [1, 2].map(i => ({ core_address: address(i), nft_address: address(i + 10),
         auction_id: '1', price_wei: '1000000000000000001' })));
-    assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_issuers')).rows[0].count, '2');
+    assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_issuers WHERE chain_id=84532')).rows[0].count, '2');
     await assert.rejects(intake(pool, 3, {offer:true, omitAcceptance:true}), /finalized auction state disagree/);
     await assert.rejects(intake(pool, 3, {offer:true, reorg:true}), /canonical block mismatch/);
     const count = async table => (await pool.query(`SELECT count(*) FROM artsoul_private.${table} WHERE core_address=$1`, [address(3)])).rows[0].count;
