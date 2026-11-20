@@ -183,28 +183,42 @@ export async function readOrdinaryResaleQuote(listener, options) {
 export async function readOrdinaryRunnerUpOffer(listener, options) {
     const auctionId = options?.auctionId;
     if (!positiveUint256(auctionId)) throw new Error('Invalid ordinary auction ID');
+    const page = await readOrdinaryRunnerUpOffers(listener, options, [auctionId]);
+    return page.offers[0];
+}
+
+// Share deployment and block verification across a bounded page of known auctions.
+export async function readOrdinaryRunnerUpOffers(listener, options, ids) {
+    if (!Array.isArray(ids) || ids.length > 16 || !ids.every(positiveUint256) || new Set(ids).size !== ids.length) {
+        throw new Error('Invalid ordinary auction page');
+    }
+    const auctionIds = [...ids];
     return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
         if (!matches(quantityPattern, header.timestamp)) throw new Error('Invalid ordinary offer block timestamp');
-        const auction = await readOrdinaryAuctionField(send, proof, block, auctionId, 'auctions');
-        if (auction.artworkId === 0n || auction.state === 0n) throw new Error('Unknown ordinary auction');
-        const offer = await readOrdinaryAuctionField(send, proof, block, auctionId, 'runnerUpOffers');
-        const offered = offer.deadline !== 0n;
-        const settled = 4n, defaulted = 5n, runnerUpOffer = 6n; // OrdinaryArtAuctions.State
-        if (auction.state > runnerUpOffer || (auction.state === runnerUpOffer && !offered) ||
-            (offered && (auction.state < settled || !nonzero(offer.bidder) || offer.price === 0n ||
-                (auction.state === settled && auction.firstCollector !== offer.bidder)))) {
-            throw new Error('Inconsistent ordinary runner-up offer');
+        const offers = [];
+        for (const auctionId of auctionIds) {
+            const auction = await readOrdinaryAuctionField(send, proof, block, auctionId, 'auctions');
+            if (auction.artworkId === 0n || auction.state === 0n) throw new Error('Unknown ordinary auction');
+            const offer = await readOrdinaryAuctionField(send, proof, block, auctionId, 'runnerUpOffers');
+            const offered = offer.deadline !== 0n;
+            const settled = 4n, defaulted = 5n, runnerUpOffer = 6n; // OrdinaryArtAuctions.State
+            if (auction.state > runnerUpOffer || (auction.state === runnerUpOffer && !offered) ||
+                (offered && (auction.state < settled || !nonzero(offer.bidder) || offer.price === 0n ||
+                    (auction.state === settled && auction.firstCollector !== offer.bidder)))) {
+                throw new Error('Inconsistent ordinary runner-up offer');
+            }
+            let status = 'not_offered';
+            if (offered) {
+                if (auction.state === settled) status = 'accepted';
+                else if (auction.state === defaulted) status = 'closed';
+                else status = BigInt(header.timestamp) <= offer.deadline ? 'open' : 'expired';
+            }
+            const bidder = offered ? offer.bidder.toLowerCase() : null;
+            offers.push(Object.freeze({ ...proof, auctionId, artworkId: auction.artworkId.toString(), status, bidder,
+                eligibleBuyer: status === 'open' ? bidder : null, priceWei: offered ? offer.price.toString() : null,
+                deadline: offered ? offer.deadline.toString() : null }));
         }
-        let status = 'not_offered';
-        if (offered) {
-            if (auction.state === settled) status = 'accepted';
-            else if (auction.state === defaulted) status = 'closed';
-            else status = BigInt(header.timestamp) <= offer.deadline ? 'open' : 'expired';
-        }
-        const bidder = offered ? offer.bidder.toLowerCase() : null;
-        return Object.freeze({ ...proof, auctionId, artworkId: auction.artworkId.toString(), status, bidder,
-            eligibleBuyer: status === 'open' ? bidder : null, priceWei: offered ? offer.price.toString() : null,
-            deadline: offered ? offer.deadline.toString() : null });
+        return { ...proof, offers };
     }, 'nft');
 }
 

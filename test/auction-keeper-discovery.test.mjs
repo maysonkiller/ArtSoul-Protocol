@@ -74,8 +74,36 @@ test('keeper discovers funded rounds across bounded ranges and restarts, updatin
         await store.sync(node, 21);
         assert.deepEqual(store.ready(250, 3), []);
         assert.deepEqual(store.ready(251, 3), [due(1, 'expireRunnerUpOffer', 251)]);
+        const offerBlock = await node.getBlock(21);
+        assert.deepEqual(store.offerCandidates(offerBlock, '0', 16), {ids:['1'], nextAfterAuction:null});
+        assert.throws(() => store.offerCandidates({...offerBlock, hash:hash(19)}, '0', 16), /checkpoint/);
         await store.sync(node, 26);
+        assert.deepEqual(store.offerCandidates(await node.getBlock(26), '0', 16).ids, []);
         assert.deepEqual(store.ready(1000, 3), []);
+    } finally { store.close(); }
+});
+
+test('the offer monitor pages known IDs in numeric order across restarts and includes the exact last second', async t => {
+    const file = fileFor(t);
+    const hugeId = 2n ** 255n + 3n;
+    const rounds = [10n, 2n, hugeId];
+    const logs = rounds.flatMap((round, i) => [
+        opening(10, i * 2, round, 110), bid(10, i * 2 + 1, round),
+        log(11,i,'AuctionClosed',[round,bidder,115]), log(12,i*2,'AuctionDefaulted',[round,bidder,2]),
+        log(12,i*2+1,'RunnerUpOfferOpened',[round,bidder,7,140])
+    ]);
+    const node = source(logs);
+    let store = openKeeperStore(file, manifest);
+    try { await store.sync(node, 12); } finally { store.close(); }
+    store = openKeeperStore(file, manifest);
+    try {
+        await store.sync(node, 14);
+        const tip = await node.getBlock(14);
+        assert.deepEqual(store.offerCandidates(tip, '0', 2), {ids:['2','10'],nextAfterAuction:'10'});
+        assert.deepEqual(store.offerCandidates(tip, '10', 2), {ids:[String(hugeId)],nextAfterAuction:null});
+        for (const cursor of ['01', '-1', String(2n**256n)]) assert.throws(() => store.offerCandidates(tip, cursor, 2), /cursor/);
+        await store.sync(node, 15);
+        assert.deepEqual(store.offerCandidates(await node.getBlock(15), '0', 2), {ids:[],nextAfterAuction:null});
     } finally { store.close(); }
 });
 
