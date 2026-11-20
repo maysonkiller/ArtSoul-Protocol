@@ -67,21 +67,22 @@ const LIVENESS = Object.freeze({
   HEALTHY_MAX_SECONDS: 120,
   // Ten minutes with no processed range is not a slow block. Something is
   // wrong and somebody should look.
-  DEGRADED_MAX_SECONDS: 600
+  DEGRADED_MAX_SECONDS: 600,
+  FUTURE_SKEW_SECONDS: 30,
+  CACHE_SECONDS: 60
 });
 
 // A chain the project stopped on purpose is not an incident. Ethereum Sepolia
 // is read-only legacy under canon 13 and its indexer is meant to be off.
 function describeLiveness(state, nowMs) {
-  const stoppedByDesign = String(state.status || '') === 'stopped';
   const lastIndexedAt = state.last_indexed_at ? Date.parse(state.last_indexed_at) : NaN;
-  const ageSeconds = Number.isFinite(lastIndexedAt)
+  const ageSeconds = Number.isFinite(lastIndexedAt) && lastIndexedAt <= nowMs + LIVENESS.FUTURE_SKEW_SECONDS * 1000
     ? Math.max(0, Math.round((nowMs - lastIndexedAt) / 1000))
     : null;
 
   let liveness;
-  if (stoppedByDesign) liveness = 'stopped_by_design';
-  else if (ageSeconds === null) liveness = 'unknown';
+  if (state.status === 'stopped') liveness = Number(state.chain_id) === 11155111 ? 'stopped_by_design' : 'stalled';
+  else if (state.status !== 'running' || ageSeconds === null) liveness = 'unknown';
   else if (ageSeconds <= LIVENESS.HEALTHY_MAX_SECONDS) liveness = 'healthy';
   else if (ageSeconds <= LIVENESS.DEGRADED_MAX_SECONDS) liveness = 'degraded';
   else liveness = 'stalled';
@@ -95,7 +96,7 @@ function describeLiveness(state, nowMs) {
     degraded_within_seconds: LIVENESS.DEGRADED_MAX_SECONDS,
     // This response is edge-cached, so an age can be up to this much older than
     // the truth.
-    response_max_age_seconds: 60
+    response_max_age_seconds: LIVENESS.CACHE_SECONDS
   };
 }
 
@@ -196,7 +197,7 @@ export default async function handler(req, res) {
     };
 
     const chains = buildChainStatus(stateRows, tableRows);
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=240');
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${LIVENESS.CACHE_SECONDS}, must-revalidate`);
     res.status(200).json({
       success: true,
       source: 'indexer_projection_status',

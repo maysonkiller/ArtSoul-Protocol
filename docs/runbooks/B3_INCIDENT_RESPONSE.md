@@ -22,9 +22,9 @@ events.
 | --- | --- | --- |
 | 1 | `artsoulprotocol.com` | The gallery paints. Cards have images. |
 | 2 | `artsoulprotocol.com/api/public/indexer-status` | Base Sepolia: `"liveness": "healthy"`. Ethereum Sepolia: `"liveness": "stopped_by_design"`. `warnings` is `[]`. |
-| 3 | `artsoulprotocol.com/api/public/artworks?limit=1` | `"success": true` with one row whose `network` is `baseSepolia`. |
+| 3 | `artsoulprotocol.com/api/public/artworks?limit=1` | `"success": true`, a Base Sepolia artwork under `data`, empty `warnings` and a `public_metrics` object for chain 84532. |
 
-If all three pass, nothing below applies.
+These checks cover the public site and its projections. The operator checks worker errors, moderation and costs separately under §§3–6.
 
 ### Reading `liveness`
 
@@ -35,9 +35,9 @@ processed block range, so a quiet chain still keeps it fresh.
 | --- | --- | --- |
 | `healthy` | A range was processed within 120 seconds. | — |
 | `degraded` | Nothing for 2 to 10 minutes. | §3 |
-| `stalled` | Nothing for over 10 minutes. | §3 |
+| `stalled` | Nothing for over 10 minutes, or the operational Base Sepolia worker reports a stop. | §3 |
 | `stopped_by_design` | The chain's indexer is deliberately off. Ethereum Sepolia only. | — |
-| `unknown` | No usable timestamp. Treat as `stalled`. | §3 |
+| `unknown` | Worker state is unconfirmed or its progress timestamp is missing, invalid or more than 30 seconds in the future. Treat as `stalled`. | §3 |
 
 `seconds_since_last_indexed` can be up to 60 seconds older than the truth,
 because the response is edge-cached. The thresholds already absorb that, and
@@ -84,7 +84,7 @@ their bid disappear. This is the incident that most damages trust in a beta.
 
 1. Note `last_indexed_block` and `last_indexed_at` **before** touching
    anything. Write them down.
-2. SSH to the indexer host and read the authenticated health JSON, per
+2. SSH to the indexer host and read the loopback health JSON, per
    [`A9_INFRA_COST_MONITORING.md`](A9_INFRA_COST_MONITORING.md) §Repository
    health check. It separates the three causes that look identical from outside:
    - `unresolvedErrors` above zero with an `eventFailures` breakdown: an event
@@ -197,4 +197,10 @@ matters is that the next person can tell whether it has happened before.
 
 | Date | Signal | What it was | What was done | Time to healthy |
 | --- | --- | --- | --- | --- |
-| | | | | |
+| 2026-11-20 | The public status edge served the earlier result as `STALE` after its advertised 60-second window. | The response allowed 240 extra seconds of stale reuse. In local checks, a stopped Base worker, a fresh unconfirmed state and a future timestamp also produced misleading verdicts. | Restricted the cache lifetime and added regression tests for worker state, timestamps and actual response headers. | The underlying Base worker was healthy in both observations below. |
+
+### Public observation, November 20, 2026 UTC
+
+The public status samples generated at 00:15:34 and 00:16:48 showed Base Sepolia advancing from block 61,059,314 to 61,059,684. Both reported `running`, a two-second progress age and empty warnings. The retired Ethereum Sepolia cursor stayed at 10,921,799 with `stopped_by_design`.
+
+At 00:15:50 the public artwork endpoint returned one Base Sepolia work and four cached figures from metrics block 59,651,556: five artists, 50 completed auctions, seven collectors and 0.0296 test ETH in settled volume. The aggregate updates on contributing events. The moderation configuration reported `reportingEnabled: true`. A full B2 observation still needs the worker's loopback error counters, the protected moderation queue, account billing evidence and operator coverage over the cohort window. These public reads used no credentials.

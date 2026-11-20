@@ -74,7 +74,7 @@ function loadHandler({ missDirectArtworkOnce = false, beforeRead = async () => {
     readNftOwnershipConfig: () => null,
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,
-    readPlatformArtworkIds: async () => new Set(),
+    readArtworkAuraKinds: async () => new Map(),
     recheckNftOwnership: async () => null,
     readWithNftOwnershipRetry: operation => operation(),
     sendError: (res, error) => res.status(error.statusCode || 500).json({ error: error.code, message: error.message }),

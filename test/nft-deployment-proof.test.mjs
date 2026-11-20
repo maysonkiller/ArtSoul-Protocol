@@ -127,6 +127,44 @@ const resaleGetter = new Interface(['function getActiveResale(uint256) view retu
 const maxUint = 2n ** 256n - 1n;
 const zeroAddress = '0x' + '0'.repeat(40);
 
+test('runner-up terms require a canonical timestamp, finalized pair and matching auction state', async () => {
+    const auctionAbi = new Interface([
+        'function auctions(uint256) view returns(uint256,uint256,uint256,uint256,uint256,address,uint256,uint256,uint8,address)',
+        'function runnerUpOffers(uint256) view returns(address,uint256,uint256)'
+    ]);
+    const auction = (state, first = zeroAddress) => auctionAbi.encodeFunctionResult('auctions', [1, 2, 4, 4, 5, CORE, 8, 1, state, first]);
+    const offer = (bidder, price, deadline) => auctionAbi.encodeFunctionResult('runnerUpOffers', [bidder, price, deadline]);
+    const header = { number: '0x64', hash: HASH, timestamp: '0x10' };
+    for (const [index, reply, message] of [
+        [2, { ...header, timestamp: '0x00' }, /block timestamp/],
+        [5, abi.encodeFunctionResult('nft', [OTHER]), /binding mismatch/],
+        [7, { number: '0x63', hash: OTHER_HASH }, /not finalized/],
+        [8, auction(0), /Unknown ordinary auction/],
+        [8, auction(7), /Inconsistent ordinary/],
+        [8, auction(4, NFT), /Inconsistent ordinary/],
+        [8, auction(6) + '00', /Invalid ordinary offer response/],
+        [9, offer(OTHER, 5, 0), /Inconsistent ordinary/],
+        [9, offer(zeroAddress, 5, 16), /Inconsistent ordinary/],
+        [9, offer(OTHER, 0, 16), /Inconsistent ordinary/],
+        [9, '0x', /Invalid ordinary offer response/],
+        [10, { ...header, hash: OTHER_HASH }, /canonical block mismatch/]
+    ]) {
+        const f = fixture({ coreGetter: 'nft' });
+        f.listener.nftAddress = NFT;
+        f.replacements.set(2, header);
+        f.replacements.set(7, header);
+        f.replacements.set(8, auction(6));
+        f.replacements.set(9, offer(OTHER, 5, 16));
+        f.replacements.set(index, reply);
+        await assert.rejects(f.listener.readOrdinaryRunnerUpOffer({ ...f.options, auctionId: '1' }), message);
+    }
+    const f = fixture({ coreGetter: 'nft' });
+    for (const auctionId of ['0', '01', 1, (maxUint + 1n).toString()]) {
+        await assert.rejects(f.listener.readOrdinaryRunnerUpOffer({ ...f.options, auctionId }), /Invalid ordinary auction ID/);
+    }
+    assert.equal(f.calls.length, 0);
+});
+
 function resaleFixture(response, chainId = 84532) {
     const f = fixture({ coreGetter: 'nft', chainId });
     f.listener.nftAddress = NFT;

@@ -142,13 +142,15 @@ Immediately before cutover, retrieve the complete export from each provider into
 its own new directory. Use the offline verifier from the reviewed kit.
 
 ```bash
-node scripts/verify-snapshot-a.mjs /restore/provider-a --second-copy /restore/provider-b --expected-root TRUSTED_CAPTURE_ROOT --announced-cut-off ANNOUNCED_ISO_TIMESTAMP
+node scripts/verify-snapshot-a.mjs /restore/provider-a --second-copy /restore/provider-b --expected-root TRUSTED_CAPTURE_ROOT --announced-cut-off ANNOUNCED_ISO_TIMESTAMP --notice-published-at PUBLICATION_ISO_TIMESTAMP
 ```
 
 The command reads both restores and succeeds only when each matches the trusted
 root. It reports the chain, cut-off, counts and root for each valid copy, and
 rejects reused files, including directory aliases and detectable hard links.
-Supply the cut-off from the original public announcement. The verifier checks
+Supply the cut-off and publication time from the original public announcement.
+Retain its public URL and a durable copy as evidence. The offline verifier
+checks that the notice was at least 14 full days before the cut-off,
 that the time has arrived and that both archives identify Base Sepolia and
 the same instant down to one microsecond. Equivalent time-zone offsets match.
 This also catches an earlier rehearsal archived together with its own root. Save the

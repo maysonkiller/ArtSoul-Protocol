@@ -20,12 +20,13 @@ import { captureCutOffMicros, verifySnapshot } from '../src/snapshot/snapshot-a.
 
 const hashText = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
-const usage = 'Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256> [--second-copy <directory>] [--announced-cut-off <ISO-8601>]]';
+const usage = 'Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256> [--second-copy <directory>] [--announced-cut-off <ISO-8601> [--notice-published-at <ISO-8601>]]]';
 let args;
 try {
     args = parseArgs({ allowPositionals: true, options: {
         'expected-root': { type: 'string', multiple: true }, 'second-copy': { type: 'string', multiple: true },
-        'announced-cut-off': { type: 'string', multiple: true }
+        'announced-cut-off': { type: 'string', multiple: true },
+        'notice-published-at': { type: 'string', multiple: true }
     } });
 } catch {
     console.error(usage);
@@ -35,16 +36,23 @@ const roots = args.values['expected-root'] ?? [];
 const copies = args.values['second-copy'] ?? [];
 const cutOffs = args.values['announced-cut-off'] ?? [];
 const announcedMicros = captureCutOffMicros(cutOffs[0]);
+const notices = args.values['notice-published-at'] ?? [];
+const publicationMicros = captureCutOffMicros(notices[0]);
 const [expectedRootHash] = roots;
 if (args.positionals.length > 1 || roots.length > 1 || copies.length > 1 || cutOffs.length > 1 ||
     (roots.length && !/^[0-9a-f]{64}$/i.test(expectedRootHash)) ||
     (cutOffs.length && (!expectedRootHash || announcedMicros === null)) ||
+    notices.length > 1 || (notices.length && (publicationMicros === null || !cutOffs.length)) ||
     (copies.length && (!copies[0] || !args.positionals[0] || !expectedRootHash))) {
     console.error(usage);
     process.exit(1);
 }
 if (announcedMicros !== null && announcedMicros > BigInt(Date.now()) * 1000n) {
     console.error('The announced cut-off has not occurred yet.');
+    process.exit(1);
+}
+if (publicationMicros !== null && announcedMicros - publicationMicros < 14n * 86400n * 1000000n) {
+    console.error('The supplied public notice must precede the cut-off by at least 14 full days.');
     process.exit(1);
 }
 const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -117,4 +125,9 @@ if (process.exitCode) {
     console.log('Fetch another durable copy and verify it against the same trusted root.');
 } else if (copies.length) {
     console.log('Both restored copies match the trusted capture root. Record the two retrieval sources separately.');
+}
+if (!process.exitCode && announcedMicros !== null) {
+    console.log(publicationMicros === null
+        ? 'Notice period was not checked. Supply --notice-published-at for final cutover verification.'
+        : 'The supplied timestamps provide the required 14-day public notice. Retain the original announcement.');
 }

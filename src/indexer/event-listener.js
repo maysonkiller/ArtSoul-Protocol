@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import { V41_CORE_ABI, parseV41EventData } from './v4-1-event-schema.js';
 import { DONATION_ABI, parseDonationEvent } from './donation-events.js';
-import { readOrdinaryResaleQuote, readOrdinarySettlement } from './nft-deployment-proof.js';
+import { readOrdinaryResaleQuote, readOrdinaryRunnerUpOffer, readOrdinarySettlement } from './nft-deployment-proof.js';
 
 function redactRpcUrl(value) {
     try {
@@ -106,6 +106,10 @@ class EventListener {
 
     readOrdinaryResaleQuote(options) {
         return readOrdinaryResaleQuote(this, options);
+    }
+
+    readOrdinaryRunnerUpOffer(options) {
+        return readOrdinaryRunnerUpOffer(this, options);
     }
 
     async _readRpcCall(operation, context) {

@@ -1,0 +1,266 @@
+{
+  "compiler": "0.8.24+commit.e11b9ed9",
+  "contracts": {
+    "contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket": {
+      "abiSha256": "a43397070fa03b43fd2067c60205eac5bd5edc30c9258237c691fe8242f973fd",
+      "compilerMetadataSha256": "d1f45b7f619b04a4ac13e286fe8b25a6db84d31fbdb4328bb3c1f638fdad2859",
+      "creation": {
+        "bytes": 25552,
+        "keccak256": "0xe3e0a45ea36ca1beda018993f8177129ecbe67ae98242b87e7295b0e17c1c936"
+      },
+      "immutableOffsets": [
+        {
+          "length": 32,
+          "start": 723
+        },
+        {
+          "length": 32,
+          "start": 910
+        },
+        {
+          "length": 32,
+          "start": 1142
+        },
+        {
+          "length": 32,
+          "start": 1555
+        },
+        {
+          "length": 32,
+          "start": 1735
+        },
+        {
+          "length": 32,
+          "start": 2316
+        },
+        {
+          "length": 32,
+          "start": 3279
+        },
+        {
+          "length": 32,
+          "start": 3599
+        },
+        {
+          "length": 32,
+          "start": 4646
+        },
+        {
+          "length": 32,
+          "start": 6260
+        },
+        {
+          "length": 32,
+          "start": 6494
+        },
+        {
+          "length": 32,
+          "start": 7029
+        },
+        {
+          "length": 32,
+          "start": 7096
+        },
+        {
+          "length": 32,
+          "start": 7507
+        },
+        {
+          "length": 32,
+          "start": 8173
+        },
+        {
+          "length": 32,
+          "start": 10108
+        },
+        {
+          "length": 32,
+          "start": 10175
+        },
+        {
+          "length": 32,
+          "start": 10350
+        },
+        {
+          "length": 32,
+          "start": 11184
+        },
+        {
+          "length": 32,
+          "start": 11720
+        },
+        {
+          "length": 32,
+          "start": 11836
+        },
+        {
+          "length": 32,
+          "start": 12027
+        },
+        {
+          "length": 32,
+          "start": 12304
+        },
+        {
+          "length": 32,
+          "start": 12973
+        },
+        {
+          "length": 32,
+          "start": 13006
+        },
+        {
+          "length": 32,
+          "start": 13226
+        }
+      ],
+      "runtimeTemplate": {
+        "bytes": 16116,
+        "keccak256": "0xa7a86d891125f4d0432dd53a570e568d4122f7f46d781d60f8e7cc58919cc562"
+      },
+      "sources": [
+        "@openzeppelin/contracts/interfaces/IERC2981.sol",
+        "@openzeppelin/contracts/interfaces/draft-IERC6093.sol",
+        "@openzeppelin/contracts/token/ERC721/ERC721.sol",
+        "@openzeppelin/contracts/token/ERC721/IERC721.sol",
+        "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol",
+        "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol",
+        "@openzeppelin/contracts/utils/Context.sol",
+        "@openzeppelin/contracts/utils/Pausable.sol",
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+        "@openzeppelin/contracts/utils/Strings.sol",
+        "@openzeppelin/contracts/utils/introspection/ERC165.sol",
+        "@openzeppelin/contracts/utils/introspection/IERC165.sol",
+        "@openzeppelin/contracts/utils/math/Math.sol",
+        "@openzeppelin/contracts/utils/math/SignedMath.sol",
+        "contracts/replacement/MarketplaceAdmissions.sol",
+        "contracts/replacement/OrdinaryArtAuctions.sol",
+        "contracts/replacement/OrdinaryArtResales.sol",
+        "contracts/replacement/OrdinaryMarket.sol",
+        "contracts/replacement/OutbidRefunds.sol",
+        "contracts/replacement/SettledArtworkNFT.sol",
+        "contracts/replacement/TreasuryBoundOrdinaryArt.sol"
+      ]
+    },
+    "contracts/replacement/SettledArtworkNFT.sol:SettledArtworkNFT": {
+      "abiSha256": "8784fd86448a6e947925b42544a4c05f04b1db9cba3f6cd7acf3c5be76d4a239",
+      "compilerMetadataSha256": "284c9e151611174932edb02bb4f77b5c03b1db180d9eb6f30ae57e717c1db072",
+      "creation": {
+        "bytes": 7950,
+        "keccak256": "0xa9ab688effa74891e1d1a0410426d1628e45dd521255ffa4fcd472326cea2fed"
+      },
+      "immutableOffsets": [
+        {
+          "length": 32,
+          "start": 1025
+        },
+        {
+          "length": 32,
+          "start": 1505
+        },
+        {
+          "length": 32,
+          "start": 1827
+        },
+        {
+          "length": 32,
+          "start": 1992
+        },
+        {
+          "length": 32,
+          "start": 2691
+        },
+        {
+          "length": 32,
+          "start": 3117
+        },
+        {
+          "length": 32,
+          "start": 3459
+        },
+        {
+          "length": 32,
+          "start": 3955
+        },
+        {
+          "length": 32,
+          "start": 4469
+        },
+        {
+          "length": 32,
+          "start": 4553
+        }
+      ],
+      "runtimeTemplate": {
+        "bytes": 7357,
+        "keccak256": "0x7bf54e05c10abb68b75a87e23091d02417909367f82f63cb2848bb2b003c9a0a"
+      },
+      "sources": [
+        "@openzeppelin/contracts/interfaces/IERC2981.sol",
+        "@openzeppelin/contracts/interfaces/draft-IERC6093.sol",
+        "@openzeppelin/contracts/token/ERC721/ERC721.sol",
+        "@openzeppelin/contracts/token/ERC721/IERC721.sol",
+        "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol",
+        "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol",
+        "@openzeppelin/contracts/utils/Context.sol",
+        "@openzeppelin/contracts/utils/Strings.sol",
+        "@openzeppelin/contracts/utils/introspection/ERC165.sol",
+        "@openzeppelin/contracts/utils/introspection/IERC165.sol",
+        "@openzeppelin/contracts/utils/math/Math.sol",
+        "@openzeppelin/contracts/utils/math/SignedMath.sol",
+        "contracts/replacement/SettledArtworkNFT.sol"
+      ]
+    }
+  },
+  "schemaVersion": 1,
+  "settings": {
+    "evmVersion": "paris",
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "": [
+          "ast"
+        ],
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata"
+        ]
+      }
+    }
+  },
+  "sourceSha256": {
+    "@openzeppelin/contracts/interfaces/IERC2981.sol": "5bbbb6dfc9b0d248cc19f10e7a14fc7706138fbf3b63cea6655fd7968e1666e0",
+    "@openzeppelin/contracts/interfaces/draft-IERC6093.sol": "4aea87243e6de38804bf8737bf86f750443d3b5e63dd0fd0b7ad92f77cdbd3e3",
+    "@openzeppelin/contracts/token/ERC721/ERC721.sol": "94f07f843e2f541a5a000a6375a41345412c6d6da9316c547f39e0fe1f2447f7",
+    "@openzeppelin/contracts/token/ERC721/IERC721.sol": "8239cba58986af2deb65af8092d5abcd4ffe60a38dee00cb2e8c6465f945c2d0",
+    "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol": "ad84633afd30a71a888403875e2ca7db9e97499d258ccdd98f48dd7cea8229f5",
+    "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol": "63d104c065c281e8d8e1fabe0eda19ff83d4660ce1378f9dad2471226d2bf34f",
+    "@openzeppelin/contracts/utils/Context.sol": "9c1cc43aa4a2bde5c7dea0d4830cd42c54813ff883e55c8d8f12e6189bf7f10a",
+    "@openzeppelin/contracts/utils/Pausable.sol": "6543160582b3c0319a180f31660faf6ba0a8444acbdb03357c09790a96256835",
+    "@openzeppelin/contracts/utils/ReentrancyGuard.sol": "8d0bac508a25133c9ff80206f65164cef959ec084645d1e7b06050c2971ae0fc",
+    "@openzeppelin/contracts/utils/Strings.sol": "0519199dbc635f98ce2e4537986604ee618bca665c65e9a1738702dfacf72010",
+    "@openzeppelin/contracts/utils/introspection/ERC165.sol": "99348354365cbdeb90157e2903334b861a00d69faab7720ae542d911d5c70d87",
+    "@openzeppelin/contracts/utils/introspection/IERC165.sol": "07ae1ac964ab74dedada999e2dfc642031a6495469cffc0bf715daa4f1e4f904",
+    "@openzeppelin/contracts/utils/math/Math.sol": "a6ee779fc42e6bf01b5e6a963065706e882b016affbedfd8be19a71ea48e6e15",
+    "@openzeppelin/contracts/utils/math/SignedMath.sol": "768c28e3a33c3312e57ae8a1caaec2893bc89ac6e386621de018f85e9a2d6e99",
+    "contracts/replacement/MarketplaceAdmissions.sol": "adc7e6e7a06f367b626ac30ed19c8d3ee36adee97d54d087619f23497ed62e5b",
+    "contracts/replacement/OrdinaryArtAuctions.sol": "d0c96078127d75b7d6398b3d0a6947e4ea3535010a320b6748c57ece9a203afd",
+    "contracts/replacement/OrdinaryArtResales.sol": "bfcd1ee5fcae4d2dbefc8ffcc67b7a174eff53ed1286a4365af4198f79e9f284",
+    "contracts/replacement/OrdinaryMarket.sol": "2e35fcccaa314e58045de4db54d6740b1cf97e7e46df1dd39518c5b5b8c05b03",
+    "contracts/replacement/OutbidRefunds.sol": "c5aa307208654949528aa0db08f6c13b245a6016abb1bda0af6622f93513d9b1",
+    "contracts/replacement/SettledArtworkNFT.sol": "c203cc2a06ffc228bb099aba5b89cc70d7111b883b4eb34ee6ef80cdc5d2c083",
+    "contracts/replacement/TreasuryBoundOrdinaryArt.sol": "0cdb9a3a58c516c1aac6e5caac01b68e716caf3721f9e2b38d36154746f1822e"
+  },
+  "toolchain": {
+    "hardhat": "2.28.6",
+    "localConfigLfSha256": "d9538322e98a41ad2899ddf7e00bd57a42a1c9edf86e9fd83d7e7f24fdbb5767",
+    "openZeppelinContracts": "5.0.0",
+    "packageLockLfSha256": "3cc70a68bed3dfeea23497fa208b5cebd8cd51141bb783ac47df9a480e0482d1"
+  }
+}

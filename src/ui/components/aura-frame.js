@@ -24,7 +24,9 @@ export function projectedArtworkAura(artwork) {
     if (artwork?.source !== 'v41_projection' || artwork.minted !== true ||
         artwork.ownership_status !== 'verified') return null;
     const kind = artwork.aura_kind;
-    if (kind === 'genesis' && Number(artwork.chain_id) !== 8453) return null;
+    const chain = artwork.chain_id;
+    if (![8453, 84532, '8453', '84532'].includes(chain) ||
+        (kind === 'genesis' && Number(chain) !== 8453)) return null;
     const className = auraFrameClassName(kind);
     return className ? { className, label: labels[kind] } : null;
 }

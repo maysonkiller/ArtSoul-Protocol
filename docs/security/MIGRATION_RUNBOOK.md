@@ -26,6 +26,16 @@ node scripts/index-ordinary-settlement.mjs reviewed-pair.json receipt-location.j
 
 The reviewed pair file supplies `chainId`, `coreAddress`, `nftAddress`, `expectedCoreCodeHash` and `expectedNftCodeHash`. Pin the runtime hashes from the release review. The receipt location supplies numeric `blockNumber`, `blockHash`, `transactionHash` and a decimal string `auctionId`. The command reads the RPC finalized boundary, deployment bindings, runtime code and receipt before opening the database transaction. Replaying identical evidence returns `inserted: false`. A disagreement fails the intake and preserves earlier rows. Continuous scanning, public history and deployment activation remain separate release steps.
 
+### Read a runner-up offer
+
+Use the same reviewed pair file and `ARTSOUL_ORDINARY_RPC_URL` to inspect one auction at a finalized block. Supply the decimal auction ID, decimal block number and block hash. This command requires only RPC read access.
+
+```sh
+node scripts/read-ordinary-runner-up.mjs reviewed-pair.json AUCTION_ID BLOCK_NUMBER BLOCK_HASH
+```
+
+The final output line contains the pair, block identity, artwork, status and offer terms. An `open` offer identifies the eligible buyer, their bid in wei and the last Unix second at which the contract accepts it. A bid alone gives `not_offered`. After the deadline, `expired` reports the lost right even before anyone records expiry. A completed purchase gives `accepted`. A recorded decline or expiry gives `closed`. Historical terms stay visible and only `open` carries an eligible buyer. A later purchase requires fresh transaction-time checks.
+
 ## Migration Families
 
 | Location | Purpose | Treatment |
