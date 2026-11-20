@@ -45,7 +45,7 @@ One aura can be auto-assigned to an NFT by priority:
 3. Partner collection aura: cyan/blue.
 4. None.
 
-Users do not pick aura colors. Running border text is Future-only and admin-toggleable.
+Users do not pick aura colors. The planned running border text is Future-only. It stays off until the application has an explicitly authorized appearance-setting writer and durable storage for this boolean with a revision and an audit trail. The current moderation role handles complaints, and the signed staff action list covers role changes, authority rotation and sign-in setup. Neither grants a visual-setting write. When enabled, reduced motion must keep the label stationary.
 
 ### Evidence for each frame
 

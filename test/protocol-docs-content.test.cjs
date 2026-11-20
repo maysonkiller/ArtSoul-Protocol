@@ -40,7 +40,7 @@ async function components(runtime = React, bindings = {}) {
 
 test('shared documentation preserves every section ID, title and its original order', async () => {
   const {sections} = await components();
-  assert.deepEqual(sections.filter(section => !['collection-verification', 'nft-frames'].includes(section.id))
+  assert.deepEqual(sections.filter(section => !['collection-verification', 'nft-frames', 'roadmap'].includes(section.id))
     .map(section => [section.id, section.title]), original.map(([id, title]) => [id, title]));
   assert.equal(new Set(sections.map(section => section.id)).size, sections.length);
   const data = fs.readFileSync('src/content/protocol-docs.js', 'utf8');
@@ -55,6 +55,26 @@ test('original documentation sections retain their rendered content', async () =
       section.blocks.map((block, key) => React.createElement(Block, {block, key}))));
     assert.equal(createHash('sha256').update(html).digest('hex'), expected, id);
   }
+});
+
+test('the public roadmap opens from search and contents at the same accessible Guide section', async () => {
+  const {searchSiteContent} = await import('../src/features/search/site-content-search.js');
+  const {sections, Section} = await components();
+  const section = sections.find(item => item.id === 'roadmap');
+  const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
+  assert.match(html, /href="\/gallery"/);
+  assert.match(html, /href="\/collection-builder"/);
+  for (const query of ['roadmap', 'Snapshot A', 'independent security audit']) {
+    const results = searchSiteContent(query, 'docs').docs.items;
+    assert.equal(results.find(item => item.id === section.id)?.url, '/docs-protocol#roadmap');
+  }
+  const h = await harness('#roadmap');
+  h.render();
+  assert.equal(h.values[0].roadmap, true);
+  assert.equal(h.focuses.at(-1).id, 'roadmap');
+  h.selectTopic('faq'); h.render();
+  h.selectTopic('roadmap'); h.render();
+  assert.equal(h.window.location.hash, '#roadmap');
 });
 
 test('the collection gallery links to a readable key for the origin mark', async () => {

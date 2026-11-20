@@ -119,7 +119,7 @@ function startAfterFirstPaint() {
 // Unknown storage availability keeps the normal restore path, including on iOS.
 async function shouldRestoreWallet() {
     const page = window.location?.pathname?.replace(/\.html$/, '').replace(/\/$/, '') || '/';
-    if (!['/', '/gallery', '/docs-protocol', '/artwork'].includes(page) && !page.startsWith('/artwork/')) return true;
+    if (!['/', '/gallery', '/docs-protocol', '/artwork', '/collection-builder'].includes(page) && !page.startsWith('/artwork/')) return true;
     if (window.ethereum || window.currentWalletAddress || /(?:wc:|wc%3a|wc_ev|walletconnect)/i.test(window.location?.href || '')) return true;
     try {
         if (!window.indexedDB?.databases) return true;

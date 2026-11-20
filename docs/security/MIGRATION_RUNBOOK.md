@@ -28,13 +28,15 @@ The reviewed pair file supplies `chainId`, `coreAddress`, `nftAddress`, `expecte
 
 ### Read a runner-up offer
 
+The settlement writer checks the auction's stored artwork, First Collector, buyer and exact wei price against the receipt at the same canonical block hash. For a runner-up purchase it also verifies that the block timestamp falls within the offer deadline. If that block loses canonical status during the read or an acceptance log is omitted, the writer stops before it creates an issuer or sale. Previously committed finalized evidence is append-only. A later contradiction requires investigation and stops further intake for the conflicting evidence.
+
 Use the same reviewed pair file and `ARTSOUL_ORDINARY_RPC_URL` to inspect one auction at a finalized block. Supply the decimal auction ID, decimal block number and block hash. This command requires only RPC read access.
 
 ```sh
 node scripts/read-ordinary-runner-up.mjs reviewed-pair.json AUCTION_ID BLOCK_NUMBER BLOCK_HASH
 ```
 
-The final output line contains the pair, block identity, artwork, status and offer terms. An `open` offer identifies the eligible buyer, their bid in wei and the last Unix second at which the contract accepts it. A bid alone gives `not_offered`. After the deadline, `expired` reports the lost right even before anyone records expiry. A completed purchase gives `accepted`. A recorded decline or expiry gives `closed`. Historical terms stay visible and only `open` carries an eligible buyer. A later purchase requires fresh transaction-time checks.
+The final output line contains the pair, block identity, artwork, status and offer terms. An `open` offer identifies the eligible buyer, their bid in wei and the last Unix second at which the contract accepts it. A bid alone gives `not_offered`. After the deadline, `expired` reports the lost right even before anyone records expiry. A completed purchase gives `accepted`. A recorded decline or expiry gives `closed`. Historical terms stay visible and only `open` carries an eligible buyer. A later purchase requires fresh transaction-time checks. Persisting an active offer and notifying its recipient requires a range scanner keyed by both chain and Core, with canonical coverage, rewind and replay for those offer events. The prototype's chain-level rewind and migration 018's finalized sale records serve different lifecycles.
 
 ## Migration Families
 

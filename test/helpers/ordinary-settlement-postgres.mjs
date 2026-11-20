@@ -13,6 +13,9 @@ const address = n => '0x' + n.toString(16).padStart(40, '0');
 const hash = n => '0x' + n.toString(16).padStart(64, '0');
 const abi = new Interface([
     'function nft() view returns (address)', 'function core() view returns (address)',
+    'function auctions(uint256) view returns(uint256,uint256,uint256,uint256,uint256,address,uint256,uint256,uint8,address)',
+    'function runnerUpOffers(uint256) view returns(address,uint256,uint256)',
+    'event RunnerUpOfferAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price)',
     'event AuctionSettled(uint256 indexed auctionId,uint256 indexed artworkId,uint256 tokenId,uint256 price)',
     'event SettledArtworkIssued(uint256 indexed auctionId,uint256 indexed artworkId,uint256 indexed tokenId,address creator,address firstCollector)',
     'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)'
@@ -27,25 +30,41 @@ function fixture(pair, overrides = {}) {
     const { transactionHash, blockHash, auctionId, coreAddress, nftAddress } = options;
     const blockNumber = toQuantity(options.blockNumber);
     const creator = address(40), buyer = address(41), token = overrides.token || 1, artwork = overrides.artwork || 1;
+    const price = overrides.price || '1000000000000000001';
+    const stateOffer = overrides.offer === true;
     const log = (emitter, event, values, position) => ({
         address: emitter, logIndex: toQuantity(position), blockNumber, blockHash, transactionHash,
         ...abi.encodeEventLog(event, values)
     });
+    const firstIndex = stateOffer ? 1 : 0;
     const logs = [
-        log(nftAddress, 'SettledArtworkIssued', [auctionId, artwork, token, creator, buyer], 0),
-        log(nftAddress, 'Transfer', [ZeroAddress, buyer, token], 1),
-        log(coreAddress, 'AuctionSettled', [auctionId, artwork, token, overrides.price || '1000000000000000001'], 2)
+        log(nftAddress, 'SettledArtworkIssued', [auctionId, artwork, token, creator, buyer], firstIndex),
+        log(nftAddress, 'Transfer', [ZeroAddress, buyer, token], firstIndex + 1),
+        log(coreAddress, 'AuctionSettled', [auctionId, artwork, token, price], firstIndex + 2)
     ];
+    if (stateOffer && !overrides.omitAcceptance) logs.unshift(log(coreAddress, 'RunnerUpOfferAccepted', [auctionId, buyer, price], 0));
+    let offerRead = false;
     const listener = Object.create(EventListener.prototype);
     Object.assign(listener, { chainId: options.chainId, contractAddress: coreAddress, nftAddress,
         _readRpcCall: async operation => operation({ send: async (method, args) => {
             if (method === 'eth_chainId') return toQuantity(options.chainId);
             if (method === 'eth_getBlockByNumber') return {
-                number: args[0] === 'finalized' && overrides.unfinalized ? '0x0' : blockNumber, hash: blockHash
+                number: args[0] === 'finalized' && overrides.unfinalized ? '0x0' : blockNumber,
+                hash: offerRead && overrides.reorg ? hash(999) : blockHash, timestamp: '0x10'
             };
             if (method === 'eth_getCode') return args[0] === coreAddress ? '0x6001' : '0x6002';
             if (method === 'eth_call') {
                 const isCore = args[0].to === coreAddress;
+                if (isCore && args[0].data === abi.encodeFunctionData('auctions', [auctionId])) {
+                    assert.deepEqual(args[1], {blockHash, requireCanonical:true});
+                    return abi.encodeFunctionResult('auctions', [artwork,1,2,2,3,stateOffer ? address(42) : buyer,
+                        stateOffer ? BigInt(price) + 1n : price,0,4,buyer]);
+                }
+                if (isCore && args[0].data === abi.encodeFunctionData('runnerUpOffers', [auctionId])) {
+                    offerRead = true;
+                    assert.deepEqual(args[1], {blockHash, requireCanonical:true});
+                    return abi.encodeFunctionResult('runnerUpOffers', [stateOffer ? buyer : address(42), price, stateOffer ? 16 : 0]);
+                }
                 return abi.encodeFunctionResult(isCore ? 'nft' : 'core', [isCore ? nftAddress : coreAddress]);
             }
             assert.equal(method, 'eth_getTransactionReceipt');
@@ -114,6 +133,15 @@ export async function checkOrdinaryIntake(pool) {
     assert.deepEqual(rows.rows, [1, 2].map(i => ({ core_address: address(i), nft_address: address(i + 10),
         auction_id: '1', price_wei: '1000000000000000001' })));
     assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_issuers')).rows[0].count, '2');
+    await assert.rejects(intake(pool, 3, {offer:true, omitAcceptance:true}), /finalized auction state disagree/);
+    await assert.rejects(intake(pool, 3, {offer:true, reorg:true}), /canonical block mismatch/);
+    const count = async table => (await pool.query(`SELECT count(*) FROM artsoul_private.${table} WHERE core_address=$1`, [address(3)])).rows[0].count;
+    assert.equal(await count('ordinary_issuers'), '0');
+    assert.equal(await count('ordinary_settlements'), '0');
+    const offerSale = await intake(pool, 3, {offer:true});
+    assert.equal(offerSale.inserted, true);
+    const stored = await pool.query('SELECT runner_up_accepted,price_wei,first_collector FROM artsoul_private.ordinary_settlements WHERE core_address=$1', [address(3)]);
+    assert.deepEqual(stored.rows, [{runner_up_accepted:true,price_wei:'1000000000000000001',first_collector:address(41)}]);
     await assert.rejects(pool.query('DELETE FROM artsoul_private.ordinary_settlements'), /append-only/);
     for (const table of ['ordinary_issuers', 'ordinary_settlements']) {
         const { rows: privileges } = await pool.query(`SELECT rolname, has_table_privilege(rolname, $1, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') AS permitted
