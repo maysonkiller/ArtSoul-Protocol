@@ -144,7 +144,7 @@ function Builder() {
         <LocalDraftNotice />
         <div className="launch-draft-tools">
             <div className="launch-actions" role="group" aria-label="Collection templates">
-                <button type="button" onClick={() => replaceDraft(createFirstArtworkDraft(), 'First artwork draft opened. Its settled price sets the price for each remaining mint.')}>First artwork auction</button>
+                <button type="button" onClick={() => replaceDraft(createFirstArtworkDraft(), 'First artwork draft opened. The first sale sets one price for the remaining mints.')}>First artwork auction and public mint</button>
                 <button type="button" onClick={() => replaceDraft(createAuctionMintDraft(), 'Edition auction draft opened. When all auction units sell, the lowest winning bid sets the public mint price.')}>Edition auction then public mint</button>
                 <button type="button" onClick={() => replaceDraft(createMintReservationDraft(), 'Mint reservation draft opened. Set the price to mint with a place and the public mint price before bidding.')}>Auction mint reservations</button>
             </div>
@@ -211,7 +211,8 @@ function Builder() {
                             <Field label="Eligibility"><select value={phase.eligibility.kind} onChange={event => updatePhase(index, 'kind', event.target.value, 'eligibility')}>{!Object.hasOwn(ELIGIBILITY, phase.eligibility.kind) && <option value={phase.eligibility.kind}>Unsupported imported eligibility</option>}{Object.entries(ELIGIBILITY).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></Field>
                             <Field label="Unused allocation"><select value={phase.unusedSupply} onChange={event => updatePhase(index, 'unusedSupply', event.target.value)}>{!Object.hasOwn(UNUSED_SUPPLY, phase.unusedSupply) && <option value={phase.unusedSupply}>Unsupported imported destination</option>}{Object.entries(UNUSED_SUPPLY).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></Field>
                         </div>
-                        {phase.mechanism === 'first-artwork-auction' && <p className="launch-help">Use token #1’s metadata for the opening work. Each bidder funds their full bid. The winning payment sets the price for later mints, and token #1 stays reserved for that buyer. With no sale, later mints stay closed.</p>}
+                        {phase.mechanism === 'first-artwork-auction' && <p className="launch-help">Each bidder funds one bid in full. Token #1 is reserved for the winning collector. The settled bid sets the price for the remaining mints.</p>}
+                        {index === 0 && review.contractCompatibility.firstWorkArtifact && <p className="launch-help">If the auction gets no bids, the author can retry twice. Each retry shifts the public mint window with it. A third bidless auction cancels this launch. The author can request a new review 30 days after that auction ends.</p>}
                         {phase.mechanism === 'mint-reservation' && <MintReservationTerms phase={phase}
                             publicPriceEth={reservationPublicMint(draft.phases, index)?.pricing.priceEth}
                             updateReservation={(key, value) => updatePhase(index, key, value, 'reservation')} />}
@@ -240,6 +241,7 @@ function Builder() {
                     </div>
                     <section className="launch-footer" aria-label="Local contract compatibility">
                         <h3>Local contract compatibility</h3>
+                        {review.contractCompatibility.firstWorkArtifact && <p className="launch-help">This template uses the local <code>{review.contractCompatibility.firstWorkArtifact}</code> contract. Any author can use it. ArtSoul reviews Partner status and identity verification separately.</p>}
                         <p className="launch-help">{review.contractCompatibility.compatible ? 'These draft settings fit the current local contract checks. Deployment and sale approval are still required.' : 'This draft needs changes before it can fit the current local contracts. Resolve the configuration items above and the limitations below.'}</p>
                         {review.contractCompatibility.findings.map((finding, index) => <p className="launch-finding" key={finding.code + ':' + index}>{finding.message}</p>)}
                         <details className="launch-details"><summary>How the local contracts interpret these settings</summary>{review.contractCompatibility.notes.map(note => <p className="launch-finding" key={note}>{note}</p>)}</details>
@@ -247,7 +249,7 @@ function Builder() {
                     <details className="launch-details"><summary>Utility and financial declarations</summary><div className="launch-stack">
                         <UtilityList config={draft} />
                         <p className="launch-help">Imported utility, crafting, creator earnings and support fields are preserved in your export. This first draft editor does not activate them or verify their enforcement.</p>
-                        <dl className="launch-definition"><div><dt>Creator earnings proposal</dt><dd>{draft.creatorEarnings.bps} bps</dd></div><div><dt>Support proposal</dt><dd>{draft.support.bps} bps · {draft.support.destination}</dd></div><div><dt>Crafting proposal</dt><dd>{draft.crafting.enabled ? `${draft.crafting.inputCount} inputs; ${draft.crafting.outputMaxSupply} outputs maximum` : 'Not enabled'}</dd></div></dl>
+                        <dl className="launch-definition"><div><dt>Creator earnings proposal</dt><dd>{draft.creatorEarnings.bps} bps{review.contractCompatibility.firstWorkArtifact && !draft.creatorEarnings.recipients.length ? ' to the collection creator' : ''}</dd></div><div><dt>Support proposal</dt><dd>{draft.support.bps} bps · {draft.support.destination}</dd></div><div><dt>Crafting proposal</dt><dd>{draft.crafting.enabled ? `${draft.crafting.inputCount} inputs; ${draft.crafting.outputMaxSupply} outputs maximum` : 'Not enabled'}</dd></div></dl>
                     </div></details>
                     <div className="launch-footer"><h3>Publishing is unavailable</h3>{review.deploymentBlockers.map(item => <p className="launch-finding" key={item}>{item}</p>)}<ExplainedAction explanationTitle="This collection is a draft"
                         reason="Collection publishing is not enabled yet. You can review and save this draft. A supported deployment and its launch settings must be verified before a collection can accept payments.">Publish unavailable</ExplainedAction></div>

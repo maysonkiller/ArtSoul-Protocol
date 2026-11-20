@@ -15,14 +15,26 @@ for (const [state, ref] of [
     assert.ok(start > 0 && end > start);
     const effect = artwork.slice(start, end + `}, [${state}]);`.length);
     for (const open of [false, true]) {
-        let cleanup, shown = 0, closed = 0;
+        let cleanup, shown = 0, closed = 0, accountListener;
+        const reportSubmissionRef = {current: null};
         const dialog = { open: false, showModal() { this.open = true; shown++; }, close() { this.open = false; closed++; } };
         vm.runInNewContext(effect, {
             [state]: open, [ref]: { current: dialog },
+            connectedReportWallet: () => '0x' + '1'.repeat(40), reportSubmissionRef,
+            window: { addEventListener: (_, handler) => { accountListener = handler; },
+                removeEventListener: (_, handler) => { assert.equal(handler, accountListener); } },
+            setReportBusy: value => assert.equal(value, false), closeArtworkReport() {},
             useEffect: fn => { cleanup = fn(); },
             document: new Proxy({}, {get() { throw new Error('The page scroll root must not be changed'); }})
         });
         assert.equal(shown, open ? 1 : 0);
+        if (state === 'isReportModalOpen' && open) {
+            const pending = new AbortController();
+            reportSubmissionRef.current = pending;
+            accountListener({ detail: { isConnected: false } });
+            assert.equal(pending.signal.aborted, true);
+            assert.equal(reportSubmissionRef.current, null);
+        }
         cleanup?.();
         assert.equal(closed, open ? 1 : 0);
     }

@@ -125,6 +125,47 @@ test('local persistence round-trips all fields including imported extension data
     assert.equal(reviewConfig(loadDraft(storage)).canPublish, false);
 });
 
+test('only an explicitly selected first-work template uses the restricted local artifact and creator royalty', () => {
+    const settings = configured();
+    const draft = createFirstArtworkDraft();
+    Object.assign(draft, { name: settings.name, description: settings.description, holderRights: settings.holderRights,
+        media: settings.media, maxSupply: 100 });
+    const [first, mint] = draft.phases;
+    Object.assign(first, { startAt: '2027-01-01T12:00:00Z', endAt: '2027-01-02T12:00:00Z' });
+    first.pricing.priceEth = '0.1';
+    Object.assign(mint, { allocation: 99, startAt: first.endAt, endAt: '2027-01-03T12:00:00Z' });
+    const storage = memoryStorage();
+    saveDraft(storage, draft);
+    const review = reviewConfig(loadDraft(storage));
+    assert.equal(review.contractCompatibility.firstWorkArtifact, 'PartnerFirstWorkLaunch');
+    assert.equal(review.contractCompatibility.compatible, true);
+    assert.equal(review.canPublish, false);
+    assert.equal(draft.creatorEarnings.bps, 550);
+    for (const [edit, code] of [
+        [d => { d.phases.push(createPhase()); }, 'FIRST_WORK_PHASES'],
+        [d => { d.phases[1].eligibility.kind = 'merkle'; }, 'FIRST_WORK_PHASES'],
+        [d => { d.phases[0].mechanism = 'uniform-auction'; }, 'FIRST_WORK_PHASES'],
+        [d => { d.phases[1].allocation = 98; }, 'FIRST_WORK_REMAINDER'],
+        [d => { d.maxSupply = 1; }, 'FIRST_WORK_REMAINDER'],
+        [d => { d.creatorEarnings.bps = 0; }, 'FIRST_WORK_ROYALTY'],
+        [d => { d.creatorEarnings.recipients = [{ address: '0x' + 'a'.repeat(40), bps: 550 }]; }, 'FIRST_WORK_ROYALTY']
+    ]) {
+        const changed = structuredClone(draft);
+        edit(changed);
+        const result = reviewConfig(changed);
+        assert.ok(result.contractCompatibility.findings.some(f => f.code === code));
+        assert.equal(result.contractCompatibility.compatible, false);
+    }
+    const legacy = structuredClone(draft);
+    delete legacy.launchTemplate;
+    legacy.creatorEarnings.bps = 0;
+    legacy.phases[1].allocation = 98;
+    assert.equal(reviewConfig(parseDraft(JSON.stringify(legacy))).contractCompatibility.compatible, true);
+    for (const other of [legacy, createAuctionMintDraft(), createOriginDraft()]) {
+        assert.equal(reviewConfig(other).contractCompatibility.firstWorkArtifact, null);
+    }
+});
+
 test('failed import or save does not overwrite the last saved copy', () => {
     const storage = memoryStorage();
     saveDraft(storage, configured());

@@ -25,31 +25,36 @@ async function main() {
         return JSON.parse(execFileSync('tar', ['-xzOf', '-', member], { input: archive }));
     }
 
-    const chain = { ...config.networks.hardhat, chainId: 84532, forking: undefined };
-    const evm = await createProvider({ ...config, networks: { hardhat: chain } }, 'hardhat', artifacts);
-    const provider = new ethers.BrowserProvider(evm, undefined, { cacheTimeout: -1 });
-    provider.pollingInterval = 10;
-    assert.equal((await provider.getNetwork()).chainId, 84532n);
-    const [relayer, ...accounts] = await provider.listAccounts();
-    const owners = accounts.slice(0, 3);
-    const addresses = owners.map(owner => owner.address);
-    async function deploy({ abi, bytecode }, ...args) {
-        return (await new ethers.ContractFactory(abi, bytecode, relayer).deploy(...args)).waitForDeployment();
+    async function createRehearsalNetwork(chainId, safeCount) {
+        const chain = { ...config.networks.hardhat, chainId, forking: undefined };
+        const evm = await createProvider({ ...config, networks: { hardhat: chain } }, 'hardhat', artifacts);
+        const provider = new ethers.BrowserProvider(evm, undefined, { cacheTimeout: -1 });
+        provider.pollingInterval = 10;
+        assert.equal((await provider.getNetwork()).chainId, BigInt(chainId));
+        const [relayer, ...accounts] = await provider.listAccounts();
+        const owners = accounts.slice(0, 3);
+        const addresses = owners.map(owner => owner.address);
+        async function deploy({ abi, bytecode }, ...args) {
+            return (await new ethers.ContractFactory(abi, bytecode, relayer).deploy(...args)).waitForDeployment();
+        }
+        const singleton = await deploy(safeArtifact('SafeL2'));
+        const factory = await deploy(safeArtifact('proxies/SafeProxyFactory'));
+        const handler = await deploy(safeArtifact('handler/CompatibilityFallbackHandler'));
+        const init = singleton.interface.encodeFunctionData('setup', [addresses, 2, zero, '0x', handler.target, zero, 0, zero]);
+        const safes = [];
+        for (let salt = 1; salt <= safeCount; salt++) {
+            const receipt = await mine(factory.createProxyWithNonce(singleton.target, init, salt));
+            const creation = receipt.logs.find(log => log.fragment?.name === 'ProxyCreation');
+            const safe = singleton.attach(creation.args.proxy);
+            assert.equal(await safe.VERSION(), '1.4.1');
+            assert.equal(await safe.getThreshold(), 2n);
+            assert.deepEqual([...(await safe.getOwners())], addresses);
+            safes.push(safe);
+        }
+        return { provider, evm, relayer, accounts, owners, addresses, deploy, safes };
     }
-    const singleton = await deploy(safeArtifact('SafeL2'));
-    const factory = await deploy(safeArtifact('proxies/SafeProxyFactory'));
-    const handler = await deploy(safeArtifact('handler/CompatibilityFallbackHandler'));
-    const init = singleton.interface.encodeFunctionData('setup', [addresses, 2, zero, '0x', handler.target, zero, 0, zero]);
-    const safes = [];
-    for (const salt of [1, 2, 3]) {
-        const receipt = await mine(factory.createProxyWithNonce(singleton.target, init, salt));
-        const creation = receipt.logs.find(log => log.fragment?.name === 'ProxyCreation');
-        const safe = singleton.attach(creation.args.proxy);
-        assert.equal(await safe.VERSION(), '1.4.1');
-        assert.equal(await safe.getThreshold(), 2n);
-        assert.deepEqual([...(await safe.getOwners())], addresses);
-        safes.push(safe);
-    }
+
+    const { provider, evm, relayer, accounts, owners, addresses, deploy, safes } = await createRehearsalNetwork(84532, 3);
     const security = safes[2];
     const coreArtifact = await artifacts.readArtifact('OrdinaryMarket');
     const factoryCore = new ethers.ContractFactory(coreArtifact.abi, coreArtifact.bytecode);
@@ -199,6 +204,29 @@ async function main() {
     assert.equal(await engine.credits(protocol.target), protocolShare);
     assert.equal(await provider.getBalance(protocol.target), 0n);
     console.log('PASS: two Safe owners claimed the exact 1% resale share and a second pair authorized a local grant.');
+
+    const pilot = await createRehearsalNetwork(8453, 1);
+    const grantSafe = pilot.safes[0];
+    const founder = pilot.accounts[4].address;
+    const genesis = await pilot.deploy(await artifacts.readArtifact('ArtSoulGenesis'), grantSafe.target, founder,
+        'ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3pteozf5b6tk3twtpjfeqmczy/');
+    const { prepareGenesisGrants } = await import('./prepare-genesis-grants.mjs');
+    const prepared = prepareGenesisGrants({
+        chainId: 8453, safe: grantSafe.target, genesis: genesis.target, founder, policyHash: ethers.id('local-policy'),
+        grants: [{ category: 'Founder', tokenId: 0, recipient: founder, activityChainId: 0, evidenceHash: ethers.id('local-decision') }]
+    });
+    const { data } = prepared.transaction;
+    const oneApproval = await signedTransfer(grantSafe, genesis.target, 0n, data, [pilot.owners[0]]);
+    await assert.rejects(grantSafe.execTransaction.staticCall(...oneApproval), /GS020/);
+    assert.equal(await genesis.totalSupply(), 0n);
+    const authorized = await signedTransfer(grantSafe, genesis.target, 0n, data, [pilot.owners[0], pilot.owners[2]]);
+    await mine(grantSafe.execTransaction(...authorized));
+    assert.equal(await genesis.ownerOf(0), founder);
+    assert.equal(await genesis.locked(0), true);
+    assert.equal((await genesis.grantRecord(0)).decisionHash, prepared.grants[0].decisionHash);
+    assert.equal(await grantSafe.nonce(), 1n);
+    console.log('PASS: a separate disposable Base simulation rejected one signature and recorded the exact Genesis decision with two.');
+
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

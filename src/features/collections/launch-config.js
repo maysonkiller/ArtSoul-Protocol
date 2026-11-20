@@ -164,6 +164,8 @@ export function createOriginDraft() {
 export function createFirstArtworkDraft() {
     const draft = createAuctionMintDraft();
     Object.assign(draft.phases[0], { name: 'First artwork', mechanism: 'first-artwork-auction', allocation: 1 });
+    draft.launchTemplate = 'first-work';
+    draft.creatorEarnings.bps = 550;
     return draft;
 }
 
@@ -178,6 +180,7 @@ export function parseDraft(raw) {
     const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
     const items = value => Array.isArray(value) && value.length <= MAX_DRAFT_ITEMS;
     if (!record(data) || data.schemaVersion !== SCHEMA_VERSION || data.status !== 'draft' ||
+        (data.launchTemplate !== undefined && data.launchTemplate !== 'first-work') ||
         !items(data.phases) || !items(data.utilities) ||
         !record(data.media) || !record(data.links) || !record(data.creatorEarnings) || !items(data.creatorEarnings.recipients) ||
         !record(data.support) || !record(data.crafting) || typeof data.crafting.enabled !== 'boolean' ||
@@ -238,6 +241,20 @@ export function reviewLocalContractCapabilities(config) {
     const add = (code, message) => findings.push({ code, message });
     const uint32 = value => positive(value) && BigInt(value) <= 0xffffffffn;
     const allowlists = ['merkle', 'wallet-allowlist'];
+    if (config.launchTemplate === 'first-work') {
+        const [opening, mint] = config.phases;
+        if (config.phases.length !== 2 || opening?.mechanism !== 'first-artwork-auction' ||
+            !['fixed', 'fcfs'].includes(mint?.mechanism) || mint?.eligibility.kind !== 'public') {
+            add('FIRST_WORK_PHASES', 'Use one opening artwork auction followed by one public fixed-price mint.');
+        }
+        if (!uint32(config.maxSupply) || Number(config.maxSupply) < 2 || !uint32(mint?.allocation) ||
+            Number(mint.allocation) !== Number(config.maxSupply) - 1) {
+            add('FIRST_WORK_REMAINDER', 'Reserve token #1 for the opening sale and allocate every remaining token to the public mint.');
+        }
+        if (Number(config.creatorEarnings.bps) !== 550 || config.creatorEarnings.recipients.length) {
+            add('FIRST_WORK_ROYALTY', 'This template declares a 5.5% ERC-2981 royalty payable directly to the collection creator.');
+        }
+    }
     if (!uint32(config.maxSupply)) add('CONTRACT_SUPPLY_WIDTH', 'CollectionLaunch maximum supply must fit a positive uint32 (at most 4,294,967,295).');
     if (config.phases.length > 32) add('CONTRACT_PHASE_LIMIT', 'CollectionLaunch supports at most 32 phases; this draft may be saved but cannot be represented by that contract.');
     config.phases.forEach((phase, index) => {
@@ -355,9 +372,10 @@ export function reviewConfig(config) {
         }
     });
     const earnings = config.creatorEarnings;
+    const firstWork = config.launchTemplate === 'first-work';
     if (!integer(earnings.bps) || Number(earnings.bps) < 0 || Number(earnings.bps) > 10000) add('fees', 'EARNINGS_INVALID', 'Creator earnings must be between 0 and 10,000 basis points.');
     const splitTotal = earnings.recipients.reduce((sum, recipient) => sum + (integer(recipient.bps) ? Number(recipient.bps) : 0), 0);
-    if (splitTotal !== Number(earnings.bps)) add('fees', 'SPLIT_MISMATCH', `Recipient shares total ${splitTotal} bps; configured creator earnings are ${earnings.bps} bps.`);
+    if (!(firstWork && earnings.recipients.length === 0) && splitTotal !== Number(earnings.bps)) add('fees', 'SPLIT_MISMATCH', `Recipient shares total ${splitTotal} bps; configured creator earnings are ${earnings.bps} bps.`);
     const recipients = new Set();
     for (const recipient of earnings.recipients) {
         if (!address(recipient.address) || !positive(recipient.bps)) add('fees', 'RECIPIENT_INVALID', 'Each earnings recipient needs a non-zero wallet and a positive integer share in basis points.');
@@ -377,9 +395,14 @@ export function reviewConfig(config) {
         // The factor count is transparent deterministic validation, never an AI score.
         passedFactors: factors.filter(f => f.passed).length,
         contractCompatibility: {
+            firstWorkArtifact: firstWork ? 'PartnerFirstWorkLaunch' : null,
             compatible: findings.length === 0 && contractFindings.length === 0,
             findings: contractFindings,
-            notes: [
+            notes: firstWork ? [
+                'The opening winner pays the full winning bid. The collection records that buyer as First Collector and reserves token #1 for their claim.',
+                'The public mint covers the entire remaining supply at the settled opening price. A sale credits 97.5% to the creator and 2.5% to the protocol receiver.',
+                'The template declares a 5.5% ERC-2981 royalty to the collection creator. Payment by an external marketplace depends on its policy.'
+            ] : [
                 'Free, claim, fixed-price and first-come phases map to Fixed for public access or Merkle for reviewed allowlists. A Merkle allowance limits claims; it does not reserve a guaranteed allocation.',
                 'Uniform auctions escrow the full bid, accept one bid per wallet with no replacement or cancellation, and prefer earlier equal bids. A linked phase remains unavailable until its source closes and sells out; a partially subscribed source does not qualify, even when it has winners.',
                 'Unused supply can move only to the immediate next phase. Unallocated or retained supply has no later admin mint path after configuration lock. Burns never replenish lifetime issuance.',
@@ -390,7 +413,9 @@ export function reviewConfig(config) {
         deploymentBlockers: [
             'No verified Collection Launch deployment is configured for this page.',
             'Compatibility is checked against local source only. Deployment arguments, immutable phase locking and wallet transaction review are not connected.',
-            'A symbol, creator, protocol receiver and royalty receiver must be reviewed separately; no missing constructor address is inferred, even for zero royalties. The first phase must still be in the future when locking.',
+            firstWork
+                ? 'Review the collection symbol, creator and protocol receiver. This template assigns ERC-2981 royalties directly to the creator. The opening auction must start after configuration lock.'
+                : 'A symbol, creator, protocol receiver and royalty receiver must be reviewed separately; no missing constructor address is inferred, even for zero royalties. The first phase must still be in the future when locking.',
             'Merkle roots need a durable reviewed claimant/allowance manifest bound to the actual chain, collection address and phase; a root string alone is not proof of eligibility.',
             'Collection marketplace fees and royalty/support receiver policy require reviewed configuration.',
             'Metadata persistence, indexed collection state and a testnet rehearsal are required before publishing.'

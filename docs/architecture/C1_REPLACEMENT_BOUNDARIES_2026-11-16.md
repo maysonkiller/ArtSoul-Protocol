@@ -244,3 +244,15 @@ This proposal is linked under canonical backlog C1 and the rework plan's deliver
 section. Source/hash/reference review validates the proposal; the linked model
 records its separate executable evidence. No live funds, role, storage, network,
 dependency or contract behavior changed.
+### November 20 ordinary refund measurements
+
+Run `node scripts/measure-ordinary-refunds.cjs` after compiling the [concrete candidate](../../contracts/replacement/OrdinaryMarket.sol). The script creates distinct creditors and measures each batch from the same closed-auction state in a disposable Hardhat network. It checks the cursor and every paid-versus-credited result. The receiver gas allowance was 30,000 for all runs.
+
+| Batch count | Wallet payments, gas used | Accepting contract payments | Payments deferred to creditor balances |
+| ---: | ---: | ---: | ---: |
+| 1 | 64,481 | 66,659 | 88,978 |
+| 4 | 116,811 | 123,780 | 202,801 |
+| 8 | 190,552 | 204,491 | 354,565 |
+| 16 | 338,043 | 365,921 | 658,105 |
+
+Use a cap of 8 and a receiver allowance of 30,000 as the starting configuration for the Base Sepolia rehearsal. A caller can request a smaller batch. These numbers are measured execution gas for the stated receivers, not a worst case or a fee quote. Include a Safe recipient, Base data fees and actual gas estimates in the public rehearsal. Mainnet constructor inputs require explicit review against that concrete build. A failed delivery keeps the recipient's full claim withdrawable.

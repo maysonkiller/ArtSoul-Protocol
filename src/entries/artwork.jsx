@@ -80,6 +80,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             { value: 'other', label: 'Other concern' }
         ];
 
+        function connectedReportWallet() {
+            const address = typeof window.getCurrentWalletAddress === 'function'
+                ? window.getCurrentWalletAddress() : window.currentWalletAddress;
+            return String(address || '').toLowerCase();
+        }
+
         function emptyArtworkReport() {
             return {
                 category: 'copyright',
@@ -438,7 +444,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const reauctionValuationControllerRef = useRef(null);
             const reportTriggerRef = useRef(null);
             const reportReturnFocusRef = useRef(null);
-            const reportSubmissionRef = useRef(false);
+            const reportSubmissionRef = useRef(null);
             const [transactionActions, setTransactionActions] = useState({});
 
             const isClassic = theme === 'classic';
@@ -729,8 +735,25 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             useEffect(() => {
                 if (!isReportModalOpen) return undefined;
                 const dialog = reportDialogRef.current;
+                let reportOwner = connectedReportWallet();
+                const walletChanged = event => {
+                    const wallet = event?.detail?.isConnected === false ? '' : connectedReportWallet();
+                    if (reportOwner && wallet !== reportOwner) {
+                        reportSubmissionRef.current?.abort();
+                        reportSubmissionRef.current = null;
+                        setReportBusy(false);
+                        closeArtworkReport();
+                    }
+                    reportOwner = wallet;
+                };
                 dialog?.showModal();
-                return () => { if (dialog?.open) dialog.close(); };
+                window.addEventListener('artsoul:wallet-state-changed', walletChanged);
+                return () => {
+                    window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
+                    reportSubmissionRef.current?.abort();
+                    reportSubmissionRef.current = null;
+                    if (dialog?.open) dialog.close();
+                };
             }, [isReportModalOpen]);
 
             useEffect(() => {
@@ -1472,19 +1495,25 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     return;
                 }
 
-                const requestedWallet = String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
-                reportSubmissionRef.current = true;
+                const requestedWallet = connectedReportWallet();
+                const submission = new AbortController();
+                reportSubmissionRef.current = submission;
                 setReportBusy(true);
                 setReportError('');
                 try {
                     const authenticated = await window.ensureAuthenticated?.();
+                    if (submission.signal.aborted) return;
                     if (!authenticated) throw new Error('Connect and sign in with your wallet to submit a report.');
-                    const currentWallet = String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
-                    if (requestedWallet && requestedWallet !== currentWallet) throw new Error('Your wallet changed. Review the report before submitting again.');
+                    const intendedWallet = requestedWallet || connectedReportWallet();
+                    const matchesSignIn = () => /^0x[0-9a-f]{40}$/.test(intendedWallet) &&
+                        connectedReportWallet() === intendedWallet &&
+                        String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase() === intendedWallet;
+                    if (!matchesSignIn()) throw new Error('Your wallet changed. Review the report before submitting again.');
                     const response = await fetch('/api/moderation/reports', {
                         method: 'POST',
                         credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
+                        signal: submission.signal,
+                        headers: { 'Content-Type': 'application/json', 'X-ArtSoul-Wallet': intendedWallet },
                         body: JSON.stringify({
                             chain_id: chainId,
                             artwork_id: reportArtworkId,
@@ -1500,8 +1529,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         })
                     });
                     const result = await response.json().catch(() => ({}));
-                    if (!response.ok) {
-                        throw new Error(result.message || 'The report could not be submitted.');
+                    if (submission.signal.aborted) return;
+                    if (!matchesSignIn()) throw new Error('Your sign-in wallet changed. Use the original account to check for report updates.');
+                    if (!response.ok || result?.success !== true || !result.report?.reference) {
+                        throw new Error(result?.message || 'The report could not be confirmed. Please try again.');
                     }
 
                     setReportReceipt({
@@ -1509,10 +1540,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         alreadySubmitted: result.alreadySubmitted === true
                     });
                 } catch (error) {
-                    setReportError(error.message || 'The report could not be submitted.');
+                    if (!submission.signal.aborted) setReportError(error.message || 'The report could not be submitted.');
                 } finally {
-                    reportSubmissionRef.current = false;
-                    setReportBusy(false);
+                    if (reportSubmissionRef.current === submission) {
+                        reportSubmissionRef.current = null;
+                        setReportBusy(false);
+                    }
                 }
             }
 

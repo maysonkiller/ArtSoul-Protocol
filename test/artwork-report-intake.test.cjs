@@ -192,6 +192,28 @@ test('a valid report uses the atomic service-role RPC and returns an opaque refe
   }
 });
 
+test('artwork and donation reports reject stale or malformed wallet bindings before accessing storage', async () => {
+  const [{default: handler}] = await modules;
+  const cookie = await sessionCookie();
+  const original = global.fetch;
+  let reads = 0;
+  global.fetch = async () => { reads++; throw new Error('unexpected storage request'); };
+  try {
+    for (const target_type of ['artwork', 'donation_message']) {
+      for (const binding of ['0x' + '2'.repeat(40), [STAFF], '']) {
+        const req = request({target_type, chain_id:84532, artwork_id: '42', category: 'spam',
+          details:'A bounded report.', good_faith_confirmed:true}, cookie);
+        req.headers['x-artsoul-wallet'] = binding;
+        const res = responseHarness();
+        await handler(req, res);
+        assert.equal(res.statusCode, 401);
+        assert.equal(res.body.error, 'SESSION_WALLET_MISMATCH');
+      }
+    }
+    assert.equal(reads, 0);
+  } finally { global.fetch = original; }
+});
+
 test('the database intake-limit signal is returned as a stable 429 response', async () => {
   const [{ default: handler }] = await modules;
   const cookie = await sessionCookie();

@@ -50,6 +50,7 @@ export function PhaseTable({ config }) {
             <p>After settlement, winners can claim their NFT and withdraw any excess. Losing bidders can withdraw their full bid.</p>
         </div>}
         {hasFirstArtwork && <p className="launch-help">Token #1 is reserved for the first artwork. The highest funded bid becomes the price per remaining NFT when the opening sale settles.</p>}
+        {config.launchTemplate === 'first-work' && <p className="launch-help">Up to three opening auctions can run, one at a time. If all three end without bids, minting stays closed and the author can request a new review after 30 days. If the first sale settles late, collectors still get the full public mint window.</p>}
         {hasAllowlistMint && <p className="launch-help">Joining the allowlist is free. An eligible wallet can mint at the phase price up to its allowance while units remain.</p>}
     </>;
 }
