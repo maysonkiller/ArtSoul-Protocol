@@ -699,13 +699,16 @@
         video.dataset.artsoulPlayedSource = url;
         // Preserve the very start of the soundtrack. An explicit scrub to a
         // different time before the first Play takes precedence.
-        if (Math.abs(video.currentTime - 0.1) <= 0.02) video.currentTime = 0;
+        if (Math.abs(video.currentTime - Math.min(0.1, video.duration || 0.1)) <= 0.02) video.currentTime = 0;
     }
 
     function restoreVideoPreview(video) {
         if (!video.readyState) return;
+        const generatedPreview = Boolean(video.dataset.artsoulPlayedSource);
         delete video.dataset.artsoulPlayedSource;
-        if (video.currentTime > 0.12) video.currentTime = video.poster ? 0 : 0.1;
+        if (!generatedPreview && video.src?.includes('#')) return;
+        const previewTime = generatedPreview ? Math.min(0.1, video.duration || 0.1) : 0;
+        if (video.currentTime > previewTime + 0.02) video.currentTime = previewTime;
     }
 
     function createMediaLoadingElement() {

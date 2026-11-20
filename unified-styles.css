@@ -5109,6 +5109,13 @@ body {
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
 }
 
+.site-header .site-wordmark,
+.site-header .site-wordmark span,
+.site-header .site-primary-nav a,
+.site-header .site-primary-nav a span {
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
+}
+
 html.classic .site-header,
 body.classic .site-header {
     box-shadow: none !important;

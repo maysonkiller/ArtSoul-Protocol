@@ -18,15 +18,15 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
-  'unified-styles.css': { version: 96, sha256: 'a45b7d18515f0a6e' },
+  'unified-styles.css': { version: 97, sha256: '004afebf6224cf4b' },
   'mobile-no-motion.css': { version: 3, sha256: '88eb61864da7f616' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 8, sha256: '618e006edefcf241' },
-  'src/ui/components/artwork-card.js': { version: 40, sha256: '7ceb235ad9bfd691' },
+  'src/ui/components/artwork-card.js': { version: 41, sha256: '4543f5497359b5d0' },
   'contracts-integration.js': { version: 21, sha256: '36189171dbb31867' },
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
-  'webmcp-tools.js': { version: 33, sha256: 'abf6e119871d2b22' },
+  'webmcp-tools.js': { version: 34, sha256: 'c9c81b8f091a00ff' },
   'voice-commands.js': { version: 18, sha256: 'b14b51af77c1cae3' },
   'avatar-dropdown.js': { version: 74, sha256: '5ae029ec40ad3214' },
   'header-prepaint.js': { version: 12, sha256: '13b9bd8192b2ce51' },

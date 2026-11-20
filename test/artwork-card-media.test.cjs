@@ -16,7 +16,7 @@ vm.runInNewContext(
     fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'artwork-url.js'), 'utf8'),
     { window, document: {} }
 );
-vm.runInNewContext(source, { window, document: {} });
+vm.runInNewContext(source, { window, document: {}, CustomEvent });
 const { mediaType, mediaUrl, posterUrl, mediaDescriptor } = window.ArtSoulArtworkCard;
 
 test('a posterless preview requests one frame and first playback includes the opening soundtrack', () => {
@@ -34,6 +34,25 @@ test('a posterless preview requests one frame and first playback includes the op
     const scrubbed = { currentTime: 3.5, dataset: {} };
     startVideoFromPreview(scrubbed, url, '');
     assert.equal(scrubbed.currentTime, 3.5);
+    const short = { currentTime: 0.04, duration: 0.04, dataset: {} };
+    startVideoFromPreview(short, url, '');
+    assert.equal(short.currentTime, 0);
+});
+
+test('restoring a cached page resets generated previews and preserves author-specified clips', () => {
+    const { reviveMediaPreviews } = window.ArtSoulArtworkCard;
+    const url = 'https://cdn.example.test/work.mp4';
+    const makeVideo = (src, dataset) => ({ src, dataset, readyState: 4, duration: 8,
+        currentTime: 4, pause() {}, closest() { return null; } });
+    const preview = makeVideo(url + '#t=0.1', { artsoulPlayedSource: url });
+    const authored = makeVideo(url + '#t=3,6', {});
+    const poster = makeVideo(url, {});
+    window.matchMedia = () => ({ matches: false });
+    window.dispatchEvent = () => {};
+    const root = { querySelectorAll: selector => selector.endsWith(' video') ? [preview, authored, poster] : [] };
+    reviveMediaPreviews(root);
+    reviveMediaPreviews(root);
+    assert.deepEqual([preview.currentTime, authored.currentTime, poster.currentTime], [0.1, 4, 0]);
 });
 
 test('video evidence wins over stale audio metadata without selecting the audio URL', () => {
