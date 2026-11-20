@@ -171,6 +171,14 @@ In the generic prototype, equal bids are ordered by their on-chain sequence. Wit
 
 The edition auction allocates actual NFTs. The reservation auction below allocates the right to buy one later. Keep reservation turnover out of artwork sale prices. Publish allocations, unit prices and completed mints separately.
 
+#### First-work attempts for Partner launches
+
+The [Partner first-work template](../../contracts/launch/PartnerFirstWorkLaunch.sol) locks one fully funded opening auction and a flat-price public phase for the entire remaining supply. Creation stays open to authors and projects. Partner designation requires its own curated record.
+
+The collection controller can retry after an opening expires with zero bids, up to three attempts. The chain moves both phase windows together and keeps the published reserve, durations, allocation and per-wallet terms. Each attempt emits the actual dates. A funded bid commits the opening to settlement. A late permissionless close starts the public mint window if its advertised start has passed. The existing first-auction record supplies the exact paid price for every public mint. The stored winner identifies the collection's First Collector, including when the winner directs token 1 to another recipient.
+
+After three empty attempts, cancellation is dated from the third on-chain deadline. At that deadline plus 30 days the controller can submit one on-chain request for a new Partner review. The cancelled auction history stays final. Classifying a new application under the same curated identity requires the Partner review service. [Local lifecycle and cooldown tests](../../test/launch/PartnerFirstWorkLaunch.test.cjs) cover the exact boundary and the absence of a mint, floor or payouts after cancellation. This is an additive, fresh-deployment contract. The shared collection helper introduces no storage slots. Public testnet deployment and independent review remain open.
+
 #### Checking the published metadata for token 1
 
 Export the collection from **Manage drafts → Download draft** and run the read-only check against the prepared metadata.
@@ -329,6 +337,18 @@ no stale listing revival; bounded utility inputs/output supply. Test native and
 contract wallets, rejected signatures, relayer identity and partial completion.
 Prototype tests do not prove these future guarantees.
 
+### Separate Genesis grant pilot
+
+The [Genesis candidate](../../contracts/genesis/ArtSoulGenesis.sol) is a fresh, immutable ERC-721 deployment. It implements [ERC-5192](https://eips.ethereum.org/EIPS/eip-5192) so wallets can identify locked art. Approval and transfer calls revert. It cannot receive payments or perform an ordinary artwork sale. Its constructor and grants require chain ID 8453. The isolated Hardhat simulation of that chain exercises the same bytecode; it creates no public awards.
+
+The grant categories are Founder (number 0 for the reviewed founder recipient), Team (numbers 1–200 for contributors, developers and team), MainnetActivity (documented activity on Base 8453), and Community (published contest or reward decisions). Activity and Community share the remaining supply according to reviewed allocations. The batch ceiling of 32 limits transaction work. It does not determine how many grants the team should award in a period. Snapshot A and testnet activity are never eligibility evidence.
+
+Before proposing grants, publish the applicable criteria and preserve their byte hash. Record the reviewed evidence for each recipient, including the actual Base chain and finalized activity for activity awards. Use opaque or salted evidence commitments for private adjudication details. Both the retained decision and the Safe review must bind the recipient, serial, category, deployment and policy. The [offline encoder](../../scripts/prepare-genesis-grants.mjs) takes these fields and produces a zero-value CALL for the named Safe. It has no signer or network connection. The chain enforces the designated authority, multi-party threshold, available serial and category. The signers verify the real-world evidence behind the commitment.
+
+The constructor accepts a single IPFS directory root in the form `ipfs://<CID>/`. It validates a lowercase base32 CIDv1 with DAG-PB and a 32-byte SHA-256 digest, including its final padding bits. The directory must contain the decimal serial as a filename (`0`, for example). File availability and media content are verified separately. [IPFS CID specification](https://specs.ipfs.tech/cid/)
+
+Before D5, review the actual Safe implementation, modules and owners, pin and independently verify every referenced IPFS metadata file and its image/animation, agree the founder recipient and first pilot batch, and obtain independent review. Use the [Genesis metadata checker](../../scripts/check-genesis-metadata.mjs) with the immutable directory, the serial and the three locally reviewed files. Its default run reads local files and reports their hashes. Repeat with `--published` to retrieve the exact metadata URI, image and animation from IPFS and compare all three with the reviewed bytes. Keep the results for serial 0 and each pilot serial and independently confirm the pin and playback. Match the mined grant and lock events against the reviewed decision before displaying benefits. The pilot remains closed.
+
 ### Independent review scope for the first Base release
 
 Request separate prices for the following scopes once the production candidate is frozen. Record the Git commit, compiler and optimizer settings, dependency lockfile, constructor inputs and build hashes on the quote. Ask each reviewer to list exclusions, cost and coverage of a fix review, and which later changes would require another review. An estimate has yet to be obtained. [Audit preparation guidance](https://www.openzeppelin.com/readiness-guide)
@@ -355,7 +375,7 @@ and undecided policy. It is not architecture sign-off or replacement Solidity.
 The November 16 [minimal replacement boundaries](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md)
 narrow this into a proposed immutable engine/NFT pair, deployment-scoped identity,
 settlement-bound mint capability and isolated liabilities with bounded refunds.
-The November 19 decisions select the ordinary-market entry pause, whole-wei payout rounding, three Safe addresses and delayed external operator admission. Contract sign-off still needs a concrete production build, bounded refund execution settings and independent review. Each external operator requires its own compatibility evidence.
+The November 19 decisions select the ordinary-market entry pause, whole-wei payout rounding, three Safe addresses and delayed external operator admission. The concrete OrdinaryMarket candidate compiles with constructor-bound Safe roles. Contract sign-off still needs reviewed target-network refund settings, an independently reviewed release build and verification of the deployed pair. Each external operator requires its own compatibility evidence.
 
 1. C1: state/rounding/deadline specification, identity/capability graph, upgrade
    selection, threats and invariants. Approve changed rules before Solidity.

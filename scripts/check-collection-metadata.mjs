@@ -22,27 +22,32 @@ export async function checkCollectionMetadata(draftJson, expectedSha256) {
     if (expectedSha256 !== undefined && sha256 !== expectedSha256.toLowerCase()) {
         throw new Error('The served metadata differs from the expected SHA-256.');
     }
-    let metadata;
-    try {
-        metadata = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(response.data));
-    } catch {
-        throw new Error('Token 1 returned invalid UTF-8 or JSON.');
-    }
-    if (!metadata || Array.isArray(metadata) || typeof metadata.name !== 'string' || !metadata.name.trim()) {
-        throw new Error('Token 1 must provide a JSON object with a display name.');
-    }
-    for (const field of ['image', ...(metadata.animation_url === undefined ? [] : ['animation_url'])]) {
-        const uri = metadata[field];
-        if (typeof uri !== 'string' || !/^(?:https|ipfs):\/\//.test(uri) || /[\s\\]/.test(uri) ||
-            !safeUrl(uri, true) || (uri.startsWith('ipfs:') && !allowedArtworkUrl(uri))) {
-            throw new Error(`Token 1 needs a valid HTTPS or IPFS URL for ${field}.`);
-        }
-    }
+    const metadata = parseTokenMetadata(response.data, '1');
     return {
         chainId: draft.chainId, tokenId: '1', metadataURI: tokenOneMetadataURI, sha256,
         bytes: response.data.length, name: metadata.name, image: metadata.image,
         ...(metadata.animation_url !== undefined && { animation_url: metadata.animation_url })
     };
+}
+
+export function parseTokenMetadata(data, tokenId) {
+    let metadata;
+    try {
+        metadata = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(data));
+    } catch {
+        throw new Error(`Token ${tokenId} returned invalid UTF-8 or JSON.`);
+    }
+    if (!metadata || Array.isArray(metadata) || typeof metadata.name !== 'string' || !metadata.name.trim()) {
+        throw new Error(`Token ${tokenId} must provide a JSON object with a display name.`);
+    }
+    for (const field of ['image', ...(metadata.animation_url === undefined ? [] : ['animation_url'])]) {
+        const uri = metadata[field];
+        if (typeof uri !== 'string' || !/^(?:https|ipfs):\/\//.test(uri) || /[\s\\]/.test(uri) ||
+            !safeUrl(uri, true) || (uri.startsWith('ipfs:') && !allowedArtworkUrl(uri))) {
+            throw new Error(`Token ${tokenId} needs a valid HTTPS or IPFS URL for ${field}.`);
+        }
+    }
+    return metadata;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -79,7 +79,9 @@ export function ProfileContentReport({ profileWallet, onClose }) {
             if (String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase() !== wallet) {
                 throw new Error('Your sign-in wallet changed. Please try again.');
             }
-            if (!response.ok || !result.success) throw new Error(result.message || result.error || 'Your report could not be submitted. Please try again.');
+            if (!response.ok || result?.success !== true || !result.report?.reference) {
+                throw new Error(result?.message || result?.error || 'Your report could not be confirmed. Please try again.');
+            }
             setReceipt({ reference: result.report?.reference, alreadySubmitted: result.alreadySubmitted === true });
         } catch (failure) {
             if (current()) setError(failure.message || 'Your report could not be submitted. Please try again.');

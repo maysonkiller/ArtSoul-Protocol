@@ -152,6 +152,13 @@ contract CollectionLaunch is ERC721, ERC2981, Ownable2Step, Pausable, Reentrancy
 
     function phaseCount() external view returns (uint256) { return _phases.length; }
 
+    /// @notice The paying collector of the opening work, recorded when its funded sale settles.
+    function collectionFirstCollector() public view returns (address) {
+        if (_phases.length == 0 || _phases[0].kind != Kind.FirstArtworkAuction ||
+            !_states[0].closed || !_states[0].subscribed) return address(0);
+        return _heaps[0][0];
+    }
+
     function phase(uint256 id) external view returns (PhaseConfig memory, PhaseState memory) {
         if (id >= _phases.length) revert InvalidPhase();
         return (_phases[id], _states[id]);
@@ -273,7 +280,7 @@ contract CollectionLaunch is ERC721, ERC2981, Ownable2Step, Pausable, Reentrancy
         if (id != 0 && !_states[id - 1].closed) revert PreviousPhaseOpen();
     }
 
-    function _closePhase(uint256 id) private {
+    function _closePhase(uint256 id) internal virtual {
         if (!configurationLocked) revert NotLocked();
         if (id >= _phases.length) revert InvalidPhase();
         PhaseConfig storage config = _phases[id];
@@ -342,8 +349,9 @@ contract CollectionLaunch is ERC721, ERC2981, Ownable2Step, Pausable, Reentrancy
             }
         }
         totalMinted += quantity;
+        address collector = id == 0 && _phases[0].kind == Kind.FirstArtworkAuction ? payer : recipient;
         for (uint256 i; i < quantity; ++i) {
-            firstCollector[firstId + i] = recipient;
+            firstCollector[firstId + i] = collector;
             _safeMint(recipient, firstId + i);
         }
         emit CollectionMinted(id, payer, recipient, firstId, quantity, price);

@@ -71,11 +71,16 @@ export default async function handler(req, res) {
     if (!['artwork', 'donation_message', 'profile_content'].includes(targetType)) {
       throw requestError('Choose a valid report target.', 'INVALID_REPORT_TARGET');
     }
+    if (targetType === 'profile_content' && !reportingConfig.profileEnabled) {
+      throw requestError('Profile reporting is not enabled yet.', 'PROFILE_REPORTING_DISABLED', 503);
+    }
+    // Existing artwork clients use only the session cookie. Current forms also bind the wallet that opened the submission.
+    const intendedWallet = req.headers?.['x-artsoul-wallet'];
+    if ((targetType === 'profile_content' || intendedWallet !== undefined) &&
+        (typeof intendedWallet !== 'string' || normalizeWallet(intendedWallet) !== reporterWallet)) {
+      throw requestError('Sign in with your connected wallet before submitting this report.', 'SESSION_WALLET_MISMATCH', 401);
+    }
     if (targetType === 'profile_content') {
-      if (!reportingConfig.profileEnabled) throw requestError('Profile reporting is not enabled yet.', 'PROFILE_REPORTING_DISABLED', 503);
-      if (typeof req.headers?.['x-artsoul-wallet'] !== 'string' || normalizeWallet(req.headers['x-artsoul-wallet']) !== reporterWallet) {
-        throw requestError('Sign in with your connected wallet before submitting this report.', 'SESSION_WALLET_MISMATCH', 401);
-      }
       profileWallet = normalizeWallet(body.profile_wallet);
       if (!profileWallet || /^0x0{40}$/.test(profileWallet) || ['chain_id', 'artwork_id',
         'donation_contract_address', 'donation_transaction_hash', 'donation_log_index'].some(key => body[key] !== undefined)) {

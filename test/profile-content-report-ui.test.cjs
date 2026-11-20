@@ -105,6 +105,15 @@ test('report sign-in and in-flight submission are canceled when the wallet switc
     }
 });
 
+test('a profile report with a missing receipt stays open for retry', async () => {
+    const h = reportHarness({fetchPage: async () => Response.json({ success: true })});
+    await h.submit();
+    assert.doesNotMatch(h.html(), /Report received/);
+    assert.match(h.html(), /could not be confirmed/);
+    assert.equal(elements(h.render(), node => node.type === 'form').length, 1);
+    h.unmount();
+});
+
 test('a pending report cannot be submitted twice and a later session change cannot confirm it', async () => {
     const wait = deferred(), h = reportHarness({ fetchPage: () => wait.promise });
     const first = h.submit(); await tick(); await h.submit();
