@@ -992,3 +992,29 @@ test('RU mode shows Russian microphone status and never claims missing audio exi
  assert.deepEqual(h.calls[0],{name:'open_page',args:{page:'nfts'}});
  assert.equal(h.spoken.length,0,'no fallback to unreviewed browser speech');
 });
+
+
+test('RU microphone responds in Russian after Latin STT and accepts NFT clarification',async()=>{
+ const h=harness({dialogue:true,speech:true,audio:true,
+  execute:async()=>JSON.stringify({opened:true,page:'nfts',title:'NFTs',url:'/gallery#nft'})});
+ h.open();h.ru.fire('click');
+ h.get('.artsoul-voice-mic').fire('click');await flush();
+ assert.equal(h.sessions[0].lang,'ru-RU');
+ h.sessions[0].onresult({results:[[{transcript:'open NFC',confidence:1}]]});await flush();
+ assert.match(h.get('.artsoul-voice-answer').textContent,/Похоже, фраза/,'RU text despite Latin misrecognition');
+ assert.equal(h.calls.length,0,'NFC does not cause unapproved navigation');
+ h.submit('галерея');await flush();
+ assert.deepEqual(h.calls,[{name:'open_page',args:{page:'nfts'}}]);
+ assert.equal(h.spoken.length,0,'unrecorded reply never switches to browser voice');
+});
+
+test('RU microphone can still parse a Latin-recognized existing command with RU answer',async()=>{
+ const h=harness({dialogue:true,speech:true,
+  execute:async()=>JSON.stringify({opened:true,page:'profile',title:'Profile',url:'/profile'})});
+ h.open();h.ru.fire('click');
+ h.get('.artsoul-voice-mic').fire('click');await flush();
+ h.sessions[0].onresult({results:[[{transcript:'open profile',confidence:1}]]});await flush();
+ assert.deepEqual(h.calls,[{name:'open_page',args:{page:'profile'}}]);
+ assert.match(h.get('.artsoul-voice-answer').textContent,/Открываю страницу ArtSoul/,
+   'RU microphone must not switch its answer to English');
+});
