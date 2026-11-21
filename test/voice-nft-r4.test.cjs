@@ -10,6 +10,9 @@ const create=()=>api.createDialogue(()=>1000000);
 const positives=[
  ['ru','открой NFT','nfts'],
  ['ru','открой нфт','nfts'],
+ ['ru','открой, пожалуйста, нфт','nfts'],
+ ['ru','открой пожалуйста NFT','nfts'],
+ ['ru','галерея NFT','nfts'],
  ['ru','открой эн-эф-ти','nfts'],
  ['ru','открой ен эф ти','nfts'],
  ['ru','покажи мне NFT','nfts'],
@@ -60,4 +63,12 @@ test('existing open_page backend is restricted to canonical NFT destinations',()
  assert.match(source,/walletNfts:\s*\{\s*url:\s*'\/profile#wallet-nfts'/);
  assert.match(source,/marketplace:\s*\{\s*url:\s*'\/gallery#marketplace'/);
  assert.match(source,/name:\s*'open_page'/);
+});
+
+// Numbered NFT works must stay on the original ID path, not an artwork-title search.
+test('explicit numbered NFT works never become a title search',()=>{
+ for(const phrase of ['открой NFT номер 38','открой NFT №31','open NFT 38']){
+  const got=create().route(phrase,{lang:/[а-яё]/iu.test(phrase)?'ru':'en'});
+  assert.notEqual(got?.tool,'search_catalog',phrase);
+ }
 });
