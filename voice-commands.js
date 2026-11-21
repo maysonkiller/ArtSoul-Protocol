@@ -169,10 +169,10 @@
             .replace(/ (?:tab|вкладку)$/u, '');
         const open = page => ({ tool: 'open_page', input: { page } });
         if (pendingNft && /^(?:нет|отмена|не надо|отмени|no|cancel|never mind|nevermind)$/u.test(text)) {
-            return { message: 'Okay. What would you like to open?' };
+            return { message: ru ? 'Хорошо. Какой раздел открыть?' : 'Okay. What would you like to open?' };
         }
         if (pendingNft && /^(?:да|ага|хочу|yes|yeah|sure)$/u.test(text)) {
-            return { nftPrompt: true, message: 'Which section or artwork number?' };
+            return { nftPrompt: true, message: ru ? 'Назовите раздел или номер работы.' : 'Which section or artwork number?' };
         }
         const id = /^(?:(?:nfts?|artwork|work|работ[ауеы]|артворк)\s*)?(?:(?:номер|number|no\.?|№|#)\s*)?([1-9]\d{0,77})$/u.exec(target);
         if (id && BigInt(id[1]) < 2n ** 256n) return { tool: 'open_artwork', input: { artwork_id: id[1] } };
@@ -182,7 +182,7 @@
         if (pendingNft && /^(?:mine|my profile|profile|(?:my )?collection|мои|(?:моем |мой )?профил[ье]|(?:моей |мою )?коллекци[июя])$/u.test(target)) return open('collected');
         if (/^nfts? (?:в (?:моем )?профиле|in (?:my |the )?profile)$/u.test(target)) return open('collected');
         if (/^(?:(?:мои |мой |какой-нибудь |любой |my |any )?nfts?)$/u.test(target)) {
-            return { nftPrompt: true, message: 'Where should I open NFTs — the gallery, marketplace, your collection or your wallet? You can also say an ArtSoul artwork number.' };
+            return { nftPrompt: true, message: ru ? 'Где показать NFT: в галерее, на маркетплейсе, в вашей коллекции или кошельке? Можно назвать номер работы.' : 'Where should I open NFTs — the gallery, marketplace, your collection or your wallet? You can also say an ArtSoul artwork number.' };
         }
         const page = NAVIGATION_PAGES.find(([, names]) => names.test(target));
         if (page) return open(page[0]);
@@ -190,7 +190,7 @@
         // A compound NFT navigation request must never pass a trailing action to
         // a different command. Unrelated turns still reach the usual parser.
         if (prefix && /^(?:мои |мой |my )?(?:nfts?|marketplace|маркетплейс)(?![\p{L}\p{N}_])/u.test(target)) {
-            return { message: 'Name one section or one ArtSoul artwork number.' };
+            return { message: ru ? 'Назовите один раздел или один номер работы ArtSoul.' : 'Name one section or one ArtSoul artwork number.' };
         }
         return null;
     }
