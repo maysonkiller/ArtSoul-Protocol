@@ -356,7 +356,7 @@ test('no audio reaches ArtSoul, and nothing listens without a click', () => {
   assert.match(source, /mic\.addEventListener\('click', start\);/);
   assert.equal((source.match(/\.start\(\)/g) || []).length, 1, 'all recognition opens use the same guarded entry');
   // A hidden tab stops listening.
-  assert.match(source, /visibilityState === 'hidden'\) stopVoice\(\)/);
+  assert.match(source, /visibilityState === 'hidden'\) \{stopVoice\(\);dialogue\?\.clear\(\);\}/);
 });
 
 test('the person is told where the audio goes before the microphone first opens', () => {

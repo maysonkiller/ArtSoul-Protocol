@@ -63,6 +63,8 @@ const legacyRootAssets = [
     // is copied verbatim rather than bundled into a page entry.
     'webmcp-tools.js',
     // Voice commands. The same shape as the agent tools, which it drives.
+    'voice-audio-bank-r2.js',
+    'voice-conversation-r2.js',
     'voice-commands.js',
     'supabase-client.js',
     'theme-sync.js',
