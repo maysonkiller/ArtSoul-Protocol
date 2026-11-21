@@ -57,7 +57,7 @@
             const say=(ruText,enText)=>({kind:'reply',text:ru?ruText:enText});
             const tool=(name,artwork)=>({kind:'tool',tool:name,input:artwork?{artwork_id:artwork}:{}});
             // Invalid or multiple explicit artwork IDs must not fall back to last.
-            const mentions=[...t.matchAll(/(?:#|№|(?:работ[ауеы]*|произведени[ея]|artwork|work)\s*(?:номер|number|#)?\s*)(\d+)\b/giu)]
+            const mentions=[...t.matchAll(/(?:#|№|(?:работ[ауеы]*|произведени[ея]|artwork|work)\s*(?:номер|number|#)?\s*)([+-]?\d[^\s,;!?]*)/giu)]
                 .map(match=>match[1]);
             const distinct=[...new Set(mentions)];
             const named=distinct.length===1?id(distinct[0]):null;
