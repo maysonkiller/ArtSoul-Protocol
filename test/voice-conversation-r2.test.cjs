@@ -35,6 +35,9 @@ test('ambiguous or invalid explicit artwork IDs never inherit the previous work'
  for(const phrase of [
    'Open artwork 31 and artwork 42',
    'Tell me more about artwork 0',
+   'Tell me more about artwork -1',
+   'Tell me more about artwork 31.5',
+   'Tell me more about artwork 42abc',
    'Подготовь ставку для работы 31 и работы 42',
    'Кто владелец работы 0?',
    'Open work 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999'
