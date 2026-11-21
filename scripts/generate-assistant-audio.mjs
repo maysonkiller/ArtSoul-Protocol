@@ -84,10 +84,13 @@ async function loadClips() {
   const win = {};
   new Function('window', 'document', 'navigator', await fs.readFile(path.join(root, 'voice-commands.js'), 'utf8'))(win, undefined, {});
   const builtIn = win.ArtSoulVoice?.replyClips;
-  const bank = await readJson(path.join(root,'docs/audio/assistant-r2-phrase-bank.json'), {version:2,model,voice,clips:[]});
-  if (!bank || bank.version !== 2 || bank.model !== model || bank.voice !== voice ||
-      !Array.isArray(bank.clips) || bank.clips.length > 200) throw new Error('invalid_phrase_bank');
-  const clips = [...builtIn,...bank.clips];
+  const bank = await readJson(path.join(root,'docs/audio/assistant-r2-phrase-bank.json'), null);
+  const video = await readJson(path.join(root,'docs/audio/assistant-video-r3-phrase-bank.json'), null);
+  for (const [item,required] of [[bank,166],[video,22]]) {
+    if (!item || item.version !== 2 || item.model !== model || item.voice !== voice ||
+        !Array.isArray(item.clips) || item.clips.length !== required) throw new Error('invalid_phrase_bank');
+  }
+  const clips = [...builtIn,...bank.clips,...video.clips];
   if (!Array.isArray(builtIn) || builtIn.length !== 18 || clips.length > 220) throw new Error('invalid_clip_list');
   const seen = new Set();
   for (const clip of clips) {
