@@ -56,6 +56,7 @@
             const ru=/[а-яё]/iu.test(phrase)||lang==='ru', t=phrase.toLowerCase().replace(/ё/g,'е').replace(/[?!.]+$/u,'');
             const say=(ruText,enText)=>({kind:'reply',text:ru?ruText:enText});
             const tool=(name,artwork)=>({kind:'tool',tool:name,input:artwork?{artwork_id:artwork}:{}});
+            const ui=(action,extra={})=>({kind:'ui',action,...extra});
             // Invalid or multiple explicit artwork IDs must not fall back to last.
             const mentions=[...t.matchAll(/(?:#|№|(?:работ[ауеы]*|произведени[ея]|artwork|work)\s*(?:номер|number|#)?\s*)([+-]?\d[^\s,;!?]*)/giu)]
                 .map(match=>match[1]);
@@ -74,6 +75,42 @@
             if(spoken&&Number(confidence)>0&&Number(confidence)<0.6&&
                /(?:bid|buy|sell|open|wallet|постав|купи|продай|открой|кошел)/iu.test(t))
                 return say('Не уверена, что правильно расслышала. Исправьте текст перед отправкой.','Low recognition confidence. Correct the transcript before submitting.');
+
+            // Exact examples witnessed in the 2026-11-21 browser recording.
+            // These are bounded, RU/EN-equivalent intents, not a generative model.
+            if(/^(?:hello|hi|hey|hello artsoul|привет|здравствуй(?:те)?|добрый день)[!,. ]*$/iu.test(t))
+                return say('Привет! Что хотите посмотреть в ArtSoul?',
+                    'Hello! What would you like to explore in ArtSoul?');
+            if(/^(?:почему.*(?:на английском|по английски|по-английски)|why (?:are you|do you|is it).*(?:speak|speaking|english))/iu.test(t))
+                return say('Русские команды поддерживаются. Для распознавания русской речи выберите RU. Не все фразы пока записаны голосом marin; остальные ответы доступны текстом.',
+                    'Russian commands are supported. Select RU to recognize spoken Russian. Not every reply has a marin recording yet; other answers appear as text.');
+            if(/^(?:это сделал[а]?|ты (?:это )?сделал[а]?|что ты сделал[а]?|did you do it|did you finish|what did you do)$/iu.test(t))
+                return say('Уточните, какое действие нужно проверить. Я не выполняю операции с кошельком без вашего подтверждения.',
+                    'Which action would you like me to check? I do not perform wallet operations without your approval.');
+            if(/^(?:connect(?: to)?(?: my| the)? wallet|open(?: my| the)? wallet(?: menu)?|show(?: me)?(?: the)? wallet(?: menu)?|подключи(?:ть)?(?: мне)? (?:мой )?кошел(?:ек|ьк[ае])|открой(?: мне)? (?:мой )?кошел(?:ек|ьк[ае]))$/iu.test(t))
+                return ui('walletMenu');
+            if(/^(?:(?:show|open|check)(?: me)?(?: my| the)? )?notifications?$/iu.test(t)||
+               /^(?:(?:покажи|открой|проверь)(?: мне)? )?уведомлени[еяий]+$/iu.test(t))
+                return ui('notifications');
+            if(/^(?:какая (?:сеть|сеть кошелька)(?: подключена)?|покажи какая сеть подключена|покажи (?:сеть|подключенную сеть|сеть кошелька)|к какой сети подключен кошелек|какая сеть сейчас|what network(?: is connected| am i on)?|which network(?: is connected| am i on)?|show (?:my |the )?(?:connected )?network|what chain am i on)$/iu.test(t))
+                return ui('networkStatus');
+            if(/^(?:режим|какой режим|тема|какая тема|mode|theme|appearance|change mode)$/iu.test(t))
+                return say('Какой режим нужен: Classic или Future? Или вы хотите включить голосовой чат?',
+                    'Which appearance do you want: Classic or Future? Or do you mean voice chat?');
+            if(/^(?:включи|выбери|поставь|переключи(?:сь)? на) (?:режим |тему )?(?:future|будущ[а-я]+)$/iu.test(t)||
+               /^(?:switch to|set|use) (?:the )?future (?:mode|theme|appearance)?$/iu.test(t))
+                return ui('theme',{theme:'future'});
+            if(/^(?:включи|выбери|поставь|переключи(?:сь)? на) (?:режим |тему )?(?:classic|классическ[а-я]+)$/iu.test(t)||
+               /^(?:switch to|set|use) (?:the )?classic (?:mode|theme|appearance)?$/iu.test(t))
+                return ui('theme',{theme:'classic'});
+            // User spoke "open artworks"/"open Explorer"; both are gallery intents.
+            if(/^(?:open|show|go to|take me to|browse) (?:the |my )?(?:artworks|works|explorer|art gallery)$/iu.test(t)||
+               /^(?:открой|покажи|перейди в) (?:все )?(?:работы|произведения|эксплорер|эксплор|каталог работ)$/iu.test(t))
+                return {kind:'tool',tool:'open_page',input:{page:'gallery'}};
+            // A misheard NFT/NFC acronym must never be treated as a known artwork.
+            if(/^(?:nft open nft|open nfc|open nfg|open nf[gc]|okay storage room)$/iu.test(t))
+                return say('Похоже, распознавание перепутало NFT. Уточните: галерея, маркетплейс, коллекция или номер работы.',
+                    'NFT may have been misheard. Choose gallery, marketplace, collection or an artwork number.');
             if(/^(?:нет[, ]+|no[, ]+|actually[, ]+|не ту\b).*?(?:друг|other|wrong|different|не ту)/iu.test(t)){
                 last=null;return say('Назовите номер другой работы, чтобы не выбирать случайную.','Please give the other artwork number so I do not guess.');
             }
@@ -99,6 +136,23 @@
             }
             if(/^(?:покажи (?:ставку|статус)|статус аукциона|what is the bid|auction status)/iu.test(t))
                 return selected?tool('get_auction_state',selected):say('Нужен номер работы.','Which artwork number?');
+
+            // Voice "open <title>" is a public catalog search, never an
+            // unverified direct navigation or wallet action. Actual result
+            // links and artwork IDs must come from ArtSoul search_catalog.
+            const requestByTitle = /^(?:open|show|find) (?:discovery |artwork (?:named |called |titled )?|work (?:named |called |titled )?)?(.{2,100})$/iu.exec(t)
+                || /^(?:открой|покажи|найди)(?: мне)? (?:(?:работу|произведение|артворк)(?: с названием)? )?(.{2,100})$/iu.exec(t);
+            if(requestByTitle){
+                let title=requestByTitle[1].trim();
+                if(/^discovery\s+/iu.test(title))title=title.replace(/^discovery\s+/iu,'');
+                const reserved=/^(?:artworks|works|explorer|discovery|gallery|explore|profile|home|create|upload|nfts?|nfc|wallet|notification[s]?|theme|mode|аукионы|галерею|профиль|главную|кошелек|кошельк[ае]|уведомлени[еяий]+|режим|сеть)$/iu;
+                const commandWord=/(?:\b(?:and|then|buy|bid|sell|withdraw|sign|approve|connect|http|www|admin|wallet|profile)\b|(?:\sи\s)|(?:купи|ставк|продай|подпиши|выведи|подключи|админ|кошел|http)|[;:{}<>])/iu;
+                if(!reserved.test(title)&&!commandWord.test(title)&&!/^\d+(?:\.\d+)?$/u.test(title)&&
+                    !/^(?:its?|the|that|this) (?:page|artwork|work)$/iu.test(title)&&
+                    !/^(?:первый|второй|третий) результат$/iu.test(title)){
+                    return {kind:'tool',tool:'search_catalog',input:{query:title,category:'artworks'}};
+                }
+            }
             return null;
         }
         return Object.freeze({route,observe,clear,snapshot,restore});
