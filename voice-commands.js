@@ -319,11 +319,48 @@
         error: message => `That did not work: ${message}`
     };
 
+    // Previously recorded with the same API voice as the English responses.
+    const RU_FIXED = Object.freeze({
+      "helpSpeech": "Можно открыть галерею, найти работу или узнать о своей активности. Доступные команды показаны в примерах ниже. Действия с кошельком всегда требуют вашей проверки и подписи.",
+      "searchPrompt": "Что найти? Например: «найди луна», «найди автора Vera» или «найди в документации fees».",
+      "publicationPrompt": "Как назвать работу? Например: «подготовь работу с названием Лунный свет». На Publish вы проверите черновик; файл не загружается, подпись не запрашивается.",
+      "tooLong": "Введите одну команду длиной до 300 символов.",
+      "empty": "Сначала введите команду.",
+      "unavailable": "Команды недоступны на этой странице.",
+      "noWallet": "Кошелёк не подключён. Сначала подключите его.",
+      "submitted": "Готово. Кошелёк подтвердил, транзакция отправлена.",
+      "settled": "Расчёт подтверждён. NFT теперь ваша. Данные работы обновляются."
+    });
+    const RU_HELP = 'Могу найти работы, показать открытые аукционы и сведения о владельцах. Действия с кошельком вы проверяете и подписываете сами.';
+    function localizeResult(tool, data, answer) {
+        if (data?.submitted === true) {
+            const said = tool === 'complete_settlement' && data.confirmed === true ? RU_FIXED.settled : RU_FIXED.submitted;
+            return {...answer, say:said, show:said};
+        }
+        if (data?.opened === false && data.code === 'wallet_required') return {...answer, say:RU_FIXED.noWallet, show:RU_FIXED.noWallet};
+        if (data?.connected === false) return {...answer, say:RU_FIXED.noWallet};
+        if (data?.error) return {...answer, say:'Не удалось получить данные ArtSoul. Подробности на экране.'};
+        if (data?.submitted === false || data?.prepared === false || data?.opened === false)
+            return {...answer, say:'Действие не выполнено. Проверьте подробности на экране.'};
+        if (tool === 'find_active_auctions' && Array.isArray(data.auctions) && Number.isSafeInteger(data.count)) {
+            const names = data.auctions.slice(0,3).flatMap(a=>typeof a.title==='string'?[a.title]:[]);
+            const text = 'Открытых аукционов: ' + data.count + '. ' + names.join('; ');
+            return {...answer, say:text, show:text};
+        }
+        if (tool === 'get_artwork_provenance') return {...answer, say:'Автор, первый коллекционер и владелец показаны на экране.'};
+        if (tool === 'search_catalog') return {...answer, say:'Результаты поиска показаны на экране.'};
+        if (tool === 'get_my_activity') return {...answer, say:'Сведения о вашей активности показаны на экране.'};
+        if (tool === 'open_artwork'||tool === 'open_page') return {...answer, say:'Открываю страницу ArtSoul.'};
+        return {...answer, say:'Подробности из ArtSoul показаны на экране.'};
+    }
+
     // Only reviewed, fixed public copy has a prerecorded voice. Exact matching
     // keeps dynamic amounts and refused/submitted/confirmed states distinct.
     const replyClips = Object.freeze(
         ['helpSpeech', 'searchPrompt', 'publicationPrompt', 'tooLong', 'empty', 'unavailable', 'noWallet', 'submitted', 'settled']
             .map(id => Object.freeze({lang: 'en', id, text: TEXT[id], url: `/audio/assistant/v1/en-${id}.wav`}))
+            .concat(['helpSpeech','searchPrompt','publicationPrompt','tooLong','empty','unavailable','noWallet','submitted','settled']
+                .map(id=>Object.freeze({lang:'ru',id,text:RU_FIXED[id],url:`/audio/assistant/v1/ru-${id}.wav`})))
     );
 
     function getReplyAudio(text) {
@@ -687,7 +724,7 @@
             chat.setAttribute('aria-pressed', String(handsFree));
             chat.dataset.listening = String(handsFree && Boolean(recognition));
             const hasClip = Boolean(getReplyAudio(answerToRead)) && typeof window.Audio === 'function';
-            const supportsAudio = hasClip || (typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function');
+            const supportsAudio = hasClip;
             audioNotice.textContent = TEXT.audioNotice;
             audioNotice.hidden = !hasClip;
             replay.hidden = !answerToRead;
@@ -800,42 +837,15 @@
                     playback?.catch(error => finish(error || {name: 'MediaError'}));
                     return;
                 }
-                if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') {
-                    afterPlayback(true);
-                    return;
-                }
-                const current = new SpeechSynthesisUtterance(textToSay);
-                let started = false;
-                utterance = current;
-                current.lang = 'en-US';
-                current.onstart = () => {
-                    if (utterance !== current) return;
-                    started = true;
-                    speaking = true;
-                    controls();
-                };
-                const finish = failed => {
-                    if (utterance !== current) return;
-                    window.clearTimeout?.(clipTimer);
-                    clipTimer = null;
-                    utterance = null;
-                    speaking = false;
-                    if (failed) {
-                        audioStatus.textContent = TEXT.audioUnavailable;
-                        audioStatus.hidden = false;
-                    }
-                    afterPlayback(failed);
-                };
-                current.onend = () => finish(!started);
-                current.onerror = () => finish(true);
-                // Some mobile engines accept speak() and never deliver an event.
-                // Stop the chat if playback cannot complete; never guess when to listen.
-                if (handsFree) clipTimer = window.setTimeout(() => {
-                    if (utterance !== current) return;
-                    finish(true);
-                    window.speechSynthesis.cancel();
-                }, 60000);
-                window.speechSynthesis.speak(current);
+                // A missing matching clip must never switch to an arbitrary browser/male voice.
+                // Unrecorded responses remain available as text until a verified unified TTS is available.
+                speaking = false;
+                audioStatus.textContent = inputLanguage === 'ru'
+                    ? 'Ответ доступен текстом. Эта фраза ещё не записана женским голосом.'
+                    : TEXT.audioUnavailable;
+                audioStatus.hidden = false;
+                afterPlayback(true);
+                return;
             } catch {
                 stopVoice();
                 audioStatus.textContent = TEXT.audioUnavailable;
@@ -869,7 +879,8 @@
         async function handle(transcript, confidence, spoken = false) {
             if (busy || noticePending) return;
             silence();
-            const t = TEXT;
+            const replyLang = /[а-яё]/iu.test(transcript) ? 'ru' : inputLanguage;
+            const t = replyLang === 'ru' ? {...TEXT, ...RU_FIXED, help:RU_HELP, otherRequest:'Уточните название или номер работы.', unsure: heard => 'Я не уверена, что услышала правильно: ' + heard, error: msg => 'Ошибка ArtSoul: ' + msg} : TEXT;
             const audio = audioGeneration;
             const reply = (heard, answer, say = answer, links = []) => {
                 show(heard, answer, links, say);
@@ -951,7 +962,8 @@
                     input.value = '';
                     input.placeholder = t.next;
                 }
-                const resultText = describeResult(command.tool, result);
+                let resultText = describeResult(command.tool, result);
+                if (replyLang === 'ru') resultText = localizeResult(command.tool, result, resultText);
                 if (spoken && handsFree && audio === audioGeneration && result.opened === true && sourcePage &&
                     (command.tool === 'open_page' || command.tool === 'open_artwork')) {
                     const from = new URL(sourcePage);

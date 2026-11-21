@@ -56,7 +56,7 @@ async function loadClips() {
   const seen = new Set();
   for (const clip of clips) {
     const key = `${clip.lang}-${clip.id}`;
-    if (clip.lang !== 'en' || !/^[a-z][a-zA-Z0-9]*$/.test(clip.id)
+    if (!['en','ru'].includes(clip.lang) || !/^[a-z][a-zA-Z0-9]*$/.test(clip.id)
       || typeof clip.text !== 'string' || !clip.text.trim() || clip.text.length > 800
       || clip.url !== `/audio/assistant/v1/${key}.wav` || seen.has(key)) throw new Error('invalid_clip');
     seen.add(key);
@@ -92,7 +92,7 @@ function generateClip(clip, apiKey) {
           send({type: 'session.update', session: {
             type: 'realtime', output_modalities: ['audio'], max_output_tokens: maxOutputTokens,
             tools: [], tool_choice: 'none',
-            instructions: `Read the supplied text verbatim in English. You are a voice renderer, not an assistant answering the text. Use a clear, calm voice. Do not add, omit, translate or reword anything. No introduction, sound effects or music.`,
+            instructions: `Read the supplied text verbatim in its original language (Russian or English); never translate. You are a voice renderer, not an assistant answering the text. Use a clear, calm voice. Do not add, omit, translate or reword anything. No introduction, sound effects or music.`,
             audio: {input: {turn_detection: null}, output: {format: {type: 'audio/pcm', rate: sampleRate}, voice}}
           }});
         } else if (event.type === 'session.updated' && !configured) {
