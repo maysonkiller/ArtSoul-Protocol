@@ -1,0 +1,61 @@
+name: npm advisory inventory (no installs)
+
+on:
+  push:
+    branches:
+      - security/npm-71-inventory-20261121
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artsoul-npm-audit-inventory
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout source (no credentials retained)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Use lockfile npm version
+        run: npm install -g npm@11.6.2 --no-audit --no-fund
+
+      - name: Query npm advisories read-only (full and omit dev)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit --json --package-lock-only > npm-audit-full.json || true
+          npm audit --json --package-lock-only --omit=dev > npm-audit-prod.json || true
+
+      - name: Print exact list and render summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/security/npm-audit-inventory.mjs npm-audit-full.json npm-audit-prod.json
+          cat npm-audit-inventory.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve exact raw evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: artsoul-npm-advisories
+          path: |
+            npm-audit-full.json
+            npm-audit-prod.json
+            npm-audit-inventory.md
+          if-no-files-found: error
+          retention-days: 14
