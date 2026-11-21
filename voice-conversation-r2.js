@@ -84,7 +84,7 @@
                     'Please specify one valid artwork number. No action was started.');
             if(/^(?:стоп|хватит|stop|end voice chat)$/iu.test(t))return {kind:'stop'};
             if(/(?:open nfg|open nf[gc]|okay storage room|^открой нфс$|^open nft open nft$)/iu.test(t))
-                return say('Похоже, фраза распознана неправильно. Уточните раздел или номер работы.','That may be misheard. Please name a section or artwork number.');
+                return {...say('Похоже, фраза распознана неправильно. Уточните раздел или номер работы.','That may be misheard. Please name a section or artwork number.'),pendingNft:true};
             if(/^(?:не |нет,?\s*не |не надо |don't |do not |never |no,?\s*not |отмена)/iu.test(t)&&
                /(?:откр|покаж|ставк|куп|прод|wallet|bid|buy|open|sell|аукцион|auction)/iu.test(t))
                 return say('Ничего не открываю и не подтверждаю.','Nothing was opened or confirmed.');
@@ -141,8 +141,8 @@
                 return {kind:'tool',tool:'open_page',input:{page:'gallery'}};
             // A misheard NFT/NFC acronym must never be treated as a known artwork.
             if(/^(?:nft open nft|open nfc|open nfg|open nf[gc]|okay storage room)$/iu.test(t))
-                return say('Похоже, распознавание перепутало NFT. Уточните: галерея, маркетплейс, коллекция или номер работы.',
-                    'NFT may have been misheard. Choose gallery, marketplace, collection or an artwork number.');
+                return {...say('Похоже, распознавание перепутало NFT. Уточните: галерея, маркетплейс, коллекция или номер работы.',
+                    'NFT may have been misheard. Choose gallery, marketplace, collection or an artwork number.'),pendingNft:true};
             if(/^(?:нет[, ]+|no[, ]+|actually[, ]+|не ту\b).*?(?:друг|other|wrong|different|не ту)/iu.test(t)){
                 last=null;return say('Назовите номер другой работы, чтобы не выбирать случайную.','Please give the other artwork number so I do not guess.');
             }
