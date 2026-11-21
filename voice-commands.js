@@ -369,20 +369,24 @@
             return {...answer, say:said, show:said};
         }
         if (data?.opened === false && data.code === 'wallet_required') return {...answer, say:RU_FIXED.noWallet, show:RU_FIXED.noWallet};
-        if (data?.connected === false) return {...answer, say:RU_FIXED.noWallet};
-        if (data?.error) return {...answer, say:'Не удалось получить данные ArtSoul. Подробности на экране.'};
+        if (data?.connected === false) return {...answer, say:RU_FIXED.noWallet, show:RU_FIXED.noWallet};
+        if (data?.error) return {...answer, say:'Не удалось получить данные ArtSoul. Подробности на экране.',
+            show:'Не удалось получить данные ArtSoul.\n'+(answer.show||'')};
         if (data?.submitted === false || data?.prepared === false || data?.opened === false)
-            return {...answer, say:'Действие не выполнено. Проверьте подробности на экране.'};
+            return {...answer, say:'Действие не выполнено. Проверьте подробности на экране.',
+                show:'Действие не выполнено.\n'+(answer.show||'')};
         if (tool === 'find_active_auctions' && Array.isArray(data.auctions) && Number.isSafeInteger(data.count)) {
             const names = data.auctions.slice(0,3).flatMap(a=>typeof a.title==='string'?[a.title]:[]);
             const text = 'Открытых аукционов: ' + data.count + '. ' + names.join('; ');
             return {...answer, say:text, show:text};
         }
-        if (tool === 'get_artwork_provenance') return {...answer, say:'Автор, первый коллекционер и владелец показаны на экране.'};
-        if (tool === 'search_catalog') return {...answer, say:'Результаты поиска показаны на экране.'};
-        if (tool === 'get_my_activity') return {...answer, say:'Сведения о вашей активности показаны на экране.'};
-        if (tool === 'open_artwork'||tool === 'open_page') return {...answer, say:'Открываю страницу ArtSoul.'};
-        return {...answer, say:'Подробности из ArtSoul показаны на экране.'};
+        const detail = (russian) => ({...answer, say:russian, show:russian+'\n'+(answer.show||'')});
+        if (tool === 'get_artwork_provenance') return detail('Автор, первый коллекционер и владелец показаны на экране.');
+        if (tool === 'search_catalog') return detail('Результаты поиска показаны на экране.');
+        if (tool === 'get_my_activity') return detail('Сведения о вашей активности показаны на экране.');
+        if (tool === 'open_artwork'||tool === 'open_page')
+            return {...answer, say:'Открываю страницу ArtSoul.', show:'Открываю страницу ArtSoul.'};
+        return detail('Подробности из ArtSoul показаны на экране.');
     }
 
     // Pre-recorded generic cues never include private, changing or unverified data.
