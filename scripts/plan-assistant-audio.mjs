@@ -8,15 +8,19 @@ import {fileURLToPath} from 'node:url';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const bank=JSON.parse(fs.readFileSync(path.join(root,'docs/audio/assistant-r2-phrase-bank.json'),'utf8'));
+const video=JSON.parse(fs.readFileSync(path.join(root,'docs/audio/assistant-video-r3-phrase-bank.json'),'utf8'));
+const clips=[...bank.clips,...video.clips];
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'public/audio/assistant/v1/manifest.json'),'utf8'));
 const size=Number(process.argv[2]||10);
 if(!Number.isSafeInteger(size)||size<1||size>30)throw new Error('Batch size must be 1..30');
 if(bank.version!==2||bank.voice!=='marin'||bank.model!=='gpt-realtime-2.1-mini'||
-   !Array.isArray(bank.clips)||bank.clips.length!==166)throw new Error('Unknown phrase bank');
+   !Array.isArray(bank.clips)||bank.clips.length!==166||
+   video.version!==2||video.voice!==bank.voice||video.model!==bank.model||
+   !Array.isArray(video.clips)||video.clips.length!==22)throw new Error('Unknown phrase bank');
 if(manifest.version!==1||!Array.isArray(manifest.clips))throw new Error('Unknown audio manifest');
 const byUrl=new Map(manifest.clips.map(c=>[c.url,c]));
 const recorded=[],pending=[];
-for(const clip of bank.clips){
+for(const clip of clips){
  if(!['en','ru'].includes(clip.lang)||!/^r2[A-Z][A-Za-z0-9]*$/.test(clip.id)||
     clip.url!==('/audio/assistant/v1/phrases/'+clip.lang+'-'+clip.id+'.wav'))
    throw new Error('Invalid bank entry');
@@ -48,7 +52,7 @@ for(let i=0;i<pending.length;i+=size){
 }
 console.log(JSON.stringify({
  mode:'OFFLINE_ONLY_NO_API_CALLS',voice:bank.voice,model:bank.model,
- phraseBank:bank.clips.length,verifiedRecorded:recorded.length,pending:pending.length,
+ phraseBank:clips.length,verifiedRecorded:recorded.length,pending:pending.length,
  reservedForPendingUsd:Number((pending.length*0.025).toFixed(3)),
  note:'Reservation is not a bill or an API limit. All commands above are dry-run only. Refill is not automatic.',
  batches
