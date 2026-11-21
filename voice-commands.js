@@ -354,6 +354,95 @@
         return {...answer, say:'Подробности из ArtSoul показаны на экране.'};
     }
 
+    // Pre-recorded generic cues never include private, changing or unverified data.
+    const SPOKEN_CUES = Object.freeze({
+      "r2AuctionResults": {
+        "en": "The current auction results are shown on screen.",
+        "ru": "Текущие данные об аукционах показаны на экране."
+      },
+      "r2ArtworkResults": {
+        "en": "The verified artwork details are shown on screen.",
+        "ru": "Проверенные сведения о работе показаны на экране."
+      },
+      "r2ProvenanceResults": {
+        "en": "Creator, First Collector, and Owner are shown on screen.",
+        "ru": "Автор, первый коллекционер и текущий владелец показаны на экране."
+      },
+      "r2SearchResults": {
+        "en": "The ArtSoul search results are shown on screen.",
+        "ru": "Результаты поиска ArtSoul показаны на экране."
+      },
+      "r2ActivityResults": {
+        "en": "Your ArtSoul activity is shown on screen.",
+        "ru": "Сведения о вашей активности в ArtSoul показаны на экране."
+      },
+      "r2BidPreparedResult": {
+        "en": "Your bid preview is ready for review. Nothing has been signed.",
+        "ru": "Предварительный просмотр ставки готов. Ничего не подписано."
+      },
+      "r2ReviewResult": {
+        "en": "You must review this action and approve it in your own wallet.",
+        "ru": "Вы должны сами проверить действие и подтвердить его в своём кошельке."
+      },
+      "r2InfoResults": {
+        "en": "Verified ArtSoul details are shown on screen.",
+        "ru": "Проверенные сведения ArtSoul показаны на экране."
+      },
+      "r2ActionNotCompleted": {
+        "en": "The action was not completed. Check the reason on screen.",
+        "ru": "Действие не выполнено. Проверьте причину на экране."
+      },
+      "r2ToolError": {
+        "en": "ArtSoul could not complete this request. Check the details on screen.",
+        "ru": "ArtSoul не смог выполнить запрос. Подробности показаны на экране."
+      },
+      "r2NoMatches": {
+        "en": "No matching items were returned. Try another title or number.",
+        "ru": "Совпадений не найдено. Попробуйте другое название или номер."
+      },
+      "r2NoAuctions": {
+        "en": "No open auctions were returned by ArtSoul.",
+        "ru": "ArtSoul не вернул открытых аукционов."
+      },
+      "r2LifecycleResults": {
+        "en": "The ArtSoul auction and settlement stages are explained on screen.",
+        "ru": "Этапы аукциона и расчёта ArtSoul объяснены на экране."
+      },
+      "r2PageNavigation": {
+        "en": "Opening the requested ArtSoul page.",
+        "ru": "Открываю выбранную страницу ArtSoul."
+      }
+    });
+    function safeToolCue(tool,data,lang) {
+        const choose = id => SPOKEN_CUES[id]?.[lang] || '';
+        if (!data || typeof data !== 'object' || Array.isArray(data) || data.error) return choose('r2ToolError');
+        if (data.submitted === false || data.prepared === false || data.opened === false || data.updated === false)
+            return choose('r2ActionNotCompleted');
+        if (tool === 'find_active_auctions') {
+            if (!Array.isArray(data.auctions) || !Number.isSafeInteger(data.count) || data.count < 0)
+                return choose('r2ToolError');
+            return choose(data.count === 0 ? 'r2NoAuctions' : 'r2AuctionResults');
+        }
+        if (tool === 'search_catalog') {
+            const groups = data.groups;
+            if (!groups || typeof groups !== 'object') return choose('r2ToolError');
+            const lengths = ['artworks','auctions','artists','pages','docs']
+                .map(key => groups[key]?.items)
+                .filter(value => Array.isArray(value)).map(value => value.length);
+            if (!lengths.length) return choose('r2ToolError');
+            return choose(lengths.some(Boolean) ? 'r2SearchResults' : 'r2NoMatches');
+        }
+        if (tool === 'get_artwork') return choose('r2ArtworkResults');
+        if (tool === 'get_auction_state') return choose('r2AuctionResults');
+        if (tool === 'get_artwork_provenance') return choose('r2ProvenanceResults');
+        if (tool === 'get_my_activity') return choose('r2ActivityResults');
+        if (tool === 'explain_settlement') return choose('r2LifecycleResults');
+        if (tool === 'prepare_bid' && data.prepared === true) return choose('r2BidPreparedResult');
+        if ((tool === 'open_page' || tool === 'open_artwork') && data.opened === true)
+            return choose('r2PageNavigation');
+        return '';
+    }
+
     // Only reviewed, fixed public copy has a prerecorded voice. Exact matching
     // keeps dynamic amounts and refused/submitted/confirmed states distinct.
     const replyClips = Object.freeze(
@@ -578,6 +667,7 @@
         describeResult,
         replyClips,
         getReplyAudio,
+        safeToolCue,
         mayRun,
         isWrite,
         WRITE_TOOLS,
@@ -789,6 +879,7 @@
             if (!keepDraft) {
                 pendingDraftField = null;
                 pendingPrompt = null;
+                dialogue?.clear();
             }
             handsFree = false;
             stopListening();
@@ -996,6 +1087,10 @@
                 }
                 let resultText = describeResult(command.tool, result);
                 if (replyLang === 'ru') resultText = localizeResult(command.tool, result, resultText);
+                // Only speak a generic cue when the corresponding verified WAV exists.
+                // Changing names, balances, prices, owner addresses stay on screen.
+                const cue = safeToolCue(command.tool,result,replyLang);
+                if (cue && getReplyAudio(cue)) resultText = {...resultText,say:cue};
                 if (spoken && handsFree && audio === audioGeneration && result.opened === true && sourcePage &&
                     (command.tool === 'open_page' || command.tool === 'open_artwork')) {
                     const from = new URL(sourcePage);
