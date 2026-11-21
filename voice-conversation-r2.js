@@ -83,7 +83,7 @@
                 return say('Уточните один действительный номер работы. Ничего не запускаю.',
                     'Please specify one valid artwork number. No action was started.');
             if(/^(?:стоп|хватит|stop|end voice chat)$/iu.test(t))return {kind:'stop'};
-            if(/(?:open nfg|open nf[gc]|okay storage room|^открой ен эф ти$|^открой нфс$|^open nft open nft$)/iu.test(t))
+            if(/(?:open nfg|open nf[gc]|okay storage room|^открой нфс$|^open nft open nft$)/iu.test(t))
                 return say('Похоже, фраза распознана неправильно. Уточните раздел или номер работы.','That may be misheard. Please name a section or artwork number.');
             if(/^(?:не |нет,?\s*не |не надо |don't |do not |never |no,?\s*not |отмена)/iu.test(t)&&
                /(?:откр|покаж|ставк|куп|прод|wallet|bid|buy|open|sell|аукцион|auction)/iu.test(t))
@@ -119,6 +119,22 @@
             if(/^(?:включи|выбери|поставь|переключи(?:сь)? на) (?:режим |тему )?(?:classic|классическ[а-я]+)$/iu.test(t)||
                /^(?:switch to|set|use) (?:the )?classic (?:mode|theme|appearance)?$/iu.test(t))
                 return ui('theme',{theme:'classic'});
+
+            // NFT intents are public navigation, not artwork title search.
+            // Only canonical existing open_page enum destinations are permitted.
+            const nftWords=t.replace(/(?:н[ -]?ф[ -]?т|эн[ -]?эф[ -]?ти|ен[ -]?эф[ -]?ти|n[ .-]?f[ .-]?t)(?![\p{L}\p{N}_])/gu,'nft');
+            const nftTool=page=>({kind:'tool',tool:'open_page',input:{page}});
+            const nftTerm='(?:nfts?)';
+            if(new RegExp('^(?:(?:open|show(?: me)?|go to|browse|view|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?|хочу (?:открыть|посмотреть))\\s+)?(?:my|мои|мою)\\s+'+nftTerm+'$','iu').test(nftWords))
+                return nftTool('collected');
+            if(new RegExp('^(?:(?:open|show(?: me)?|go to|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?)\\s+)?'+nftTerm+'\\s+(?:in (?:my|the) wallet|from my wallet|в кошельке|из кошелька|моего кошелька)$','iu').test(nftWords))
+                return nftTool('walletNfts');
+            if(new RegExp('^(?:(?:open|show(?: me)?|go to|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?)\\s+)?'+nftTerm+'\\s+(?:in (?:my|the) profile|в профиле|моего профиля)$','iu').test(nftWords))
+                return nftTool('collected');
+            if(new RegExp('^(?:(?:open|show(?: me)?|go to|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?)\\s+)?'+nftTerm+'\\s+(?:marketplace|на маркетплейсе|в маркетплейсе)$','iu').test(nftWords))
+                return nftTool('marketplace');
+            if(new RegExp('^(?:(?:open|show(?: me)?|go to|browse|view|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?|хочу (?:открыть|посмотреть))\\s+)?(?:(?:all|the|все|весь|каталог|галерею|gallery|catalog|раздел|страницу)\\s+)?'+nftTerm+'(?:\\s+(?:gallery|catalog|галерею|каталог|в галерее|в каталоге))?$','iu').test(nftWords))
+                return nftTool('nfts');
             // User spoke "open artworks"/"open Explorer"; both are gallery intents.
             if(/^(?:open|show|go to|take me to|browse) (?:the |my )?(?:artworks|works|explorer|art gallery)$/iu.test(t)||
                /^(?:открой|покажи|перейди в) (?:все )?(?:работы|произведения|эксплорер|эксплор|каталог работ)$/iu.test(t))
