@@ -43,7 +43,7 @@ test('ambiguous or invalid explicit artwork IDs never inherit the previous work'
    assert.equal(got?.kind,'reply',phrase);
    assert.equal(got?.tool,undefined,phrase);
  }
- assert.equal(d.route('Open artwork 42')?.input?.artwork_id,'42');
+ assert.equal(d.route('Tell me more about artwork 42')?.input?.artwork_id,'42');
  assert.equal(d.route('Open its page')?.input?.artwork_id,'31');
 });
 
