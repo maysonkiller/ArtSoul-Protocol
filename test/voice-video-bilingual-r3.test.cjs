@@ -141,3 +141,39 @@ test('voice text is never replaced with an arbitrary browser TTS or private dyna
  assert.match(voice.getReplyAudio('Hello! What would you like to explore in ArtSoul?'),
     /^\/audio\/assistant\/v1\/phrases\/en-r2Greeting\.wav$/);
 });
+
+
+test('opening a title is a two-stage read-only search followed by verified choice',()=>{
+ const d=make();
+ const search=d.route('open Discovery test black',{lang:'en'});
+ assert.deepEqual(search,{kind:'tool',tool:'search_catalog',
+    input:{query:'test black',category:'artworks'}});
+ assert.equal(d.route('open first result',{lang:'en'}).kind,'reply');
+ d.observe('search_catalog',{groups:{artworks:{items:[
+   {artwork_id:'31',url:'/artwork/31',title:'Test Black'},
+   {artwork_id:'42',url:'/artwork/42',title:'Test Other'}
+ ]}}});
+ assert.equal(d.route('open first result',{lang:'en'}).input.artwork_id,'31');
+ assert.equal(d.route('открой второй результат',{lang:'ru'}).input.artwork_id,'42');
+ assert.equal(d.route('открой результат',{lang:'ru'}).kind,'reply','ambiguous selection');
+ d.observe('search_catalog',{error:'search failed'});
+ assert.equal(d.route('open first result',{lang:'en'}).kind,'reply','no stale search data');
+});
+
+test('search result IDs and paths are verified before any follow-up navigation',()=>{
+ const d=make();
+ for(const invalid of [
+  {artwork_id:'31',url:'https://attacker.example/31',title:'Lookalike'},
+  {artwork_id:'0',url:'/artwork/0',title:'Invalid'},
+  {artwork_id:'31;alert(1)',url:'/artwork/31;alert(1)',title:'Injection'},
+  {artwork_id:'31',url:'/artwork/42',title:'Mismatched'}
+ ]){
+  d.observe('search_catalog',{groups:{artworks:{items:[invalid]}}});
+  assert.equal(d.route('open first result').kind,'reply',JSON.stringify(invalid));
+ }
+ d.observe('search_catalog',{groups:{artworks:{items:[
+   {artwork_id:'31',url:'/artwork/31',title:'Duplicate'},
+   {artwork_id:'31',url:'/artwork/31',title:'Duplicate'}
+ ]}}});
+ assert.equal(d.route('open first result').kind,'reply','duplicates rejected');
+});
