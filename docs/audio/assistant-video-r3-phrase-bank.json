@@ -1,0 +1,140 @@
+{
+  "version": 2,
+  "model": "gpt-realtime-2.1-mini",
+  "voice": "marin",
+  "note": "Additional exact bilingual replies from screen-recorded cases. SOURCE_ONLY: recordings have not been generated.",
+  "clips": [
+    {
+      "lang": "en",
+      "id": "r2VideoLanguageHelp",
+      "text": "Russian commands are supported. Select RU to recognize spoken Russian. Not every reply has a marin recording yet; other answers appear as text.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoLanguageHelp.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoLanguageHelp",
+      "text": "Русские команды поддерживаются. Для распознавания русской речи выберите RU. Не все фразы пока записаны голосом marin; остальные ответы доступны текстом.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoLanguageHelp.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoDidIt",
+      "text": "Which action would you like me to check? I do not perform wallet operations without your approval.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoDidIt.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoDidIt",
+      "text": "Уточните, какое действие нужно проверить. Я не выполняю операции с кошельком без вашего подтверждения.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoDidIt.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoWalletMenu",
+      "text": "Account menu opened. Select a wallet and approve the connection yourself. Nothing was signed.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoWalletMenu.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoWalletMenu",
+      "text": "Открыла меню аккаунта. Для подключения выберите кошелёк и подтвердите действие сами. Ничего не подписано.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoWalletMenu.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNotifications",
+      "text": "Opening notifications. If no wallet is connected, the panel will show a connection prompt.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNotifications.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNotifications",
+      "text": "Открываю панель уведомлений. Если кошелёк не подключён, появится подсказка.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNotifications.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkLoading",
+      "text": "Wallet state is still loading. Check the network in your wallet menu.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkLoading.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkLoading",
+      "text": "Состояние кошелька ещё загружается. Проверьте сеть в меню кошелька.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkLoading.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkDisconnected",
+      "text": "No wallet is connected. Its selected network is unknown.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkDisconnected.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkDisconnected",
+      "text": "Кошелёк не подключён. Сеть кошелька сейчас неизвестна.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkDisconnected.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkUnknown",
+      "text": "Wallet connected, but the network is not verified by available state. Check it in your wallet.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkUnknown.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkUnknown",
+      "text": "Кошелёк подключён, но сеть не подтверждена доступными данными. Проверьте её в кошельке.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkUnknown.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoThemeClassic",
+      "text": "ArtSoul Classic appearance is enabled.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoThemeClassic.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoThemeClassic",
+      "text": "Включила классический вид ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoThemeClassic.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoThemeFuture",
+      "text": "ArtSoul Future appearance is enabled.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoThemeFuture.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoThemeFuture",
+      "text": "Включила оформление Future.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoThemeFuture.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoModeClarify",
+      "text": "Which appearance do you want: Classic or Future? Or do you mean voice chat?",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoModeClarify.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoModeClarify",
+      "text": "Какой режим нужен: Classic или Future? Или вы хотите включить голосовой чат?",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoModeClarify.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoSearchChoice",
+      "text": "Choose a specific result: first, second, or third.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoSearchChoice.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoSearchChoice",
+      "text": "Выберите номер результата: первый, второй или третий.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoSearchChoice.wav"
+    }
+  ]
+}
