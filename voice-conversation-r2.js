@@ -3,19 +3,29 @@
 (function () {
     'use strict';
     const id = x => typeof x === 'string' && /^[1-9]\d{0,77}$/.test(x) && BigInt(x) < (1n<<256n) ? x : null;
-    const clean = x => String(x||'').trim().replace(/\s+/g,' ').slice(0,300);
+    const clean = x => typeof x === 'string' ? x.trim().replace(/\s+/g,' ').slice(0,300) : '';
     function createDialogue(now=()=>Date.now()) {
         let last=null, list=[], updated=now();
         const touch=()=>{if(now()<updated||now()-updated>900000)clear();updated=now();};
         function clear(){last=null;list=[];updated=now();}
         function observe(tool,result){
-            if(!result||typeof result!=='object'||result.error||result.opened===false||result.prepared===false||result.submitted===false)return;
+            if(!result||typeof result!=='object'||Array.isArray(result)||result.error||result.opened===false||result.prepared===false||result.submitted===false||result.updated===false||result.confirmed===false)return;
             touch();
-            if(tool==='find_active_auctions'&&Array.isArray(result.auctions)){
-                list=result.auctions.slice(0,12).flatMap(a=>{
-                    const artwork=id(a?.artwork_id),hours=a?.hours_remaining===null?NaN:Number(a?.hours_remaining);
-                    return artwork&&Number.isFinite(hours)&&hours>=0?[{artwork,hours}]:[];
+            if(tool==='find_active_auctions'){
+                // Malformed auction responses must never preserve stale selections.
+                if(!Array.isArray(result.auctions)||!Number.isSafeInteger(result.count)||
+                    result.count<0||result.count<result.auctions.length){
+                    list=[];last=null;return;
+                }
+                const parsed=result.auctions.slice(0,12).map(a=>{
+                    const artwork=id(a?.artwork_id),hours=a?.hours_remaining;
+                    return artwork&&typeof hours==='number'&&Number.isFinite(hours)&&hours>=0
+                        ?{artwork,hours}:null;
                 });
+                if(parsed.some(x=>!x)||new Set(parsed.map(x=>x.artwork)).size!==parsed.length){
+                    list=[];last=null;return;
+                }
+                list=parsed;
                 last=list.length===1?list[0].artwork:null;
             } else if(['get_auction_state','get_artwork','get_artwork_provenance','open_artwork','prepare_bid'].includes(tool)){
                 const confirmed=id(result.artwork_id);if(confirmed)last=confirmed;
@@ -25,8 +35,13 @@
         function restore(data){
             if(!data||data.version!==2||!Number.isFinite(data.at)||data.at>now()||now()-data.at>30000||
                (data.last!==null&&!id(data.last))||!Array.isArray(data.auctions)||data.auctions.length>12)return false;
-            const auctions=[];
-            for(const a of data.auctions)if(id(a?.artwork)&&Number.isFinite(a.hours)&&a.hours>=0)auctions.push({artwork:a.artwork,hours:a.hours});
+            const auctions=[],seen=new Set();
+            for(const a of data.auctions){
+                const artwork=id(a?.artwork);
+                if(!artwork||typeof a.hours!=='number'||!Number.isFinite(a.hours)||
+                    a.hours<0||seen.has(artwork))return false;
+                seen.add(artwork);auctions.push({artwork,hours:a.hours});
+            }
             last=data.last;list=auctions;updated=now();return true;
         }
         function route(input,{lang='en',spoken=false,confidence=1}={}){
@@ -34,8 +49,15 @@
             const ru=/[а-яё]/iu.test(phrase)||lang==='ru', t=phrase.toLowerCase().replace(/ё/g,'е').replace(/[?!.]+$/u,'');
             const say=(ruText,enText)=>({kind:'reply',text:ru?ruText:enText});
             const tool=(name,artwork)=>({kind:'tool',tool:name,input:artwork?{artwork_id:artwork}:{}});
-            const match=/(?:#|№|(?:работ[ауеы]*|произведени[ея]|artwork|work)\s*(?:номер|number|#)?\s*)([1-9]\d{0,77})\b/iu.exec(t);
-            const named=match&&id(match[1]), selected=named||last;
+            // Invalid or multiple explicit artwork IDs must not fall back to last.
+            const mentions=[...t.matchAll(/(?:#|№|(?:работ[ауеы]*|произведени[ея]|artwork|work)\s*(?:номер|number|#)?\s*)(\d+)\b/giu)]
+                .map(match=>match[1]);
+            const distinct=[...new Set(mentions)];
+            const named=distinct.length===1?id(distinct[0]):null;
+            const selected=named||(mentions.length===0?last:null);
+            if(distinct.length>1||(mentions.length>0&&!named))
+                return say('Уточните один действительный номер работы. Ничего не запускаю.',
+                    'Please specify one valid artwork number. No action was started.');
             if(/^(?:стоп|хватит|stop|end voice chat)$/iu.test(t))return {kind:'stop'};
             if(/(?:open nfg|open nf[gc]|okay storage room)/iu.test(t))
                 return say('Похоже, фраза распознана неправильно. Уточните раздел или номер работы.','That may be misheard. Please name a section or artwork number.');
@@ -51,6 +73,9 @@
             if(/(?:объясни|что (?:будет|произойдет)|расскажи|explain|what happens|how does).*?(?:после.*аукцион|аукцион.*заверш|расчет|settlement|after.*auction)/iu.test(t))return tool('explain_settlement');
             if(/(?:како[йе] (?:из них|аукцион).*?(?:раньше|перв|скорее)|котор[а-я]* заканчива|which (?:of them|one).*?(?:ends|finishes)|earliest (?:auction|deadline|end))/iu.test(t)){
                 const sorted=list.slice().sort((a,b)=>a.hours-b.hours);
+                if(sorted.length>1&&sorted[0].hours===sorted[1].hours)
+                    return say('У двух аукционов одинаковый срок. Назовите номер работы.',
+                        'Two auctions share the earliest deadline. Please specify an artwork number.');
                 return sorted.length?tool('get_auction_state',sorted[0].artwork):say('Сначала получите текущий список аукционов.','First get a current list of open auctions.');
             }
             if(/^(?:покажи|какие|найди|что|есть ли|show|find|list|which|what|are there).*?(?:аукцион|auction)|^(?:что сейчас продается|what is up for auction)/iu.test(t))return tool('find_active_auctions');
