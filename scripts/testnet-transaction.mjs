@@ -67,12 +67,13 @@ function writeRecord(file, value, exclusive = false) {
     finally { fs.closeSync(fd); }
 }
 
-async function verifiedReceipt(record, rpcs, errorCode) {
+export async function verifiedReceipt(record, rpcs, errorCode) {
     const receipts = await Promise.all(rpcs.map(rpc => rpc('eth_getTransactionReceipt', [record.hash])));
     const fields = ['blockNumber', 'transactionIndex', 'gasUsed', 'effectiveGasPrice', 'l1Fee'];
     for (const receipt of receipts.filter(Boolean)) {
         if (receipt.transactionHash?.toLowerCase() !== record.hash.toLowerCase() ||
             receipt.from?.toLowerCase() !== record.sender.toLowerCase() || receipt.to?.toLowerCase() !== record.to.toLowerCase() ||
+            (record.type != null && receipt.type !== record.type) ||
             !hash(receipt.blockHash) || !['0x0', '0x1'].includes(receipt.status) ||
             fields.some(field => !hexQuantity(receipt[field])) || !Array.isArray(receipt.logs)) fail(errorCode + '_IDENTITY');
         // This runner accounts for legacy execution gas and the Base L1 data fee.
@@ -95,9 +96,14 @@ async function verifiedReceipt(record, rpcs, errorCode) {
     return first;
 }
 
+export function networkFees(receipt) {
+    const executionWei = BigInt(receipt.gasUsed) * BigInt(receipt.effectiveGasPrice);
+    const l1DataWei = BigInt(receipt.l1Fee);
+    return { executionWei, l1DataWei, totalWei: executionWei + l1DataWei };
+}
+
 function receiptCost(record, receipt) {
-    return (receipt.status === '0x1' ? BigInt(record.valueWei) : 0n) +
-        BigInt(receipt.gasUsed) * BigInt(receipt.effectiveGasPrice) + BigInt(receipt.l1Fee);
+    return (receipt.status === '0x1' ? BigInt(record.valueWei) : 0n) + networkFees(receipt).totalWei;
 }
 
 async function reconcilePriorTransactions(records, sender, rpcs) {
