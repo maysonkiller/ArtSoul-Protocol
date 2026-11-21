@@ -51,6 +51,24 @@ npm run keeper:auctions -- --config /private/engine.json --state /private/keeper
 
 The operator has no reason to hold user assets, control Safe signers, or replenish itself from a treasury. Ethereum execution gas limits do not cap the complete Base network fee, which includes L1 data costs. Monitor actual receipt costs and the gas wallet balance. Mainnet execution still requires a reviewed release, a testnet rehearsal and a separately approved operating budget. [Base network fees](https://docs.base.org/specifications/transactions/network-fees)
 
+### Checking a finalized fee
+
+For an EIP-1559 call on Base Sepolia, pass its public transaction hash, expected sender and expected contract. The command reads two public RPC providers without a wallet. It checks finality and the canonical receipt on both. It reports execution and L1 data fees in wei, including gas spent on a revert. It stops if a provider reports unsupported operator charges.
+
+```sh
+node scripts/read-testnet-fee.mjs TX_HASH EXPECTED_SENDER EXPECTED_CONTRACT
+```
+
+On November 21 both providers returned the following figures for the existing prototype. The network fee excludes the bid deposit and purchase amount.
+
+| Operation | Execution gas | Execution fee (wei) | L1 data (wei) | Network fee (wei) |
+| --- | ---: | ---: | ---: | ---: |
+| [Bid, auction 76](https://sepolia.basescan.org/tx/0x054e2c4ced90c535b732d701489671e9f92a8781040caac732d1583456fdef4e) | 104,853 | 629,118,000,000 | 160 | 629,118,000,160 |
+| [Close, auction 75](https://sepolia.basescan.org/tx/0x39c751169641602b88a7362fe282f821b14f1b9721f1ad8a5a8b82713bf1c331) | 59,937 | 359,622,000,000 | 88 | 359,622,000,088 |
+| [Settle, auction 75](https://sepolia.basescan.org/tx/0xc3166f53beb86f309469a1a6d74c46cddf32a44884bcd7541cc82f5119813007) | 502,928 | 3,017,568,000,000 | 88 | 3,017,568,000,088 |
+
+Use the replacement Core address and its own keeper and refund transaction hashes for C13 measurements.
+
 ## Verification
 
 The [Hardhat lifecycle tests](../../test/OrdinaryAuctionKeeper.test.cjs) exercise deadline extensions, ordinary winner settlement during a preview, pause and runner-up expiry. The [discovery tests](../../test/auction-keeper-discovery.test.mjs) cover restart and checkpoint integrity. The [test signer tests](../../test/auction-keeper-testnet.test.mjs) cover irreversible state changes, account separation, fee limits, daily reservations and ambiguous submissions.

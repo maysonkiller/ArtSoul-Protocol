@@ -160,7 +160,7 @@ async function verifyAtBlock(register, rpc, block, refundLimits) {
     };
 }
 
-function readRpc(url) {
+export function readRpc(url) {
     check(url && new URL(url).protocol === 'https:', 'Supply a private HTTPS RPC endpoint');
     return async (method, params) => {
         const res = await fetch(url, {
