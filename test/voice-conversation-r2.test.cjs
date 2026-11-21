@@ -25,6 +25,6 @@ test('all site scripts load conversation before voice commands',()=>{
   for(const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol']){
     const html=fs.readFileSync(page+'.html','utf8');
     assert.ok(html.indexOf('/voice-conversation-r2.js?v=1')>=0,page);
-    assert.ok(html.indexOf('/voice-conversation-r2.js?v=1')<html.indexOf('/voice-commands.js?v=19'),page);
+    assert.ok(html.indexOf('/voice-conversation-r2.js?v=1')<html.indexOf('/voice-commands.js?v=20'),page);
   }
 });
