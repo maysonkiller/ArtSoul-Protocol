@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - security/npm-71-inventory-20261121
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
