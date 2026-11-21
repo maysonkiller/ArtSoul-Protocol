@@ -3,14 +3,14 @@ const bank=JSON.parse(fs.readFileSync('docs/audio/assistant-r2-phrase-bank.json'
 const voice=fs.readFileSync('voice-commands.js','utf8');
 test('the bilingual audio library is bounded, unique and public-generic',()=>{
  assert.equal(bank.voice,'marin');assert.equal(bank.model,'gpt-realtime-2.1-mini');
- assert.equal(bank.clips.length,138);const keys=new Set();
+ assert.equal(bank.clips.length,166);const keys=new Set();
  for(const item of bank.clips){
    assert.match(item.id,/^r2[A-Za-z0-9]+$/);assert.ok(['ru','en'].includes(item.lang));
    assert.equal(item.url,'/audio/assistant/v1/phrases/'+item.lang+'-'+item.id+'.wav');
    assert.ok(item.text.length>=5&&item.text.length<=800);assert.ok(!keys.has(item.url));keys.add(item.url);
  }
- assert.equal(bank.clips.filter(x=>x.lang==='en').length,69);
- assert.equal(bank.clips.filter(x=>x.lang==='ru').length,69);
+ assert.equal(bank.clips.filter(x=>x.lang==='en').length,83);
+ assert.equal(bank.clips.filter(x=>x.lang==='ru').length,83);
 });
 test('male voice fallback is not reachable and audio index is empty before generation',()=>{
  const w={};new Function('window','document','navigator',voice)(w,undefined,{});
@@ -35,4 +35,24 @@ test('asset generator remains dry-run by default and bank index requires verifie
  assert.match(generator,/audio_index_validation_failed/);
  assert.match(generator,/hash\(await fs.readFile/);
  assert.doesNotMatch(voice,/\bfetch\(/);
+});
+test('fixed tool summaries narrate only verified generic facts, not private data',()=>{
+ const win={};new Function('window','document','navigator',voice)(win,undefined,{});
+ const summary=win.ArtSoulVoice.safeToolCue;
+ const fixtures=[
+  ['find_active_auctions',{count:1,auctions:[{artwork_id:'31',title:'Mock Work',hours_remaining:1}]},'r2AuctionResults'],
+  ['find_active_auctions',{count:0,auctions:[]},'r2NoAuctions'],
+  ['get_artwork',{artwork_id:'31',title:'Mock Work',current_bid_eth:'0.05'},'r2ArtworkResults'],
+  ['get_artwork_provenance',{artwork_id:'31',owner:'0x123'},'r2ProvenanceResults'],
+  ['get_my_activity',{needs_attention_count:1},'r2ActivityResults'],
+  ['explain_settlement',{lifecycle:['Step one']},'r2LifecycleResults'],
+  ['prepare_bid',{prepared:true,artwork_id:'31'},'r2BidPreparedResult'],
+  ['prepare_bid',{prepared:false,artwork_id:'31'},'r2ActionNotCompleted'],
+  ['get_artwork',{error:'Private data'},'r2ToolError']
+ ];
+ for(const [tool,data,name] of fixtures)for(const lang of ['en','ru']){
+  const cue=summary(tool,data,lang);
+  assert.equal(cue,bank.clips.find(x=>x.id===name&&x.lang===lang)?.text,name+lang);
+  assert.ok(!cue.includes('Mock Work')&&!cue.includes('0x123')&&!cue.includes('0.05'));
+ }
 });
