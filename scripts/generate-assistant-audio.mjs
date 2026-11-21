@@ -15,7 +15,7 @@ const voice = 'marin';
 const sampleRate = 24000;
 const maxOutputTokens = 1024;
 const reserveUsd = 0.025;
-const budgetUsd = 1;
+const defaultBudgetUsd = 1;
 const manifestPath = path.join(root, 'public/audio/assistant/v1/manifest.json');
 const ledgerPath = path.join(root, 'docs/private/assistant-audio-generation-ledger.json');
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -51,14 +51,20 @@ async function loadClips() {
   // Match the parser tests: no document or tool registry means no UI is mounted.
   const win = {};
   new Function('window', 'document', 'navigator', await fs.readFile(path.join(root, 'voice-commands.js'), 'utf8'))(win, undefined, {});
-  const clips = win.ArtSoulVoice?.replyClips;
-  if (!Array.isArray(clips) || !clips.length || clips.length > 30) throw new Error('invalid_clip_list');
+  const builtIn = win.ArtSoulVoice?.replyClips;
+  const bank = await readJson(path.join(root,'docs/audio/assistant-r2-phrase-bank.json'), {version:2,model,voice,clips:[]});
+  if (!bank || bank.version !== 2 || bank.model !== model || bank.voice !== voice ||
+      !Array.isArray(bank.clips) || bank.clips.length > 200) throw new Error('invalid_phrase_bank');
+  const clips = [...builtIn,...bank.clips];
+  if (!Array.isArray(builtIn) || builtIn.length !== 18 || clips.length > 220) throw new Error('invalid_clip_list');
   const seen = new Set();
   for (const clip of clips) {
     const key = `${clip.lang}-${clip.id}`;
+    const expectedUrl = clip.id.startsWith('r2')
+      ? `/audio/assistant/v1/phrases/${key}.wav` : `/audio/assistant/v1/${key}.wav`;
     if (!['en','ru'].includes(clip.lang) || !/^[a-z][a-zA-Z0-9]*$/.test(clip.id)
       || typeof clip.text !== 'string' || !clip.text.trim() || clip.text.length > 800
-      || clip.url !== `/audio/assistant/v1/${key}.wav` || seen.has(key)) throw new Error('invalid_clip');
+      || clip.url !== expectedUrl || seen.has(key)) throw new Error('invalid_clip');
     seen.add(key);
   }
   return clips;
@@ -125,18 +131,47 @@ function generateClip(clip, apiKey) {
   });
 }
 
+async function syncVerifiedIndex(manifest) {
+  const entries = [];
+  for (const clip of manifest.clips) {
+    if (!clip?.id?.startsWith('r2') ||
+        !/^\/audio\/assistant\/v1\/phrases\/(?:ru|en)-r2[A-Za-z0-9]+\.wav$/.test(clip.url || '') ||
+        typeof clip.text !== 'string' || typeof clip.sha256 !== 'string') continue;
+    try {
+      if (hash(await fs.readFile(path.join(root,'public',clip.url))) === clip.sha256)
+        entries.push([clip.text,clip.url]);
+    } catch(error) {
+      if(error.code !== 'ENOENT')throw new Error('audio_index_validation_failed');
+    }
+  }
+  if(new Map(entries).size !== entries.length)throw new Error('ambiguous_phrase');
+  const js = '(function(){\'use strict\';const map=new Map(' + JSON.stringify(entries) +
+    ');window.ArtSoulVoiceAudioBank=Object.freeze({lookup:text=>map.get(text)||\'\'});})();\n';
+  const final = path.join(root,'voice-audio-bank-r2.js');
+  const temp = final+'.'+process.pid+'.tmp';
+  await fs.writeFile(temp,js,{flag:'wx'}); await fs.rename(temp,final);
+  console.log(JSON.stringify({audio_index:'updated',verified_clips:entries.length}));
+}
+
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help')) {
-    console.log('node scripts/generate-assistant-audio.mjs [--generate] [--only en-helpSpeech,en-settled]');
+    console.log('node scripts/generate-assistant-audio.mjs [--generate] [--max-new 10] [--budget-usd 1] [--only ru-r2Greeting,en-r2Greeting] [--sync-bank]');
     console.log('Default: dry run, no credentials read or API calls. Existing verified clips are skipped.');
     return;
   }
-  let generate = false, only = null;
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--generate') generate = true;
-    else if (args[i] === '--only' && args[i + 1]) only = new Set(args[++i].split(','));
-    else throw new Error('unknown_argument');
+  let generate=false,only=null,syncBank=false,maxNew=10,budgetUsd=defaultBudgetUsd;
+  for (let i=0;i<args.length;i++) {
+    if(args[i]==='--generate')generate=true;
+    else if(args[i]==='--sync-bank')syncBank=true;
+    else if(args[i]==='--only'&&args[i+1])only=new Set(args[++i].split(','));
+    else if(args[i]==='--max-new'&&args[i+1]){
+      const n=Number(args[++i]);if(!Number.isSafeInteger(n)||n<1||n>30)throw new Error('invalid_batch_size');
+      maxNew=n;
+    } else if(args[i]==='--budget-usd'&&args[i+1]){
+      const v=Number(args[++i]);if(!Number.isFinite(v)||v<1||v>30)throw new Error('invalid_budget');
+      budgetUsd=v;
+    } else throw new Error('unknown_argument');
   }
   const all = await loadClips();
   if (only && [...only].some(key => !all.some(clip => `${clip.lang}-${clip.id}` === key))) throw new Error('unknown_clip');
@@ -160,17 +195,20 @@ async function main() {
       }
       if (!verified) pending.push(clip);
     }
-    console.log(JSON.stringify({mode: generate ? 'generate' : 'dry_run', model, pending: pending.map(clip => `${clip.lang}-${clip.id}`), reservedUsd: pending.length * reserveUsd}));
-    if (!generate || !pending.length) return;
+    const batch=pending.slice(0,maxNew);
+    console.log(JSON.stringify({mode:generate?'generate':'dry_run',model,voice,pendingTotal:pending.length,
+      planned:batch.map(clip=>`${clip.lang}-${clip.id}`),reservedUsd:batch.length*reserveUsd,budgetUsd}));
+    if(!generate){if(syncBank)await syncVerifiedIndex(manifest);return;}
+    if(!batch.length){if(syncBank)await syncVerifiedIndex(manifest);return;}
     const ledger = await readJson(ledgerPath, {version: 1, attempts: []});
     if (ledger.version !== 1 || !Array.isArray(ledger.attempts)) throw new Error('invalid_ledger');
     const reserved = ledger.attempts.reduce((sum, attempt) => sum + Number(attempt.reservedUsd), 0);
-    if (!Number.isFinite(reserved) || reserved < 0 || reserved + pending.length * reserveUsd > budgetUsd) throw new Error('generation_budget_exceeded');
+    if (!Number.isFinite(reserved) || reserved < 0 || reserved + batch.length * reserveUsd > budgetUsd) throw new Error('generation_budget_exceeded');
     let apiKey;
     try { apiKey = parseEnv(await fs.readFile(path.join(root, '.env.local'), 'utf8')).OPENAI_API_KEY; }
     catch { throw new Error('credential_unavailable'); }
     if (!apiKey) throw new Error('credential_unavailable');
-    for (const clip of pending) {
+    for (const clip of batch) {
       const attempt = {id: `${clip.lang}-${clip.id}`, at: new Date().toISOString(), reservedUsd: reserveUsd, status: 'started'};
       ledger.attempts.push(attempt);
       await writeJson(ledgerPath, ledger);
@@ -195,6 +233,7 @@ async function main() {
       await writeJson(ledgerPath, ledger);
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
+    if(syncBank)await syncVerifiedIndex(manifest);
   } finally {
     if (lock) {
       await lock.close();

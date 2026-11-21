@@ -366,7 +366,12 @@
     function getReplyAudio(text) {
         const phrase = ['options', 'askSearch', 'askTitle'].find(id => TEXT[id] === text);
         if (phrase) return `/audio/assistant/v1/phrases/en-${phrase}.wav`;
-        return replyClips.find(clip => clip.text === text)?.url || '';
+        const fixed = replyClips.find(clip => clip.text === text)?.url;
+        if (fixed) return fixed;
+        // Generated offline, never a runtime call to any API or browser voice.
+        const extra = window.ArtSoulVoiceAudioBank?.lookup?.(text);
+        return typeof extra === 'string' &&
+            /^\/audio\/assistant\/v1\/phrases\/(?:ru|en)-r2[A-Za-z0-9]+\.wav$/.test(extra) ? extra : '';
     }
 
     function hoursText(value) {
