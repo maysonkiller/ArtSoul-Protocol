@@ -122,7 +122,7 @@
 
             // NFT intents are public navigation, not artwork title search.
             // Only canonical existing open_page enum destinations are permitted.
-            const nftWords=t.replace(/(?:н[ -]?ф[ -]?т|эн[ -]?эф[ -]?ти|ен[ -]?эф[ -]?ти|n[ .-]?f[ .-]?t)(?![\p{L}\p{N}_])/gu,'nft');
+            const nftWords=t.replace(/\s*,\s*/gu,' ').replace(/(?:^|\s)пожалуйста(?=\s|$)/gu,' ').replace(/\s+/gu,' ').trim().replace(/(?:н[ -]?ф[ -]?т|эн[ -]?эф[ -]?ти|ен[ -]?эф[ -]?ти|n[ .-]?f[ .-]?t)(?![\p{L}\p{N}_])/gu,'nft');
             const nftTool=page=>({kind:'tool',tool:'open_page',input:{page}});
             const nftTerm='(?:nfts?)';
             if(new RegExp('^(?:(?:open|show(?: me)?|go to|browse|view|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?|хочу (?:открыть|посмотреть))\\s+)?(?:my|мои|мою)\\s+'+nftTerm+'$','iu').test(nftWords))
@@ -133,7 +133,7 @@
                 return nftTool('collected');
             if(new RegExp('^(?:(?:open|show(?: me)?|go to|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?)\\s+)?'+nftTerm+'\\s+(?:marketplace|на маркетплейсе|в маркетплейсе)$','iu').test(nftWords))
                 return nftTool('marketplace');
-            if(new RegExp('^(?:(?:open|show(?: me)?|go to|browse|view|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?|хочу (?:открыть|посмотреть))\\s+)?(?:(?:all|the|все|весь|каталог|галерею|gallery|catalog|раздел|страницу)\\s+)?'+nftTerm+'(?:\\s+(?:gallery|catalog|галерею|каталог|в галерее|в каталоге))?$','iu').test(nftWords))
+            if(new RegExp('^(?:(?:open|show(?: me)?|go to|browse|view|открой(?: мне)?|покажи(?: мне)?|перейди(?: в| на)?|хочу (?:открыть|посмотреть))\\s+)?(?:(?:all|the|все|весь|каталог|галерею|галерея|gallery|catalog|раздел|страницу)\\s+)?'+nftTerm+'(?:\\s+(?:gallery|catalog|галерею|каталог|в галерее|в каталоге))?$','iu').test(nftWords))
                 return nftTool('nfts');
             // User spoke "open artworks"/"open Explorer"; both are gallery intents.
             if(/^(?:open|show|go to|take me to|browse) (?:the |my )?(?:artworks|works|explorer|art gallery)$/iu.test(t)||
@@ -195,6 +195,8 @@
                 || /^(?:открой|покажи|найди)(?: мне)? (?:(?:работу|произведение|артворк)(?: с названием)? )?(.{2,100})$/iu.exec(t);
             if(requestByTitle){
                 let title=requestByTitle[1].trim();
+                // Numbered NFT commands belong to the ID parser, not catalog title search.
+                if (/^(?:nfts?|нфт|эн[ -]?эф[ -]?ти)\s*(?:номер|number|№|#|\d)/iu.test(title)) return null;
                 if(/^discovery\s+/iu.test(title))title=title.replace(/^discovery\s+/iu,'');
                 const reserved=/^(?:artworks|works|explorer|discovery|gallery|explore|profile|home|create|upload|nfts?|nfc|wallet|notification[s]?|theme|mode|аукионы|галерею|профиль|главную|кошелек|кошельк[ае]|уведомлени[еяий]+|режим|сеть)$/iu;
                 const commandWord=/(?:\b(?:and|then|buy|bid|sell|withdraw|sign|approve|connect|http|www|admin|wallet|profile)\b|(?:\sи\s)|(?:купи|ставк|продай|подпиши|выведи|подключи|админ|кошел|http)|[;:{}<>])/iu;
