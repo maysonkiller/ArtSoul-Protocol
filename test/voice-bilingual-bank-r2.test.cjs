@@ -24,7 +24,7 @@ test('no public page loads the old voice script cache key and all load the bank 
  for(const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol']){
   const html=fs.readFileSync(page+'.html','utf8');
   assert.ok(html.indexOf('/voice-audio-bank-r2.js?v=1')>=0,page);
-  assert.ok(html.indexOf('/voice-audio-bank-r2.js?v=1')<html.indexOf('/voice-commands.js?v=21'),page);
+  assert.ok(html.indexOf('/voice-audio-bank-r2.js?v=1')<html.indexOf('/voice-commands.js?v=22'),page);
  }
  assert.match(fs.readFileSync('vite.config.js','utf8'),/'voice-audio-bank-r2.js'/);
 });
