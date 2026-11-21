@@ -38,8 +38,9 @@ describe('Read-only wallet metadata acceptance on the ordinary market', function
             const metadata = JSON.stringify({ name: 'First edition', image: 'ipfs://' + cid + '/image.png' });
             const digest = createHash('sha256').update(metadata).digest('hex');
             const mine = async tx => (await tx).wait();
+            await mine(core.connect(next).registerArtwork('ipfs://unsold-work'));
             await mine(core.connect(creator).registerArtwork(uri));
-            await mine(core.connect(creator).createAuction(1, 1000, 86400));
+            await mine(core.connect(creator).createAuction(2, 1000, 86400));
             const bid = await mine(core.connect(first).placeBid(1, 1000, { value: await core.requiredDepositForBid(1000) }));
             await evm.send('evm_setNextBlockTimestamp', [Number((await core.auctions(1)).end)]);
             const paid = await mine(core.connect(first).settleAuction(1));
@@ -56,6 +57,8 @@ describe('Read-only wallet metadata acceptance on the ordinary market', function
                 assert.equal(atMint.owner, first.address.toLowerCase());
                 assert.equal(after.owner, next.address.toLowerCase());
                 for (const result of [atMint, after]) {
+                    assert.equal(result.artworkId, '2');
+                    assert.equal(result.tokenId, '1');
                     assert.equal(result.creator, creator.address.toLowerCase());
                     assert.equal(result.firstCollector, first.address.toLowerCase());
                     assert.equal(result.metadataURI, uri);
@@ -66,6 +69,21 @@ describe('Read-only wallet metadata acceptance on the ordinary market', function
                 assert.equal(after.metadata.sha256, digest);
                 assert.equal(fetch.mock.callCount(), 1);
                 await assert.rejects(read(transferred, '0'.repeat(64)), /differs from the expected/);
+                // Replay the finalized read with one inconsistent mapping returned by the provider.
+                for (const [getter, value, expected] of [
+                    ['tokenToArtwork', 0n, /no registered artwork/],
+                    ['artworkToToken', 2n, /mappings disagree/]
+                ]) {
+                    const selector = nft.interface.getFunction(getter).selector;
+                    const rpc = { send: (method, params) => {
+                        if (method === 'eth_call' && params[0].data.startsWith(selector)) {
+                            return nft.interface.encodeFunctionResult(getter, [value]);
+                        }
+                        return evm.send(method, params);
+                    } };
+                    await assert.rejects(checkOrdinaryToken({ ...listener, _readRpcCall: run => run(rpc) },
+                        { ...pair, tokenId: '1', blockNumber: transferred.blockNumber, blockHash: transferred.blockHash }), expected);
+                }
                 assert.equal(await provider.getBlockNumber(), transferred.blockNumber);
             } finally { fetch.mock.restore(); }
         } finally { provider.destroy(); }
@@ -231,7 +249,7 @@ describe('Ordinary artwork NFT paired with its issuing engine', function () {
         const next = new ethers.Contract(await second.nft(), nft.interface, publisher);
         assert.notEqual(next.target, nft.target);
         assert.equal(await next.core(), second.target);
-        await mine(second.setRecord(8, record({ creator: buyer.address, firstCollector: creator.address })));
+        await mine(second.setRecord(8, record({ creator: buyer.address, firstCollector: creator.address, metadataURI: 'ipfs://second-work' })));
         await expectRevert(second.issue.staticCall(nft.target, 8), 'UnauthorizedCore');
         await mine(second.issue(next.target, 8));
         await mine(source.issue(nft.target, 8));
@@ -239,6 +257,16 @@ describe('Ordinary artwork NFT paired with its issuing engine', function () {
         assert.equal(await next.ownerOf(1), creator.address);
         assert.equal(await nft.tokenCreator(1), creator.address);
         assert.equal(await next.tokenCreator(1), buyer.address);
+        await mine(nft.connect(collector).transferFrom(collector.address, buyer.address, 1));
+        assert.equal(await nft.ownerOf(1), buyer.address);
+        assert.equal(await next.ownerOf(1), creator.address);
+        for (const [collection, first, author, metadata] of [
+            [nft, collector, creator, uri], [next, creator, buyer, 'ipfs://second-work']
+        ]) {
+            assert.equal(await collection.firstCollector(1), first.address);
+            assert.equal(await collection.tokenURI(1), metadata);
+            assert.deepEqual([...await collection.royaltyInfo(1, 10_000n)], [author.address, 550n]);
+        }
     });
 
     it('provides complete provenance in a receiver callback and rolls back a rejected delivery', async () => {
