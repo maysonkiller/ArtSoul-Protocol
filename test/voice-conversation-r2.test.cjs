@@ -24,8 +24,8 @@ test('context resets and invalid navigation IDs are rejected',()=>{
 test('all site scripts load conversation before voice commands',()=>{
   for(const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol']){
     const html=fs.readFileSync(page+'.html','utf8');
-    assert.ok(html.indexOf('/voice-conversation-r2.js?v=3')>=0,page);
-    assert.ok(html.indexOf('/voice-conversation-r2.js?v=3')<html.indexOf('/voice-commands.js?v=22'),page);
+    assert.ok(html.indexOf('/voice-conversation-r2.js?v=4')>=0,page);
+    assert.ok(html.indexOf('/voice-conversation-r2.js?v=4')<html.indexOf('/voice-commands.js?v=23'),page);
   }
 });
 
