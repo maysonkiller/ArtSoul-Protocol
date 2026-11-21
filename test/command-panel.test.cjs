@@ -137,7 +137,7 @@ test('Russian commands use the archived RU female recording; English retains its
 test('NFT clarification accepts a short typed answer and closing the panel clears the choice', async () => {
   const h = harness({execute: async () => JSON.stringify({opened: true, page: 'marketplace', title: 'Marketplace', url: '/gallery#marketplace'})});
   h.open(); h.ru.fire('click'); h.submit('открой NFT'); await flush();
-  assert.match(h.get('.artsoul-voice-answer').textContent, /marketplace/);
+  assert.match(h.get('.artsoul-voice-answer').textContent, /маркетплейс/);
   assert.deepEqual(h.calls, []);
   h.submit('на маркетплейсе'); await flush();
   assert.deepEqual(h.calls, [{name: 'open_page', args: {page: 'marketplace'}}]);
