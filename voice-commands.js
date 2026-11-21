@@ -1049,7 +1049,7 @@
         async function handle(transcript, confidence, spoken = false) {
             if (busy || noticePending) return;
             silence();
-            const replyLang = /[а-яё]/iu.test(transcript) ? 'ru' : inputLanguage;
+            const replyLang = /[а-яё]/iu.test(transcript) ? 'ru' : /[a-z]/iu.test(transcript) ? 'en' : inputLanguage;
             const t = replyLang === 'ru' ? {...TEXT, ...RU_FIXED, help:RU_HELP, otherRequest:'Уточните название или номер работы.', unsure: heard => 'Я не уверена, что услышала правильно: ' + heard, error: msg => 'Ошибка ArtSoul: ' + msg} : TEXT;
             const audio = audioGeneration;
             const reply = (heard, answer, say = answer, links = []) => {
