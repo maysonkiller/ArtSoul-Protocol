@@ -275,7 +275,7 @@
 
     const TEXT = {
         title: 'ArtSoul commands',
-        hint: 'Choose the language you speak. Replies are in English. Wallet actions need your review and signature.',
+        hint: 'Choose the language you speak. Verified recordings are in English and Russian; other answers remain text. Wallet actions need your review and signature.',
         input: 'Your command', placeholder: 'Open gallery, search moon…',
         send: 'Send', microphone: 'Use microphone', stop: 'Stop listening',
         conversation: 'Start voice chat', endConversation: 'End voice chat',
@@ -1015,7 +1015,7 @@
                 reply(transcript, t.next);
                 return;
             }
-            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, inputLanguage, pendingDraftField);
+            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, replyLang, pendingDraftField);
             pendingDraftField = draftTurn?.nextField || null;
             if (draftTurn?.message) {
                 reply(transcript, draftTurn.message, pendingDraftField === 'title' ? t.askTitle : draftTurn.message);
@@ -1026,7 +1026,7 @@
             });
             let command = draftTurn || (contextual?.kind === 'tool'
                 ? {tool:contextual.tool,input:contextual.input}
-                : parseCommand(transcript, inputLanguage, previousPrompt === 'nft'));
+                : parseCommand(transcript, replyLang, previousPrompt === 'nft'));
             if (contextual?.kind === 'stop') { stopVoice(); show(transcript,'',[], ''); return; }
             if (contextual?.kind === 'reply') { reply(transcript,contextual.text); return; }
             // The answer to a search/title question is data, even when it sounds like a wallet command.
@@ -1272,7 +1272,12 @@
             if (!window.artsoulSettledWalletState && (arrivingFrom.wallet || readStored('artsoul_wallet'))) return;
             const nav = arrivingFrom;
             arrivingFrom = null;
-            if (nav.wallet !== walletIdentity() || Date.now() - nav.at >= NAVIGATION_TTL ||
+            if (nav.wallet !== walletIdentity()) {
+                // Do not resurrect prior-account conversational references.
+                dialogue?.clear();
+                return;
+            }
+            if (Date.now() - nav.at >= NAVIGATION_TTL ||
                 !voiceConsent || typeof Recognition !== 'function' || document.visibilityState !== 'visible' || panel.hidden) return;
             handsFree = true;
             show('', TEXT.arrival, [], '');
