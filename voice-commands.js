@@ -1082,7 +1082,9 @@
         async function handle(transcript, confidence, spoken = false) {
             if (busy || noticePending) return;
             silence();
-            const replyLang = /[а-яё]/iu.test(transcript) ? 'ru' : /[a-z]/iu.test(transcript) ? 'en' : inputLanguage;
+            const acronymOnly = /^(?:nfts?|n[ .-]?f[ .-]?t)$/iu.test(transcript.trim());
+            const replyLang = /[а-яё]/iu.test(transcript) ? 'ru' : acronymOnly ? inputLanguage
+                : /[a-z]/iu.test(transcript) ? 'en' : inputLanguage;
             const t = replyLang === 'ru' ? {...TEXT,...RU_UI, ...RU_FIXED, help:RU_HELP, otherRequest:'Уточните название или номер работы.', unsure: heard => 'Я не уверена, что услышала правильно: ' + heard, error: msg => 'Ошибка ArtSoul: ' + msg} : TEXT;
             const audio = audioGeneration;
             const reply = (heard, answer, say = answer, links = []) => {
@@ -1256,7 +1258,7 @@
                 session = new Recognition();
             } catch {
                 handsFree = false;
-                show('', TEXT.notHeard);
+                show('', inputLanguage === 'ru' ? RU_UI.notHeard : TEXT.notHeard);
                 return;
             }
             recognition = session;
@@ -1282,24 +1284,26 @@
                 handsFree = false;
                 stopListening();
                 const code = event && event.error;
+                const ui = inputLanguage === 'ru' ? RU_UI : TEXT;
                 show('', code === 'not-allowed' || code === 'service-not-allowed'
-                    ? (arrival ? TEXT.resumeMic : TEXT.micBlocked) : TEXT.notHeard);
+                    ? (arrival ? ui.resumeMic : ui.micBlocked) : ui.notHeard);
             };
             session.onend = () => {
                 if (recognition !== session || panel.hidden) return;
                 handsFree = false;
                 stopListening();
-                if (!answered) show('', TEXT.notHeard);
+                if (!answered) show('', inputLanguage === 'ru' ? RU_UI.notHeard : TEXT.notHeard);
             };
 
             setListening(true);
-            if (!resume) show('', TEXT.listening);
+            if (!resume) show('', inputLanguage === 'ru' ? RU_UI.listening : TEXT.listening);
             try {
                 session.start();
             } catch {
                 handsFree = false;
                 stopListening();
-                show('', arrival ? TEXT.resumeMic : TEXT.notHeard);
+                const ui = inputLanguage === 'ru' ? RU_UI : TEXT;
+                show('', arrival ? ui.resumeMic : ui.notHeard);
             }
         }
 
