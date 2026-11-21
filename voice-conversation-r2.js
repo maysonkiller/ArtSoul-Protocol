@@ -56,7 +56,7 @@
             if(/^(?:покажи|какие|найди|что|есть ли|show|find|list|which|what|are there).*?(?:аукцион|auction)|^(?:что сейчас продается|what is up for auction)/iu.test(t))return tool('find_active_auctions');
             if(/^(?:расскажи подробнее|подробнее|расскажи об? этой работе|tell me more|tell me about this work|more details)/iu.test(t))
                 return selected?tool('get_artwork',selected):say('Уточните номер работы.','Please specify the artwork number.');
-            if(/(?:кто (?:е[её] |ее |это )?(?:создал|автор|владелец)|кто сейчас владеет|кому (?:она|это) принадлежит|who (?:created|owns|made)|who is (?:the )?owner|provenance)/iu.test(t))
+            if(/(?:кто (?:сейчас )?(?:е[её] |ее |это )?(?:создал|автор|владелец)|кто сейчас владеет|кому (?:она|это) принадлежит|who (?:created|owns|made)|who is (?:the )?owner|provenance)/iu.test(t))
                 return selected?tool('get_artwork_provenance',selected):say('Назовите номер работы, чтобы проверить владельца.','Please give the artwork number to check ownership.');
             if(/^(?:открой (?:ее|её|эту работу|страницу|ее страницу)|open (?:its|the|that|this) (?:page|artwork|work)|go to (?:its|that) page)$/iu.test(t))
                 return selected?tool('open_artwork',selected):say('Назовите номер работы для открытия.','Please give the artwork number to open.');
