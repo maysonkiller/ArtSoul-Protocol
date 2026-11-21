@@ -1,6 +1,6 @@
 # R2 Bilingual Voice Phrase Bank (source-only)
 
-Voice: OpenAI API `marin`, model `gpt-realtime-2.1-mini` (the same API voice as the existing PR #496 recordings). This is **not** ChatGPT Live 1.1 voice output. The fixed 69 pairs / 138 RU+EN lines contain NO dynamic artwork, price, owner, or transaction facts. These facts must come from actual WebMCP results.
+Voice: OpenAI API `marin`, model `gpt-realtime-2.1-mini` (the same API voice as the existing PR #496 recordings). This is **not** ChatGPT Live 1.1 voice output. The fixed 83 pairs / 166 RU+EN lines contain NO dynamic artwork, price, owner, or transaction facts. These facts must come from actual WebMCP results.
 
 ## Generation is NOT yet done
 The new library and generator are source-only. The front-end ships an empty `voice-audio-bank-r2.js` map until offline generation and SHA256 verification. All unsupported dynamic answers remain text-only; no switch to browser voice, no live cost.
