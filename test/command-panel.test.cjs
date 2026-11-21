@@ -119,22 +119,19 @@ test('opening, typing, examples and language selection never start the microphon
   assert.equal(h.calls.length, 0); assert.equal(h.sessions.length, 0); assert.equal(h.prompts(), 0);
 });
 
-test('Russian browser locales and restored input preferences always receive English copy and audio', async () => {
+test('Russian commands use the archived RU female recording; English retains its own clip', async () => {
   for (const stored of [false, true]) {
     const storage = new Map(stored ? [['artsoul.voice.lang', 'ru']] : []);
     const h = harness({speech: true, audio: true, browserLanguage: 'ru-RU', storage});
     h.open();
     assert.equal(h.get('.artsoul-voice-panel').attrs.lang, 'en');
     assert.equal(h.ru.attrs['aria-pressed'], String(stored));
-    assert.equal(h.get('h2').textContent, 'ArtSoul commands');
-    assert.match(h.get('.artsoul-voice-examples p').textContent, /open gallery/);
-    h.submit(stored ? 'помощь' : 'help');
-    await flush();
+    h.submit(stored ? 'помощь' : 'help'); await flush();
     h.get('.artsoul-voice-replay').fire('click');
-    assert.equal(h.plays[0].src, '/audio/assistant/v1/en-helpSpeech.wav');
+    assert.equal(h.plays[0].src, '/audio/assistant/v1/' + (stored ? 'ru' : 'en') + '-helpSpeech.wav');
+    assert.equal(h.spoken.length, 0, 'speechSynthesis may not replace the selected voice');
   }
 });
-
 test('NFT clarification accepts a short typed answer and closing the panel clears the choice', async () => {
   const h = harness({execute: async () => JSON.stringify({opened: true, page: 'marketplace', title: 'Marketplace', url: '/gallery#marketplace'})});
   h.open(); h.ru.fire('click'); h.submit('открой NFT'); await flush();
@@ -194,38 +191,37 @@ test('Publish captures a dictated title as data across voice and typing and clea
   assert.equal(h.calls.length, 1);
 });
 
-test('voice chat listens for the next turn only after a finished answer and stops by voice', async () => {
-  for (const audio of [false, true]) {
-    const h = harness({speech: true, audio});
-    h.open(); h.ru.fire('click');
-    const chat = h.get('.artsoul-voice-chat');
-    chat.fire('click'); await flush();
-    assert.equal(chat.textContent, 'End voice chat');
-    assert.equal(chat.dataset.listening, 'true');
-    const hear = (session, transcript) => session.onresult({results: [[{transcript, confidence: 1}]]});
-    hear(h.sessions[0], 'помощь'); await flush();
-    assert.equal(h.sessions[0].aborted, true);
-    assert.equal(chat.dataset.listening, 'false');
-    if (audio) {
-      h.players[0].emit('playing');
-      assert.equal(h.sessions.length, 1, 'does not listen during recorded speech');
-      h.players[0].emit('ended');
-    } else {
-      h.utterances[0].onstart();
-      assert.equal(h.sessions.length, 1, 'does not listen during native speech');
-      h.utterances[0].onend();
-    }
-    assert.equal(h.sessions.length, 1, 'keeps a brief gap after reply audio');
-    h.runTimers(); await flush();
-    assert.equal(h.sessions.length, 2); assert.equal(h.prompts(), 1);
-    assert.equal(h.sessions[1].lang, 'ru-RU');
-    assert.match(h.get('.artsoul-voice-answer').textContent, /open gallery/);
-    hear(h.sessions[1], 'стоп'); await flush(); h.runTimers();
-    assert.equal(h.sessions.length, 2); assert.equal(h.calls.length, 0);
-    assert.equal(chat.attrs['aria-pressed'], 'false');
-  }
+test('voice chat resumes only after a complete recorded reply and stops by voice', async () => {
+  const h = harness({speech: true, audio: true});
+  h.open(); h.ru.fire('click');
+  const chat = h.get('.artsoul-voice-chat');
+  chat.fire('click'); await flush();
+  assert.equal(chat.textContent, 'End voice chat');
+  assert.equal(chat.dataset.listening, 'true');
+  h.sessions[0].onresult({results: [[{transcript:'помощь',confidence:1}]]}); await flush();
+  assert.equal(h.sessions[0].aborted,true);
+  assert.equal(h.plays[0].src,'/audio/assistant/v1/ru-helpSpeech.wav');
+  h.players[0].emit('playing');
+  assert.equal(h.sessions.length,1,'never recognize its own speech');
+  h.players[0].emit('ended');
+  h.runTimers(); await flush();
+  assert.equal(h.sessions.length,2);
+  assert.equal(h.sessions[1].lang,'ru-RU');
+  h.sessions[1].onresult({results: [[{transcript:'стоп',confidence:1}]]}); await flush(); h.runTimers();
+  assert.equal(h.sessions.length,2); assert.equal(h.calls.length,0);
+  assert.equal(chat.attrs['aria-pressed'],'false');
+  assert.equal(h.spoken.length,0);
 });
-
+test('voice chat without a verified audio engine stops safely after the text answer', async () => {
+  const h = harness({speech:true,audio:false});h.open();h.ru.fire('click');
+  h.get('.artsoul-voice-chat').fire('click');await flush();
+  h.sessions[0].onresult({results: [[{transcript:'помощь',confidence:1}]]});await flush();
+  h.runTimers();await flush();
+  assert.equal(h.sessions.length,1,'no audio means no blind microphone restart');
+  assert.equal(h.get('.artsoul-voice-chat').attrs['aria-pressed'],'false');
+  assert.equal(h.spoken.length,0);
+  assert.match(h.get('.artsoul-voice-answer').textContent,/Могу найти работы/);
+});
 test('ending voice chat, typing or leaving the page cancels any queued next turn', async () => {
   for (const stop of ['button', 'typing', 'hidden', 'close', 'account', 'language', 'pagehide']) {
     const h = harness({speech: true, audio: true}); h.open();
@@ -245,18 +241,18 @@ test('ending voice chat, typing or leaving the page cancels any queued next turn
   }
 });
 
-test('voice chat pauses a protected request for deliberate review and never treats reply audio as approval', async () => {
-  const h = harness({speech: true}); h.open(); h.get('.artsoul-voice-chat').fire('click'); await flush();
-  h.sessions[0].onresult({results: [[{transcript: 'buy artwork 31', confidence: 1}]]});
-  assert.deepEqual(h.calls, []);
-  assert.equal(h.get('.artsoul-voice-chat').attrs['aria-pressed'], 'false');
-  assert.equal(h.get('input').value, 'buy artwork 31');
-  assert.match(h.get('.artsoul-voice-answer').textContent, /press Send/);
-  h.utterances[0].onstart(); h.utterances[0].onend(); h.runTimers();
-  assert.equal(h.sessions.length, 1);
-  h.get('form').fire('submit'); await flush(); assert.equal(h.calls.length, 1);
+test('voice chat pauses wallet actions for explicit Send and cannot auto-sign', async () => {
+  const h=harness({speech:true});h.open();h.get('.artsoul-voice-chat').fire('click');await flush();
+  h.sessions[0].onresult({results: [[{transcript:'buy artwork 31',confidence:1}]]});await flush();
+  assert.deepEqual(h.calls,[]);
+  assert.equal(h.get('.artsoul-voice-chat').attrs['aria-pressed'],'false');
+  assert.equal(h.get('input').value,'buy artwork 31');
+  assert.match(h.get('.artsoul-voice-answer').textContent,/press Send/);
+  assert.equal(h.utterances.length,0,'no alternative browser voice');
+  h.runTimers();assert.equal(h.sessions.length,1);
+  h.get('form').fire('submit');await flush();
+  assert.equal(h.calls.length,1,'user initiated the protected tool');
 });
-
 async function voiceNavigation({from = 'https://artsoul.test/', url = '/gallery#discover', account,
   mode = 'chat', beforeLeaving} = {}) {
   const session = new Map(), storage = new Map();
@@ -372,70 +368,49 @@ test('unsuccessful recognition or playback ends voice chat without restarting th
   }
 });
 
-test('typed answers stay silent and manual audio reads the safe summary without rerunning a tool', async () => {
-  const h = harness({execute: async () => JSON.stringify({
-    created: {count: 2}, owned: {count: 3}, resale_listings: {count: 1},
-    needs_attention: [{artwork_id: '31', tool: 'unknown', why: 'Private account detail visible on screen only'}]
+test('typed dynamic replies stay private and text-only without a verified female recording', async () => {
+  const h=harness({audio:true,execute:async()=>JSON.stringify({
+    created:{count:2},owned:{count:3},resale_listings:{count:1},
+    needs_attention:[{artwork_id:'31',tool:'unknown',why:'Private account detail visible on screen only'}]
   })});
-  h.open();
-  const replay = h.get('.artsoul-voice-replay');
-  assert.equal(replay.hidden, true);
-  h.submit('my activity'); await flush();
-  assert.match(h.get('.artsoul-voice-answer').textContent, /Private account detail/);
-  assert.equal(h.spoken.length, 0);
-  assert.equal(replay.hidden, false); assert.equal(replay.disabled, false);
+  h.open();const replay=h.get('.artsoul-voice-replay');
+  assert.equal(replay.hidden,true);
+  h.submit('my activity');await flush();
+  assert.match(h.get('.artsoul-voice-answer').textContent,/Private account detail/);
+  assert.equal(replay.hidden,false);
+  assert.equal(replay.disabled,true,'unknown dynamic results cannot be spoken by a different voice');
   replay.fire('click');
-  assert.deepEqual(h.spoken, ['You created 2, own 3, and have 1 listings. 1 available actions.']);
-  assert.equal(h.calls.length, 1); assert.equal(h.prompts(), 0); assert.equal(h.sessions.length, 0);
-  assert.equal(replay.textContent, 'Listen to answer');
-  assert.equal(replay.attrs['aria-pressed'], 'false');
-  h.utterances[0].onstart();
-  assert.equal(replay.textContent, 'Stop audio'); assert.equal(replay.attrs['aria-pressed'], 'true');
-  const cancelled = h.cancelled();
-  replay.fire('click');
-  assert.equal(h.cancelled(), cancelled + 1);
-  assert.equal(h.utterances[0].onstart, null); assert.equal(h.utterances[0].onend, null); assert.equal(h.utterances[0].onerror, null);
-  assert.equal(replay.textContent, 'Listen to answer'); assert.equal(h.spoken.length, 1);
-  replay.fire('click');
-  assert.equal(h.spoken.length, 2); assert.equal(h.calls.length, 1);
+  assert.equal(h.plays.length,0);assert.equal(h.utterances.length,0);
+  assert.equal(h.calls.length,1);assert.equal(h.prompts(),0);
+  assert.equal(h.get('input').disabled,false);
 });
-
-test('listening to a completed wallet action never submits it again or reads the transaction hash', async () => {
-  const hash = '0x' + 'ab'.repeat(32);
-  const h = harness({execute: async () => JSON.stringify({submitted: true, transaction_hash: hash, url: '/artwork/31'})});
-  h.open(); h.submit('buy artwork 31'); await flush();
-  h.get('.artsoul-voice-replay').fire('click'); h.utterances[0].onend();
-  h.get('.artsoul-voice-replay').fire('click');
-  assert.equal(h.calls.length, 1);
-  assert.equal(h.get('input').value, '');
-  assert.deepEqual(h.spoken, [
-    'Done. The wallet approved it and the transaction was sent.',
-    'Done. The wallet approved it and the transaction was sent.'
-  ]);
-  assert.doesNotMatch(h.spoken.join(' '), new RegExp(hash));
-});
-
-test('microphone answers speak English when Russian recognition is selected and retain manual playback', async () => {
-  const h = harness({speech: true}); h.open(); h.ru.fire('click');
-  h.get('.artsoul-voice-mic').fire('click'); await flush();
-  h.sessions[0].onresult({results: [[{transcript: 'помощь', confidence: 1}]]}); await flush();
-  assert.equal(h.spoken.length, 1);
-  assert.match(h.spoken[0], /open the gallery/);
-  assert.match(h.get('.artsoul-voice-answer').textContent, /open gallery/, 'full examples remain visible');
-  assert.equal(h.utterances[0].lang, 'en-US');
-  const replay = h.get('.artsoul-voice-replay');
-  assert.equal(replay.textContent, 'Listen to answer');
-  h.utterances[0].onstart();
-  assert.equal(replay.textContent, 'Stop audio');
-  h.utterances[0].onend();
-  assert.equal(replay.textContent, 'Listen to answer');
-  assert.equal(replay.attrs['aria-pressed'], 'false');
-  assert.equal(h.get('.artsoul-voice-audio-status').hidden, true);
+test('replay of a confirmed wallet-submitted reply never submits again or speaks a tx hash', async () => {
+  const hash='0x'+'ab'.repeat(32);
+  const h=harness({audio:true,execute:async()=>JSON.stringify({submitted:true,transaction_hash:hash,url:'/artwork/31'})});
+  h.open();h.submit('buy artwork 31');await flush();
+  const replay=h.get('.artsoul-voice-replay');
+  replay.fire('click');assert.equal(h.plays[0].src,'/audio/assistant/v1/en-submitted.wav');
+  h.players[0].emit('playing');h.players[0].emit('ended');
   replay.fire('click');
-  assert.deepEqual(h.spoken, [h.spoken[0], h.spoken[0]]);
-  assert.equal(h.sessions.length, 1); assert.equal(h.calls.length, 0);
+  assert.equal(h.calls.length,1);
+  assert.equal(h.get('input').value,'');
+  assert.equal(h.plays[1].src,'/audio/assistant/v1/en-submitted.wav');
+  assert.ok(!h.plays.map(x=>x.src).join(' ').includes(hash));
+  assert.equal(h.spoken.length,0);
 });
-
+test('Russian microphone help uses the original RU marin WAV and allows replay', async () => {
+  const h=harness({speech:true,audio:true});h.open();h.ru.fire('click');
+  h.get('.artsoul-voice-mic').fire('click');await flush();
+  h.sessions[0].onresult({results: [[{transcript:'помощь',confidence:1}]]});await flush();
+  assert.equal(h.spoken.length,0);
+  assert.equal(h.plays[0].src,'/audio/assistant/v1/ru-helpSpeech.wav');
+  assert.match(h.get('.artsoul-voice-answer').textContent,/Могу найти работы/);
+  h.players[0].emit('playing');h.players[0].emit('ended');
+  const replay=h.get('.artsoul-voice-replay');replay.fire('click');
+  assert.equal(h.plays.length,2);
+  assert.equal(h.plays[1].src,'/audio/assistant/v1/ru-helpSpeech.wav');
+  assert.equal(h.calls.length,0);
+});
 test('silent native speech rejection remains retryable and stale audio callbacks cannot change a newer answer', async () => {
   const h = harness(); h.open(); h.submit('help'); await flush();
   const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
