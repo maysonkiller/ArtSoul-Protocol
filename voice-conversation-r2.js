@@ -5,10 +5,26 @@
     const id = x => typeof x === 'string' && /^[1-9]\d{0,77}$/.test(x) && BigInt(x) < (1n<<256n) ? x : null;
     const clean = x => typeof x === 'string' ? x.trim().replace(/\s+/g,' ').slice(0,300) : '';
     function createDialogue(now=()=>Date.now()) {
-        let last=null, list=[], updated=now();
+        let last=null, list=[], searchResults=[], updated=now();
         const touch=()=>{if(now()<updated||now()-updated>900000)clear();updated=now();};
-        function clear(){last=null;list=[];updated=now();}
+        function clear(){last=null;list=[];searchResults=[];updated=now();}
         function observe(tool,result){
+            // Any new search replaces old search context; never invent search IDs.
+            if(tool==='search_catalog'){
+                searchResults=[];last=null;list=[];
+                if(!result||typeof result!=='object'||Array.isArray(result)||result.error) return;
+                const group=result.groups?.artworks;
+                if(!group||!Array.isArray(group.items)) return;
+                const parsed=group.items.slice(0,8).map(item=>{
+                    const artwork=id(item?.artwork_id);
+                    return artwork&&item?.url==='/artwork/'+artwork&&
+                        typeof item?.title==='string'&&item.title.trim()
+                        ?{artwork,title:item.title.trim()}:null;
+                });
+                if(parsed.some(x=>!x)||new Set(parsed.map(x=>x.artwork)).size!==parsed.length)return;
+                searchResults=parsed;
+                touch();return;
+            }
             // A failed refresh must not let previous auction results drive a new choice.
             if(tool==='find_active_auctions'&&
                (!result||typeof result!=='object'||Array.isArray(result)||result.error||
@@ -137,6 +153,25 @@
             if(/^(?:покажи (?:ставку|статус)|статус аукциона|what is the bid|auction status)/iu.test(t))
                 return selected?tool('get_auction_state',selected):say('Нужен номер работы.','Which artwork number?');
 
+
+            // Follow-up navigation may only use actual, validated search result IDs.
+            // A named title is never guessed from a previous auction selection.
+            const searchChoice=/^(?:open|show) (?:the )?(first|second|third|1st|2nd|3rd|\d+) (?:search )?(?:result|artwork|work)$/iu.exec(t)
+                || /^(?:открой|покажи) (?:мне )?(первый|второй|третий|\d+)(?:-й)? (?:результат|работу из поиска)$/iu.exec(t);
+            if(searchChoice){
+                const ord=searchChoice[1].toLowerCase();
+                const index=({first:0,second:1,third:2,'1st':0,'2nd':1,'3rd':2,
+                    'первый':0,'второй':1,'третий':2})[ord]??(Number(ord)-1);
+                if(!Number.isSafeInteger(index)||index<0||index>=searchResults.length)
+                    return say('Такого номера нет в последних проверенных результатах. Повторите поиск.',
+                        'That number is not in the latest verified search results. Search again.');
+                return tool('open_artwork',searchResults[index].artwork);
+            }
+            if(/^(?:open (?:the |that )?(?:search )?result|открой (?:этот |найденный )?результат)$/iu.test(t)){
+                return searchResults.length===1?tool('open_artwork',searchResults[0].artwork)
+                    :say('Выберите номер результата: первый, второй или третий.',
+                        'Choose a specific result: first, second, or third.');
+            }
             // Voice "open <title>" is a public catalog search, never an
             // unverified direct navigation or wallet action. Actual result
             // links and artwork IDs must come from ArtSoul search_catalog.
