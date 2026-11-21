@@ -1,2 +1,1 @@
-/* Built only from hash-verified recorded clips. Empty until explicitly generated. */
-(function(){'use strict';window.ArtSoulVoiceAudioBank=Object.freeze({lookup:()=>''});})();
+(function(){'use strict';const map=new Map([["Hello! What would you like to explore in ArtSoul?","/audio/assistant/v1/phrases/en-r2Greeting.wav"]]);window.ArtSoulVoiceAudioBank=Object.freeze({lookup:text=>map.get(text)||''});})();

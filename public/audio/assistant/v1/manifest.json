@@ -327,6 +327,24 @@
         "output_tokens": 171
       },
       "estimated_usd": 0.0034662
+    },
+    {
+      "lang": "en",
+      "id": "r2Greeting",
+      "text": "Hello! What would you like to explore in ArtSoul?",
+      "url": "/audio/assistant/v1/phrases/en-r2Greeting.wav",
+      "transcript": "Hello! What would you like to explore in ArtSoul?",
+      "sha256": "40d51e8e7cf98a67f49b71759ceaaa362870364e505087c47932328cd98bf3a0",
+      "bytes": 148844,
+      "duration_seconds": 3.1,
+      "generated_at": "2026-11-21T15:11:31.518Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 81,
+        "output_tokens": 108
+      },
+      "estimated_usd": 0.0022086
     }
   ]
 }
