@@ -56,3 +56,28 @@ test('fixed tool summaries narrate only verified generic facts, not private data
   assert.ok(!cue.includes('Mock Work')&&!cue.includes('0x123')&&!cue.includes('0.05'));
  }
 });
+
+test('Realtime error diagnostics reveal only allowlisted categories and phases', async () => {
+  const {safeApiDiagnostic} = await import('../scripts/generate-assistant-audio.mjs');
+  assert.deepEqual(safeApiDiagnostic({
+    type: 'error', error: {
+      type: 'invalid_request_error', code: 'unknown_parameter',
+      param: 'session.audio.output.voice', message: 'sk-proj-private-key'
+    }
+  }, 'session_update'), {
+    stage: 'session_update',
+    providerCode: 'unknown_parameter',
+    providerParam: 'session.audio.output.voice'
+  });
+  assert.deepEqual(safeApiDiagnostic({
+    error: {code: 'insufficient_quota', message: 'secret data'}
+  }, 'response_create'), {
+    stage: 'response_create',
+    providerCode: 'insufficient_quota'
+  });
+  const untrusted = safeApiDiagnostic({
+    error: {code: 'sk-proj-dont-log', type: 'not-allowed', param: 'secret data', message: 'secret data'}
+  }, 'secret-stage');
+  assert.deepEqual(untrusted, {stage: 'connect', providerCode: 'unclassified'});
+  assert.doesNotMatch(JSON.stringify(untrusted), /secret|sk-proj/);
+});
