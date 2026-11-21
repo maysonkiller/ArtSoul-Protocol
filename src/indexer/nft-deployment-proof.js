@@ -14,6 +14,8 @@ const transfers = new Interface(['event Transfer(address indexed from, address i
 const token = new Interface([
     'function supportsInterface(bytes4) view returns (bool)',
     'function ownerOf(uint256) view returns (address)',
+    'function tokenToArtwork(uint256) view returns (uint256)',
+    'function artworkToToken(uint256) view returns (uint256)',
     'function tokenCreator(uint256) view returns (address)',
     'function firstCollector(uint256) view returns (address)',
     'function tokenURI(uint256) view returns (string)',
@@ -184,13 +186,16 @@ export async function readOrdinaryToken(listener, options) {
             const [supported] = await field('supportsInterface', [id]);
             if (supported !== expected) throw new Error('Ordinary token interfaces differ from the reviewed standard');
         }));
-        const [[owner], [creator], [firstCollector], [metadataURI], [recipient, royalty]] = await Promise.all([
+        const [[owner], [creator], [firstCollector], [metadataURI], [recipient, royalty], [artworkId]] = await Promise.all([
             field('ownerOf', [tokenId]), field('tokenCreator', [tokenId]), field('firstCollector', [tokenId]),
-            field('tokenURI', [tokenId]), field('royaltyInfo', [tokenId, 10_000n])
+            field('tokenURI', [tokenId]), field('royaltyInfo', [tokenId, 10_000n]), field('tokenToArtwork', [tokenId])
         ]);
         if (![owner, creator, firstCollector].every(nonzero) || !metadataURI.trim() ||
             recipient !== creator || royalty !== 550n) throw new Error('Invalid ordinary token provenance or royalty');
-        return Object.freeze({ ...proof, tokenId, owner: owner.toLowerCase(), creator: creator.toLowerCase(),
+        if (artworkId === 0n) throw new Error('Ordinary token has no registered artwork');
+        const [issuedToken] = await field('artworkToToken', [artworkId]);
+        if (issuedToken !== BigInt(tokenId)) throw new Error('Ordinary token and artwork mappings disagree');
+        return Object.freeze({ ...proof, tokenId, artworkId: artworkId.toString(), owner: owner.toLowerCase(), creator: creator.toLowerCase(),
             firstCollector: firstCollector.toLowerCase(), metadataURI, royaltyRecipient: recipient.toLowerCase(),
             royaltyBps: Number(royalty) });
     }, 'nft');

@@ -48,7 +48,9 @@ With the same reviewed pair file and `ARTSOUL_ORDINARY_RPC_URL`, query a minted 
 node scripts/check-ordinary-token.mjs reviewed-pair.json TOKEN_ID BLOCK_NUMBER BLOCK_HASH
 ```
 
-The report includes the owner at that block, creator, First Collector, token URI and royalty recipient. An optional last argument supplies the independently recorded SHA-256 of the published metadata bytes. A missing token, mismatched deployment, block or digest makes the command exit with an error. It requires no signing key or database connection.
+The report identifies the NFT by chain, NFT contract and `tokenId`, and the original work by chain, Core and `artworkId`. The two IDs can differ. The verifier reads both NFT mappings at the same finalized block and rejects a missing or contradictory link. Preserve both contract addresses when comparing releases because different pairs can reuse the same IDs.
+
+The report also includes the owner at that block, creator, First Collector, token URI and royalty recipient. An optional last argument supplies the independently recorded SHA-256 of the published metadata bytes. A missing token, mismatched deployment, block or digest makes the command exit with an error. It requires no signing key or database connection.
 
 ## Migration Families
 
