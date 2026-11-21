@@ -1083,8 +1083,13 @@
             if (busy || noticePending) return;
             silence();
             const acronymOnly = /^(?:nfts?|n[ .-]?f[ .-]?t)$/iu.test(transcript.trim());
-            const replyLang = /[а-яё]/iu.test(transcript) ? 'ru' : acronymOnly ? inputLanguage
+            const hasCyrillic = /[а-яё]/iu.test(transcript);
+            const parseLang = hasCyrillic ? 'ru' : acronymOnly ? inputLanguage
                 : /[a-z]/iu.test(transcript) ? 'en' : inputLanguage;
+            // A RU microphone can occasionally transcribe a Russian utterance
+            // as Latin English. Parse the actual transcript, but answer in the
+            // selected spoken language rather than unexpectedly switching to EN.
+            const replyLang = hasCyrillic ? 'ru' : spoken ? inputLanguage : parseLang;
             const t = replyLang === 'ru' ? {...TEXT,...RU_UI, ...RU_FIXED, help:RU_HELP, otherRequest:'Уточните название или номер работы.', unsure: heard => 'Я не уверена, что услышала правильно: ' + heard, error: msg => 'Ошибка ArtSoul: ' + msg} : TEXT;
             const audio = audioGeneration;
             const reply = (heard, answer, say = answer, links = []) => {
@@ -1105,7 +1110,7 @@
                 reply(transcript, t.next);
                 return;
             }
-            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, replyLang, pendingDraftField);
+            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, parseLang, pendingDraftField);
             pendingDraftField = draftTurn?.nextField || null;
             if (draftTurn?.message) {
                 reply(transcript, draftTurn.message, pendingDraftField === 'title' ? t.askTitle : draftTurn.message);
@@ -1116,9 +1121,12 @@
             });
             let command = draftTurn || (contextual?.kind === 'tool'
                 ? {tool:contextual.tool,input:contextual.input}
-                : parseCommand(transcript, replyLang, previousPrompt === 'nft'));
+                : parseCommand(transcript, parseLang, previousPrompt === 'nft'));
             if (contextual?.kind === 'stop') { stopVoice(); show(transcript,'',[], ''); return; }
-            if (contextual?.kind === 'reply') { reply(transcript,contextual.text); return; }
+            if (contextual?.kind === 'reply') {
+                if (contextual.pendingNft === true) pendingPrompt = 'nft';
+                reply(transcript,contextual.text); return;
+            }
             if (contextual?.kind === 'ui') {
                 const outcome = safeVoiceUiAction(contextual,{win:window,doc:document,lang:replyLang});
                 reply(transcript,outcome.show,outcome.say);
