@@ -20,6 +20,38 @@ const manifestPath = path.join(root, 'public/audio/assistant/v1/manifest.json');
 const ledgerPath = path.join(root, 'docs/private/assistant-audio-generation-ledger.json');
 const hash = data => createHash('sha256').update(data).digest('hex');
 
+const PUBLIC_ERROR_CODES = new Set([
+  'invalid_request_error', 'invalid_api_key', 'authentication_error',
+  'permission_denied', 'insufficient_quota', 'billing_hard_limit_reached',
+  'rate_limit_exceeded', 'rate_limit_error', 'model_not_found',
+  'unsupported_model', 'unsupported_value', 'unknown_parameter',
+  'invalid_parameter', 'server_error', 'quota_exceeded',
+  'context_length_exceeded'
+]);
+const PUBLIC_ERROR_PARAMS = new Set([
+  'session.output_modalities', 'session.max_output_tokens',
+  'session.audio.output.voice', 'session.audio.output.format',
+  'session.audio.input.turn_detection', 'session.tools',
+  'session.tool_choice', 'response.output_modalities',
+  'response.max_output_tokens', 'model'
+]);
+const PUBLIC_ERROR_STAGES = new Set([
+  'connect', 'session_update', 'text_input', 'response_create', 'audio_stream'
+]);
+
+// Never print provider messages. They can echo user text, request bodies or secrets.
+export function safeApiDiagnostic(event, stage) {
+  const info = event?.error || {};
+  const providerCode = [info.code, info.type].find(code => PUBLIC_ERROR_CODES.has(code)) || 'unclassified';
+  const param = PUBLIC_ERROR_PARAMS.has(info.param) ? info.param : null;
+  return {
+    stage: PUBLIC_ERROR_STAGES.has(stage) ? stage : 'connect',
+    providerCode,
+    ...(param ? {providerParam: param} : {})
+  };
+}
+
+
 export const normalizeTranscript = text => String(text).normalize('NFKC').toLowerCase()
   .replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
@@ -78,6 +110,7 @@ function generateClip(clip, apiKey) {
     });
     const chunks = [];
     let bytes = 0, transcript = '', finished = false, configured = false, requested = false;
+    let stage = 'connect';
     const timer = setTimeout(() => finish(new Error('generation_timeout')), 45000);
     const finish = (error, result) => {
       if (finished) return;
@@ -88,13 +121,25 @@ function generateClip(clip, apiKey) {
     };
     const send = event => socket.send(JSON.stringify(event));
     socket.on('error', () => finish(new Error('connection_failed')));
+    socket.on('unexpected-response', (_request, response) => {
+      const error = new Error('connection_failed');
+      const status = Number(response?.statusCode);
+      if ([400, 401, 403, 404, 408, 429, 500, 502, 503].includes(status)) error.httpStatus = status;
+      response?.resume?.();
+      finish(error);
+    });
     socket.on('close', () => finish(new Error('connection_closed')));
     socket.on('message', raw => {
       if (finished) return;
       try {
         const event = JSON.parse(raw.toString());
-        if (event.type === 'error') return finish(new Error('api_request_failed'));
+        if (event.type === 'error') {
+          const error = new Error('api_request_failed');
+          Object.assign(error, safeApiDiagnostic(event, stage));
+          return finish(error);
+        }
         if (event.type === 'session.created') {
+          stage = 'session_update';
           send({type: 'session.update', session: {
             type: 'realtime', output_modalities: ['audio'], max_output_tokens: maxOutputTokens,
             tools: [], tool_choice: 'none',
@@ -103,11 +148,14 @@ function generateClip(clip, apiKey) {
           }});
         } else if (event.type === 'session.updated' && !configured) {
           configured = true;
+          stage = 'text_input';
           send({type: 'conversation.item.create', item: {type: 'message', role: 'user', content: [{type: 'input_text', text: clip.text}]}});
         } else if (event.type === 'conversation.item.done' && configured && !requested && event.item?.role === 'user') {
           requested = true;
+          stage = 'response_create';
           send({type: 'response.create', response: {max_output_tokens: maxOutputTokens, output_modalities: ['audio']}});
         } else if (event.type === 'response.output_audio.delta') {
+          stage = 'audio_stream';
           const chunk = Buffer.from(event.delta, 'base64');
           bytes += chunk.length;
           if (bytes > 60 * sampleRate * 2) return finish(new Error('audio_limit_exceeded'));
@@ -251,7 +299,16 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   main().catch(error => {
     // Never print provider messages, request headers, environment values or stacks.
     const code = /^[a-z_]+$/.test(error.message) ? error.message : 'generation_failed';
-    console.error(JSON.stringify({error: code, automaticRetry: false}));
+    const diagnostic = {error: code, automaticRetry: false};
+    if (PUBLIC_ERROR_STAGES.has(error.stage)) diagnostic.stage = error.stage;
+    if (PUBLIC_ERROR_CODES.has(error.providerCode) || error.providerCode === 'unclassified') {
+      diagnostic.providerCode = error.providerCode;
+    }
+    if (PUBLIC_ERROR_PARAMS.has(error.providerParam)) diagnostic.parameter = error.providerParam;
+    if ([400, 401, 403, 404, 408, 429, 500, 502, 503].includes(error.httpStatus)) {
+      diagnostic.httpStatus = error.httpStatus;
+    }
+    console.error(JSON.stringify(diagnostic));
     process.exitCode = 1;
   });
 }
