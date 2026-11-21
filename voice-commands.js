@@ -331,6 +331,37 @@
       "submitted": "Готово. Кошелёк подтвердил, транзакция отправлена.",
       "settled": "Расчёт подтверждён. NFT теперь ваша. Данные работы обновляются."
     });
+    // Russian interface for the RU microphone; missing marin WAVs remain text-only.
+    const RU_UI = Object.freeze({
+        title:'Команды ArtSoul',
+        hint:'RU — распознавание русской речи. Голос marin доступен только для записанных фраз; остальные ответы показываются текстом. Кошелёк требует личного подтверждения.',
+        input:'Ваша команда',placeholder:'Открой NFT, покажи аукционы…',
+        send:'Отправить',microphone:'Микрофон',stop:'Остановить',
+        conversation:'Начать голосовой диалог',endConversation:'Завершить диалог',
+        conversationHint:'Если озвучка ответа ещё не записана, прочитайте текст и нажмите микрофон снова.',
+        resumeMic:'Страница открыта. Нажмите «Начать голосовой диалог», чтобы продолжить.',
+        arrival:'Страница открыта. Слушаю следующий запрос.',
+        navigationWait:'Переход затянулся. Голосовой диалог приостановлен.',
+        reviewCommand:'Проверьте действие и нажмите «Отправить».',
+        listenReply:'Прослушать ответ',stopReply:'Остановить звук',
+        audioUnavailable:'Ответ доступен текстом: отдельной записи marin для этой фразы пока нет.',
+        audioBlocked:'Браузер заблокировал воспроизведение. Нажмите «Прослушать ответ».',
+        audioNotice:'Записанный голос marin.',
+        close:'Закрыть команды',examples:'Примеры',
+        noSpeech:'Микрофон недоступен. Используйте текстовое поле.',
+        working:'Выполняю запрос… Проверьте любые действия с кошельком самостоятельно.',
+        empty:'Сначала введите команду.',changed:'Кошелёк изменился. Введите новую команду.',
+        tooLong:'Введите одну команду длиной до 300 символов.',
+        listening:'Слушаю… произнесите одну команду.',
+        notHeard:'Речь не распознана. Проверьте микрофон и попробуйте ещё раз.',
+        options:'Можно открыть NFT, найти работу или посмотреть аукционы.',
+        askSearch:'Что найти?',askTitle:'Как назвать работу?',
+        otherRequest:'Попробуйте «открой NFT», «найди луна» или «моя активность».',
+        unavailable:'Команды недоступны на этой странице.',
+        micBlocked:'Разрешите использование микрофона в настройках браузера.',
+        notice:'Браузер может отправлять звук микрофона в службу распознавания речи. ArtSoul не получает исходный звук.\n\nРазрешить микрофон?',
+        help:'Попробуйте: «открой NFT», «открой мои NFT», «открой NFT в кошельке», «открой маркетплейс», «покажи аукционы», «найди луна», «расскажи про работу 31», «моя активность», «помощь».'
+    });
     const RU_HELP = 'Могу найти работы, показать открытые аукционы и сведения о владельцах. Действия с кошельком вы проверяете и подписываете сами.';
     function localizeResult(tool, data, answer) {
         if (data?.submitted === true) {
@@ -828,14 +859,14 @@
         const close = panel.querySelector('.artsoul-voice-close');
 
         function label() {
-            const t = TEXT;
+            const t = inputLanguage === 'ru' ? {...TEXT,...RU_UI} : TEXT;
             button.setAttribute('aria-label', t.title);
-            panel.setAttribute('lang', 'en');
+            panel.setAttribute('lang', inputLanguage);
             panel.querySelector('h2').textContent = t.title;
             panel.querySelector('.artsoul-voice-hint').textContent = typeof Recognition === 'function'
                 ? t.hint + ' ' + t.conversationHint : t.hint;
             if (/^\/upload(?:\.html)?\/?$/.test(window.location?.pathname || '')) {
-                panel.querySelector('.artsoul-voice-hint').textContent += ' For a draft, say “title” and dictate it, or say “choose 48 hours”.';
+                panel.querySelector('.artsoul-voice-hint').textContent += inputLanguage === 'ru' ? ' Для черновика назовите заголовок или длительность аукциона.' : ' For a draft, say “title” and dictate it, or say “choose 48 hours”.';
             }
             panel.querySelector('label').textContent = t.input;
             input.placeholder = t.placeholder;
@@ -887,20 +918,21 @@
             mic.hidden = handsFree;
             chat.hidden = typeof Recognition !== 'function';
             chat.disabled = !handsFree && (busy || noticePending || Boolean(recognition));
-            chat.textContent = handsFree ? TEXT.endConversation : TEXT.conversation;
-            chat.title = TEXT.conversationHint;
+            const ui = inputLanguage === 'ru' ? {...TEXT,...RU_UI} : TEXT;
+            chat.textContent = handsFree ? ui.endConversation : ui.conversation;
+            chat.title = ui.conversationHint;
             chat.setAttribute('aria-pressed', String(handsFree));
             chat.dataset.listening = String(handsFree && Boolean(recognition));
             const hasClip = Boolean(getReplyAudio(answerToRead)) && typeof window.Audio === 'function';
             const supportsAudio = hasClip;
-            audioNotice.textContent = TEXT.audioNotice;
+            audioNotice.textContent = ui.audioNotice;
             audioNotice.hidden = !hasClip;
             replay.hidden = !answerToRead;
             replay.disabled = busy || noticePending || Boolean(recognition) || !supportsAudio;
-            replay.textContent = speaking ? TEXT.stopReply : TEXT.listenReply;
+            replay.textContent = speaking ? ui.stopReply : ui.listenReply;
             replay.setAttribute('aria-pressed', String(speaking));
             if (answerToRead && !supportsAudio) {
-                audioStatus.textContent = TEXT.audioUnavailable;
+                audioStatus.textContent = ui.audioUnavailable;
                 audioStatus.hidden = false;
             }
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => { el.disabled = busy || noticePending; });
@@ -1025,7 +1057,8 @@
 
         function setListening(on) {
             mic.setAttribute('aria-pressed', String(on));
-            mic.textContent = on ? TEXT.stop : TEXT.microphone;
+            const ui = inputLanguage === 'ru' ? {...TEXT,...RU_UI} : TEXT;
+            mic.textContent = on ? ui.stop : ui.microphone;
             button.classList.toggle('is-listening', on);
             controls();
         }
@@ -1043,14 +1076,14 @@
                 }
             }
             setListening(false);
-            if (answerEl.textContent === TEXT.listening) show('', '');
+            if (answerEl.textContent === TEXT.listening || answerEl.textContent === RU_UI.listening) show('', '');
         }
 
         async function handle(transcript, confidence, spoken = false) {
             if (busy || noticePending) return;
             silence();
             const replyLang = /[а-яё]/iu.test(transcript) ? 'ru' : /[a-z]/iu.test(transcript) ? 'en' : inputLanguage;
-            const t = replyLang === 'ru' ? {...TEXT, ...RU_FIXED, help:RU_HELP, otherRequest:'Уточните название или номер работы.', unsure: heard => 'Я не уверена, что услышала правильно: ' + heard, error: msg => 'Ошибка ArtSoul: ' + msg} : TEXT;
+            const t = replyLang === 'ru' ? {...TEXT,...RU_UI, ...RU_FIXED, help:RU_HELP, otherRequest:'Уточните название или номер работы.', unsure: heard => 'Я не уверена, что услышала правильно: ' + heard, error: msg => 'Ошибка ArtSoul: ' + msg} : TEXT;
             const audio = audioGeneration;
             const reply = (heard, answer, say = answer, links = []) => {
                 show(heard, answer, links, say);
@@ -1201,7 +1234,7 @@
                 controls();
                 let approved = false;
                 try {
-                    approved = await window.confirm(TEXT.notice);
+                    approved = await window.confirm(inputLanguage === 'ru' ? RU_UI.notice : TEXT.notice);
                 } catch {
                     // A failed or dismissed consent dialog never starts audio.
                 } finally {
