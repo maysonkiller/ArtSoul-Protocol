@@ -8,8 +8,9 @@ $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $audio = Join-Path $repo 'public\audio\assistant\v1'
 $phraseBank = Join-Path $repo 'docs\audio\assistant-r2-phrase-bank.json'
+$videoBank = Join-Path $repo 'docs\audio\assistant-video-r3-phrase-bank.json'
 $audioIndex = Join-Path $repo 'voice-audio-bank-r2.js'
-foreach ($required in @($audio, $phraseBank, $audioIndex)) {
+foreach ($required in @($audio, $phraseBank, $videoBank, $audioIndex)) {
     if (-not (Test-Path -LiteralPath $required)) {
         throw ("Required voice source missing: " + $required)
     }
@@ -27,6 +28,7 @@ try {
     New-Item -ItemType Directory -Force -Path $docsFolder | Out-Null
     Copy-Item -LiteralPath $audio -Destination (Join-Path $audioParent 'v1') -Recurse
     Copy-Item -LiteralPath $phraseBank -Destination (Join-Path $docsFolder 'assistant-r2-phrase-bank.json')
+    Copy-Item -LiteralPath $videoBank -Destination (Join-Path $docsFolder 'assistant-video-r3-phrase-bank.json')
     Copy-Item -LiteralPath $audioIndex -Destination (Join-Path $stage 'voice-audio-bank-r2.js')
     # Compress only this explicit allowlist of static public/audio and script data.
     Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
