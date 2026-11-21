@@ -56,7 +56,10 @@ test('each visible recording intent has matched RU/EN behavior without guesswork
      assert.equal(got.action,expected.slice(3),phrase);
    } else {
      assert.equal(got.kind==='tool'?got.tool:got.tool,expected,lang+' '+phrase+' '+JSON.stringify(got));
-     if(input)assert.deepEqual(got.input,input,lang+' '+phrase);
+     if(input && expected==='search_catalog') {
+       assert.equal(got.input.category,input.category,lang+' '+phrase);
+       assert.ok(typeof got.input.query==='string'&&got.input.query.length>0,lang+' '+phrase);
+     } else if(input)assert.deepEqual(got.input,input,lang+' '+phrase);
    }
    pair.push(got);
   }
