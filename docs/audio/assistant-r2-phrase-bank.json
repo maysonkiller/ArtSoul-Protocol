@@ -831,6 +831,174 @@
       "id": "r2Goodbye",
       "text": "До встречи! Можете снова открыть помощника, когда потребуется.",
       "url": "/audio/assistant/v1/phrases/ru-r2Goodbye.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionResults",
+      "text": "The current auction results are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionResults",
+      "text": "Текущие данные об аукционах показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ArtworkResults",
+      "text": "The verified artwork details are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ArtworkResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ArtworkResults",
+      "text": "Проверенные сведения о работе показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ArtworkResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ProvenanceResults",
+      "text": "Creator, First Collector, and Owner are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ProvenanceResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ProvenanceResults",
+      "text": "Автор, первый коллекционер и текущий владелец показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ProvenanceResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchResults",
+      "text": "The ArtSoul search results are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchResults",
+      "text": "Результаты поиска ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ActivityResults",
+      "text": "Your ArtSoul activity is shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ActivityResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ActivityResults",
+      "text": "Сведения о вашей активности в ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ActivityResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2BidPreparedResult",
+      "text": "Your bid preview is ready for review. Nothing has been signed.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidPreparedResult.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidPreparedResult",
+      "text": "Предварительный просмотр ставки готов. Ничего не подписано.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidPreparedResult.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ReviewResult",
+      "text": "You must review this action and approve it in your own wallet.",
+      "url": "/audio/assistant/v1/phrases/en-r2ReviewResult.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ReviewResult",
+      "text": "Вы должны сами проверить действие и подтвердить его в своём кошельке.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ReviewResult.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2InfoResults",
+      "text": "Verified ArtSoul details are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2InfoResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2InfoResults",
+      "text": "Проверенные сведения ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2InfoResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ActionNotCompleted",
+      "text": "The action was not completed. Check the reason on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ActionNotCompleted.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ActionNotCompleted",
+      "text": "Действие не выполнено. Проверьте причину на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ActionNotCompleted.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ToolError",
+      "text": "ArtSoul could not complete this request. Check the details on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ToolError.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ToolError",
+      "text": "ArtSoul не смог выполнить запрос. Подробности показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ToolError.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoMatches",
+      "text": "No matching items were returned. Try another title or number.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoMatches.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoMatches",
+      "text": "Совпадений не найдено. Попробуйте другое название или номер.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoMatches.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAuctions",
+      "text": "No open auctions were returned by ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAuctions.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAuctions",
+      "text": "ArtSoul не вернул открытых аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAuctions.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2LifecycleResults",
+      "text": "The ArtSoul auction and settlement stages are explained on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2LifecycleResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2LifecycleResults",
+      "text": "Этапы аукциона и расчёта ArtSoul объяснены на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2LifecycleResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2PageNavigation",
+      "text": "Opening the requested ArtSoul page.",
+      "url": "/audio/assistant/v1/phrases/en-r2PageNavigation.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2PageNavigation",
+      "text": "Открываю выбранную страницу ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2PageNavigation.wav"
     }
   ]
 }
