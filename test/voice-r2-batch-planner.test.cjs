@@ -12,8 +12,8 @@ test('R2 batch plan is deterministic, offline, complete and never proposes paid 
  assert.equal(a.stdout,b.stdout,'no random ordering or current-time-dependent values');
  const plan=JSON.parse(a.stdout);
  assert.equal(plan.mode,'OFFLINE_ONLY_NO_API_CALLS');
- assert.equal(plan.phraseBank,166);
- assert.equal(plan.verifiedRecorded+plan.pending,166);
+ assert.equal(plan.phraseBank,188);
+ assert.equal(plan.verifiedRecorded+plan.pending,188);
  assert.equal(plan.batches.length,Math.ceil(plan.pending/10));
  const ids=plan.batches.flatMap(b=>b.ids);
  assert.equal(ids.length,plan.pending);
