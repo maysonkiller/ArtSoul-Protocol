@@ -145,8 +145,8 @@ async function syncVerifiedIndex(manifest) {
     }
   }
   if(new Map(entries).size !== entries.length)throw new Error('ambiguous_phrase');
-  const js = '(function(){\'use strict\';const map=new Map(' + JSON.stringify(entries) +
-    ');window.ArtSoulVoiceAudioBank=Object.freeze({lookup:text=>map.get(text)||\'\'});})();\n';
+  const js = "(function(){'use strict';const map=new Map(" + JSON.stringify(entries) +
+    ");window.ArtSoulVoiceAudioBank=Object.freeze({lookup:text=>map.get(text)||''});})();\n";
   const final = path.join(root,'voice-audio-bank-r2.js');
   const temp = final+'.'+process.pid+'.tmp';
   await fs.writeFile(temp,js,{flag:'wx'}); await fs.rename(temp,final);
