@@ -214,6 +214,49 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         assert.equal(await provider.getBalance(protocol.target), (firstPrice + secondPrice) / 40n);
     });
 
+    it('separates the same bidder’s refundable and defaulted deposits across two live auctions', async () => {
+        const eth = ethers.parseEther;
+        const bidder = await deploy('OrdinaryBidderFixture');
+        const nft = new ethers.Contract(await engine.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, provider);
+        for (const [id, creator, start] of [[1, artist, '0.2'], [2, collector, '0.5']]) {
+            await mine(engine.connect(creator).registerArtwork('ipfs://work-' + id));
+            await mine(engine.connect(creator).createAuction(id, eth(start), day));
+            await mine(bidder.bid(engine.target, id, eth(start), { value: eth(start) / 10n }));
+        }
+        await mine(engine.connect(buyer).placeBid(1, eth('0.3'), { value: eth('0.03') }));
+        await network.provider.send('evm_setNextBlockTimestamp', [Number((await engine.auctions(2)).end)]);
+        await mine(engine.connect(buyer).settleAuction(1, { value: eth('0.27') }));
+        await mine(engine.closeAuction(2));
+        assert.equal(await nft.ownerOf(1), buyer.address);
+        assert.equal((await engine.works(1)).floor, eth('0.3'));
+        assert.equal(await engine.credits(artist.address), eth('0.2925'));
+        assert.equal(await engine.credits(protocol.target), eth('0.0075'));
+
+        // The bidder initially refuses ETH. A retry must preserve exactly one fallback credit.
+        await mine(engine.processRefunds(1, 1));
+        await mine(engine.processRefunds(1, 1));
+        assert.equal(await engine.credits(bidder.target), eth('0.02'));
+        await mine(bidder.acceptDelivery(true, false));
+        await mine(bidder.withdraw(engine.target));
+        assert.equal(await provider.getBalance(bidder.target), eth('0.02'));
+        await rejects(bidder.withdraw.staticCall(engine.target), 'NoCredit');
+        await mine(engine.connect(artist).withdraw());
+        await mine(protocol.claim(engine.target));
+        assert.equal((await engine.auctions(2)).deposit, eth('0.05'));
+        assert.equal(await provider.getBalance(engine.target), eth('0.05'));
+
+        await network.provider.send('evm_setNextBlockTimestamp', [Number((await engine.auctions(2)).deadline + 1n)]);
+        await mine(engine.finalizeDefault(2));
+        assert.equal(await engine.credits(collector.address), eth('0.04'));
+        assert.equal(await engine.credits(protocol.target), eth('0.01'));
+        assert.equal(await engine.currentAuctionForWork(2), 0n);
+        assert.equal((await engine.works(2)).floor, 0n);
+        assert.equal(await nft.totalSupply(), 1n);
+        await mine(engine.connect(collector).withdraw());
+        await mine(protocol.claim(engine.target));
+        assert.equal(await provider.getBalance(engine.target), 0n);
+    });
+
     it('matches largest remainders in role order for all price residues and full-width prices', async () => {
         const quotes = await deploy('TreasuryBindingFixture', protocol.target, ecosystem.target, security.target);
         function expectedShares(amount, weights) {
