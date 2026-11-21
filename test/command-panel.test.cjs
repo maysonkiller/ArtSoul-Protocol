@@ -9,7 +9,7 @@ const searchResult = { category: 'all', groups: {
 }};
 
 function harness({speech = false, audio = false, execute = async () => JSON.stringify(searchResult),
-  navigation, session = new Map(), storage = new Map(), browserLanguage = 'en'} = {}) {
+  navigation, session = new Map(), storage = new Map(), browserLanguage = 'en', dialogue = false} = {}) {
   const nodes = new Map(), calls = [], sessions = [], spoken = [], utterances = [];
   const players = [], plays = [], timers = new Map();
   let prompts = 0, cancelled = 0, timerId = 0;
@@ -86,6 +86,7 @@ function harness({speech = false, audio = false, execute = async () => JSON.stri
     document.visibilityState = navigation.visibility || 'visible';
     window.performance = {getEntriesByType: () => [{type: navigation.type || 'navigate'}]};
   }
+  if (dialogue) new Function('window', fs.readFileSync('voice-conversation-r2.js','utf8'))(window);
   new Function('window', 'document', 'navigator', 'SpeechSynthesisUtterance', 'Audio', source)(window, document, {language: browserLanguage}, function(text) {this.text = text;}, audio ? Audio : undefined);
   const get = selector => nodes.get(selector);
   return {get, document, window, calls, sessions, spoken, utterances, en, ru, storage, players, plays,
@@ -114,7 +115,8 @@ test('no microphone support still exposes a labelled keyboard composer without r
 
 test('opening, typing, examples and language selection never start the microphone', async () => {
   const h = harness({speech: true}); h.open(); h.submit('help'); await flush();
-  h.ru.fire('click'); assert.equal(h.get('h2').textContent, 'ArtSoul commands');
+  h.ru.fire('click'); assert.equal(h.get('h2').textContent, 'Команды ArtSoul');
+  assert.equal(h.get('.artsoul-voice-panel').attrs.lang, 'ru');
   h.submit('помощь'); await flush();
   assert.equal(h.calls.length, 0); assert.equal(h.sessions.length, 0); assert.equal(h.prompts(), 0);
 });
@@ -124,7 +126,7 @@ test('Russian commands use the archived RU female recording; English retains its
     const storage = new Map(stored ? [['artsoul.voice.lang', 'ru']] : []);
     const h = harness({speech: true, audio: true, browserLanguage: 'ru-RU', storage});
     h.open();
-    assert.equal(h.get('.artsoul-voice-panel').attrs.lang, 'en');
+    assert.equal(h.get('.artsoul-voice-panel').attrs.lang, stored ? 'ru' : 'en');
     assert.equal(h.ru.attrs['aria-pressed'], String(stored));
     h.submit(stored ? 'помощь' : 'help'); await flush();
     h.get('.artsoul-voice-replay').fire('click');
@@ -196,7 +198,7 @@ test('voice chat resumes only after a complete recorded reply and stops by voice
   h.open(); h.ru.fire('click');
   const chat = h.get('.artsoul-voice-chat');
   chat.fire('click'); await flush();
-  assert.equal(chat.textContent, 'End voice chat');
+  assert.equal(chat.textContent, 'Завершить диалог');
   assert.equal(chat.dataset.listening, 'true');
   h.sessions[0].onresult({results: [[{transcript:'помощь',confidence:1}]]}); await flush();
   assert.equal(h.sessions[0].aborted,true);
@@ -957,4 +959,36 @@ test('typed and recognized speech routes by actual script regardless of mic-lang
  h.submit('открой галерею'); await flush();
  assert.deepEqual(h.calls[1],{name:'open_page',args:{page:'gallery'}},
    'Russian text must reach Russian parser even with EN mic selected');
+});
+
+
+test('real integrated RU and EN NFT requests navigate to gallery instead of searching title',async()=>{
+ const cases=[
+   ['ru','открой нфт','nfts'],['ru','открой NFT','nfts'],
+   ['ru','покажи все NFT','nfts'],['ru','открой NFT в кошельке','walletNfts'],
+   ['en','open NFT','nfts'],['en','open NFT gallery','nfts'],
+   ['en','show my nfts','collected']
+ ];
+ for(const [lang,say,page] of cases){
+  const h=harness({dialogue:true,speech:true,execute:async()=>JSON.stringify({opened:true,page,title:page,url:'/gallery#nft'})});
+  h.open();
+  if(lang==='ru')h.ru.fire('click');
+  h.submit(say);await flush();
+  assert.deepEqual(h.calls.map(v=>({name:v.name,args:v.args})),
+   [{name:'open_page',args:{page}}],lang+' '+say);
+ }
+});
+
+test('RU mode shows Russian microphone status and never claims missing audio exists',async()=>{
+ const h=harness({dialogue:true,speech:true,audio:true});
+ h.open();h.ru.fire('click');
+ const panel=h.get('.artsoul-voice-panel');
+ assert.equal(panel.attrs.lang,'ru');
+ assert.match(h.get('.artsoul-voice-hint').textContent,/RU.*marin/);
+ h.get('.artsoul-voice-mic').fire('click');await flush();
+ assert.equal(h.sessions[0].lang,'ru-RU');
+ assert.match(h.get('.artsoul-voice-answer').textContent,/Слушаю/);
+ h.sessions[0].onresult({results:[[{transcript:'открой нфт',confidence:1}]]});await flush();
+ assert.deepEqual(h.calls[0],{name:'open_page',args:{page:'nfts'}});
+ assert.equal(h.spoken.length,0,'no fallback to unreviewed browser speech');
 });
