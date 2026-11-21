@@ -7,6 +7,7 @@ const fs=require('node:fs');
 
 const sandbox={};
 new Function('window',fs.readFileSync('voice-conversation-r2.js','utf8'))(sandbox);
+new Function('window',fs.readFileSync('voice-audio-bank-r2.js','utf8'))(sandbox);
 new Function('window','document','navigator',fs.readFileSync('voice-commands.js','utf8'))(sandbox,undefined,{});
 const voice=sandbox.ArtSoulVoice;
 const make=()=>sandbox.ArtSoulVoiceConversation.createDialogue(()=>1000000);
