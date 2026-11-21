@@ -204,9 +204,14 @@ async function main() {
     if (ledger.version !== 1 || !Array.isArray(ledger.attempts)) throw new Error('invalid_ledger');
     const reserved = ledger.attempts.reduce((sum, attempt) => sum + Number(attempt.reservedUsd), 0);
     if (!Number.isFinite(reserved) || reserved < 0 || reserved + batch.length * reserveUsd > budgetUsd) throw new Error('generation_budget_exceeded');
-    let apiKey;
-    try { apiKey = parseEnv(await fs.readFile(path.join(root, '.env.local'), 'utf8')).OPENAI_API_KEY; }
-    catch { throw new Error('credential_unavailable'); }
+    // Codex or a local operator may supply a narrowly scoped environment secret.
+    // Never print it, write it to evidence, or put it in tracked source files.
+    let apiKey = typeof process.env.OPENAI_API_KEY === 'string'
+      ? process.env.OPENAI_API_KEY.trim() : '';
+    if (!apiKey) {
+      try { apiKey = parseEnv(await fs.readFile(path.join(root, '.env.local'), 'utf8')).OPENAI_API_KEY; }
+      catch { /* A missing local env file is fine when the secret is injected. */ }
+    }
     if (!apiKey) throw new Error('credential_unavailable');
     for (const clip of batch) {
       const attempt = {id: `${clip.lang}-${clip.id}`, at: new Date().toISOString(), reservedUsd: reserveUsd, status: 'started'};
