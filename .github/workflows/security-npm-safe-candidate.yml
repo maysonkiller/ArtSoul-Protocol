@@ -8,7 +8,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: artsoul-security-fix-proposal
@@ -22,7 +22,7 @@ jobs:
       - name: Checkout without persistent credentials
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
@@ -57,6 +57,27 @@ jobs:
             }
           '
           git diff --stat
+
+      - name: Commit only compatible lockfile changes to isolated security branch
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/security/npm-71-inventory-20261121" ]; then
+            echo "Ref outside isolated security branch: stopping."
+            exit 0
+          fi
+          if git diff --quiet -- package-lock.json; then
+            echo "No compatible lockfile changes remain."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- package-lock.json
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          test "$(git diff --cached --name-only)" = "package-lock.json"
+          git commit -m "fix(security): apply npm-compatible lockfile advisory updates"
+          git push origin HEAD:refs/heads/security/npm-71-inventory-20261121
 
       - name: Downloadable candidate and evidence (not committed)
         if: always()
