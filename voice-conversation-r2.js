@@ -9,6 +9,13 @@
         const touch=()=>{if(now()<updated||now()-updated>900000)clear();updated=now();};
         function clear(){last=null;list=[];updated=now();}
         function observe(tool,result){
+            // A failed refresh must not let previous auction results drive a new choice.
+            if(tool==='find_active_auctions'&&
+               (!result||typeof result!=='object'||Array.isArray(result)||result.error||
+                result.opened===false||result.prepared===false||result.submitted===false||
+                result.updated===false||result.confirmed===false)){
+                clear();return;
+            }
             if(!result||typeof result!=='object'||Array.isArray(result)||result.error||result.opened===false||result.prepared===false||result.submitted===false||result.updated===false||result.confirmed===false)return;
             touch();
             if(tool==='find_active_auctions'){
