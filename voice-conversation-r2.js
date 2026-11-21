@@ -67,7 +67,7 @@
                 return say('Уточните один действительный номер работы. Ничего не запускаю.',
                     'Please specify one valid artwork number. No action was started.');
             if(/^(?:стоп|хватит|stop|end voice chat)$/iu.test(t))return {kind:'stop'};
-            if(/(?:open nfg|open nf[gc]|okay storage room)/iu.test(t))
+            if(/(?:open nfg|open nf[gc]|okay storage room|^открой ен эф ти$|^открой нфс$|^open nft open nft$)/iu.test(t))
                 return say('Похоже, фраза распознана неправильно. Уточните раздел или номер работы.','That may be misheard. Please name a section or artwork number.');
             if(/^(?:не |нет,?\s*не |не надо |don't |do not |never |no,?\s*not |отмена)/iu.test(t)&&
                /(?:откр|покаж|ставк|куп|прод|wallet|bid|buy|open|sell|аукцион|auction)/iu.test(t))
