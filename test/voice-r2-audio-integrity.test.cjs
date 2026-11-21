@@ -9,6 +9,8 @@ const crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..');
 const pub=path.join(root,'public');
 const bank=JSON.parse(fs.readFileSync(path.join(root,'docs/audio/assistant-r2-phrase-bank.json'),'utf8'));
+const video=JSON.parse(fs.readFileSync(path.join(root,'docs/audio/assistant-video-r3-phrase-bank.json'),'utf8'));
+const allPhrases=[...bank.clips,...video.clips];
 const manifest=JSON.parse(fs.readFileSync(path.join(pub,'audio/assistant/v1/manifest.json'),'utf8'));
 const normalize=text=>String(text).normalize('NFKC').toLowerCase().replace(/ё/g,'е')
   .replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -64,6 +66,24 @@ test('bank has 83 unique, identical-language RU/EN pairs without dynamic fields'
     assert.notEqual(languages.get('en').text,languages.get('ru').text,id);
   }
 });
+test('video observations add eleven verified EN/RU source pairs with no audio claims',()=>{
+  assert.equal(video.model,bank.model);
+  assert.equal(video.voice,bank.voice);
+  assert.equal(video.clips.length,22);
+  const paired=new Map();
+  for(const clip of video.clips){
+    assert.ok(['ru','en'].includes(clip.lang));
+    assert.match(clip.id,/^r2Video[A-Z][A-Za-z0-9]*$/);
+    assert.equal(clip.url,'/audio/assistant/v1/phrases/'+clip.lang+'-'+clip.id+'.wav');
+    assert.ok(clip.text.trim()&&clip.text.length<=800);
+    const langs=paired.get(clip.id)||new Set();
+    assert.equal(langs.has(clip.lang),false);
+    langs.add(clip.lang);paired.set(clip.id,langs);
+  }
+  assert.equal(paired.size,11);
+  for(const langs of paired.values())assert.deepEqual([...langs].sort(),['en','ru']);
+  assert.equal(new Set(allPhrases.map(c=>c.url)).size,allPhrases.length);
+});
 test('all manifest WAVs exist, have matching SHA256 and valid PCM headers',()=>{
   assert.equal(manifest.version,1);
   assert.equal(manifest.voice,'marin');
@@ -79,7 +99,7 @@ test('all manifest WAVs exist, have matching SHA256 and valid PCM headers',()=>{
   }
 });
 test('any r2 WAV in manifest has an identical approved script entry',()=>{
-  const phrases=new Map(bank.clips.map(c=>[c.url,c]));
+  const phrases=new Map(allPhrases.map(c=>[c.url,c]));
   const recorded=manifest.clips.filter(c=>c.id.startsWith('r2'));
   for(const clip of recorded){
     const expected=phrases.get(clip.url);
@@ -100,7 +120,7 @@ test('every generated r2 file is indexed by the manifest; dynamic text is silent
   const w={};
   new Function('window',fs.readFileSync(path.join(root,'voice-audio-bank-r2.js'),'utf8'))(w);
   assert.equal(w.ArtSoulVoiceAudioBank.lookup('A user balance, signed receipt, or dynamic reply'), '');
-  for(const clip of bank.clips){
+  for(const clip of allPhrases){
     const lookup=w.ArtSoulVoiceAudioBank.lookup(clip.text);
     if(entries.has(clip.url))assert.equal(lookup,clip.url,'recorded phrase must be indexed');
     else assert.equal(lookup,'','unrecorded phrase must not be voiced');
