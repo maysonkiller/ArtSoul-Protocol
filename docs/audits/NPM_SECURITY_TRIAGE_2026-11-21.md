@@ -10,7 +10,7 @@
 - Same-lockfile candidate: [run 44918414072](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/44918414072). It evaluated `npm audit fix --package-lock-only --ignore-scripts` **without `--force`**.
 - Candidate changes were independently inspected before committing only `package-lock.json` to this dedicated branch. Root package.json requirements are unchanged.
 
-## Verified audit counts
+## Verified audit counts for the initial compatible trial (before restoring the C12 OpenZeppelin pin)
 
 | npm severity | OLD full | NEW lockfile | OLD omit=dev | NEW omit=dev |
 |---|---:|---:|---:|---:|
@@ -20,14 +20,16 @@
 | Low | 19 | 26 | 18 | 21 |
 | **Total** | **71** | **62** | **60** | **52** |
 
+The initial trial moved OpenZeppelin 5.0.0 to 5.6.1. That is **not acceptable for the existing C12 contract-source and storage-layout pins**. The submitted PR candidate restores the exact OpenZeppelin 5.0.0 dependency record and updates only the C12 toolchain version and lockfile SHA256 in the candidate manifest; all compiler-source/ABI/bytecode hashes and settings are kept unchanged. The currently submitted branch requires a new audit and exact-head CI. Do not treat the trial's 62 as the submitted branch's final count.
+
 These are npm *affected-package* counts, not unique CVEs. A production-scope npm audit does not establish whether browser visitors can reach a vulnerable path.
 
 ## Compatible changes in isolated lockfile
 
 - `handlebars` 4.7.9 → 4.7.10 and `proxy-addr` 2.0.7 → 2.0.8 address the two **critical** audit entries.
-- Compatible updates also removed the previous audit entries for `@openzeppelin/contracts`, `body-parser`, `brace-expansion`, `fast-uri`, `follow-redirects`, `form-data`, `immutable`, `ip-address`, `js-yaml`, `nanoid`, `pbkdf2`, `postcss`, `postcss-selector-parser`, `qs`, and `source-map-js`.
-- `hardhat` 2.28.6 → 2.29.2; `@openzeppelin/contracts` 5.0.0 → 5.6.1. These need exact contract tests, even though their root semver ranges permit the upgrades.
-- The candidate changed 32 resolved versions and introduced new nested resolution paths. The remaining audit count is 62, and low-severity findings increased. No zero-vulnerability claim is made.
+- The temporary trial removed `@openzeppelin/contracts` but the PR intentionally restores its original pinned version to maintain immutable compiler evidence. Compatible updates removed previous audit entries for `body-parser`, `brace-expansion`, `fast-uri`, `follow-redirects`, `form-data`, `immutable`, `ip-address`, `js-yaml`, `nanoid`, `pbkdf2`, `postcss`, `postcss-selector-parser`, `qs`, and `source-map-js`.
+- `hardhat` 2.28.6 → 2.29.2; `@openzeppelin/contracts` stays at 5.0.0 in the submitted candidate. The C12 source hashes, ABI and bytecode pins stay unchanged. Exact contract tests are still required.
+- The initial npm proposal changed 32 resolved versions and introduced new nested resolution paths. Its count was 62 (including the OpenZeppelin update); the submitted PR preserves C12 OpenZeppelin 5.0.0, so the final audit count must be recalculated. No zero-vulnerability claim is made.
 
 ## Remaining blockers
 
