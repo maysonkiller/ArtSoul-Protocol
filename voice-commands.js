@@ -63,7 +63,7 @@
     // A new tool requires a deliberate Send until its voice-chat effects are reviewed.
     const CHAT_TOOLS = new Set(['search_catalog', 'find_active_auctions', 'get_auction_state',
         'get_artwork_provenance', 'get_artwork', 'get_my_activity', 'open_artwork', 'open_page',
-        DRAFT_TOOL, 'revise_publication_draft']);
+        'explain_settlement', 'prepare_bid', DRAFT_TOOL, 'revise_publication_draft']);
 
     // Recognisers write numbers as digits: "31", "0.05", and in Russian "0,05".
     const AMOUNT = '(\\d+(?:[.,]\\d{1,18})?)';
@@ -501,6 +501,15 @@
             const text = `Opening ${data.title}.`;
             return { say: text, show: text };
         }
+        case 'explain_settlement': {
+            const steps = Array.isArray(data.lifecycle) ? data.lifecycle.filter(x => typeof x === 'string').slice(0,7) : [];
+            const explanation = steps.length ? steps.join(' ') : t.unavailable;
+            return {say:explanation,show:[explanation,data.floor_rule,data.exact_figures].filter(Boolean).join('\n')};
+        }
+        case 'prepare_bid': {
+            const message = typeof data.instruction === 'string' ? data.instruction : t.unavailable;
+            return {say:message,show:message};
+        }
         case 'revoke_wallet_access': {
             const text = data.revoked
                 ? 'The agent can no longer open your wallet.'
@@ -578,12 +587,21 @@
         if (launcher?.dataset.commandsInitialized) return;
         const agent = window.ArtSoulWebMCP;
         const tools = new Map(agent.createTools(agent.browserDependencies()).map(tool => [tool.name, tool]));
+        const dialogue = window.ArtSoulVoiceConversation?.createDialogue?.();
+        const DIALOGUE_KEY = 'artsoul.voice.dialogue.r2';
 
         let inputLanguage = readStored(LANG_KEY) === 'ru' ? 'ru' : 'en';
         let recognition = null;
         let handsFree = false;
         let leavingFor = null;
         let arrivingFrom = takeNavigation();
+        if (arrivingFrom && dialogue) {
+            try {
+                const saved = window.sessionStorage.getItem(DIALOGUE_KEY);
+                if (saved && saved.length < 1500) dialogue.restore(JSON.parse(saved));
+                window.sessionStorage.removeItem(DIALOGUE_KEY);
+            } catch { dialogue.clear(); }
+        }
         let pendingDraftField = null;
         let pendingPrompt = null;
         let voiceConsent = readStored(NOTICE_KEY) === 'accepted';
@@ -774,6 +792,7 @@
 
         function closePanel() {
             stopVoice();
+            dialogue?.clear();
             panel.hidden = true;
             button.setAttribute('aria-expanded', 'false');
             button.focus({ preventScroll: true });
@@ -906,7 +925,14 @@
                 reply(transcript, draftTurn.message, pendingDraftField === 'title' ? t.askTitle : draftTurn.message);
                 return;
             }
-            let command = draftTurn || parseCommand(transcript, inputLanguage, previousPrompt === 'nft');
+            const contextual = !draftTurn && !isValue && dialogue?.route(transcript, {
+                lang:replyLang, spoken, confidence
+            });
+            let command = draftTurn || (contextual?.kind === 'tool'
+                ? {tool:contextual.tool,input:contextual.input}
+                : parseCommand(transcript, inputLanguage, previousPrompt === 'nft'));
+            if (contextual?.kind === 'stop') { stopVoice(); show(transcript,'',[], ''); return; }
+            if (contextual?.kind === 'reply') { reply(transcript,contextual.text); return; }
             // The answer to a search/title question is data, even when it sounds like a wallet command.
             if (previousPrompt === 'search' && command?.tool !== 'search_catalog' && !command?.searchPrompt && !command?.help) {
                 command = { tool: 'search_catalog', input: { query: transcript.trim() } };
@@ -956,6 +982,7 @@
             try {
                 const result = JSON.parse(await tool.execute(command.input));
                 if (current !== generation || currentWallet !== walletIdentity()) return;
+                dialogue?.observe(command.tool,result);
                 if (!result.error && (result.submitted === true || result.updated === true || result.revoked === true)) {
                     // A finished action must not remain armed in the composer.
                     // Declines/errors retain the draft for a deliberate retry.
@@ -1130,9 +1157,10 @@
         });
         // Never listen in a tab nobody is looking at.
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') stopVoice();
+            if (document.visibilityState === 'hidden') {stopVoice();dialogue?.clear();}
         });
         function clearAccount() {
+            dialogue?.clear();
             generation++;
             stopVoice();
             input.value = '';
@@ -1158,7 +1186,10 @@
         window.addEventListener('artsoul:auth-state-changed', () => { clearAccount(); show('', ''); });
         window.addEventListener('pagehide', () => {
             if (leavingFor && Date.now() - leavingFor.at < NAVIGATION_TTL) {
-                try { window.sessionStorage.setItem(NAVIGATION_KEY, JSON.stringify(leavingFor)); }
+                try {
+                    if (dialogue) window.sessionStorage.setItem(DIALOGUE_KEY,JSON.stringify(dialogue.snapshot()));
+                    window.sessionStorage.setItem(NAVIGATION_KEY, JSON.stringify(leavingFor));
+                }
                 catch { /* Browsing still works when tab storage is unavailable. */ }
             }
             clearAccount();
