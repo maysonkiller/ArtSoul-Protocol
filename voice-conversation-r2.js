@@ -73,7 +73,7 @@
                /(?:откр|покаж|ставк|куп|прод|wallet|bid|buy|open|sell|аукцион|auction)/iu.test(t))
                 return say('Ничего не открываю и не подтверждаю.','Nothing was opened or confirmed.');
             if(spoken&&Number(confidence)>0&&Number(confidence)<0.6&&
-               /(?:bid|buy|sell|open|wallet|постав|купи|продай|открой|кошел)/iu.test(t))
+               /(?:bid|buy|sell|open|wallet|connect|notification|network|theme|future|classic|постав|купи|продай|открой|кошел|подключ|уведомлен|сеть|режим|тему)/iu.test(t))
                 return say('Не уверена, что правильно расслышала. Исправьте текст перед отправкой.','Low recognition confidence. Correct the transcript before submitting.');
 
             // Exact examples witnessed in the 2026-11-21 browser recording.
