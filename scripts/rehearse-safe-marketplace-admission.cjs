@@ -54,7 +54,9 @@ async function main() {
         return { provider, evm, relayer, accounts, owners, addresses, deploy, safes };
     }
 
-    const { provider, evm, relayer, accounts, owners, addresses, deploy, safes } = await createRehearsalNetwork(84532, 3);
+    const { provider, evm, relayer, accounts, owners, addresses, deploy, safes: allSafes } = await createRehearsalNetwork(84532, 11);
+    const safes = allSafes.slice(0, 3);
+    const bidderSafes = allSafes.slice(3);
     const security = safes[2];
     const coreArtifact = await artifacts.readArtifact('OrdinaryMarket');
     const factoryCore = new ethers.ContractFactory(coreArtifact.abi, coreArtifact.bytecode);
@@ -67,7 +69,7 @@ async function main() {
         custody[role] = { address: safes[i].target, owners: addresses, threshold: 2 };
     }
     // The independent encoder and the local signer use rehearsal-only refund limits.
-    const limits = [2, 30_000];
+    const limits = [8, 30_000];
     const creation = await factoryCore.getDeployTransaction(...safes.map(safe => safe.target), ...limits);
     const { prepareOrdinaryDeployment } = await import('./prepare-ordinary-deployment.mjs');
     const plan = prepareOrdinaryDeployment(coreArtifact, {
@@ -204,6 +206,44 @@ async function main() {
     assert.equal(await engine.credits(protocol.target), protocolShare);
     assert.equal(await provider.getBalance(protocol.target), 0n);
     console.log('PASS: two Safe owners claimed the exact 1% resale share and a second pair authorized a local grant.');
+
+    await mine(engine.connect(artist).registerArtwork('ipfs://local-safe-bidder-refunds'));
+    await mine(engine.connect(artist).createAuction(await engine.workCount(), ethers.parseEther('0.11'), 86400));
+    const auctionId = await engine.auctionCount();
+    const deposits = [];
+    for (const safe of bidderSafes) {
+        const price = await engine.minimumBid(auctionId);
+        const deposit = await engine.requiredDepositForBid(price);
+        await mine(relayer.sendTransaction({ to: safe.target, value: deposit }));
+        const call = engine.interface.encodeFunctionData('placeBid', [auctionId, price]);
+        await mine(safe.execTransaction(...await signedTransfer(safe, engine.target, deposit, call, firstPair)));
+        assert.equal(await provider.getBalance(safe.target), 0n);
+        deposits.push(deposit);
+    }
+    const finalBid = await engine.minimumBid(auctionId);
+    await mine(engine.connect(buyer).placeBid(auctionId, finalBid, { value: await engine.requiredDepositForBid(finalBid) }));
+    await evm.send('evm_setNextBlockTimestamp', [Number((await engine.auctions(auctionId)).end)]);
+    await mine(engine.closeAuction(auctionId));
+    for (const count of [1, 4, 8]) {
+        const snapshot = await evm.send('evm_snapshot');
+        const receipt = await mine(engine.processRefunds(auctionId, count));
+        const refunds = receipt.logs.filter(log => log.fragment?.name === 'OutbidRefundProcessed');
+        assert.equal(refunds.length, count);
+        assert.deepEqual(Array.from(await engine.refundProgress(auctionId)), [BigInt(count), BigInt(bidderSafes.length)]);
+        for (const [i, safe] of bidderSafes.entries()) {
+            const paid = i < count;
+            if (paid) assert.deepEqual(Array.from(refunds[i].args), [auctionId, BigInt(i), safe.target, deposits[i], true]);
+            assert.equal(await provider.getBalance(safe.target), paid ? deposits[i] : 0n);
+            assert.equal(await engine.credits(safe.target), 0n);
+        }
+        if (count === bidderSafes.length) {
+            const replay = await mine(engine.processRefunds(auctionId, count));
+            assert.equal(replay.logs.some(log => log.fragment?.name === 'OutbidRefundProcessed'), false);
+            assert.deepEqual(await Promise.all(bidderSafes.map(safe => provider.getBalance(safe.target))), deposits);
+        }
+        console.log('PASS: ' + count + ' Safe bidder refunds used ' + receipt.gasUsed + ' local execution gas.');
+        assert.equal(await evm.send('evm_revert', [snapshot]), true);
+    }
 
     const pilot = await createRehearsalNetwork(8453, 1);
     const grantSafe = pilot.safes[0];
