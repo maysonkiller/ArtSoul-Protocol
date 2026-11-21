@@ -942,3 +942,19 @@ test('late audio approval is discarded after closing, tab lifecycle, language or
     assert.equal(h.get('input').disabled, false, change);
   }
 });
+
+
+test('typed and recognized speech routes by actual script regardless of mic-language selection',async()=>{
+ const h=harness({speech:true,execute:async()=>JSON.stringify({
+   opened:true,page:'gallery',title:'Explore',url:'/gallery'
+ })});
+ h.open();
+ h.ru.fire('click');
+ h.submit('open gallery'); await flush();
+ assert.deepEqual(h.calls[0],{name:'open_page',args:{page:'gallery'}},
+   'English text must reach English parser even with RU mic selected');
+ h.en.fire('click');
+ h.submit('открой галерею'); await flush();
+ assert.deepEqual(h.calls[1],{name:'open_page',args:{page:'gallery'}},
+   'Russian text must reach Russian parser even with EN mic selected');
+});
