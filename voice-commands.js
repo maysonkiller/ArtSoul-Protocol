@@ -661,6 +661,60 @@
         } catch { return null; }
     }
 
+
+    // UI-only voice intents. No wallet connection, signatures or transfers:
+    // these helpers may display an existing menu or set a presentation theme.
+    function safeVoiceUiAction(intent, { win = window, doc = typeof document === 'undefined' ? null : document, lang = 'en' } = {}) {
+        const result=(ru,en)=>({show:lang==='ru'?ru:en,say:lang==='ru'?ru:en});
+        const unavailable=()=>result('Эта функция сейчас недоступна на странице. Попробуйте кнопку в шапке сайта.',
+            'This control is unavailable here. Please use the corresponding header button.');
+        if (!intent || intent.kind !== 'ui' || !doc || doc.visibilityState === 'hidden') return unavailable();
+        if (intent.action === 'walletMenu') {
+            const button = doc.querySelector('.avatar-button[aria-label="ArtSoul account menu"]');
+            if (!button || button.disabled || typeof button.click !== 'function') return unavailable();
+            try {
+                if (button.getAttribute('aria-expanded') !== 'true') button.click();
+            } catch { return unavailable(); }
+            return result('Открыла меню аккаунта. Для подключения выберите кошелёк и подтвердите действие сами. Ничего не подписано.',
+                'Account menu opened. Select a wallet and approve the connection yourself. Nothing was signed.');
+        }
+        if (intent.action === 'notifications') {
+            const button = doc.querySelector('[data-notification-preview]');
+            if (!button || button.disabled || typeof button.click !== 'function') return unavailable();
+            try { button.click(); } catch { return unavailable(); }
+            return result('Открываю панель уведомлений. Если кошелёк не подключён, появится подсказка.',
+                'Opening notifications. If no wallet is connected, the panel will show a connection prompt.');
+        }
+        if (intent.action === 'theme') {
+            if (!['classic','future'].includes(intent.theme) ||
+                typeof win.ThemeManager?.setTheme !== 'function') return unavailable();
+            try { win.ThemeManager.setTheme(intent.theme); } catch { return unavailable(); }
+            return intent.theme === 'classic'
+                ? result('Включила классический вид ArtSoul.', 'ArtSoul Classic appearance is enabled.')
+                : result('Включила оформление Future.', 'ArtSoul Future appearance is enabled.');
+        }
+        if (intent.action === 'networkStatus') {
+            if (win.artsoulWalletStateSettled !== true)
+                return result('Состояние кошелька ещё загружается. Проверьте сеть в меню кошелька.',
+                    'Wallet state is still loading. Check the network in your wallet menu.');
+            const state=win.artsoulSettledWalletState;
+            if (!state?.isConnected || !/^0x[0-9a-f]{40}$/i.test(String(state.address||'')))
+                return result('Кошелёк не подключён. Сеть кошелька сейчас неизвестна.',
+                    'No wallet is connected. Its selected network is unknown.');
+            const raw = state.chainId ?? state.network?.chainId;
+            const chain = typeof raw === 'string' && /^0x[0-9a-f]+$/i.test(raw)
+                ? Number.parseInt(raw.slice(2),16) : Number(raw);
+            if (Number.isSafeInteger(chain) && chain > 0) {
+                const label=({84532:'Base Sepolia',8453:'Base Mainnet',1:'Ethereum Mainnet',11155111:'Ethereum Sepolia'})[chain];
+                return result('Кошелёк подключён. Выбранная сеть: '+(label||'ID '+chain)+'.',
+                    'Wallet connected. Selected network: '+(label||'ID '+chain)+'.');
+            }
+            return result('Кошелёк подключён, но сеть не подтверждена доступными данными. Проверьте её в кошельке.',
+                'Wallet connected, but the network is not verified by available state. Check it in your wallet.');
+        }
+        return unavailable();
+    }
+
     window.ArtSoulVoice = Object.freeze({
         parseCommand,
         parseNavigationTurn,
@@ -671,7 +725,8 @@
         mayRun,
         isWrite,
         WRITE_TOOLS,
-        WRITE_CONFIDENCE
+        WRITE_CONFIDENCE,
+        safeVoiceUiAction
     });
 
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1029,6 +1084,11 @@
                 : parseCommand(transcript, replyLang, previousPrompt === 'nft'));
             if (contextual?.kind === 'stop') { stopVoice(); show(transcript,'',[], ''); return; }
             if (contextual?.kind === 'reply') { reply(transcript,contextual.text); return; }
+            if (contextual?.kind === 'ui') {
+                const outcome = safeVoiceUiAction(contextual,{win:window,doc:document,lang:replyLang});
+                reply(transcript,outcome.show,outcome.say);
+                return;
+            }
             // The answer to a search/title question is data, even when it sounds like a wallet command.
             if (previousPrompt === 'search' && command?.tool !== 'search_catalog' && !command?.searchPrompt && !command?.help) {
                 command = { tool: 'search_catalog', input: { query: transcript.trim() } };
