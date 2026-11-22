@@ -171,7 +171,7 @@ test('confirmation normalizes a comma once, preserves exact value, and passes a 
     await h.run();
     assert.equal(h.writes.length, 1);
     assert.deepEqual(h.writes[0].slice(0, 3), ['28', '0.001', 24]);
-    assert.ok(edited.includes(`${h.writes[0][1]} test ETH · ${h.writes[0][2]} hours`));
+    assert.ok(edited.includes(`${h.writes[0][1]} test ETH / ${h.writes[0][2]} hours`));
     assert.ok(!edited.includes('0.00001'));
     assert.equal(h.writes[0][3].expectedWallet, CREATOR);
     assert.equal(h.writes[0][3].expectedChainId, 84532);
