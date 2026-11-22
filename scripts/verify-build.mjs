@@ -79,7 +79,7 @@ for (const page of pages) {
     }
 
     if (page === 'index.html') {
-        const balancedHero = /<h1\b[^>]*>\s*Discover a work — start its next chapter\s*<\/h1>/;
+        const balancedHero = /<h1\b[^>]*>\s*Discover a work and start its next chapter\s*<\/h1>/;
         if (!balancedHero.test(source) || !balancedHero.test(built)) {
             throw new Error('The homepage headline must be one naturally wrapping phrase without a forced break.');
         }

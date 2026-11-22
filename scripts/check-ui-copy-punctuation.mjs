@@ -44,8 +44,8 @@ for (const abs of paths) {
   }
 }
 const required = [
-  ['index.html', 'Art first — ownership next'],
-  ['index.html', 'Discover a work — start its next chapter'],
+  ['index.html', 'Art comes first'],
+  ['index.html', 'Discover a work and start its next chapter'],
   ['gallery.html', 'Art worth discovering</h1>'],
   ['visual-lab.html', 'Discovery-First Auctions for Digital Art'],
   ['collection-builder.html', 'Local draft — unpublished']
