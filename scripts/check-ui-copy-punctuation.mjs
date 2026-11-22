@@ -36,7 +36,9 @@ for (const abs of paths) {
   if (/\s\u2022\s/u.test(source)) errors.push(file + ': decorative spaced bullet');
   for (const match of source.matchAll(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi)) {
     const visible = match[2].replace(/<[^>]+>/g, ' ').replace(/\{[^{}]*\}/g, ' ').replace(/\s+/g, ' ').trim();
-    if (visible && /\.(?:\s*)$/.test(visible)) {
+    // JSX numbered headings like `{index + 1}. {phase.name}` reduce to a bare dot.
+    // A numbering dot is semantic, not a decorative sentence-final period.
+    if (visible !== '.' && /[\p{L}\p{N}].*\.$/u.test(visible)) {
       errors.push(file + ': heading ends with a decorative full stop (' + visible.slice(0, 90) + ')');
     }
   }
