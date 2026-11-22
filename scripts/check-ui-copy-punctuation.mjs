@@ -47,6 +47,7 @@ const required = [
   ['index.html', 'Art first — ownership next'],
   ['index.html', 'Discover a work — start its next chapter'],
   ['gallery.html', 'Art worth discovering</h1>'],
+  ['visual-lab.html', 'Discovery-First Auctions for Digital Art'],
   ['collection-builder.html', 'Local draft — unpublished']
 ];
 for (const [file, expected] of required) {
@@ -57,6 +58,10 @@ for (const [file, expected] of required) {
 const homepage = readFileSync(join(root, 'index.html'), 'utf8');
 if (/<h1\b[^>]*>[^<]*Discover a work[^<]*<br\b/i.test(homepage)) {
   errors.push('index.html: forced line break inside homepage headline');
+}
+const visualLab = readFileSync(join(root, 'visual-lab.html'), 'utf8');
+if (/<h1\b[^>]*>[^<]*Discovery-First Auctions[^<]*<br\b/i.test(visualLab)) {
+  errors.push('visual-lab.html: forced line break inside the Visual Lab headline');
 }
 const responsiveCSS = readFileSync(join(root, 'unified-styles.css'), 'utf8');
 if (!responsiveCSS.includes('Owner copy review 2026-11-22')

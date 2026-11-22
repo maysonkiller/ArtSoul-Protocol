@@ -524,6 +524,17 @@
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
+        /* Scope natural wrapping to the Visual Lab hero, not card content. */
+        .visual-lab #homeSection .text-center h1 {
+            text-wrap: balance;
+            white-space: normal;
+            word-spacing: normal;
+            overflow-wrap: break-word;
+        }
+        .visual-lab #homeSection .text-center > p {
+            text-wrap: pretty;
+            overflow-wrap: break-word;
+        }
     </style>
     <link rel="stylesheet" href="/mobile-no-motion.css?v=3">
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
@@ -629,7 +640,7 @@
         <main id="homeSection" class="section active container mx-auto px-4 relative z-10" style="padding-top: 2rem; padding-bottom: 3rem;">
             <div class="text-center mb-16">
                 <h1 class="text-5xl md:text-6xl font-bold mb-6">
-                    Discovery-First Auctions<br/>for Digital Art
+                    Discovery-First Auctions for Digital Art
                 </h1>
                 <p class="text-2xl md:text-3xl font-light opacity-90 mb-8 max-w-3xl mx-auto">
                     Publish artwork, build collector demand, and mint only after settlement.

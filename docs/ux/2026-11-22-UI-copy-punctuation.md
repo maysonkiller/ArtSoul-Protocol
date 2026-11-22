@@ -20,6 +20,7 @@ The founder prefers no decorative periods in short marketing headlines, hero ban
 
 ## Exact changes
 
+- Visual Lab mock homepage heading no longer inserts a hard `<br>`, and its layout respects natural balance/wrapping
 - Home hero line-break copy now uses `Discover a work` and `Start its next chapter`, without the headline full stops
 - Home eyebrow: `Art first — ownership next`; spotlight subtitle no final period
 - Gallery hero: `Art worth discovering`; collection draft badge: `Local draft — unpublished`
