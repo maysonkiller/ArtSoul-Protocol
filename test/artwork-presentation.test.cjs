@@ -153,7 +153,7 @@ test('the details panel links an eligible frame to the frame legend', () => {
 test('the same collector and owner retain both labels in one actual profile link, case independently', () => {
     for (const isClassic of [true, false]) {
         const html = render({ isClassic, ownerAddress: COLLECTOR.toUpperCase() }).ownershipPanel;
-        assert.match(html, />First Collector · Owner<\/div>/);
+        assert.match(html, />First Collector \/ Owner<\/div>/);
         assert.equal((html.match(/href="\/profile\?address=/g) || []).length, 2);
         assert.equal((html.match(/>Owner<\/div>/g) || []).length, 0);
         assert.match(html, new RegExp(`href="/profile\\?address=${COLLECTOR}"`));
@@ -165,7 +165,7 @@ test('buyback and later transfer preserve the first collector and separate curre
         const html = render({ ownerAddress }).ownershipPanel;
         assert.match(html, />First Collector<\/div>/);
         assert.match(html, />Owner<\/div>/);
-        assert.doesNotMatch(html, /First Collector · Owner/);
+        assert.doesNotMatch(html, /First Collector \/ Owner/);
         assert.equal((html.match(/href="\/profile\?address=/g) || []).length, 3);
     }
 });
@@ -207,7 +207,7 @@ test('both themes keep creator and collector identities outside collapsed detail
         const html = render({ isClassic }).ownershipPanel;
         assert.match(html, /^<div class="artwork-page-panel artwork-page-people/);
         assert.match(html, />Creator<\/div>/);
-        assert.match(html, />First Collector · Owner<\/div>/);
+        assert.match(html, />First Collector \/ Owner<\/div>/);
         assert.doesNotMatch(html, /<details|<summary/);
     }
 });

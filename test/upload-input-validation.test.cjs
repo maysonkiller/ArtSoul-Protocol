@@ -35,7 +35,7 @@ test('publish review tracks the entered starting price and duration and clears i
     const terms = element('publishAuctionTerms');
     element('artPrice').value = '0.00001';
     context.selectAuctionDuration(24);
-    assert.match(terms.textContent, /0\.00001 test ETH · 24 hours/);
+    assert.match(terms.textContent, /0\.00001 test ETH \/ 24 hours/);
     element('artPrice').value = '0,001';
     context.selectAuctionDuration(48);
     assert.match(terms.textContent, /0\.001 test ETH · 48 hours/);

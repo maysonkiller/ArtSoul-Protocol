@@ -195,8 +195,8 @@ test('reduced-motion users retain manual navigation without autoplay', () => {
 test('homepage keeps one editorial line and removes the demo slide and repeated feed', () => {
     const home = readFileSync('index.html', 'utf8');
     const css = readFileSync('unified-styles.css', 'utf8');
-    assert.match(home, /Discover a work\.\s*<br class="home-hero-break">Start its next chapter\./);
-    assert.match(home, /<p class="home-hero-eyebrow">Art first\. Ownership next\.<\/p>/);
+    assert.match(home, /<h1\b[^>]*>\s*Discover a work — start its next chapter\s*<\/h1>/);
+    assert.match(home, /<p class="home-hero-eyebrow">Art first — ownership next<\/p>/);
     assert.match(home, /Collector demand comes before minting/);
     for (const repeat of [
         'Art worth a closer look.',
@@ -243,6 +243,6 @@ test('counter is the only pause control and no opaque pause icon is rendered', (
 
 test('Home explains that successful settlement creates the NFT', () => {
     const html = readFileSync('index.html','utf8');
-    assert.match(html, /Discover a work\.\s*<br class="home-hero-break">Start its next chapter\./);
+    assert.match(html, /<h1\b[^>]*>\s*Discover a work — start its next chapter\s*<\/h1>/);
     assert.match(html, /An NFT is created only after successful settlement\./);
 });
