@@ -460,7 +460,7 @@
         // Cards are built off-DOM. Paint the initial value before insertion;
         // only later ticks should stop when the card is disconnected.
         const extended = auctionWasExtended(artwork);
-        pill.textContent = extended ? 'Extended · ' + info.label : info.label;
+        pill.textContent = extended ? 'Extended / ' + info.label : info.label;
         pill.setAttribute('aria-label', countdownAriaLabel(info.label, extended));
 
         const update = (now = Date.now()) => {
@@ -471,7 +471,7 @@
                 onEnd?.(now);
                 return false;
             }
-            pill.textContent = extended ? 'Extended · ' + label : label;
+            pill.textContent = extended ? 'Extended / ' + label : label;
             pill.setAttribute('aria-label', countdownAriaLabel(label, extended));
             return true;
         };
@@ -502,13 +502,13 @@
         const wouldBuy = toNumber(signals.wouldBuy ?? artwork.would_buy_count);
         const watching = toNumber(signals.watching ?? artwork.watching_count);
         if (includeZero) {
-            return `${likes} likes · ${wouldBuy} would buy · ${watching} watching`;
+            return `${likes} likes / ${wouldBuy} would buy / ${watching} watching`;
         }
         const parts = [];
         if (likes) parts.push(`${likes} likes`);
         if (wouldBuy) parts.push(`${wouldBuy} would buy`);
         if (watching) parts.push(`${watching} watching`);
-        return parts.join(' · ');
+        return parts.join(' / ');
     }
 
     function detailHref(artwork = {}) {
@@ -1172,7 +1172,7 @@
             role: 'timer',
             'aria-live': 'off',
             'aria-label': countdownAriaLabel(current.label, extended)
-        }, extended ? 'Extended · ' + current.label : current.label);
+        }, extended ? 'Extended / ' + current.label : current.label);
     }
 
     function ReactCard({ artwork = {}, href = '', onOpen = null, actions = null, onStartAuction = null, respectHidden = true, minimal = false, surface = '', onMediaUnavailable = null }) {
