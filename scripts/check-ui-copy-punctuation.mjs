@@ -43,7 +43,7 @@ for (const abs of paths) {
 }
 const required = [
   ['index.html', 'Art first — ownership next'],
-  ['index.html', 'Start its next chapter'],
+  ['index.html', 'Discover a work — start its next chapter'],
   ['gallery.html', 'Art worth discovering</h1>'],
   ['collection-builder.html', 'Local draft — unpublished']
 ];
@@ -52,6 +52,17 @@ for (const [file, expected] of required) {
     errors.push(file + ': expected approved copy missing: ' + expected);
   }
 }
+const homepage = readFileSync(join(root, 'index.html'), 'utf8');
+if (/<h1\b[^>]*>[^<]*Discover a work[^<]*<br\b/i.test(homepage)) {
+  errors.push('index.html: forced line break inside homepage headline');
+}
+const responsiveCSS = readFileSync(join(root, 'unified-styles.css'), 'utf8');
+if (!responsiveCSS.includes('Owner copy review 2026-11-22')
+  || !responsiveCSS.includes('#homeSection .home-hero-copy h1')
+  || !responsiveCSS.includes('text-wrap: balance')) {
+  errors.push('unified-styles.css: natural headline wrap rules are missing');
+}
+
 if (errors.length) {
   process.stderr.write(errors.join('\n') + '\n');
   process.exitCode = 1;

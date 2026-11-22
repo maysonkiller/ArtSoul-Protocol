@@ -1,8 +1,12 @@
 # ArtSoul Protocol — UI copy punctuation audit
 
-**Date:** 2026-11-22  
-**Base:** `main` @ `9f72dbbd972fc29ad8095c0ca549650bbf2af637`  
+**Date:** 2026-11-22
+**Base:** `main` @ `9f72dbbd972fc29ad8095c0ca549650bbf2af637`
 **Mode:** SOURCE_ONLY / TEST_ONLY — not merged, not deployed, no contract or payment changes
+
+## Natural headline wrapping
+
+The homepage hero no longer uses a forced `<br>` tag; it displays as one balanced phrase. A small scoped CSS rule uses `text-wrap: balance` for headings and `text-wrap: pretty` for marketing descriptions and retains normal word spacing. This avoids awkward whitespace and widow words on mobile without touching creator-written prose, profile bios or transaction text.
 
 ## Why
 
@@ -33,8 +37,8 @@ The founder prefers no decorative periods in short marketing headlines, hero ban
 - A static gate is provided at `scripts/check-ui-copy-punctuation.mjs`. It reads first-party HTML/JS/JSX/TS/TSX in root and source UI directories and rejects centered dots, spaced decorative bullets, static heading periods and missing headline copy
 - Source diffs are limited to first-party user-visible copy, the check script and this record. Review after a commit using GitHub's changed-files list
 - The creator's original content may contain punctuation by design and should not be modified automatically
-- Real full browser QA, native mobile devices, `npm run build`, all runtime/tab states and preview deployment: **NOT_RUN** in this source-only chat environment. Do not report an exhaustive UI PASS without those tests
+- CI build and static checks must pass on Linux and Windows before merge. Actual mobile screenshot verification, full interactive page states and accessibility checks remain **NOT_RUN** unless independent receipts exist.
 
 ## Follow-up for the owner
 
-Review the draft pull request and run `node scripts/check-ui-copy-punctuation.mjs` plus project build and browser checks on a controlled local machine. No merge or production deploy until explicit owner approval.
+Review the draft pull request and run `node scripts/check-ui-copy-punctuation.mjs` plus project build and browser checks on a controlled local machine. The owner has explicitly requested a single PR merge to `main` after green CI. Do not bypass failing checks. Git integration can trigger an automated Vercel deployment on merge; do not claim production readiness until that deployment is inspected.
