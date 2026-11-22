@@ -113,6 +113,9 @@ jobs:
             node --check "$f"
           done
 
+      - name: UI copy punctuation and headline wrapping
+        run: node scripts/check-ui-copy-punctuation.mjs
+
       - name: git diff --check (whitespace and conflict markers)
         shell: bash
         env:

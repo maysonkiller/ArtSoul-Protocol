@@ -166,12 +166,12 @@ function confirmationHarness(input = {}, { price = '0,001', duration = 24, creat
 test('confirmation normalizes a comma once, preserves exact value, and passes a wallet guard', async () => {
     const h = confirmationHarness();
     const initial = formatAuctionOpeningTerms('0.00001', 48);
-    assert.equal(initial, 'Starting price: 0.00001 test ETH · 48 hours. Your wallet pays only network gas to open the auction.');
+    assert.equal(initial, 'Starting price: 0.00001 test ETH / 48 hours. Your wallet pays only network gas to open the auction.');
     const edited = formatAuctionOpeningTerms(h.scope.newAuctionPrice, h.scope.newAuctionDuration);
     await h.run();
     assert.equal(h.writes.length, 1);
     assert.deepEqual(h.writes[0].slice(0, 3), ['28', '0.001', 24]);
-    assert.ok(edited.includes(`${h.writes[0][1]} test ETH · ${h.writes[0][2]} hours`));
+    assert.ok(edited.includes(`${h.writes[0][1]} test ETH / ${h.writes[0][2]} hours`));
     assert.ok(!edited.includes('0.00001'));
     assert.equal(h.writes[0][3].expectedWallet, CREATOR);
     assert.equal(h.writes[0][3].expectedChainId, 84532);

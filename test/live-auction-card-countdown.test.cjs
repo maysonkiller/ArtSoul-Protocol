@@ -245,7 +245,7 @@ test('only a verified extension changes the card clock label', () => {
   assert.equal(timerFor(artwork).textContent, '10m 05s');
   assert.equal(timerFor({ ...artwork, auction_original_end_time: artwork.auction_end_time }).textContent, '10m 05s');
   const extended = timerFor({ ...artwork, auction_original_end_time: original });
-  assert.equal(extended.textContent, 'Extended · 10m 05s');
+  assert.equal(extended.textContent, 'Extended / 10m 05s');
   assert.equal(extended.attributes['aria-label'], 'Bidding extended. Auction ends in 10m 05s');
   assert.equal(extended.attributes['aria-live'], 'off');
 });

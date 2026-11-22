@@ -8,7 +8,7 @@ export function formatAuctionOpeningTerms(price, hours) {
     if (![24, 36, 48].includes(hours)) return '';
     try {
         const { eth } = parseUserEthAmount(price);
-        return `Starting price: ${eth} test ETH · ${hours} hours. Your wallet pays only network gas to open the auction.`;
+        return `Starting price: ${eth} test ETH / ${hours} hours. Your wallet pays only network gas to open the auction.`;
     } catch {
         return '';
     }

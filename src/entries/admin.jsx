@@ -33,8 +33,8 @@ function ProfileReportSnapshot({ report }) {
         {avatar && <p><a href={avatar} target="_blank" rel="noopener noreferrer"><img src={avatar} width="64" height="64" style={{ objectFit: 'cover' }} loading="lazy" referrerPolicy="no-referrer" alt="Captured profile avatar" /></a></p>}
         <p>Name: {captured.username || 'Not set'}</p>
         <p>Bio: {captured.bio || 'Not set'}</p>
-        <p>X: {captured.twitter_username || captured.twitter_handle || 'Not set'}{(captured.twitter_username || captured.twitter_handle) && (captured.twitter_connected ? ' · Verified connection' : ' · Self-reported')}</p>
-        <p>Discord: {captured.discord_username || 'Not set'}{captured.discord_username && (captured.discord_connected ? ' · Verified connection' : ' · Self-reported')}</p>
+        <p>X: {captured.twitter_username || captured.twitter_handle || 'Not set'}{(captured.twitter_username || captured.twitter_handle) && (captured.twitter_connected ? ' / Verified connection' : ' / Self-reported')}</p>
+        <p>Discord: {captured.discord_username || 'Not set'}{captured.discord_username && (captured.discord_connected ? ' / Verified connection' : ' / Self-reported')}</p>
         {safeExternalUrl(captured.discord_profile_url) && <a href={safeExternalUrl(captured.discord_profile_url)} target="_blank" rel="noopener noreferrer">Captured Discord profile</a>}
         {(report.profile_content_changed || report.profile_content_available === false) && <p role="status">The current profile differs from this captured content or is unavailable. Dismiss or resolve this report; review a new report before hiding changed content.</p>}
     </div>;
@@ -559,7 +559,7 @@ function ProtocolAdminPage() {
                         : 'Secure moderation tools for verified staff wallets.'}</p>
                     <div className="protocol-admin-session">
                         <span className={`protocol-admin-access-status${ready ? ' is-verified' : ''}`} role="status">{statusLabel}</span>
-                        <span>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : 'No staff wallet connected'}{roleLabel ? ` · ${roleLabel}` : ''}</span>
+                        <span>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : 'No staff wallet connected'}{roleLabel ? ` / ${roleLabel}` : ''}</span>
                     </div>
                 </div>
                 <div className="protocol-admin-header-actions">
@@ -624,7 +624,7 @@ function ProtocolAdminPage() {
                     {queueTarget && <p className="protocol-admin-message">
                         {queueTarget.target_type === 'profile_content'
                             ? `Profile-content reports for ${shortWallet(queueTarget.profile_wallet)}.`
-                            : `${queueTarget.target_type === 'donation_message' ? 'Donation-message reports' : 'Artwork reports'} for artwork ${queueTarget.artwork_id} · Chain ${queueTarget.chain_id}.`}
+                            : `${queueTarget.target_type === 'donation_message' ? 'Donation-message reports' : 'Artwork reports'} for artwork ${queueTarget.artwork_id} / Chain ${queueTarget.chain_id}.`}
                         {' '}<button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => changeQueueStatus(queueStatus === 'all' ? 'pending_review' : queueStatus, null)}>Show all reports</button>
                     </p>}
                     {groups.length === 0 ? <p className="protocol-admin-empty">No reports in this state.</p> : groups.map(group => (
@@ -638,8 +638,8 @@ function ProtocolAdminPage() {
                                 <div>
                                     <h3>{group.targetType === 'donation_message' ? 'Donation message for artwork' : 'Artwork'} {group.artworkId}</h3>
                                     <p>{(data.artworks || []).find(item => item.chain_id === Number(group.chainId) && item.artwork_id === String(group.artworkId))?.title}</p>
-                                    <p>Chain {group.chainId} · {group.reports.length} independent report{group.reports.length === 1 ? '' : 's'}</p>
-                                    {group.targetType === 'donation_message' && <p>Transaction {shortWallet(group.transactionHash)} · Log {group.logIndex}</p>}
+                                    <p>Chain {group.chainId} / {group.reports.length} independent report{group.reports.length === 1 ? '' : 's'}</p>
+                                    {group.targetType === 'donation_message' && <p>Transaction {shortWallet(group.transactionHash)} / Log {group.logIndex}</p>}
                                 </div>
                                 <a href={window.ArtSoulArtworkUrl.artworkPath(`v41:${group.chainId}:${group.artworkId}`)}>Open artwork</a>
                                 </>}
@@ -716,7 +716,7 @@ function ProtocolAdminPage() {
                                 <div key={`${item.action || item.event_type}:${item.id}`}>
                                     <strong>{item.action || item.event_type}</strong>
                                     <span>{item.report_id ? `Report ${item.report_id}` : `Artwork ${item.artwork_id}`}</span>
-                                    <span>{new Date(item.created_at).toLocaleString('en-US')} · {item.actor_wallet ? shortWallet(item.actor_wallet) : 'Identity private'}{item.reason ? ` · ${item.reason}` : ''}</span>
+                                    <span>{new Date(item.created_at).toLocaleString('en-US')} / {item.actor_wallet ? shortWallet(item.actor_wallet) : 'Identity private'}{item.reason ? ` / ${item.reason}` : ''}</span>
                                 </div>
                             ))}
                     </div>

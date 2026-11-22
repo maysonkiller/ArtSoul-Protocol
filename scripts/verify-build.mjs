@@ -74,8 +74,15 @@ for (const page of pages) {
         throw new Error('The collection editor must show its initial page while the application loads.');
     }
 
-    if (page === 'gallery.html' && !/<h1>Art worth discovering\.<\/h1>[\s\S]*?<div id="app">/.test(built)) {
+    if (page === 'gallery.html' && !/<h1>Art worth discovering<\/h1>[\s\S]*?<div id="app">/.test(built)) {
         throw new Error('The gallery heading must be visible before the filter and artwork bundle starts.');
+    }
+
+    if (page === 'index.html') {
+        const balancedHero = /<h1\b[^>]*>\s*Discover a work — start its next chapter\s*<\/h1>/;
+        if (!balancedHero.test(source) || !balancedHero.test(built)) {
+            throw new Error('The homepage headline must be one naturally wrapping phrase without a forced break.');
+        }
     }
 
     // Do not replace already painted fallback text when a font arrives late.

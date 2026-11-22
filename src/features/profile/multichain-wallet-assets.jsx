@@ -54,7 +54,7 @@ function NftCard({ item }) {
         <NetworkBadge network={item.network}/>
       </div>
       <p className="wallet-asset-collection">{item.collection || 'Unnamed collection'}</p>
-      <p className="wallet-asset-brief">{item.tokenType}{item.quantity !== '1' ? ' · ×' + item.quantity : ''}</p>
+      <p className="wallet-asset-brief">{item.tokenType}{item.quantity !== '1' ? ' / ×' + item.quantity : ''}</p>
       <details className="wallet-asset-details"><summary>NFT details</summary>
         {item.description && <p className="wallet-asset-description">{item.description}</p>}
         <dl><dt>Network</dt><dd>{item.networkName}</dd><dt>Contract</dt><dd><code>{item.contractAddress}</code></dd>
@@ -151,7 +151,7 @@ export function MultiChainWalletAssets({ wallet }) {
   const page = state.page, loading = state.status === 'loading';
   return <section className="wallet-nfts wallet-multichain" aria-label="Multichain wallet collection" aria-busy={loading}>
     <header className="wallet-multichain-heading">
-      <div><p className="wallet-multichain-kicker">YOUR WALLET · READ ONLY</p>
+      <div><p className="wallet-multichain-kicker">YOUR WALLET / READ ONLY</p>
         <h3>Onchain collection</h3>
         <p className="wallet-assets-note">One place for NFTs and tokens. Viewing never switches your wallet network.</p></div>
       <div className="wallet-asset-tabs" role="group" aria-label="Choose asset type">
@@ -182,8 +182,8 @@ export function MultiChainWalletAssets({ wallet }) {
       <button type="button" className="btn-secondary" onClick={() => void signIn()}>Sign in</button></p>}
     {state.message && <p role="status" className="wallet-asset-error">{state.message}</p>}
     {page && <>
-      <p className="wallet-assets-note">{page.items.length} displayed · indexed by Alchemy · fetched {new Date(page.fetchedAt).toLocaleString('en-US')}
-        {page.omittedCount > 0 ? ' · ' + page.omittedCount + ' unsupported items omitted' : ''}</p>
+      <p className="wallet-assets-note">{page.items.length} displayed / indexed by Alchemy / fetched {new Date(page.fetchedAt).toLocaleString('en-US')}
+        {page.omittedCount > 0 ? ' / ' + page.omittedCount + ' unsupported items omitted' : ''}</p>
       {page.partialNetworks.length > 0 && <p role="status" className="wallet-asset-warning">
         Some networks did not respond: {page.partialNetworks.map(networkName).join(', ')}.
         Successful NFTs remain visible; you can select the affected network separately.</p>}

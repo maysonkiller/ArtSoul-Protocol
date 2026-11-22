@@ -544,9 +544,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     </dl>
                                     <p>
                                         <a href="/docs-protocol#trust-community">Community signals</a>
-                                        <span aria-hidden="true"> · </span>
+                                        <span aria-hidden="true"> / </span>
                                         <a href="/docs-protocol#discovery">Ranking</a>
-                                        <span aria-hidden="true"> · </span>
+                                        <span aria-hidden="true"> / </span>
                                         <a href="/docs-protocol#settlement">Settlement</a>
                                     </p>
                                 </div>

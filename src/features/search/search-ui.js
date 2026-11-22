@@ -125,13 +125,13 @@ function resultLink(item, key) {
         const media = card.mediaDescriptor(item); const image = ['image', 'gif'].includes(media.type) ? media.thumbnailUrl : media.poster;
         addImage(link, image, '/ARTSOULlogo-clean.png');
         const creator = card.creatorLabel(item), lifecycle = card.statusInfo(item).label, price = card.formatPrice(item);
-        const lifecycleLabel = element('span', '', [lifecycle, price].filter(Boolean).join(' · '));
+        const lifecycleLabel = element('span', '', [lifecycle, price].filter(Boolean).join(' / '));
         text.append(element('strong', '', item.title || `Artwork #${id}`), element('span', '', `Creator: ${creator}`), lifecycleLabel);
         const countdown = card.countdownInfo(item);
         if (countdown) {
             const deadline = element('span', '', 'Ends ' + new Date(countdown.endTime).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }));
             text.append(deadline);
-            deadlineUpdates.push(() => { if (Date.now() >= countdown.endTime) { lifecycleLabel.textContent = ['Auction ended', price].filter(Boolean).join(' · '); deadline.textContent = 'Bidding is closed.'; } });
+            deadlineUpdates.push(() => { if (Date.now() >= countdown.endTime) { lifecycleLabel.textContent = ['Auction ended', price].filter(Boolean).join(' / '); deadline.textContent = 'Bidding is closed.'; } });
         }
         link.title = [item.title || `Artwork #${id}`, creator, lifecycle, price].filter(Boolean).join(' — ');
     }
