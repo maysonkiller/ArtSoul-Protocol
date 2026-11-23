@@ -423,3 +423,38 @@ body[data-as-season="newyear"] .site-header .site-header-shell{padding-top:32px!
 /* Keep the pompon inside narrow 320px viewports without clipping the hat. */
 @media(max-width:355px){.as-santa-hat{left:calc(50% - 19px)!important}}
 #as-header-ornament .as-bulb{margin-left:-4px}
+
+
+/* ArtSoul Preview v5 — surface-specific correction after auditing 11 route sources.
+   Unframed text, labels, and logo never carry a floating snowcap. */
+.as-seasonal-ink{position:relative}
+body[data-as-season="winter"] :is(.site-primary-nav a,.site-header .mobile-nav a,.publication-type-nav a,.home-section-link,.launch-topline a).as-seasonal-ink{
+  text-shadow:0 0 9px rgba(162,225,255,.32);filter:drop-shadow(0 -1px 1px rgba(215,247,255,.13))
+}
+body[data-as-season="newyear"] :is(.site-primary-nav a,.site-header .mobile-nav a,.publication-type-nav a,.home-section-link,.launch-topline a).as-seasonal-ink{
+  text-shadow:0 0 9px rgba(255,190,136,.25)
+}
+/* No text-only/transparent CTA may inherit a previous generic crown. */
+body :is(a,button).as-seasonal-ink>.as-snow-crown,
+body :is(a,button).as-seasonal-ink>.as-holiday-detail{display:none!important}
+/* Real material varies by width, density and object type. Fixed profile per node. */
+.as-drift-0>.as-snow-crown{left:7%!important;right:12%!important}
+.as-drift-1>.as-snow-crown{left:11%!important;right:7%!important}
+.as-drift-2>.as-snow-crown{left:5%!important;right:8%!important}
+.as-drift-3>.as-snow-crown{left:9%!important;right:4%!important}
+body[data-as-season="winter"] .as-drift-0>.as-snow-crown{transform:translateY(1px) scaleY(.89)!important}
+body[data-as-season="winter"] .as-drift-1>.as-snow-crown{transform:translateY(-1px) scaleY(1.08)!important}
+body[data-as-season="winter"] .as-drift-2>.as-snow-crown{transform:translateY(0) scaleY(.94)!important}
+body[data-as-season="winter"] .as-drift-3>.as-snow-crown{transform:translateY(1px) scaleY(1.04)!important}
+/* In New Year, foliage/festive lights are independent of winter's ice profile. */
+body[data-as-season="newyear"] .as-drift-0>.as-holiday-detail{transform:translateY(1px) scaleY(.94)!important}
+body[data-as-season="newyear"] .as-drift-1>.as-holiday-detail{transform:translateY(-1px) scaleY(1.05)!important}
+body[data-as-season="newyear"] .as-drift-2>.as-holiday-detail{transform:translateY(0) scaleY(.91)!important}
+body[data-as-season="newyear"] .as-drift-3>.as-holiday-detail{transform:translateY(1px) scaleY(1.08)!important}
+/* Route-wide light, including React-rendered screens beyond the homepage. */
+body[data-as-season="winter"] :is(.gallery-page-main,.artwork-page-shell,.upload-page-main,.launch-page,.protocol-admin-root,.wallet-test-shell) {filter:drop-shadow(0 0 9px rgba(92,190,231,.06))}
+body[data-as-season="newyear"] :is(.gallery-page-main,.artwork-page-shell,.upload-page-main,.launch-page,.protocol-admin-root,.wallet-test-shell) {filter:drop-shadow(0 0 9px rgba(227,104,121,.06))}
+/* Distinct card classes without overriding original layout or button mechanics. */
+.as-page-halo{max-width:100%;overflow:hidden}
+@media(prefers-reduced-motion:reduce){.as-drift-0>.as-holiday-detail,.as-drift-1>.as-holiday-detail,.as-drift-2>.as-holiday-detail,.as-drift-3>.as-holiday-detail{transform:none!important}}
+@media(forced-colors:active){.as-seasonal-ink{filter:none!important;text-shadow:none!important}}
