@@ -1,0 +1,82 @@
+/* ArtSoul Solstice REAL WEBSITE PREVIEW 2026/27. Additive; no contract logic changes. */
+:root{--as-ice:#b8ecff;--as-champagne:#edcf92;--as-cherry:#d34b75;--as-midnight:#090b18}
+#as-ambient,#as-weather,#as-fireworks{position:fixed;inset:0;pointer-events:none;user-select:none}
+#as-ambient{z-index:2;opacity:0;transition:opacity .55s ease;mix-blend-mode:screen;overflow:hidden}
+#as-ambient::before,#as-ambient::after{content:"";position:absolute;inset:-18%;pointer-events:none;transition:background .4s ease}
+body[data-as-season="winter"] #as-ambient,body[data-as-season="newyear"] #as-ambient{opacity:1}
+body[data-as-season="winter"] #as-ambient::before{background:radial-gradient(ellipse 55% 42% at 9% 28%,rgba(76,165,217,.23),transparent 68%),radial-gradient(ellipse 57% 56% at 88% 74%,rgba(55,119,159,.22),transparent 70%);animation:as-aurora 28s ease-in-out infinite alternate}
+body[data-as-season="winter"] #as-ambient::after{background:radial-gradient(ellipse 55% 20% at 48% 98%,rgba(129,213,239,.12),transparent 80%),linear-gradient(120deg,transparent 30%,rgba(189,229,249,.05) 45%,transparent 62%);opacity:.7}
+body[data-as-season="newyear"] #as-ambient::before{background:radial-gradient(ellipse 55% 42% at 93% 17%,rgba(191,26,68,.30),transparent 71%),radial-gradient(ellipse 55% 50% at 2% 86%,rgba(176,34,75,.25),transparent 70%),radial-gradient(ellipse 47% 32% at 60% 55%,rgba(211,115,61,.13),transparent 71%);animation:as-aurora 21s ease-in-out infinite alternate}
+body[data-as-season="newyear"] #as-ambient::after{background:radial-gradient(ellipse 60% 35% at 24% 16%,rgba(235,183,101,.08),transparent 68%),radial-gradient(ellipse 65% 32% at 95% 94%,rgba(231,66,123,.16),transparent 75%);animation:as-aurora 34s ease-in-out infinite alternate-reverse}
+@keyframes as-aurora{from{transform:translate3d(-2%,1%,0) scale(1)}to{transform:translate3d(3%,-3%,0) scale(1.04)}}
+#as-weather{z-index:27;width:100%;height:100%;opacity:.78}
+#as-fireworks{z-index:1500;width:100%;height:100%;opacity:1}
+body[data-as-snow="off"] #as-weather,body[data-as-season="original"] #as-weather{display:none}
+/* Header receives an authored light installation without moving the logo or account controls. */
+.site-header{position:relative}
+#as-header-ornament{position:absolute;inset:auto 0 -8px 0;height:19px;z-index:2;pointer-events:none;overflow:hidden;display:none}
+body[data-as-season="winter"] #as-header-ornament,body[data-as-season="newyear"] #as-header-ornament{display:block}
+#as-header-ornament .as-wire{position:absolute;left:0;right:0;top:1px;height:10px;border-bottom:1px solid rgba(201,228,241,.42);border-radius:0 0 50% 50%}
+#as-header-ornament .as-bulb{position:absolute;left:var(--x);top:8px;width:7px;height:9px;border-radius:2px 2px 6px 6px;background:var(--bulb,#f9e5ab);box-shadow:0 0 7px 2px var(--bulb,#f9e5ab),0 0 19px var(--bulb,#f9e5ab);opacity:.72;animation:as-bulb 3.7s ease-in-out infinite;animation-delay:var(--delay)}
+#as-header-ornament .as-bulb::before{content:"";position:absolute;left:2px;top:-4px;width:3px;height:4px;border-radius:1px;background:#75686a}
+body[data-as-season="winter"] #as-header-ornament .as-wire{border-color:rgba(180,230,250,.85);border-bottom-width:3px;filter:drop-shadow(0 1px 3px rgba(174,222,255,.7))}
+body[data-as-season="winter"] #as-header-ornament .as-bulb{width:3px;height:4px;border-radius:50%;background:#d6f7ff;box-shadow:0 0 7px 2px rgba(182,236,255,.82);opacity:.63}
+body[data-as-season="newyear"] .site-header{box-shadow:0 5px 30px rgba(179,33,67,.13),inset 0 -1px 0 rgba(240,189,125,.12)}
+body[data-as-season="winter"] .site-header{box-shadow:0 8px 36px rgba(95,184,243,.1),inset 0 -1px 0 rgba(184,235,252,.27)}
+body[data-as-season="newyear"] .site-header .site-wordmark{filter:drop-shadow(0 0 13px rgba(217,91,120,.38))}
+body[data-as-season="winter"] .site-header .site-wordmark{filter:drop-shadow(0 0 12px rgba(127,223,255,.31))}
+@keyframes as-bulb{0%,100%{opacity:.47;filter:saturate(.82)}50%{opacity:1;filter:saturate(1.3)}}
+/* Countdown ribbon is attached immediately below the actual navigation header. */
+#as-countdown-ribbon{display:none;position:sticky;top:var(--as-sticky-offset,0px);z-index:56;min-height:49px;padding:8px 19px;align-items:center;justify-content:center;gap:clamp(10px,2.8vw,32px);color:#f7f2e8;background:linear-gradient(105deg,rgba(37,14,27,.97),rgba(81,20,39,.95) 43%,rgba(23,17,34,.97));border-top:1px solid rgba(238,189,119,.18);border-bottom:1px solid rgba(242,193,111,.27);box-shadow:0 11px 26px rgba(15,2,9,.32);backdrop-filter:blur(18px)}
+body[data-as-season="newyear"] #as-countdown-ribbon{display:flex}
+#as-countdown-ribbon::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 16%,rgba(246,201,121,.11) 45%,transparent 63%)}
+.as-ribbon-title{font-size:10px;letter-spacing:.16em;line-height:1.3;text-transform:uppercase;font-weight:750;color:#e8cb9a;white-space:nowrap}
+.as-ribbon-title span{display:block;color:#aaabbf;font-size:9px;letter-spacing:.09em;margin-top:3px}
+.as-clock{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";white-space:nowrap;display:flex;align-items:baseline;gap:7px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:clamp(15px,1.75vw,21px);letter-spacing:.025em;font-weight:650}
+.as-clock strong{color:#fff;font:inherit;text-shadow:0 0 16px rgba(240,202,126,.32)}
+.as-clock span{font-size:9px;color:#d6b98c;font-weight:700;letter-spacing:.08em}
+.as-ribbon-small{font-size:10px;color:#cabdd4;white-space:nowrap}
+.as-preview-badge{position:absolute;right:12px;top:8px;font:700 9px ui-monospace,monospace;letter-spacing:.08em;color:#c89ab2;opacity:.8;pointer-events:none}
+/* Seasonal scene. A centered luminous tree sits between hero and live artworks, never covering the showcase. */
+#as-solstice-scene{display:none;position:relative;isolation:isolate;min-height:250px;max-width:1130px;margin:6px auto 32px;overflow:hidden;border-radius:26px;background:radial-gradient(ellipse 43% 95% at 50% 65%,rgba(167,55,102,.14),transparent 76%),linear-gradient(105deg,rgba(29,21,38,.74),rgba(11,16,32,.75));border:1px solid rgba(231,173,118,.20);box-shadow:inset 0 1px 0 rgba(255,231,184,.1),0 22px 80px rgba(6,3,13,.26)}
+body[data-as-season="newyear"] #as-solstice-scene{display:grid;grid-template-columns:1fr 255px 1fr;align-items:center;padding:16px clamp(17px,4vw,42px);gap:15px}
+#as-solstice-scene::before{content:"";position:absolute;inset:8px;border:1px solid rgba(229,179,117,.10);border-radius:19px;pointer-events:none}
+.as-scene-copy{z-index:1;min-width:0}
+.as-scene-kicker{font-size:10px;letter-spacing:.22em;color:#e5bda0;font-weight:800;text-transform:uppercase}
+.as-scene-title{font-size:clamp(25px,3vw,41px);color:#f8f2e9;margin:12px 0 11px!important;line-height:1.09;letter-spacing:-.04em;font-weight:700;text-wrap:balance}
+.as-scene-desc{max-width:340px;font-size:12px;line-height:1.7;color:#c6b3c4}
+.as-scene-side{z-index:1;justify-self:end;align-self:center;text-align:right;color:#e7c48f;max-width:210px;font-size:12px;letter-spacing:.07em;line-height:1.9}
+.as-scene-side b{display:block;font-size:clamp(21px,2.5vw,32px);font-weight:500;color:#f2d29a}
+#as-tree-canvas{display:block;width:255px;height:226px;z-index:1;filter:drop-shadow(0 0 14px rgba(242,183,105,.24))}
+/* Frost and glass spill softly across real site sections all the way down the page. */
+body[data-as-season="winter"] .home-hero,body[data-as-season="winter"] .home-spotlight,body[data-as-season="winter"] .gallery,body[data-as-season="winter"] .site-page-container{filter:drop-shadow(0 0 12px rgba(102,183,236,.08))}
+body[data-as-season="newyear"] .home-hero,body[data-as-season="newyear"] .home-spotlight,body[data-as-season="newyear"] .gallery,body[data-as-season="newyear"] .site-page-container{filter:drop-shadow(0 0 13px rgba(176,36,66,.085))}
+body[data-as-season="newyear"] :is(.artwork-card,.nft-card,.artcard,.card-system,.home-showcase,.profile-card){box-shadow:0 0 0 1px rgba(199,84,115,.065),0 17px 37px rgba(115,14,40,.07)}
+body[data-as-season="winter"] :is(.artwork-card,.nft-card,.artcard,.card-system,.home-showcase,.profile-card){box-shadow:0 0 0 1px rgba(163,231,249,.07),0 17px 37px rgba(83,163,211,.07)}
+/* Compact mode controller, separate from the existing Classic/Future theme toggle. */
+#as-scene-button{position:fixed;right:max(13px,env(safe-area-inset-right));bottom:calc(15px + env(safe-area-inset-bottom));z-index:720;border:1px solid rgba(207,196,209,.32);background:rgba(12,15,30,.91);color:#f1f4fa;padding:11px 14px;border-radius:50px;box-shadow:0 15px 34px rgba(0,0,0,.27),inset 0 1px 0 rgba(255,255,255,.09);font:650 12px Inter,system-ui,sans-serif;display:flex;align-items:center;gap:9px;cursor:pointer;backdrop-filter:blur(18px);max-width:calc(100vw - 24px)}
+#as-scene-button .as-mode-indicator{width:9px;height:9px;border-radius:50%;background:#8ee7fa;box-shadow:0 0 11px #8ee7fa;flex:none}
+body[data-as-season="newyear"] #as-scene-button .as-mode-indicator{background:#efb681;box-shadow:0 0 11px #e17e93}
+body[data-as-season="original"] #as-scene-button .as-mode-indicator{background:#9fa5b3;box-shadow:none}
+#as-scene-panel{display:none;position:fixed;z-index:721;right:max(13px,env(safe-area-inset-right));bottom:calc(65px + env(safe-area-inset-bottom));width:min(343px,calc(100vw - 26px));padding:17px;border-radius:22px;border:1px solid rgba(205,194,218,.3);color:#f2f2f7;background:linear-gradient(150deg,rgba(28,23,40,.98),rgba(9,14,29,.98));box-shadow:0 25px 85px rgba(0,0,0,.49),inset 0 1px 0 rgba(255,255,255,.08);backdrop-filter:blur(24px);font-family:Inter,system-ui,sans-serif}
+#as-scene-panel[data-open="true"]{display:block}
+.as-panel-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.as-panel-top h2{font-size:15px;font-weight:750;letter-spacing:.02em;margin:0;color:#f7f1e8}
+.as-panel-close{background:none!important;border:1px solid rgba(218,207,235,.2)!important;color:#d9dbe8!important;border-radius:9px;padding:5px 9px;cursor:pointer}
+.as-mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.as-mode-option{border:1px solid rgba(215,208,227,.17);border-radius:12px;padding:13px 5px;color:#c3c4d0;background:rgba(255,255,255,.035);font:650 12px Inter,system-ui,sans-serif;cursor:pointer;min-height:43px}
+.as-mode-option[aria-pressed="true"]{color:#f6f5ef;border-color:#e5bd8b;background:linear-gradient(125deg,rgba(169,66,93,.25),rgba(198,154,98,.15));box-shadow:0 0 0 1px rgba(223,183,114,.13) inset}
+.as-panel-snow-row{margin-top:14px;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.as-panel-snow-row span{font-size:12px;color:#d3d2dc}
+.as-snow-button,.as-preview-button{border-radius:10px;border:1px solid rgba(193,215,232,.25);background:rgba(123,161,199,.13);color:#e5eef5;padding:10px 12px;cursor:pointer;font:600 11px Inter,system-ui,sans-serif}
+.as-snow-button:disabled{opacity:.35;cursor:not-allowed}
+.as-preview-button{margin-top:12px;width:100%;background:rgba(189,80,105,.22);border-color:rgba(231,179,129,.37);color:#ffe2b6}
+.as-panel-note{margin:13px 0 0!important;color:#aeb1c4;font-size:10px;line-height:1.5}
+#as-scene-button:focus-visible,#as-scene-panel button:focus-visible{outline:2px solid #c4eeff!important;outline-offset:3px}
+#as-midnight-toast{position:fixed;left:50%;top:26%;transform:translateX(-50%);z-index:1501;display:none;max-width:min(88vw,520px);padding:19px 27px;border-radius:17px;border:1px solid rgba(237,188,119,.35);background:rgba(28,18,36,.88);color:#f9e3b7;font:650 clamp(18px,4vw,31px) Inter,system-ui,sans-serif;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);pointer-events:none;backdrop-filter:blur(16px)}
+#as-midnight-toast[data-visible="true"]{display:block}
+@media(max-width:950px){body[data-as-season="newyear"] #as-solstice-scene{grid-template-columns:1fr 220px;gap:10px}.as-scene-side{display:none}#as-tree-canvas{width:220px;height:226px}}
+@media(max-width:620px){#as-countdown-ribbon{min-height:51px;padding:7px 8px;gap:8px;justify-content:space-between}.as-ribbon-title{font-size:9px;letter-spacing:.05em}.as-ribbon-title span{font-size:8px}.as-clock{font-size:15px;gap:4px}.as-clock span{font-size:8px}.as-ribbon-small{display:none}.as-preview-badge{display:none}body[data-as-season="newyear"] #as-solstice-scene{min-height:210px;grid-template-columns:1fr 134px;gap:0;padding:13px 11px;margin:10px 5px 24px;border-radius:19px}.as-scene-kicker{font-size:9px;letter-spacing:.13em}.as-scene-title{font-size:clamp(19px,5.8vw,27px)}.as-scene-desc{font-size:10px;line-height:1.55}#as-tree-canvas{width:132px;height:188px}.as-scene-copy{padding-left:3px}#as-header-ornament{bottom:-7px}}
+@media(max-width:355px){.as-ribbon-title{max-width:107px}.as-clock{font-size:13px}.as-clock span{font-size:7px}}
+@media(prefers-reduced-motion:reduce){#as-ambient::before,#as-ambient::after,#as-header-ornament .as-bulb{animation:none!important}#as-weather,#as-fireworks{display:none!important}}
+@media(forced-colors:active){#as-header-ornament,#as-ambient{display:none!important}.as-mode-option[aria-pressed="true"]{outline:2px solid Highlight}}
