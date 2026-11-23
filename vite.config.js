@@ -212,9 +212,9 @@ function seasonalPreviewOnlyPlugin() {
                 }
                 if (html.includes('artsoul-seasonal-preview.js')) return html;
                 return html.replace('</head>',
-                    '<link rel="stylesheet" href="/artsoul-seasonal-preview.css?v=1">\n</head>')
+                    '<link rel="stylesheet" href="/artsoul-seasonal-preview.css?v=5">\n</head>')
                     .replace('</body>',
-                        '<script src="/artsoul-seasonal-preview.js?v=1" defer></script>\n</body>');
+                        '<script src="/artsoul-seasonal-preview.js?v=5" defer></script>\n</body>');
             }
         }
     };
