@@ -458,3 +458,45 @@ body[data-as-season="newyear"] :is(.gallery-page-main,.artwork-page-shell,.uploa
 .as-page-halo{max-width:100%;overflow:hidden}
 @media(prefers-reduced-motion:reduce){.as-drift-0>.as-holiday-detail,.as-drift-1>.as-holiday-detail,.as-drift-2>.as-holiday-detail,.as-drift-3>.as-holiday-detail{transform:none!important}}
 @media(forced-colors:active){.as-seasonal-ink{filter:none!important;text-shadow:none!important}}
+
+/* ArtSoul Solstice v6 — wallet-state-stable seasonal account ornaments.
+   Decorations live on the header's stable avatar plaque, not the wallet button's
+   mutable children; every visual layer is pointer-transparent. */
+.site-header .avatar-plaque.as-seasonal-ornament-host{
+  position:relative;overflow:visible!important;
+}
+.site-header .as-seasonal-ornament-host > .as-santa-hat{
+  display:none!important;position:absolute!important;pointer-events:none!important;
+  left:calc(var(--as-account-ornament-x,100%) - 20px)!important;
+  top:calc(var(--as-account-ornament-y,0px) - 43px)!important;
+  width:73px!important;height:61px!important;
+  transform:translateX(-50%) rotate(-10deg)!important;
+  z-index:36!important;overflow:visible!important;
+  filter:drop-shadow(2px 4px 2px rgba(0,0,0,.66)) drop-shadow(0 0 6px rgba(203,38,52,.25))!important;
+}
+body[data-as-season="newyear"] .site-header .as-seasonal-ornament-host > .as-santa-hat{display:block!important}
+.site-header .as-seasonal-ornament-host > .as-winter-crest{
+  position:absolute!important;display:none!important;pointer-events:none!important;
+  left:var(--as-account-ornament-x,100%)!important;
+  top:calc(var(--as-account-ornament-y,0px) - 16px)!important;
+  transform:translateX(-50%)!important;
+  width:56px;height:38px;z-index:35!important;
+  filter:drop-shadow(0 2px 2px rgba(7,31,58,.42)) drop-shadow(0 0 6px rgba(128,206,246,.4));
+}
+.site-header .as-winter-crest svg{display:block;width:100%;height:100%;overflow:visible}
+body[data-as-season="winter"] .site-header .as-seasonal-ornament-host > .as-winter-crest{display:block!important}
+/* When the connected account re-renders, the frosted button remains clickable.
+   Original removes ALL ornaments; New Year and Winter are mutually exclusive. */
+body[data-as-season="original"] .site-header .as-seasonal-ornament-host > :is(.as-santa-hat,.as-winter-crest){display:none!important}
+@media(max-width:640px){
+ .site-header .as-seasonal-ornament-host > .as-santa-hat{
+  top:calc(var(--as-account-ornament-y,0px) - 37px)!important;
+  width:63px!important;height:53px!important;
+ }
+ .site-header .as-seasonal-ornament-host > .as-winter-crest{
+  top:calc(var(--as-account-ornament-y,0px) - 13px)!important;
+  width:49px;height:35px;
+ }
+}
+@media(prefers-reduced-motion:reduce){.site-header .as-santa-hat,.site-header .as-winter-crest{animation:none!important;transition:none!important}}
+@media(forced-colors:active){.site-header .as-seasonal-ornament-host > :is(.as-santa-hat,.as-winter-crest){display:none!important}}
