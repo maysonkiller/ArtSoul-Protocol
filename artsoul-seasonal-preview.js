@@ -94,31 +94,54 @@
   const scrollMist=elt('div',{id:'as-scroll-mist','aria-hidden':'true'});
   BODY.insertBefore(scrollMist,BODY.firstChild);
   const nodesSeen=new WeakSet();
+  /* Surface-by-surface audit, not a universal banner placed on every link.
+     Only visible, supported surfaces can carry physical snow. */
   const selectors=[
     '.site-header .logo-link',
     '.site-header .site-primary-nav a',
+    '.site-header .mobile-nav a',
     '.site-header .site-header-actions button',
-    '.site-header .avatar-button',
     '.site-header .site-header-nav button',
+    '.site-header .avatar-button',
     '.site-header .menu-button',
     '.site-header .mobile-menu-button',
-    '.site-header .mobile-nav a',
     '.home-hero-actions a',
-    '.site-page-container a.btn-main',
-    '.site-page-container a.btn-secondary',
-    '.site-page-container button.btn-main',
-    '.site-page-container button.btn-secondary',
-    '.site-page-container :is(.home-showcase,.profile-card,.auction-card,.collection-card,.artwork-card,.nft-card,.artwork-tile,.artwork-detail-card)',
+    '.site-page-container :is(a.btn-main,a.btn-secondary,button.btn-main,button.btn-secondary)',
+    'main :is(a,button)[class*="btn-"]',
+    'main :is(a,button)[class*="-btn"]',
+    'main :is(a,button)[class*="button"]',
+    '.gallery-page-main button',
+    '.launch-page button',
+    '.site-page-container :is(.home-showcase,.profile-card,.auction-card,.collection-card,.artwork-card,.nft-card,.artwork-tile,.artwork-detail-card,.gallery-card,.artwork-preview-card,.featured-artwork,.publish-panel,.home-highlight-card)',
+    '.gallery-page-main :is(article,.gallery-card,.artwork-card,.artwork-tile,[data-artwork-card],[data-artwork-id])',
+    '.artwork-page-shell :is(.artwork-detail-card,.artwork-detail-frame,.artwork-card,.nft-card)',
+    '.launch-page :is(.launch-hero,.collection-card,.collection-tile,.launch-card)',
+    '.protocol-admin-root :is(.admin-card,.metric-card,.dashboard-card)',
     '.site-page-container .gallery article',
     '.site-page-container .gallery [data-artwork-id]',
     '.site-page-container .gallery [data-artwork-card]',
     '.site-page-container :is(.docs-card,.info-card,.feature-card,.collection-tile)'
   ];
   const targetSelector=selectors.join(',');
-  function crownClass(el){
-    if(el.matches('.site-header a,.site-header button'))return 'as-trim-nav';
-    if(el.matches('a,button'))return 'as-trim-button';
-    if(el.matches('.home-showcase,.docs-card,.info-card'))return 'as-trim-panel';
+  function painted(value){
+    if(!value||value==='transparent'||value==='none')return false;
+    const m=value.match(/^rgba?\(([^)]+)\)/i);
+    if(m){const parts=m[1].split(',');if(parts.length>=4)return Number(parts[3])>.08;}
+    return true;
+  }
+  function physicalSurface(el,style,rect){
+    if(rect.width<27||rect.height<24||rect.width>Math.max(2400,innerWidth*2)||style.visibility==='hidden'||style.opacity==='0')return null;
+    if(el.closest('form,[role="dialog"],[role="menu"],[popover],.notification-panel,.upload-zone,.wallet-modal,.appkit-modal,.payment-modal,[data-checkout],[data-confirmation]'))return null;
+    if(el.matches('.site-header .logo-link,.site-primary-nav a,.site-header .mobile-nav a,.publication-type-nav a,.home-section-link,.launch-topline a'))return 'ink';
+    const border=parseFloat(style.borderTopWidth)||0;
+    const framed=(border>=.8 && style.borderTopStyle!=='none' && painted(style.borderTopColor)) ||
+      painted(style.backgroundColor) || (style.backgroundImage!=='none' && Boolean(style.backgroundImage));
+    if(!framed)return null;
+    const radius=parseFloat(style.borderTopLeftRadius)||0;
+    const round=el.matches('button,.avatar-button')&&rect.width<=90&&Math.abs(rect.width-rect.height)<rect.width*.28&&radius>=rect.width*.25;
+    if(el.matches('a,button'))return round?'as-trim-round':'as-trim-button';
+    if(rect.width<115||rect.height<65)return null;
+    if(el.matches('.home-showcase,.docs-card,.info-card,.publish-panel,.launch-hero'))return 'as-trim-panel';
     return 'as-trim-card';
   }
   let detailCount=0;
@@ -126,18 +149,21 @@
     if(nodesSeen.has(el)||el.closest('#as-scene-panel,#as-countdown-ribbon,#as-solstice-scene'))return;
     if(detailCount>175)return;
     if(!el.isConnected||el.closest('[hidden],[aria-hidden="true"],dialog,[role="dialog"]'))return;
-    const style=getComputedStyle(el);
-    if(style.display==='none')return;
-    // Snow belongs on a real frame, never across unpadded bare text.
-    const kind=crownClass(el);
-    if(kind==='as-trim-card' &&
-       (parseFloat(style.paddingTop)||0)<9 &&
-       (parseFloat(style.borderTopLeftRadius)||0)<6 &&
-       (parseFloat(style.borderTopWidth)||0)<1)return;
+    const style=getComputedStyle(el),rect=el.getBoundingClientRect();
+    if(style.display==='none'||!rect.width||!rect.height)return;
+    // Decorative snow requires a physical shelf, visible paint or a true circle.
+    const kind=physicalSurface(el,style,rect);
+    if(!kind)return;
     nodesSeen.add(el);
-    // Never rewrite or remove existing text, links, focus or handlers.
+    if(kind==='ink'){
+      // Typography is not a shelf: no pseudo snow, no SVG over floating letters.
+      el.classList.add('as-seasonal-ink');
+      return;
+    }
     if(style.position==='static')el.style.position='relative';
-    el.classList.add('as-snow-trim',kind);
+    // Four stable, slightly different snow profiles replace repeated clones.
+    const h=(Math.round(rect.width)+Math.round(rect.height)+el.className.length+detailCount)%4;
+    el.classList.add('as-snow-trim',kind,'as-drift-'+h);
     const cap=elt('span',{'class':'as-snow-crown','aria-hidden':'true'});
     cap.innerHTML='<svg viewBox="0 0 320 34" preserveAspectRatio="none" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
       '<path class="as-cap-base" d="M0 11 C15 9 27 5 40 9 C55 1 69 2 83 9 C99 5 113 3 124 8 C141 2 153 6 164 9 C180 2 197 3 209 8 C225 5 239 3 254 10 C268 4 287 6 297 9 C308 6 317 10 320 10 L320 16 C306 20 304 18 295 17 C292 27 286 28 283 18 C272 22 259 18 251 18 C243 23 230 19 219 18 C207 22 197 18 186 17 C180 30 170 30 172 17 C157 22 141 18 130 18 C116 23 107 20 95 18 C84 21 76 19 66 17 C60 30 53 31 53 18 C37 22 20 19 0 17 Z"/>'+
@@ -145,10 +171,7 @@
       '<path class="as-cap-highlight" d="M12 11 C23 8 31 8 41 10 M112 9 C126 6 140 7 150 10 M218 10 C233 7 240 8 250 10 M286 10 C299 8 306 9 315 11"/>'+
       '</svg>';
     // Choose an object-specific snow silhouette instead of one flat banner.
-    const rect=el.getBoundingClientRect();
-    const radius=parseFloat(style.borderTopLeftRadius)||0;
-    const isCircle=el.matches('button,.avatar-button')&&rect.width>=26&&rect.width<=84&&
-      rect.height>=26&&Math.abs(rect.width-rect.height)<rect.width*.27&&radius>=rect.width*.30;
+    const isCircle=kind==='as-trim-round';
     if(isCircle){
       el.classList.add('as-trim-round');
       cap.innerHTML='<svg viewBox="0 0 100 42" preserveAspectRatio="none" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
@@ -230,7 +253,7 @@
   function decorateSite(){
     const elements=DOC.querySelectorAll(targetSelector);
     for(const el of elements)decorateNode(el);
-    for(const el of DOC.querySelectorAll('.site-page-container')){
+    for(const el of DOC.querySelectorAll('main.site-page-container,main.launch-page,main.protocol-admin-root,main.wallet-test-shell,main#homeSection,.gallery-page-main,.artwork-page-shell')){
       if(el.querySelector(':scope > .as-page-halo'))continue;
       if(getComputedStyle(el).position==='static')el.style.position='relative';
       el.prepend(elt('div',{'class':'as-page-halo','aria-hidden':'true'}));
@@ -243,7 +266,7 @@
   }
   decorateSite();
   const domObserver=new MutationObserver(records=>{
-    if(records.some(record=>[...record.addedNodes].some(n=>n.nodeType===1&&!n.matches?.('.as-snow-crown,.as-page-halo'))))scheduleDecoration();
+    if(records.some(record=>[...record.addedNodes].some(n=>n.nodeType===1&&!n.matches?.('.as-snow-crown,.as-holiday-detail,.as-santa-hat,.as-page-halo'))))scheduleDecoration();
   });
   domObserver.observe(BODY,{childList:true,subtree:true});
   /* Additional near/far snow depth, respecting device capacity. */
