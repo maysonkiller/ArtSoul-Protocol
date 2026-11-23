@@ -167,16 +167,62 @@
       el.style.setProperty('--as-logo-frost-y',((parseFloat(style.paddingTop)||0)+1).toFixed(1)+'px');
     }
     el.appendChild(cap);
+    // Gala decorations are a different material: pine needles, gold wire,
+    // a little powder only on the actual edge; no frozen ice shelves.
+    // A label is ink, not a shelf: put the holiday light cord under the glyphs.
+    if(!el.matches('.site-header .logo-link')){
+      const gala=elt('span',{'class':'as-holiday-detail','aria-hidden':'true'});
+      const open='<svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" ';
+      if(isCircle){
+        gala.classList.add('as-gala-round');
+        gala.innerHTML=open+'viewBox="0 0 100 42" preserveAspectRatio="none">'+
+          '<path class="as-gala-shadow" d="M14 25 Q25 9 45 7 Q65 5 85 24 L88 28 Q67 15 55 16 Q41 15 28 23 Q20 29 14 25Z"/>'+
+          '<path class="as-gala-powder" d="M10 25 Q25 7 47 7 Q70 6 88 26 Q84 30 76 25 Q62 17 55 18 Q47 24 43 18 Q29 16 20 26 Q14 29 10 25Z"/>'+
+          '<path class="as-gala-vine" d="M17 21 Q43 7 72 18 Q82 20 87 25"/>'+
+          '<path class="as-gala-needle" d="M31 13L25 7 M35 12L37 5 M57 12L54 4 M67 15L75 8"/>'+
+          '<circle class="as-gala-lamp" cx="42" cy="12" r="3.7"/><circle class="as-gala-ruby" cx="74" cy="20" r="3.2"/></svg>';
+      }else if(el.matches('.site-primary-nav a,.site-header .mobile-nav a')){
+        gala.classList.add('as-gala-nav');
+        gala.innerHTML=open+'viewBox="0 0 120 15" preserveAspectRatio="none">'+
+          '<path class="as-gala-wire" d="M3 3 Q33 12 60 5 Q89 12 117 4"/>'+
+          '<path class="as-gala-needle" d="M22 8L17 3 M24 8L29 3 M87 9L83 4 M91 9L96 4"/>'+
+          '<circle class="as-gala-ruby" cx="40" cy="8" r="3.3"/><circle class="as-gala-lamp" cx="73" cy="9" r="3.2"/></svg>';
+      }else if(el.matches('a,button')){
+        gala.classList.add('as-gala-button');
+        gala.innerHTML=open+'viewBox="0 0 320 33" preserveAspectRatio="none">'+
+          '<path class="as-gala-shadow" d="M1 19 Q19 3 47 8 Q63 10 79 22 Q67 19 56 18 Q39 13 24 22 Z M245 21 Q268 5 289 10 Q313 11 319 25 Q307 18 294 20 Q274 12 258 23Z"/>'+
+          '<path class="as-gala-powder" d="M1 18 Q20 3 44 7 Q61 7 77 21 Q60 14 51 16 Q34 10 21 19 Q12 22 1 18Z M244 21 Q264 5 288 8 Q310 8 318 22 Q299 16 289 17 Q275 11 259 22Z"/>'+
+          '<path class="as-gala-vine" d="M5 20 Q28 8 51 16 M275 15 Q300 8 315 19"/>'+
+          '<path class="as-gala-needle" d="M30 12L25 4 M40 13L47 5 M287 12L281 5 M299 12L304 6"/>'+
+          '<circle class="as-gala-lamp" cx="49" cy="17" r="4"/><circle class="as-gala-ruby" cx="277" cy="15" r="3.9"/></svg>';
+      }else{
+        gala.classList.add('as-gala-card');
+        gala.innerHTML=open+'viewBox="0 0 320 33" preserveAspectRatio="none">'+
+          '<path class="as-gala-powder" d="M0 11 Q18 1 37 4 Q50 5 68 16 Q48 9 34 13 Q13 10 0 16Z M248 15 Q267 1 290 5 Q307 4 320 13 L320 20 Q302 12 285 12 Q271 10 250 18Z"/>'+
+          '<path class="as-gala-vine" d="M5 16 Q30 7 54 13 M269 12 Q292 8 316 17"/>'+
+          '<path class="as-gala-needle" d="M29 9L22 2 M41 10L47 3 M287 9L282 2 M303 12L309 5"/>'+
+          '<circle class="as-gala-lamp" cx="49" cy="12" r="3.5"/><circle class="as-gala-ruby" cx="278" cy="13" r="3.5"/></svg>';
+      }
+      el.appendChild(gala);
+    }
     if(el.matches('.site-header .avatar-button')){
+      el.classList.add('as-santa-anchor');
       const hat=elt('span',{'class':'as-santa-hat','aria-hidden':'true'});
-      hat.innerHTML='<svg viewBox="0 0 112 84" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
-        '<defs><linearGradient id="as-hat-felt" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#ff5c5e"/><stop offset=".47" stop-color="#c82335"/><stop offset="1" stop-color="#730c24"/></linearGradient><linearGradient id="as-hat-wool" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#b8d2dc"/></linearGradient></defs>'+
-        '<path d="M18 56 C25 23 46 5 67 9 C83 10 92 26 96 43 C101 46 105 43 104 40 C109 51 104 60 95 60 C83 57 75 47 65 47 C51 44 38 50 18 56Z" fill="url(#as-hat-felt)" stroke="#77263e" stroke-width="1.2"/>'+
-        '<path d="M33 38 C42 20 54 15 67 15" fill="none" stroke="#ffabb0" stroke-width="3.2" opacity=".5" stroke-linecap="round"/>'+
-        '<circle cx="98" cy="52" r="10.5" fill="url(#as-hat-wool)"/><circle cx="93.6" cy="47" r="3.3" fill="#fff" opacity=".8"/>'+
-        '<path d="M12 55 Q38 45 59 47 Q79 47 88 58 Q91 67 82 67 Q47 58 18 68 Q9 67 12 55 Z" fill="url(#as-hat-wool)" stroke="#c5dfec" stroke-width="1"/>'+
-        '<path d="M18 57 Q43 49 66 53" fill="none" stroke="white" stroke-width="2.5" opacity=".92" stroke-linecap="round"/>'+
-        '</svg>';
+      // Full folded felt cone, physical cuff overlapping the circle, and rounded pom.
+      // The design is an original inline vector; pointer-events stay disabled.
+      hat.innerHTML='<svg viewBox="0 0 150 122" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
+        '<defs><linearGradient id="as-v4-felt" x1=".18" y1="0" x2=".86" y2="1"><stop stop-color="#ff6563"/><stop offset=".42" stop-color="#c91b34"/><stop offset="1" stop-color="#6e081c"/></linearGradient><linearGradient id="as-v4-fur" x1="0" y1="0" x2=".15" y2="1"><stop stop-color="#fff"/><stop offset=".42" stop-color="#fffafa"/><stop offset="1" stop-color="#c9d5df"/></linearGradient><radialGradient id="as-v4-pom" cx=".28" cy=".23" r=".85"><stop stop-color="#fff"/><stop offset=".5" stop-color="#f5f4f0"/><stop offset="1" stop-color="#bdccd6"/></radialGradient></defs>'+
+        '<path d="M25 83 C32 52 48 18 77 12 C96 7 105 19 109 32 C112 49 124 48 133 58 L126 80 C108 68 93 62 76 64 C52 67 38 78 25 83Z" fill="url(#as-v4-felt)" stroke="#7a1b2a" stroke-width="1.4"/>'+
+        '<path d="M83 16 C104 12 108 38 118 50 C127 57 136 58 139 65 Q126 78 116 73 C111 53 100 47 88 44 C101 36 92 23 83 16Z" fill="#870c23" opacity=".61"/>'+
+        '<path d="M35 72 C49 34 62 21 82 18" fill="none" stroke="#ffb1ab" opacity=".5" stroke-linecap="round" stroke-width="4.4"/>'+
+        '<path d="M57 47 C65 37 73 36 83 37" stroke="#ef7180" stroke-width="1.4" opacity=".6" fill="none"/>'+
+        '<path d="M124 65 C129 57 137 57 141 63 C148 64 151 72 146 79 C150 86 144 94 137 92 C132 99 121 95 120 89 C112 88 111 79 118 75 C116 70 119 65 124 65Z" fill="url(#as-v4-pom)" stroke="#b9c7d0" stroke-width="1.1"/>'+
+        '<path d="M123 73 Q131 65 139 69" stroke="#fff" stroke-width="3.8" stroke-linecap="round" opacity=".93" fill="none"/>'+
+        '<path d="M19 80 C29 72 44 68 61 69 C79 65 97 69 108 79 Q113 86 108 95 C94 92 82 85 67 88 Q44 91 21 99 Q15 98 17 90 Q14 86 19 80Z" fill="url(#as-v4-fur)" stroke="#c1d1d8" stroke-width="1.4"/>'+
+        '<path d="M20 80 C29 77 33 77 39 79 C49 74 52 75 60 77 C71 74 78 75 88 78 C95 77 101 80 107 82" stroke="#fff" fill="none" stroke-width="4.5" stroke-linecap="round" opacity=".97"/>'+
+        '<path d="M22 95 Q39 88 54 87 Q78 83 101 92" stroke="#a9bccb" fill="none" stroke-width="2.6" opacity=".57"/>'+
+        '<path d="M34 80l2-3m14 3l2-3m17 1l1-2m17 5l1-2" stroke="#fff" stroke-width="1.2" opacity=".9"/>'+
+        '<g fill="#fff" opacity=".76"><circle cx="65" cy="29" r="1.3"/><circle cx="48" cy="55" r=".9"/><circle cx="89" cy="30" r="1.1"/></g></svg>';
       el.appendChild(hat);
     }
     detailCount++;
