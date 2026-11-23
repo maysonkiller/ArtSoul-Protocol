@@ -80,3 +80,173 @@ body[data-as-season="original"] #as-scene-button .as-mode-indicator{background:#
 @media(max-width:355px){.as-ribbon-title{max-width:107px}.as-clock{font-size:13px}.as-clock span{font-size:7px}}
 @media(prefers-reduced-motion:reduce){#as-ambient::before,#as-ambient::after,#as-header-ornament .as-bulb{animation:none!important}#as-weather,#as-fireworks{display:none!important}}
 @media(forced-colors:active){#as-header-ornament,#as-ambient{display:none!important}.as-mode-option[aria-pressed="true"]{outline:2px solid Highlight}}
+
+/* ArtSoul Solstice v2: quiet, site-wide snow architecture.
+   All layers are presentational, reversible and pointer-transparent. */
+:root {
+  --as-frost-white: #edf9ff;
+  --as-frost-shadow: #a3d5ec;
+}
+/* The same winter atmosphere follows every page and every long scroll,
+   while the current Classic / Future theme continues to own base colors. */
+#as-scroll-mist {
+  position:fixed; inset:-8% -6%; z-index:3; pointer-events:none; overflow:hidden;
+  background-repeat:repeat-y;
+  mix-blend-mode:screen; opacity:0; transition:opacity .5s ease;
+  transform:translate3d(0,0,0);
+}
+body[data-as-season="winter"] #as-scroll-mist {
+  opacity:.83;
+  background-image:
+    radial-gradient(ellipse 36% 20% at 7% 18%,rgba(140,225,251,.11),transparent 79%),
+    radial-gradient(ellipse 31% 24% at 92% 63%,rgba(75,161,218,.12),transparent 78%),
+    radial-gradient(ellipse 33% 18% at 48% 93%,rgba(168,230,255,.075),transparent 84%);
+  background-size:100% 1150px;
+  animation:as-haze-breathe 24s ease-in-out infinite alternate;
+}
+body[data-as-season="newyear"] #as-scroll-mist {
+  opacity:.91;
+  background-image:
+    radial-gradient(ellipse 36% 27% at 90% 17%,rgba(228,35,79,.19),transparent 78%),
+    radial-gradient(ellipse 35% 25% at 5% 65%,rgba(159,24,77,.19),transparent 79%),
+    radial-gradient(ellipse 33% 20% at 59% 94%,rgba(245,156,99,.10),transparent 83%);
+  background-size:100% 1100px;
+  animation:as-haze-breathe 22s ease-in-out infinite alternate;
+}
+@keyframes as-haze-breathe {
+  from{background-position:0 0;filter:brightness(.87)}
+  to{background-position:0 115px;filter:brightness(1.12)}
+}
+/* Actual snow caps, not decorative ovals below cards. Generated only inside
+   guarded visual targets; never inserted into payment or wallet logic. */
+.as-snow-trim {
+  --as-cap-gap:12%; --as-cap-height:15px;
+  position:relative;
+}
+.as-snow-trim > .as-snow-crown {
+  position:absolute!important; display:block!important; pointer-events:none!important;
+  user-select:none;
+  left:var(--as-cap-gap); right:var(--as-cap-gap); top:-3px;
+  height:var(--as-cap-height); z-index:6; opacity:0; transform:translateY(-3px);
+  transition:opacity .28s ease,transform .28s ease; overflow:visible;
+  filter:drop-shadow(0 2px 2px rgba(11,31,52,.28));
+}
+body[data-as-season="winter"] .as-snow-trim > .as-snow-crown,
+body[data-as-season="newyear"] .as-snow-trim > .as-snow-crown {
+  opacity:1;transform:translateY(0);
+}
+.as-snow-crown::before {
+  content:""; display:block; position:absolute; inset:0;
+  background:
+   radial-gradient(ellipse 27px 11px at 1% 80%,rgba(252,255,255,.96) 95%,transparent 100%),
+   radial-gradient(ellipse 33px 11px at 24% 86%,rgba(241,250,255,.96) 93%,transparent 100%),
+   radial-gradient(ellipse 29px 10px at 48% 77%,rgba(253,255,255,.96) 94%,transparent 100%),
+   radial-gradient(ellipse 37px 12px at 71% 82%,rgba(239,250,255,.97) 94%,transparent 100%),
+   radial-gradient(ellipse 27px 10px at 96% 82%,rgba(251,255,255,.96) 95%,transparent 100%);
+}
+.as-snow-crown::after {
+  content:"";position:absolute;left:6%;right:9%;top:5px;height:5px;border-radius:99px;
+  background:linear-gradient(90deg,transparent 0%,rgba(176,228,249,.45) 16%,rgba(250,254,255,.90) 43%,rgba(164,219,244,.47) 71%,transparent 100%);
+  filter:blur(1.2px);
+}
+body[data-as-season="newyear"] .as-snow-crown {
+  filter:drop-shadow(0 2px 2px rgba(32,16,38,.37)) drop-shadow(0 0 5px rgba(250,182,151,.18));
+}
+/* Different scales for small navigation and large art frames. */
+.as-trim-nav {--as-cap-gap:8%;--as-cap-height:9px}
+.as-trim-button {--as-cap-gap:9%;--as-cap-height:12px}
+.as-trim-card {--as-cap-gap:4%;--as-cap-height:20px}
+.as-trim-panel {--as-cap-gap:5%;--as-cap-height:19px}
+.as-trim-nav > .as-snow-crown{top:-5px}
+.as-trim-button > .as-snow-crown{top:-7px}
+.as-trim-card > .as-snow-crown{top:-3px}
+.as-trim-panel > .as-snow-crown{top:-7px}
+/* Preserve click area and contrast on real navigation, buttons and panels. */
+body[data-as-season="winter"] .site-header :is(.site-primary-nav a,.site-header-actions button,.logo-link,.avatar-button),
+body[data-as-season="winter"] .as-trim-button {
+  text-shadow:0 0 10px rgba(172,231,249,.14);
+}
+body[data-as-season="newyear"] .site-header :is(.site-primary-nav a,.site-header-actions button,.logo-link,.avatar-button),
+body[data-as-season="newyear"] .as-trim-button {
+  text-shadow:0 0 12px rgba(240,138,155,.18);
+}
+body[data-as-season="winter"] :is(.as-trim-card,.as-trim-panel) {
+  box-shadow:0 0 0 1px rgba(175,229,253,.16),0 11px 36px rgba(80,154,207,.065);
+}
+body[data-as-season="newyear"] :is(.as-trim-card,.as-trim-panel) {
+  box-shadow:0 0 0 1px rgba(239,181,166,.14),0 11px 36px rgba(176,26,76,.075);
+}
+/* Gentle light on real sections in every route. Not a new layout. */
+.as-page-halo {
+  position:absolute!important; inset:0; pointer-events:none!important;z-index:0;opacity:0;
+  background-position:center top; background-size:100% 910px;background-repeat:repeat-y;
+  transition:opacity .35s ease;
+}
+body[data-as-season="winter"] .as-page-halo {
+ opacity:.8;background-image:
+  radial-gradient(ellipse 39% 20% at 10% 26%,rgba(92,183,238,.09),transparent 80%),
+  radial-gradient(ellipse 36% 22% at 90% 79%,rgba(135,224,246,.08),transparent 78%);
+}
+body[data-as-season="newyear"] .as-page-halo {
+ opacity:.88;background-image:
+  radial-gradient(ellipse 39% 24% at 93% 27%,rgba(209,36,82,.14),transparent 80%),
+  radial-gradient(ellipse 37% 24% at 9% 77%,rgba(233,86,107,.11),transparent 78%),
+  radial-gradient(ellipse 22% 15% at 61% 52%,rgba(249,171,103,.05),transparent 82%);
+}
+/* A delicate double snowline across navigation, also visible in mobile menus. */
+body[data-as-season="winter"] #as-header-ornament {
+  height:25px;bottom:-11px;
+  background:linear-gradient(to bottom,rgba(211,249,255,.15),transparent 65%);
+}
+body[data-as-season="newyear"] #as-header-ornament {
+  height:25px;bottom:-11px;
+  background:linear-gradient(to bottom,rgba(246,191,168,.09),transparent 70%);
+}
+body[data-as-season="winter"] .site-header .site-header-shell,
+body[data-as-season="winter"] .site-header .site-header-row {
+  box-shadow:inset 0 -1px 0 rgba(196,234,252,.12);
+}
+body[data-as-season="newyear"] .site-header .site-header-shell,
+body[data-as-season="newyear"] .site-header .site-header-row {
+  box-shadow:inset 0 -1px 0 rgba(246,196,156,.13);
+}
+/* Atmospheric UI controls retain their original functionality and focus. */
+body[data-as-season="winter"] #as-scene-panel {
+  border-color:rgba(156,220,252,.38);
+  background:linear-gradient(145deg,rgba(13,36,57,.97),rgba(9,15,31,.97));
+}
+body[data-as-season="newyear"] #as-scene-panel {
+  border-color:rgba(228,173,139,.35);
+  background:linear-gradient(145deg,rgba(54,20,38,.97),rgba(14,13,29,.97));
+}
+/* Keep modal covers, actual bids, commerce and account clicks untouched. */
+#as-weather,#as-scroll-mist,.as-page-halo,.as-snow-crown {pointer-events:none!important}
+@media(max-width:680px) {
+ .as-snow-trim {--as-cap-height:12px}
+ .as-trim-card,.as-trim-panel {--as-cap-height:15px}
+ .as-trim-nav {--as-cap-height:7px}
+ #as-scroll-mist {inset:-5% -4%}
+}
+@media(prefers-reduced-motion:reduce){#as-scroll-mist{animation:none!important}}
+@media(forced-colors:active){#as-scroll-mist,.as-page-halo,.as-snow-crown{display:none!important}}
+/* Long rails get a seamless snow shelf with a slightly irregular lower lip. */
+.as-trim-card > .as-snow-crown::before,.as-trim-panel > .as-snow-crown::before {
+  background:
+    radial-gradient(ellipse 27% 13px at 3% 55%,rgba(247,253,255,.96) 78%,transparent 84%),
+    radial-gradient(ellipse 29% 15px at 25% 47%,rgba(242,251,255,.98) 79%,transparent 85%),
+    radial-gradient(ellipse 30% 15px at 50% 56%,rgba(250,254,255,.99) 78%,transparent 85%),
+    radial-gradient(ellipse 27% 14px at 76% 48%,rgba(239,250,255,.98) 79%,transparent 85%),
+    radial-gradient(ellipse 28% 12px at 100% 54%,rgba(251,255,255,.98) 79%,transparent 85%);
+}
+
+/* Contoured snow, no rectangular banner strips. */
+.as-snow-crown::before,.as-snow-crown::after {content:none!important;display:none!important}
+.as-snow-crown svg {display:block;width:100%;height:100%;overflow:visible}
+.as-cap-base{fill:#f1fbff}
+.as-cap-shade{fill:#a8d6e7;opacity:.58}
+.as-cap-highlight{fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;opacity:.83}
+body[data-as-season="newyear"] .as-cap-shade{fill:#c3cde0;opacity:.43}
+body[data-as-season="newyear"] .as-cap-base{fill:#f5fbff}
+
+/* Internal routes retain hidden scene nodes for translations, without inserting a tree. */
+#as-solstice-scene.as-scene-internal{display:none!important}
