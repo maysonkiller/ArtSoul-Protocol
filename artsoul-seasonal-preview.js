@@ -125,12 +125,17 @@
   function decorateNode(el){
     if(nodesSeen.has(el)||el.closest('#as-scene-panel,#as-countdown-ribbon,#as-solstice-scene'))return;
     if(detailCount>175)return;
-    nodesSeen.add(el);
     if(!el.isConnected||el.closest('[hidden],[aria-hidden="true"],dialog,[role="dialog"]'))return;
     const style=getComputedStyle(el);
     if(style.display==='none')return;
-    // Never rewrite or remove existing text, links, focus or handlers.
+    // Snow belongs on a real frame, never across unpadded bare text.
     const kind=crownClass(el);
+    if(kind==='as-trim-card' &&
+       (parseFloat(style.paddingTop)||0)<9 &&
+       (parseFloat(style.borderTopLeftRadius)||0)<6 &&
+       (parseFloat(style.borderTopWidth)||0)<1)return;
+    nodesSeen.add(el);
+    // Never rewrite or remove existing text, links, focus or handlers.
     if(style.position==='static')el.style.position='relative';
     el.classList.add('as-snow-trim',kind);
     const cap=elt('span',{'class':'as-snow-crown','aria-hidden':'true'});
