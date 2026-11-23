@@ -1,0 +1,502 @@
+/* ArtSoul Solstice REAL WEBSITE PREVIEW 2026/27. Additive; no contract logic changes. */
+:root{--as-ice:#b8ecff;--as-champagne:#edcf92;--as-cherry:#d34b75;--as-midnight:#090b18}
+#as-ambient,#as-weather,#as-fireworks{position:fixed;inset:0;pointer-events:none;user-select:none}
+#as-ambient{z-index:2;opacity:0;transition:opacity .55s ease;mix-blend-mode:screen;overflow:hidden}
+#as-ambient::before,#as-ambient::after{content:"";position:absolute;inset:-18%;pointer-events:none;transition:background .4s ease}
+body[data-as-season="winter"] #as-ambient,body[data-as-season="newyear"] #as-ambient{opacity:1}
+body[data-as-season="winter"] #as-ambient::before{background:radial-gradient(ellipse 55% 42% at 9% 28%,rgba(76,165,217,.23),transparent 68%),radial-gradient(ellipse 57% 56% at 88% 74%,rgba(55,119,159,.22),transparent 70%);animation:as-aurora 28s ease-in-out infinite alternate}
+body[data-as-season="winter"] #as-ambient::after{background:radial-gradient(ellipse 55% 20% at 48% 98%,rgba(129,213,239,.12),transparent 80%),linear-gradient(120deg,transparent 30%,rgba(189,229,249,.05) 45%,transparent 62%);opacity:.7}
+body[data-as-season="newyear"] #as-ambient::before{background:radial-gradient(ellipse 55% 42% at 93% 17%,rgba(191,26,68,.30),transparent 71%),radial-gradient(ellipse 55% 50% at 2% 86%,rgba(176,34,75,.25),transparent 70%),radial-gradient(ellipse 47% 32% at 60% 55%,rgba(211,115,61,.13),transparent 71%);animation:as-aurora 21s ease-in-out infinite alternate}
+body[data-as-season="newyear"] #as-ambient::after{background:radial-gradient(ellipse 60% 35% at 24% 16%,rgba(235,183,101,.08),transparent 68%),radial-gradient(ellipse 65% 32% at 95% 94%,rgba(231,66,123,.16),transparent 75%);animation:as-aurora 34s ease-in-out infinite alternate-reverse}
+@keyframes as-aurora{from{transform:translate3d(-2%,1%,0) scale(1)}to{transform:translate3d(3%,-3%,0) scale(1.04)}}
+#as-weather{z-index:27;width:100%;height:100%;opacity:.78}
+#as-fireworks{z-index:1500;width:100%;height:100%;opacity:1}
+body[data-as-snow="off"] #as-weather,body[data-as-season="original"] #as-weather{display:none}
+/* Header receives an authored light installation without moving the logo or account controls. */
+.site-header{position:relative}
+#as-header-ornament{position:absolute;inset:auto 0 -8px 0;height:19px;z-index:2;pointer-events:none;overflow:hidden;display:none}
+body[data-as-season="winter"] #as-header-ornament,body[data-as-season="newyear"] #as-header-ornament{display:block}
+#as-header-ornament .as-wire{position:absolute;left:0;right:0;top:1px;height:10px;border-bottom:1px solid rgba(201,228,241,.42);border-radius:0 0 50% 50%}
+#as-header-ornament .as-bulb{position:absolute;left:var(--x);top:8px;width:7px;height:9px;border-radius:2px 2px 6px 6px;background:var(--bulb,#f9e5ab);box-shadow:0 0 7px 2px var(--bulb,#f9e5ab),0 0 19px var(--bulb,#f9e5ab);opacity:.72;animation:as-bulb 3.7s ease-in-out infinite;animation-delay:var(--delay)}
+#as-header-ornament .as-bulb::before{content:"";position:absolute;left:2px;top:-4px;width:3px;height:4px;border-radius:1px;background:#75686a}
+body[data-as-season="winter"] #as-header-ornament .as-wire{border-color:rgba(180,230,250,.85);border-bottom-width:3px;filter:drop-shadow(0 1px 3px rgba(174,222,255,.7))}
+body[data-as-season="winter"] #as-header-ornament .as-bulb{width:3px;height:4px;border-radius:50%;background:#d6f7ff;box-shadow:0 0 7px 2px rgba(182,236,255,.82);opacity:.63}
+body[data-as-season="newyear"] .site-header{box-shadow:0 5px 30px rgba(179,33,67,.13),inset 0 -1px 0 rgba(240,189,125,.12)}
+body[data-as-season="winter"] .site-header{box-shadow:0 8px 36px rgba(95,184,243,.1),inset 0 -1px 0 rgba(184,235,252,.27)}
+body[data-as-season="newyear"] .site-header .site-wordmark{filter:drop-shadow(0 0 13px rgba(217,91,120,.38))}
+body[data-as-season="winter"] .site-header .site-wordmark{filter:drop-shadow(0 0 12px rgba(127,223,255,.31))}
+@keyframes as-bulb{0%,100%{opacity:.47;filter:saturate(.82)}50%{opacity:1;filter:saturate(1.3)}}
+/* Countdown ribbon is attached immediately below the actual navigation header. */
+#as-countdown-ribbon{display:none;position:sticky;top:var(--as-sticky-offset,0px);z-index:56;min-height:49px;padding:8px 19px;align-items:center;justify-content:center;gap:clamp(10px,2.8vw,32px);color:#f7f2e8;background:linear-gradient(105deg,rgba(37,14,27,.97),rgba(81,20,39,.95) 43%,rgba(23,17,34,.97));border-top:1px solid rgba(238,189,119,.18);border-bottom:1px solid rgba(242,193,111,.27);box-shadow:0 11px 26px rgba(15,2,9,.32);backdrop-filter:blur(18px)}
+body[data-as-season="newyear"] #as-countdown-ribbon{display:flex}
+#as-countdown-ribbon::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 16%,rgba(246,201,121,.11) 45%,transparent 63%)}
+.as-ribbon-title{font-size:10px;letter-spacing:.16em;line-height:1.3;text-transform:uppercase;font-weight:750;color:#e8cb9a;white-space:nowrap}
+.as-ribbon-title span{display:block;color:#aaabbf;font-size:9px;letter-spacing:.09em;margin-top:3px}
+.as-clock{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";white-space:nowrap;display:flex;align-items:baseline;gap:7px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:clamp(15px,1.75vw,21px);letter-spacing:.025em;font-weight:650}
+.as-clock strong{color:#fff;font:inherit;text-shadow:0 0 16px rgba(240,202,126,.32)}
+.as-clock span{font-size:9px;color:#d6b98c;font-weight:700;letter-spacing:.08em}
+.as-ribbon-small{font-size:10px;color:#cabdd4;white-space:nowrap}
+.as-preview-badge{position:absolute;right:12px;top:8px;font:700 9px ui-monospace,monospace;letter-spacing:.08em;color:#c89ab2;opacity:.8;pointer-events:none}
+/* Seasonal scene. A centered luminous tree sits between hero and live artworks, never covering the showcase. */
+#as-solstice-scene{display:none;position:relative;isolation:isolate;min-height:250px;max-width:1130px;margin:6px auto 32px;overflow:hidden;border-radius:26px;background:radial-gradient(ellipse 43% 95% at 50% 65%,rgba(167,55,102,.14),transparent 76%),linear-gradient(105deg,rgba(29,21,38,.74),rgba(11,16,32,.75));border:1px solid rgba(231,173,118,.20);box-shadow:inset 0 1px 0 rgba(255,231,184,.1),0 22px 80px rgba(6,3,13,.26)}
+body[data-as-season="newyear"] #as-solstice-scene{display:grid;grid-template-columns:1fr 255px 1fr;align-items:center;padding:16px clamp(17px,4vw,42px);gap:15px}
+#as-solstice-scene::before{content:"";position:absolute;inset:8px;border:1px solid rgba(229,179,117,.10);border-radius:19px;pointer-events:none}
+.as-scene-copy{z-index:1;min-width:0}
+.as-scene-kicker{font-size:10px;letter-spacing:.22em;color:#e5bda0;font-weight:800;text-transform:uppercase}
+.as-scene-title{font-size:clamp(25px,3vw,41px);color:#f8f2e9;margin:12px 0 11px!important;line-height:1.09;letter-spacing:-.04em;font-weight:700;text-wrap:balance}
+.as-scene-desc{max-width:340px;font-size:12px;line-height:1.7;color:#c6b3c4}
+.as-scene-side{z-index:1;justify-self:end;align-self:center;text-align:right;color:#e7c48f;max-width:210px;font-size:12px;letter-spacing:.07em;line-height:1.9}
+.as-scene-side b{display:block;font-size:clamp(21px,2.5vw,32px);font-weight:500;color:#f2d29a}
+#as-tree-canvas{display:block;width:255px;height:226px;z-index:1;filter:drop-shadow(0 0 14px rgba(242,183,105,.24))}
+/* Frost and glass spill softly across real site sections all the way down the page. */
+body[data-as-season="winter"] .home-hero,body[data-as-season="winter"] .home-spotlight,body[data-as-season="winter"] .gallery,body[data-as-season="winter"] .site-page-container{filter:drop-shadow(0 0 12px rgba(102,183,236,.08))}
+body[data-as-season="newyear"] .home-hero,body[data-as-season="newyear"] .home-spotlight,body[data-as-season="newyear"] .gallery,body[data-as-season="newyear"] .site-page-container{filter:drop-shadow(0 0 13px rgba(176,36,66,.085))}
+body[data-as-season="newyear"] :is(.artwork-card,.nft-card,.artcard,.card-system,.home-showcase,.profile-card){box-shadow:0 0 0 1px rgba(199,84,115,.065),0 17px 37px rgba(115,14,40,.07)}
+body[data-as-season="winter"] :is(.artwork-card,.nft-card,.artcard,.card-system,.home-showcase,.profile-card){box-shadow:0 0 0 1px rgba(163,231,249,.07),0 17px 37px rgba(83,163,211,.07)}
+/* Compact mode controller, separate from the existing Classic/Future theme toggle. */
+#as-scene-button{position:fixed;right:max(13px,env(safe-area-inset-right));bottom:calc(15px + env(safe-area-inset-bottom));z-index:720;border:1px solid rgba(207,196,209,.32);background:rgba(12,15,30,.91);color:#f1f4fa;padding:11px 14px;border-radius:50px;box-shadow:0 15px 34px rgba(0,0,0,.27),inset 0 1px 0 rgba(255,255,255,.09);font:650 12px Inter,system-ui,sans-serif;display:flex;align-items:center;gap:9px;cursor:pointer;backdrop-filter:blur(18px);max-width:calc(100vw - 24px)}
+#as-scene-button .as-mode-indicator{width:9px;height:9px;border-radius:50%;background:#8ee7fa;box-shadow:0 0 11px #8ee7fa;flex:none}
+body[data-as-season="newyear"] #as-scene-button .as-mode-indicator{background:#efb681;box-shadow:0 0 11px #e17e93}
+body[data-as-season="original"] #as-scene-button .as-mode-indicator{background:#9fa5b3;box-shadow:none}
+#as-scene-panel{display:none;position:fixed;z-index:721;right:max(13px,env(safe-area-inset-right));bottom:calc(65px + env(safe-area-inset-bottom));width:min(343px,calc(100vw - 26px));padding:17px;border-radius:22px;border:1px solid rgba(205,194,218,.3);color:#f2f2f7;background:linear-gradient(150deg,rgba(28,23,40,.98),rgba(9,14,29,.98));box-shadow:0 25px 85px rgba(0,0,0,.49),inset 0 1px 0 rgba(255,255,255,.08);backdrop-filter:blur(24px);font-family:Inter,system-ui,sans-serif}
+#as-scene-panel[data-open="true"]{display:block}
+.as-panel-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.as-panel-top h2{font-size:15px;font-weight:750;letter-spacing:.02em;margin:0;color:#f7f1e8}
+.as-panel-close{background:none!important;border:1px solid rgba(218,207,235,.2)!important;color:#d9dbe8!important;border-radius:9px;padding:5px 9px;cursor:pointer}
+.as-mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.as-mode-option{border:1px solid rgba(215,208,227,.17);border-radius:12px;padding:13px 5px;color:#c3c4d0;background:rgba(255,255,255,.035);font:650 12px Inter,system-ui,sans-serif;cursor:pointer;min-height:43px}
+.as-mode-option[aria-pressed="true"]{color:#f6f5ef;border-color:#e5bd8b;background:linear-gradient(125deg,rgba(169,66,93,.25),rgba(198,154,98,.15));box-shadow:0 0 0 1px rgba(223,183,114,.13) inset}
+.as-panel-snow-row{margin-top:14px;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.as-panel-snow-row span{font-size:12px;color:#d3d2dc}
+.as-snow-button,.as-preview-button{border-radius:10px;border:1px solid rgba(193,215,232,.25);background:rgba(123,161,199,.13);color:#e5eef5;padding:10px 12px;cursor:pointer;font:600 11px Inter,system-ui,sans-serif}
+.as-snow-button:disabled{opacity:.35;cursor:not-allowed}
+.as-preview-button{margin-top:12px;width:100%;background:rgba(189,80,105,.22);border-color:rgba(231,179,129,.37);color:#ffe2b6}
+.as-panel-note{margin:13px 0 0!important;color:#aeb1c4;font-size:10px;line-height:1.5}
+#as-scene-button:focus-visible,#as-scene-panel button:focus-visible{outline:2px solid #c4eeff!important;outline-offset:3px}
+#as-midnight-toast{position:fixed;left:50%;top:26%;transform:translateX(-50%);z-index:1501;display:none;max-width:min(88vw,520px);padding:19px 27px;border-radius:17px;border:1px solid rgba(237,188,119,.35);background:rgba(28,18,36,.88);color:#f9e3b7;font:650 clamp(18px,4vw,31px) Inter,system-ui,sans-serif;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);pointer-events:none;backdrop-filter:blur(16px)}
+#as-midnight-toast[data-visible="true"]{display:block}
+@media(max-width:950px){body[data-as-season="newyear"] #as-solstice-scene{grid-template-columns:1fr 220px;gap:10px}.as-scene-side{display:none}#as-tree-canvas{width:220px;height:226px}}
+@media(max-width:620px){#as-countdown-ribbon{min-height:51px;padding:7px 8px;gap:8px;justify-content:space-between}.as-ribbon-title{font-size:9px;letter-spacing:.05em}.as-ribbon-title span{font-size:8px}.as-clock{font-size:15px;gap:4px}.as-clock span{font-size:8px}.as-ribbon-small{display:none}.as-preview-badge{display:none}body[data-as-season="newyear"] #as-solstice-scene{min-height:210px;grid-template-columns:1fr 134px;gap:0;padding:13px 11px;margin:10px 5px 24px;border-radius:19px}.as-scene-kicker{font-size:9px;letter-spacing:.13em}.as-scene-title{font-size:clamp(19px,5.8vw,27px)}.as-scene-desc{font-size:10px;line-height:1.55}#as-tree-canvas{width:132px;height:188px}.as-scene-copy{padding-left:3px}#as-header-ornament{bottom:-7px}}
+@media(max-width:355px){.as-ribbon-title{max-width:107px}.as-clock{font-size:13px}.as-clock span{font-size:7px}}
+@media(prefers-reduced-motion:reduce){#as-ambient::before,#as-ambient::after,#as-header-ornament .as-bulb{animation:none!important}#as-weather,#as-fireworks{display:none!important}}
+@media(forced-colors:active){#as-header-ornament,#as-ambient{display:none!important}.as-mode-option[aria-pressed="true"]{outline:2px solid Highlight}}
+
+/* ArtSoul Solstice v2: quiet, site-wide snow architecture.
+   All layers are presentational, reversible and pointer-transparent. */
+:root {
+  --as-frost-white: #edf9ff;
+  --as-frost-shadow: #a3d5ec;
+}
+/* The same winter atmosphere follows every page and every long scroll,
+   while the current Classic / Future theme continues to own base colors. */
+#as-scroll-mist {
+  position:fixed; inset:-8% -6%; z-index:3; pointer-events:none; overflow:hidden;
+  background-repeat:repeat-y;
+  mix-blend-mode:screen; opacity:0; transition:opacity .5s ease;
+  transform:translate3d(0,0,0);
+}
+body[data-as-season="winter"] #as-scroll-mist {
+  opacity:.83;
+  background-image:
+    radial-gradient(ellipse 36% 20% at 7% 18%,rgba(140,225,251,.11),transparent 79%),
+    radial-gradient(ellipse 31% 24% at 92% 63%,rgba(75,161,218,.12),transparent 78%),
+    radial-gradient(ellipse 33% 18% at 48% 93%,rgba(168,230,255,.075),transparent 84%);
+  background-size:100% 1150px;
+  animation:as-haze-breathe 24s ease-in-out infinite alternate;
+}
+body[data-as-season="newyear"] #as-scroll-mist {
+  opacity:.91;
+  background-image:
+    radial-gradient(ellipse 36% 27% at 90% 17%,rgba(228,35,79,.19),transparent 78%),
+    radial-gradient(ellipse 35% 25% at 5% 65%,rgba(159,24,77,.19),transparent 79%),
+    radial-gradient(ellipse 33% 20% at 59% 94%,rgba(245,156,99,.10),transparent 83%);
+  background-size:100% 1100px;
+  animation:as-haze-breathe 22s ease-in-out infinite alternate;
+}
+@keyframes as-haze-breathe {
+  from{background-position:0 0;filter:brightness(.87)}
+  to{background-position:0 115px;filter:brightness(1.12)}
+}
+/* Actual snow caps, not decorative ovals below cards. Generated only inside
+   guarded visual targets; never inserted into payment or wallet logic. */
+.as-snow-trim {
+  --as-cap-gap:12%; --as-cap-height:15px;
+  position:relative;
+}
+.as-snow-trim > .as-snow-crown {
+  position:absolute!important; display:block!important; pointer-events:none!important;
+  user-select:none;
+  left:var(--as-cap-gap); right:var(--as-cap-gap); top:-3px;
+  height:var(--as-cap-height); z-index:6; opacity:0; transform:translateY(-3px);
+  transition:opacity .28s ease,transform .28s ease; overflow:visible;
+  filter:drop-shadow(0 2px 2px rgba(11,31,52,.28));
+}
+body[data-as-season="winter"] .as-snow-trim > .as-snow-crown,
+body[data-as-season="newyear"] .as-snow-trim > .as-snow-crown {
+  opacity:1;transform:translateY(0);
+}
+.as-snow-crown::before {
+  content:""; display:block; position:absolute; inset:0;
+  background:
+   radial-gradient(ellipse 27px 11px at 1% 80%,rgba(252,255,255,.96) 95%,transparent 100%),
+   radial-gradient(ellipse 33px 11px at 24% 86%,rgba(241,250,255,.96) 93%,transparent 100%),
+   radial-gradient(ellipse 29px 10px at 48% 77%,rgba(253,255,255,.96) 94%,transparent 100%),
+   radial-gradient(ellipse 37px 12px at 71% 82%,rgba(239,250,255,.97) 94%,transparent 100%),
+   radial-gradient(ellipse 27px 10px at 96% 82%,rgba(251,255,255,.96) 95%,transparent 100%);
+}
+.as-snow-crown::after {
+  content:"";position:absolute;left:6%;right:9%;top:5px;height:5px;border-radius:99px;
+  background:linear-gradient(90deg,transparent 0%,rgba(176,228,249,.45) 16%,rgba(250,254,255,.90) 43%,rgba(164,219,244,.47) 71%,transparent 100%);
+  filter:blur(1.2px);
+}
+body[data-as-season="newyear"] .as-snow-crown {
+  filter:drop-shadow(0 2px 2px rgba(32,16,38,.37)) drop-shadow(0 0 5px rgba(250,182,151,.18));
+}
+/* Different scales for small navigation and large art frames. */
+.as-trim-nav {--as-cap-gap:8%;--as-cap-height:9px}
+.as-trim-button {--as-cap-gap:9%;--as-cap-height:12px}
+.as-trim-card {--as-cap-gap:4%;--as-cap-height:20px}
+.as-trim-panel {--as-cap-gap:5%;--as-cap-height:19px}
+.as-trim-nav > .as-snow-crown{top:-5px}
+.as-trim-button > .as-snow-crown{top:-7px}
+.as-trim-card > .as-snow-crown{top:-3px}
+.as-trim-panel > .as-snow-crown{top:-7px}
+/* Preserve click area and contrast on real navigation, buttons and panels. */
+body[data-as-season="winter"] .site-header :is(.site-primary-nav a,.site-header-actions button,.logo-link,.avatar-button),
+body[data-as-season="winter"] .as-trim-button {
+  text-shadow:0 0 10px rgba(172,231,249,.14);
+}
+body[data-as-season="newyear"] .site-header :is(.site-primary-nav a,.site-header-actions button,.logo-link,.avatar-button),
+body[data-as-season="newyear"] .as-trim-button {
+  text-shadow:0 0 12px rgba(240,138,155,.18);
+}
+body[data-as-season="winter"] :is(.as-trim-card,.as-trim-panel) {
+  box-shadow:0 0 0 1px rgba(175,229,253,.16),0 11px 36px rgba(80,154,207,.065);
+}
+body[data-as-season="newyear"] :is(.as-trim-card,.as-trim-panel) {
+  box-shadow:0 0 0 1px rgba(239,181,166,.14),0 11px 36px rgba(176,26,76,.075);
+}
+/* Gentle light on real sections in every route. Not a new layout. */
+.as-page-halo {
+  position:absolute!important; inset:0; pointer-events:none!important;z-index:0;opacity:0;
+  background-position:center top; background-size:100% 910px;background-repeat:repeat-y;
+  transition:opacity .35s ease;
+}
+body[data-as-season="winter"] .as-page-halo {
+ opacity:.8;background-image:
+  radial-gradient(ellipse 39% 20% at 10% 26%,rgba(92,183,238,.09),transparent 80%),
+  radial-gradient(ellipse 36% 22% at 90% 79%,rgba(135,224,246,.08),transparent 78%);
+}
+body[data-as-season="newyear"] .as-page-halo {
+ opacity:.88;background-image:
+  radial-gradient(ellipse 39% 24% at 93% 27%,rgba(209,36,82,.14),transparent 80%),
+  radial-gradient(ellipse 37% 24% at 9% 77%,rgba(233,86,107,.11),transparent 78%),
+  radial-gradient(ellipse 22% 15% at 61% 52%,rgba(249,171,103,.05),transparent 82%);
+}
+/* A delicate double snowline across navigation, also visible in mobile menus. */
+body[data-as-season="winter"] #as-header-ornament {
+  height:25px;bottom:-11px;
+  background:linear-gradient(to bottom,rgba(211,249,255,.15),transparent 65%);
+}
+body[data-as-season="newyear"] #as-header-ornament {
+  height:25px;bottom:-11px;
+  background:linear-gradient(to bottom,rgba(246,191,168,.09),transparent 70%);
+}
+body[data-as-season="winter"] .site-header .site-header-shell,
+body[data-as-season="winter"] .site-header .site-header-row {
+  box-shadow:inset 0 -1px 0 rgba(196,234,252,.12);
+}
+body[data-as-season="newyear"] .site-header .site-header-shell,
+body[data-as-season="newyear"] .site-header .site-header-row {
+  box-shadow:inset 0 -1px 0 rgba(246,196,156,.13);
+}
+/* Atmospheric UI controls retain their original functionality and focus. */
+body[data-as-season="winter"] #as-scene-panel {
+  border-color:rgba(156,220,252,.38);
+  background:linear-gradient(145deg,rgba(13,36,57,.97),rgba(9,15,31,.97));
+}
+body[data-as-season="newyear"] #as-scene-panel {
+  border-color:rgba(228,173,139,.35);
+  background:linear-gradient(145deg,rgba(54,20,38,.97),rgba(14,13,29,.97));
+}
+/* Keep modal covers, actual bids, commerce and account clicks untouched. */
+#as-weather,#as-scroll-mist,.as-page-halo,.as-snow-crown {pointer-events:none!important}
+@media(max-width:680px) {
+ .as-snow-trim {--as-cap-height:12px}
+ .as-trim-card,.as-trim-panel {--as-cap-height:15px}
+ .as-trim-nav {--as-cap-height:7px}
+ #as-scroll-mist {inset:-5% -4%}
+}
+@media(prefers-reduced-motion:reduce){#as-scroll-mist{animation:none!important}}
+@media(forced-colors:active){#as-scroll-mist,.as-page-halo,.as-snow-crown{display:none!important}}
+/* Long rails get a seamless snow shelf with a slightly irregular lower lip. */
+.as-trim-card > .as-snow-crown::before,.as-trim-panel > .as-snow-crown::before {
+  background:
+    radial-gradient(ellipse 27% 13px at 3% 55%,rgba(247,253,255,.96) 78%,transparent 84%),
+    radial-gradient(ellipse 29% 15px at 25% 47%,rgba(242,251,255,.98) 79%,transparent 85%),
+    radial-gradient(ellipse 30% 15px at 50% 56%,rgba(250,254,255,.99) 78%,transparent 85%),
+    radial-gradient(ellipse 27% 14px at 76% 48%,rgba(239,250,255,.98) 79%,transparent 85%),
+    radial-gradient(ellipse 28% 12px at 100% 54%,rgba(251,255,255,.98) 79%,transparent 85%);
+}
+
+/* Contoured snow, no rectangular banner strips. */
+.as-snow-crown::before,.as-snow-crown::after {content:none!important;display:none!important}
+.as-snow-crown svg {display:block;width:100%;height:100%;overflow:visible}
+.as-cap-base{fill:#f1fbff}
+.as-cap-shade{fill:#a8d6e7;opacity:.58}
+.as-cap-highlight{fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;opacity:.83}
+body[data-as-season="newyear"] .as-cap-shade{fill:#c3cde0;opacity:.43}
+body[data-as-season="newyear"] .as-cap-base{fill:#f5fbff}
+
+/* Internal routes retain hidden scene nodes for translations, without inserting a tree. */
+#as-solstice-scene.as-scene-internal{display:none!important}
+
+
+/* V3 / TACTILE WINTER: snow is weighted to the physical top edge of an object.
+   Text gets delicate settled rime, circular objects get curved banks, and
+   the account avatar carries its own felt Santa hat only in New Year mode. */
+.as-snow-trim.as-trim-round { isolation:isolate; }
+.as-snow-trim.as-trim-round > .as-snow-crown {
+  top:-12px!important;left:7%!important;right:7%!important;
+  height:24px!important;filter:drop-shadow(0 2px 2px rgba(10,29,43,.65));
+  z-index:5;
+}
+.as-trim-round .as-cap-shade{fill:#9cbdcf;opacity:.66}
+.as-trim-round .as-cap-highlight{stroke-width:2.4;opacity:.86}
+/* This rime touches the upper pixels of each navigation label; no floating
+   white strip above an invisible navigation rectangle. */
+.site-primary-nav .as-snow-trim.as-trim-text > .as-snow-crown,
+.site-header .mobile-nav .as-snow-trim.as-trim-text > .as-snow-crown {
+  top:var(--as-rime-y,1px)!important;
+  left:var(--as-rime-x,0px)!important;right:var(--as-rime-right,0px)!important;
+  height:7px!important;opacity:0;filter:drop-shadow(0 1px 1px rgba(13,46,57,.46));
+}
+body:is([data-as-season="winter"],[data-as-season="newyear"]) .site-primary-nav .as-trim-text > .as-snow-crown,
+body:is([data-as-season="winter"],[data-as-season="newyear"]) .site-header .mobile-nav .as-trim-text > .as-snow-crown { opacity:.93 }
+/* Frost is perched over the real wordmark, leaving the icon and click target intact. */
+.site-header .logo-link.as-trim-logo > .as-snow-crown {
+  top:var(--as-logo-frost-y,0px)!important;
+  left:var(--as-logo-frost-x,32%)!important;right:8%!important;
+  height:6px!important;filter:drop-shadow(0 1px 1px rgba(14,40,51,.39));
+}
+/* Actual raised actions have a tactile lip, narrow enough not to cover copy. */
+.home-hero-actions :is(a,button).as-snow-trim > .as-snow-crown,
+.site-page-container :is(.btn-main,.btn-secondary).as-snow-trim > .as-snow-crown {
+  top:-7px!important;height:13px!important;left:10%!important;right:11%!important;
+}
+/* The cap sits over the avatar's top arc. During New Year the Santa hat takes
+   that space instead, so the two material objects never overlap. */
+body[data-as-season="newyear"] .avatar-button.as-trim-round > .as-snow-crown{opacity:0!important}
+.as-santa-hat {
+  position:absolute!important;display:none!important;pointer-events:none!important;
+  width:53px;height:41px;max-width:none;top:-30px;left:50%;right:auto;
+  transform:translateX(-50%) rotate(-12deg);z-index:11;overflow:visible;
+  filter:drop-shadow(1px 3px 2px rgba(5,6,18,.66)) drop-shadow(0 0 6px rgba(221,47,64,.25));
+  user-select:none;
+}
+.as-santa-hat svg{width:100%;height:100%;display:block;overflow:visible}
+body[data-as-season="newyear"] .avatar-button .as-santa-hat{display:block!important}
+body[data-as-season="original"] .avatar-button .as-santa-hat,
+body[data-as-season="winter"] .avatar-button .as-santa-hat{display:none!important}
+/* Snow must stay outside controls and not interrupt keyboard, wallet, or menu. */
+:is(.as-santa-hat,.as-snow-crown,#as-scroll-mist)::selection{background:transparent}
+.site-header :is(.avatar-button,.site-search-button,.site-theme-toggle,.notification-toggle) { overflow:visible!important }
+/* Floating air is NOT piled snow: soft, low-contrast translucent winter
+   ground fog slides behind the interface with no sharp patches or walls. */
+#as-scroll-mist::before,#as-scroll-mist::after {
+  content:"";position:absolute;display:block;pointer-events:none;
+  border-radius:50%;opacity:0;will-change:transform;
+}
+body[data-as-season="winter"] #as-scroll-mist::before {
+  opacity:.64;width:140%;height:150px;left:-34%;top:18%;
+  background:radial-gradient(ellipse 56% 46% at 47% 57%,rgba(198,239,248,.19),rgba(136,209,235,.05) 56%,transparent 79%);
+  filter:blur(23px);animation:as-cold-fog-drift 37s ease-in-out infinite alternate;
+}
+body[data-as-season="winter"] #as-scroll-mist::after {
+  opacity:.48;width:132%;height:116px;left:-18%;top:67%;
+  background:radial-gradient(ellipse 55% 46% at 44% 58%,rgba(213,246,251,.14),transparent 82%);
+  filter:blur(27px);animation:as-cold-fog-drift 47s ease-in-out infinite alternate-reverse;
+}
+body[data-as-season="newyear"] #as-scroll-mist::before {
+  opacity:.3;width:133%;height:120px;left:-15%;top:44%;
+  background:radial-gradient(ellipse 55% 48%,rgba(234,168,188,.12),transparent 77%);
+  filter:blur(24px);animation:as-cold-fog-drift 48s ease-in-out infinite alternate;
+}
+@keyframes as-cold-fog-drift{from{transform:translate3d(-9%,7px,0)}to{transform:translate3d(11%,-12px,0)}}
+@media(max-width:620px){
+  .as-snow-trim.as-trim-round > .as-snow-crown{top:-10px!important;height:20px!important}
+  .as-santa-hat{width:45px;height:35px;top:-27px}
+  .site-primary-nav .as-trim-text > .as-snow-crown{height:5px!important}
+  body[data-as-season="winter"] #as-scroll-mist::before {height:95px;opacity:.38;filter:blur(15px)}
+  body[data-as-season="winter"] #as-scroll-mist::after {height:80px;opacity:.3;filter:blur(18px)}
+}
+@media(prefers-reduced-motion:reduce){
+  #as-scroll-mist::before,#as-scroll-mist::after{animation:none!important;will-change:auto!important}
+}
+@media(forced-colors:active){.as-santa-hat,#as-scroll-mist::before,#as-scroll-mist::after{display:none!important}}
+
+/* ArtSoul Solstice V4 / GLACIER x GALA. Two physically distinct material systems.
+   Additive preview-only decorations; no wallet or auction interaction. */
+
+/* Shared display gate: do not stack Winter's ice bank on Gala's fine trim. */
+.as-holiday-detail{position:absolute!important;display:block!important;pointer-events:none!important;user-select:none!important;opacity:0;z-index:7;overflow:visible;left:0;right:0;top:-8px;height:22px;filter:drop-shadow(0 2px 2px rgba(26,12,17,.55));transition:opacity .2s ease}
+.as-holiday-detail svg{display:block;width:100%;height:100%;overflow:visible}
+body[data-as-season="newyear"] .as-holiday-detail{opacity:1}
+body[data-as-season="winter"] .as-holiday-detail,body[data-as-season="original"] .as-holiday-detail{opacity:0!important}
+body[data-as-season="newyear"] .as-snow-trim > .as-snow-crown{opacity:0!important;visibility:hidden!important}
+.as-holiday-detail .as-gala-powder{fill:#f6f2e8}
+.as-holiday-detail .as-gala-shadow{fill:#aebbc1;opacity:.65}
+.as-holiday-detail .as-gala-vine{fill:none;stroke:#315c49;stroke-width:3.4;stroke-linecap:round}
+.as-holiday-detail .as-gala-needle{fill:none;stroke:#537b5e;stroke-width:2;stroke-linecap:round}
+.as-holiday-detail .as-gala-wire{fill:none;stroke:#cda76d;stroke-width:1.8;stroke-linecap:round}
+.as-holiday-detail .as-gala-lamp{fill:#ffe0a4;filter:drop-shadow(0 0 3px rgba(255,197,96,.72))}
+.as-holiday-detail .as-gala-ruby{fill:#d84f68;filter:drop-shadow(0 0 3px rgba(243,63,113,.5))}
+.as-trim-round>.as-holiday-detail{top:-10px;height:23px;left:3%;right:3%}
+.site-primary-nav .as-trim-text>.as-holiday-detail,.site-header .mobile-nav .as-trim-text>.as-holiday-detail{top:auto!important;bottom:-5px!important;height:10px!important;left:2%!important;right:2%!important;filter:drop-shadow(0 0 2px rgba(249,182,97,.18))}
+.as-trim-button>.as-holiday-detail,.home-hero-actions a>.as-holiday-detail{top:-7px;height:24px;left:0;right:0}
+.as-trim-card>.as-holiday-detail,.as-trim-panel>.as-holiday-detail{top:-7px;height:24px;left:0;right:0}
+/* The brand text is ink, not a physical shelf. No hovering strip over PROTOCOL. */
+.site-header .logo-link.as-trim-logo>.as-snow-crown,.site-header .logo-link>.as-holiday-detail{display:none!important}
+body[data-as-season="winter"] .site-header .site-wordmark{background:linear-gradient(180deg,#f8fdff 0%,#bce9ff 45%,#7dbdc8 100%);background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 3px rgba(175,239,255,.4))}
+body[data-as-season="newyear"] .site-header .site-wordmark{background:linear-gradient(135deg,#fff4d4 3%,#f2d49a 43%,#f5b9ac 80%,#fff0db);background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 8px rgba(247,119,103,.3))}
+body[data-as-season="winter"] .site-header .site-logo{filter:drop-shadow(0 0 4px rgba(179,236,254,.66)) saturate(.85)}
+body[data-as-season="newyear"] .site-header .site-logo{filter:drop-shadow(0 0 5px rgba(246,143,132,.52)) saturate(1.12)}
+
+/* WINTER / GLACIER: compacted snow with blue compressed lower layers,
+   crystalline facets, thicker lips and a cold, frost-breath air mass. */
+body[data-as-season="winter"] .as-snow-trim>.as-snow-crown{filter:drop-shadow(0 2px 1px rgba(46,93,117,.72)) drop-shadow(0 0 7px rgba(170,227,248,.34))!important}
+body[data-as-season="winter"] .as-trim-button>.as-snow-crown,body[data-as-season="winter"] .home-hero-actions .as-snow-crown{height:19px!important;top:-9px!important}
+body[data-as-season="winter"] .as-trim-card>.as-snow-crown,body[data-as-season="winter"] .as-trim-panel>.as-snow-crown{height:29px!important;top:-9px!important}
+body[data-as-season="winter"] .as-trim-round>.as-snow-crown{height:26px!important;top:-14px!important}
+body[data-as-season="winter"] .as-cap-base{fill:#f0fcff!important;stroke:#c5eefa;stroke-width:.8}
+body[data-as-season="winter"] .as-cap-shade{fill:#81bdcf!important;opacity:.78!important}
+body[data-as-season="winter"] .as-cap-highlight{stroke:#fff!important;stroke-width:2.1!important;opacity:1!important}
+/* Text glyphs receive crystalline tint, not a floating shelf. */
+body[data-as-season="winter"] .site-primary-nav .as-trim-text>.as-snow-crown,body[data-as-season="winter"] .site-header .mobile-nav .as-trim-text>.as-snow-crown{visibility:hidden!important;opacity:0!important}
+body[data-as-season="winter"] .site-primary-nav a,body[data-as-season="winter"] .site-header .mobile-nav a{color:#d5f5ff!important;text-shadow:0 -1px 1px #fff5,0 2px 6px #73c9f344!important}
+body[data-as-season="winter"] .site-header{background:linear-gradient(155deg,rgba(8,29,46,.98),rgba(15,35,55,.97) 55%,rgba(6,22,41,.98))!important;border-bottom:1px solid rgba(158,215,244,.43)!important;box-shadow:inset 0 1px 0 rgba(235,251,255,.12),0 10px 34px rgba(65,151,189,.14)!important}
+/* Winter ornament is now an attached ice cornice with irregular icicles, NOT a light string. */
+body[data-as-season="winter"] #as-header-ornament{height:30px!important;bottom:-14px!important;overflow:visible!important;background:none!important;z-index:2}
+body[data-as-season="winter"] #as-header-ornament :is(.as-wire,.as-bulb){display:none!important}
+body[data-as-season="winter"] #as-header-ornament::before{content:"";position:absolute;left:0;right:0;top:3px;height:14px;background:linear-gradient(180deg,#f8fdff,#b8dfed 53%,rgba(80,151,180,.58) 93%,transparent);clip-path:polygon(0 0,100% 0,100% 60%,96% 67%,93% 47%,89% 73%,85% 49%,81% 65%,77% 52%,73% 73%,68% 45%,64% 64%,59% 56%,55% 70%,50% 46%,46% 72%,41% 52%,36% 69%,32% 50%,27% 73%,22% 46%,18% 62%,13% 50%,9% 68%,4% 51%,0 70%);opacity:.93;filter:drop-shadow(0 2px 3px #23618455)}
+body[data-as-season="winter"] #as-header-ornament::after{content:"";position:absolute;left:0;right:0;top:9px;height:19px;background:linear-gradient(180deg,rgba(221,247,255,.85),rgba(110,190,222,.34) 50%,transparent);clip-path:polygon(4% 0,4.5% 55%,5% 0,16% 0,16.3% 75%,16.8% 0,29% 0,29.3% 45%,29.8% 0,45% 0,45.4% 72%,45.9% 0,58% 0,58.6% 57%,59.1% 0,74% 0,74.6% 94%,75.1% 0,90% 0,90.4% 72%,90.9% 0);opacity:.95}
+body[data-as-season="winter"] #as-scroll-mist{z-index:18!important;opacity:1!important;background-size:100% 760px!important;mix-blend-mode:screen;background-image:radial-gradient(ellipse 55% 24% at 3% 23%,rgba(140,211,243,.22),transparent 83%),radial-gradient(ellipse 52% 30% at 96% 71%,rgba(126,194,229,.18),transparent 82%),linear-gradient(90deg,rgba(167,222,248,.035),transparent 26%,transparent 75%,rgba(154,210,240,.055))!important}
+body[data-as-season="winter"] #as-scroll-mist::before{width:155%!important;height:clamp(170px,34vh,320px)!important;left:-31%!important;top:18%!important;opacity:.95!important;background:radial-gradient(ellipse 55% 50%,rgba(185,230,250,.3),rgba(150,214,238,.15) 43%,transparent 84%)!important;filter:blur(23px)!important;animation:as-cold-fog-drift 21s ease-in-out infinite alternate!important}
+body[data-as-season="winter"] #as-scroll-mist::after{width:162%!important;height:clamp(160px,27vh,280px)!important;left:-41%!important;top:66%!important;opacity:.83!important;background:radial-gradient(ellipse 56% 49%,rgba(192,230,249,.28),rgba(160,216,240,.09) 45%,transparent 85%)!important;filter:blur(24px)!important;animation:as-cold-fog-drift 31s ease-in-out infinite alternate-reverse!important}
+body[data-as-season="winter"] :is(.as-trim-card,.as-trim-panel){border-color:rgba(160,221,246,.29);box-shadow:inset 0 1px 0 rgba(243,253,255,.1),0 13px 44px rgba(84,155,204,.11)!important}
+
+/* NEW YEAR / GARNET GALA: snow is sparse, luxurious and held by pine needles,
+   while the header becomes a warm illuminated wreath. No cold icicle fringe. */
+body[data-as-season="newyear"] .site-header{background:linear-gradient(120deg,rgba(27,10,24,.98),rgba(50,15,31,.97) 45%,rgba(24,9,22,.98))!important;border-bottom:1px solid rgba(240,186,113,.38)!important;box-shadow:inset 0 1px 0 rgba(255,223,171,.08),0 12px 40px rgba(171,25,63,.25)!important}
+body[data-as-season="newyear"] #as-header-ornament{height:30px!important;bottom:-17px!important;background:linear-gradient(180deg,rgba(50,92,68,.22),transparent 88%)!important;overflow:visible!important}
+body[data-as-season="newyear"] #as-header-ornament::before{content:"";position:absolute;inset:2px 0 10px;background:repeating-linear-gradient(110deg,transparent 0 10px,rgba(26,93,63,.62) 10px 12px,transparent 12px 21px),linear-gradient(180deg,rgba(20,82,54,.48),rgba(16,56,38,.16));clip-path:polygon(0 0,100% 0,100% 82%,93% 67%,86% 91%,78% 66%,71% 89%,63% 74%,55% 96%,47% 69%,40% 87%,32% 71%,25% 89%,16% 64%,8% 87%,0 71%);opacity:.8}
+body[data-as-season="newyear"] #as-header-ornament .as-wire{border-bottom-color:rgba(223,177,105,.82)!important;border-bottom-width:1.4px!important}
+body[data-as-season="newyear"] #as-header-ornament .as-bulb{width:7px;height:10px;box-shadow:0 0 8px 2px var(--bulb),0 0 23px var(--bulb);animation:as-bulb 4s ease-in-out infinite}
+body[data-as-season="newyear"] :is(.as-trim-card,.as-trim-panel){border-color:rgba(218,157,127,.25);box-shadow:inset 0 1px 0 rgba(255,212,158,.1),0 16px 38px rgba(138,21,59,.16)!important}
+body[data-as-season="newyear"] .site-primary-nav a,body[data-as-season="newyear"] .site-header .mobile-nav a{color:#ffe5ce!important;text-shadow:0 0 9px rgba(255,162,123,.28)!important}
+body[data-as-season="newyear"] .site-header :is(.site-search-button,.site-theme-toggle,.notification-toggle,.avatar-button){border-color:rgba(248,188,125,.38)!important;box-shadow:inset 0 1px 0 rgba(255,231,189,.1),0 0 11px rgba(183,44,83,.22)}
+body[data-as-season="newyear"] .as-trim-button{box-shadow:0 1px 0 rgba(240,187,122,.17),0 7px 22px rgba(185,42,67,.12)}
+body[data-as-season="newyear"] #as-scroll-mist{z-index:3!important;opacity:.88!important;mix-blend-mode:screen}
+body[data-as-season="newyear"] #as-scroll-mist::after{opacity:0!important}
+
+/* Felt hat: a real long drooping silhouette, brim seats on the avatar's upper rim. */
+.as-santa-hat{width:73px!important;height:61px!important;top:-49px!important;left:51%!important;transform:translateX(-50%) rotate(-10deg)!important;filter:drop-shadow(2px 4px 2px rgba(0,0,0,.66)) drop-shadow(0 0 5px rgba(199,29,50,.26))!important}
+.as-santa-hat svg{overflow:visible}
+body[data-as-season="newyear"] .avatar-button.as-santa-anchor>.as-santa-hat{display:block!important}
+body[data-as-season="winter"] .avatar-button.as-santa-anchor>.as-santa-hat,body[data-as-season="original"] .avatar-button.as-santa-anchor>.as-santa-hat{display:none!important}
+body[data-as-season="newyear"] .avatar-button.as-santa-anchor>.as-snow-crown{visibility:hidden!important}
+@media(max-width:640px){.as-santa-hat{width:63px!important;height:53px!important;top:-42px!important;left:53%!important}body[data-as-season="winter"] #as-scroll-mist::before{height:190px!important;opacity:.78!important;filter:blur(20px)!important}body[data-as-season="winter"] #as-scroll-mist::after{height:168px!important;opacity:.73!important;filter:blur(22px)!important}body[data-as-season="winter"] .as-trim-card>.as-snow-crown{height:23px!important}body[data-as-season="newyear"] #as-header-ornament{height:26px!important;bottom:-14px!important}}
+@media(prefers-reduced-motion:reduce){body[data-as-season="winter"] #as-scroll-mist::before,body[data-as-season="winter"] #as-scroll-mist::after{animation:none!important}}
+@media(forced-colors:active){.as-holiday-detail,.as-santa-hat{display:none!important}}
+
+/* V4 QA corrections: immediate mutually exclusive material visibility.
+   No left-over ice bank during a switch to the holiday installation. */
+body[data-as-season="winter"] .as-snow-trim>.as-snow-crown{display:block!important;visibility:visible!important;opacity:1!important;transform:translateY(0)!important;transition:none!important}
+body[data-as-season="newyear"] .as-snow-trim>.as-snow-crown,body[data-as-season="original"] .as-snow-trim>.as-snow-crown{display:none!important;visibility:hidden!important;opacity:0!important;transition:none!important}
+body[data-as-season="newyear"] .as-holiday-detail{display:block!important;opacity:1!important;transition:none!important}
+body[data-as-season="winter"] .as-holiday-detail,body[data-as-season="original"] .as-holiday-detail{display:none!important;opacity:0!important;transition:none!important}
+/* Raise the REAL header contents so the folded red felt cone is visible,
+   rather than clipped off the top of the first device row. */
+body[data-as-season="newyear"] .site-header .site-header-shell{padding-top:32px!important}
+.as-santa-hat{left:calc(50% - 14px)!important;top:-41px!important}
+@media(max-width:640px){body[data-as-season="newyear"] .site-header .site-header-shell{padding-top:29px!important}.as-santa-hat{top:-36px!important}}
+/* Keep the pompon inside narrow 320px viewports without clipping the hat. */
+@media(max-width:355px){.as-santa-hat{left:calc(50% - 19px)!important}}
+#as-header-ornament .as-bulb{margin-left:-4px}
+
+
+/* ArtSoul Preview v5 — surface-specific correction after auditing 11 route sources.
+   Unframed text, labels, and logo never carry a floating snowcap. */
+.as-seasonal-ink{position:relative}
+body[data-as-season="winter"] :is(.site-primary-nav a,.site-header .mobile-nav a,.publication-type-nav a,.home-section-link,.launch-topline a).as-seasonal-ink{
+  text-shadow:0 0 9px rgba(162,225,255,.32);filter:drop-shadow(0 -1px 1px rgba(215,247,255,.13))
+}
+body[data-as-season="newyear"] :is(.site-primary-nav a,.site-header .mobile-nav a,.publication-type-nav a,.home-section-link,.launch-topline a).as-seasonal-ink{
+  text-shadow:0 0 9px rgba(255,190,136,.25)
+}
+/* No text-only/transparent CTA may inherit a previous generic crown. */
+body :is(a,button).as-seasonal-ink>.as-snow-crown,
+body :is(a,button).as-seasonal-ink>.as-holiday-detail{display:none!important}
+/* Real material varies by width, density and object type. Fixed profile per node. */
+.as-drift-0>.as-snow-crown{left:7%!important;right:12%!important}
+.as-drift-1>.as-snow-crown{left:11%!important;right:7%!important}
+.as-drift-2>.as-snow-crown{left:5%!important;right:8%!important}
+.as-drift-3>.as-snow-crown{left:9%!important;right:4%!important}
+body[data-as-season="winter"] .as-drift-0>.as-snow-crown{transform:translateY(1px) scaleY(.89)!important}
+body[data-as-season="winter"] .as-drift-1>.as-snow-crown{transform:translateY(-1px) scaleY(1.08)!important}
+body[data-as-season="winter"] .as-drift-2>.as-snow-crown{transform:translateY(0) scaleY(.94)!important}
+body[data-as-season="winter"] .as-drift-3>.as-snow-crown{transform:translateY(1px) scaleY(1.04)!important}
+/* In New Year, foliage/festive lights are independent of winter's ice profile. */
+body[data-as-season="newyear"] .as-drift-0>.as-holiday-detail{transform:translateY(1px) scaleY(.94)!important}
+body[data-as-season="newyear"] .as-drift-1>.as-holiday-detail{transform:translateY(-1px) scaleY(1.05)!important}
+body[data-as-season="newyear"] .as-drift-2>.as-holiday-detail{transform:translateY(0) scaleY(.91)!important}
+body[data-as-season="newyear"] .as-drift-3>.as-holiday-detail{transform:translateY(1px) scaleY(1.08)!important}
+/* Route-wide light, including React-rendered screens beyond the homepage. */
+body[data-as-season="winter"] :is(.gallery-page-main,.artwork-page-shell,.upload-page-main,.launch-page,.protocol-admin-root,.wallet-test-shell) {filter:drop-shadow(0 0 9px rgba(92,190,231,.06))}
+body[data-as-season="newyear"] :is(.gallery-page-main,.artwork-page-shell,.upload-page-main,.launch-page,.protocol-admin-root,.wallet-test-shell) {filter:drop-shadow(0 0 9px rgba(227,104,121,.06))}
+/* Distinct card classes without overriding original layout or button mechanics. */
+.as-page-halo{max-width:100%;overflow:hidden}
+@media(prefers-reduced-motion:reduce){.as-drift-0>.as-holiday-detail,.as-drift-1>.as-holiday-detail,.as-drift-2>.as-holiday-detail,.as-drift-3>.as-holiday-detail{transform:none!important}}
+@media(forced-colors:active){.as-seasonal-ink{filter:none!important;text-shadow:none!important}}
+
+/* ArtSoul Solstice v6 — wallet-state-stable seasonal account ornaments.
+   Decorations live on the header's stable avatar plaque, not the wallet button's
+   mutable children; every visual layer is pointer-transparent. */
+.site-header .avatar-plaque.as-seasonal-ornament-host{
+  position:relative;overflow:visible!important;
+}
+.site-header .as-seasonal-ornament-host > .as-santa-hat{
+  display:none!important;position:absolute!important;pointer-events:none!important;
+  left:calc(var(--as-account-ornament-x,100%) - 20px)!important;
+  top:calc(var(--as-account-ornament-y,0px) - 43px)!important;
+  width:73px!important;height:61px!important;
+  transform:translateX(-50%) rotate(-10deg)!important;
+  z-index:36!important;overflow:visible!important;
+  filter:drop-shadow(2px 4px 2px rgba(0,0,0,.66)) drop-shadow(0 0 6px rgba(203,38,52,.25))!important;
+}
+body[data-as-season="newyear"] .site-header .as-seasonal-ornament-host > .as-santa-hat{display:block!important}
+.site-header .as-seasonal-ornament-host > .as-winter-crest{
+  position:absolute!important;display:none!important;pointer-events:none!important;
+  left:var(--as-account-ornament-x,100%)!important;
+  top:calc(var(--as-account-ornament-y,0px) - 16px)!important;
+  transform:translateX(-50%)!important;
+  width:56px;height:38px;z-index:35!important;
+  filter:drop-shadow(0 2px 2px rgba(7,31,58,.42)) drop-shadow(0 0 6px rgba(128,206,246,.4));
+}
+.site-header .as-winter-crest svg{display:block;width:100%;height:100%;overflow:visible}
+body[data-as-season="winter"] .site-header .as-seasonal-ornament-host > .as-winter-crest{display:block!important}
+/* When the connected account re-renders, the frosted button remains clickable.
+   Original removes ALL ornaments; New Year and Winter are mutually exclusive. */
+body[data-as-season="original"] .site-header .as-seasonal-ornament-host > :is(.as-santa-hat,.as-winter-crest){display:none!important}
+@media(max-width:640px){
+ .site-header .as-seasonal-ornament-host > .as-santa-hat{
+  top:calc(var(--as-account-ornament-y,0px) - 37px)!important;
+  width:63px!important;height:53px!important;
+ }
+ .site-header .as-seasonal-ornament-host > .as-winter-crest{
+  top:calc(var(--as-account-ornament-y,0px) - 13px)!important;
+  width:49px;height:35px;
+ }
+}
+@media(prefers-reduced-motion:reduce){.site-header .as-santa-hat,.site-header .as-winter-crest{animation:none!important;transition:none!important}}
+@media(forced-colors:active){.site-header .as-seasonal-ornament-host > :is(.as-santa-hat,.as-winter-crest){display:none!important}}

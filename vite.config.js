@@ -45,6 +45,9 @@ const legacyRootAssets = [
     // the built pages and the component disagreed about the same picture: the
     // component saw a "different" src, rewrote the already-rendered image and
     // forced a second request plus a blank bitmap frame on every page load.
+    // Seasonal visual preview, copied verbatim. No contract or wallet changes.
+    'artsoul-seasonal-preview.css',
+    'artsoul-seasonal-preview.js',
     'design-system.css',
     'favicon.jpg',
     'ipfs-client.js',
@@ -196,6 +199,27 @@ function copyLegacyRuntimeAssets() {
     };
 }
 
+// An additive, build-only preview layer for all 11 multi-page entry points.
+function seasonalPreviewOnlyPlugin() {
+    return {
+        name: 'artsoul-solstice-preview-only',
+        apply: 'build',
+        transformIndexHtml: {
+            order: 'post',
+            handler(html) {
+                if (!html.includes('</head>') || !html.includes('</body>')) {
+                    throw new Error('Solstice preview: expected complete HTML document');
+                }
+                if (html.includes('artsoul-seasonal-preview.js')) return html;
+                return html.replace('</head>',
+                    '<link rel="stylesheet" href="/artsoul-seasonal-preview.css?v=7">\n</head>')
+                    .replace('</body>',
+                        '<script src="/artsoul-seasonal-preview.js?v=7" defer></script>\n</body>');
+            }
+        }
+    };
+}
+
 // Match the hosted artwork route when serving the site locally.
 function serveArtworkPage(server) {
     server.middlewares.use((request, _response, next) => {
@@ -211,7 +235,7 @@ export default defineConfig({
     plugins: [
         react(),
         { name: 'local-artwork-route', configureServer: serveArtworkPage, configurePreviewServer: serveArtworkPage },
-        inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()
+        inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets(), seasonalPreviewOnlyPlugin()
     ],
     build: {
         outDir,
