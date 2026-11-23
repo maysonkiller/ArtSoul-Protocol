@@ -560,3 +560,7 @@ body[data-as-season="newyear"] #as-header-ornament .as-bulb{top:7px;width:5px;he
 }
 
 body[data-as-season="newyear"] #as-countdown-ribbon {overflow:hidden}
+/* The secondary wordmark is real ink: never inherit the parent's clipped fill. */
+body[data-as-season="winter"] .site-header .site-wordmark span{color:#cae7f0!important;-webkit-text-fill-color:#cae7f0!important;text-shadow:none!important}
+body[data-as-season="newyear"] .site-header .site-wordmark span{color:#ead4ae!important;-webkit-text-fill-color:#ead4ae!important;text-shadow:none!important}
+@media(forced-colors:active){body:is([data-as-season="winter"],[data-as-season="newyear"]) .site-header .site-wordmark span{color:CanvasText!important;-webkit-text-fill-color:currentColor!important}}
