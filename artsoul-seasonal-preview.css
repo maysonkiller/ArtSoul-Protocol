@@ -250,3 +250,87 @@ body[data-as-season="newyear"] .as-cap-base{fill:#f5fbff}
 
 /* Internal routes retain hidden scene nodes for translations, without inserting a tree. */
 #as-solstice-scene.as-scene-internal{display:none!important}
+
+
+/* V3 / TACTILE WINTER: snow is weighted to the physical top edge of an object.
+   Text gets delicate settled rime, circular objects get curved banks, and
+   the account avatar carries its own felt Santa hat only in New Year mode. */
+.as-snow-trim.as-trim-round { isolation:isolate; }
+.as-snow-trim.as-trim-round > .as-snow-crown {
+  top:-12px!important;left:7%!important;right:7%!important;
+  height:24px!important;filter:drop-shadow(0 2px 2px rgba(10,29,43,.65));
+  z-index:5;
+}
+.as-trim-round .as-cap-shade{fill:#9cbdcf;opacity:.66}
+.as-trim-round .as-cap-highlight{stroke-width:2.4;opacity:.86}
+/* This rime touches the upper pixels of each navigation label; no floating
+   white strip above an invisible navigation rectangle. */
+.site-primary-nav .as-snow-trim.as-trim-text > .as-snow-crown,
+.site-header .mobile-nav .as-snow-trim.as-trim-text > .as-snow-crown {
+  top:var(--as-rime-y,1px)!important;
+  left:var(--as-rime-x,0px)!important;right:var(--as-rime-right,0px)!important;
+  height:7px!important;opacity:0;filter:drop-shadow(0 1px 1px rgba(13,46,57,.46));
+}
+body:is([data-as-season="winter"],[data-as-season="newyear"]) .site-primary-nav .as-trim-text > .as-snow-crown,
+body:is([data-as-season="winter"],[data-as-season="newyear"]) .site-header .mobile-nav .as-trim-text > .as-snow-crown { opacity:.93 }
+/* Frost is perched over the real wordmark, leaving the icon and click target intact. */
+.site-header .logo-link.as-trim-logo > .as-snow-crown {
+  top:var(--as-logo-frost-y,0px)!important;
+  left:var(--as-logo-frost-x,32%)!important;right:8%!important;
+  height:6px!important;filter:drop-shadow(0 1px 1px rgba(14,40,51,.39));
+}
+/* Actual raised actions have a tactile lip, narrow enough not to cover copy. */
+.home-hero-actions :is(a,button).as-snow-trim > .as-snow-crown,
+.site-page-container :is(.btn-main,.btn-secondary).as-snow-trim > .as-snow-crown {
+  top:-7px!important;height:13px!important;left:10%!important;right:11%!important;
+}
+/* The cap sits over the avatar's top arc. During New Year the Santa hat takes
+   that space instead, so the two material objects never overlap. */
+body[data-as-season="newyear"] .avatar-button.as-trim-round > .as-snow-crown{opacity:0!important}
+.as-santa-hat {
+  position:absolute!important;display:none!important;pointer-events:none!important;
+  width:53px;height:41px;max-width:none;top:-30px;left:50%;right:auto;
+  transform:translateX(-50%) rotate(-12deg);z-index:11;overflow:visible;
+  filter:drop-shadow(1px 3px 2px rgba(5,6,18,.66)) drop-shadow(0 0 6px rgba(221,47,64,.25));
+  user-select:none;
+}
+.as-santa-hat svg{width:100%;height:100%;display:block;overflow:visible}
+body[data-as-season="newyear"] .avatar-button .as-santa-hat{display:block!important}
+body[data-as-season="original"] .avatar-button .as-santa-hat,
+body[data-as-season="winter"] .avatar-button .as-santa-hat{display:none!important}
+/* Snow must stay outside controls and not interrupt keyboard, wallet, or menu. */
+:is(.as-santa-hat,.as-snow-crown,#as-scroll-mist)::selection{background:transparent}
+.site-header :is(.avatar-button,.site-search-button,.site-theme-toggle,.notification-toggle) { overflow:visible!important }
+/* Floating air is NOT piled snow: soft, low-contrast translucent winter
+   ground fog slides behind the interface with no sharp patches or walls. */
+#as-scroll-mist::before,#as-scroll-mist::after {
+  content:"";position:absolute;display:block;pointer-events:none;
+  border-radius:50%;opacity:0;will-change:transform;
+}
+body[data-as-season="winter"] #as-scroll-mist::before {
+  opacity:.64;width:140%;height:150px;left:-34%;top:18%;
+  background:radial-gradient(ellipse 56% 46% at 47% 57%,rgba(198,239,248,.19),rgba(136,209,235,.05) 56%,transparent 79%);
+  filter:blur(23px);animation:as-cold-fog-drift 37s ease-in-out infinite alternate;
+}
+body[data-as-season="winter"] #as-scroll-mist::after {
+  opacity:.48;width:132%;height:116px;left:-18%;top:67%;
+  background:radial-gradient(ellipse 55% 46% at 44% 58%,rgba(213,246,251,.14),transparent 82%);
+  filter:blur(27px);animation:as-cold-fog-drift 47s ease-in-out infinite alternate-reverse;
+}
+body[data-as-season="newyear"] #as-scroll-mist::before {
+  opacity:.3;width:133%;height:120px;left:-15%;top:44%;
+  background:radial-gradient(ellipse 55% 48%,rgba(234,168,188,.12),transparent 77%);
+  filter:blur(24px);animation:as-cold-fog-drift 48s ease-in-out infinite alternate;
+}
+@keyframes as-cold-fog-drift{from{transform:translate3d(-9%,7px,0)}to{transform:translate3d(11%,-12px,0)}}
+@media(max-width:620px){
+  .as-snow-trim.as-trim-round > .as-snow-crown{top:-10px!important;height:20px!important}
+  .as-santa-hat{width:45px;height:35px;top:-27px}
+  .site-primary-nav .as-trim-text > .as-snow-crown{height:5px!important}
+  body[data-as-season="winter"] #as-scroll-mist::before {height:95px;opacity:.38;filter:blur(15px)}
+  body[data-as-season="winter"] #as-scroll-mist::after {height:80px;opacity:.3;filter:blur(18px)}
+}
+@media(prefers-reduced-motion:reduce){
+  #as-scroll-mist::before,#as-scroll-mist::after{animation:none!important;will-change:auto!important}
+}
+@media(forced-colors:active){.as-santa-hat,#as-scroll-mist::before,#as-scroll-mist::after{display:none!important}}
