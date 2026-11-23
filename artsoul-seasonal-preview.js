@@ -144,7 +144,41 @@
       '<path class="as-cap-shade" d="M0 16 C22 20 37 18 53 18 C53 31 60 30 66 17 C84 22 104 19 130 18 C142 21 157 22 172 17 C170 30 180 30 186 17 C205 22 222 18 251 18 C260 22 273 22 283 18 C286 28 292 27 295 17 C304 18 310 20 320 16 L320 19 C295 23 283 23 270 20 C249 26 238 22 219 22 C199 25 182 23 165 22 C141 24 111 25 95 21 C74 24 45 25 23 22 L0 20 Z"/>'+
       '<path class="as-cap-highlight" d="M12 11 C23 8 31 8 41 10 M112 9 C126 6 140 7 150 10 M218 10 C233 7 240 8 250 10 M286 10 C299 8 306 9 315 11"/>'+
       '</svg>';
+    // Choose an object-specific snow silhouette instead of one flat banner.
+    const rect=el.getBoundingClientRect();
+    const radius=parseFloat(style.borderTopLeftRadius)||0;
+    const isCircle=el.matches('button,.avatar-button')&&rect.width>=26&&rect.width<=84&&
+      rect.height>=26&&Math.abs(rect.width-rect.height)<rect.width*.27&&radius>=rect.width*.30;
+    if(isCircle){
+      el.classList.add('as-trim-round');
+      cap.innerHTML='<svg viewBox="0 0 100 42" preserveAspectRatio="none" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
+        '<path class="as-cap-base" d="M6 30 Q10 19 19 14 Q31 4 46 4 Q57 1 68 8 Q80 12 89 21 L94 31 Q84 24 77 27 Q69 22 60 20 Q57 33 52 25 L48 19 Q36 19 31 25 Q25 22 19 28 Z"/>'+
+        '<path class="as-cap-shade" d="M9 29 Q23 15 36 15 Q49 10 63 17 Q81 20 91 30 L83 27 Q68 20 60 20 Q54 31 51 25 L47 20 Q32 19 20 28 Z"/>'+
+        '<path class="as-cap-highlight" d="M18 18 Q34 5 48 7 M60 8 Q70 10 79 18"/>'+
+        '</svg>';
+    } else if(el.matches('.site-primary-nav a,.site-header .mobile-nav a')){
+      el.classList.add('as-trim-text');
+      const padTop=parseFloat(style.paddingTop)||0;
+      el.style.setProperty('--as-rime-y',(padTop+1).toFixed(1)+'px');
+      el.style.setProperty('--as-rime-x',((parseFloat(style.paddingLeft)||0)+1).toFixed(1)+'px');
+      el.style.setProperty('--as-rime-right',((parseFloat(style.paddingRight)||0)+1).toFixed(1)+'px');
+    } else if(el.matches('.site-header .logo-link')){
+      el.classList.add('as-trim-logo');
+      el.style.setProperty('--as-logo-frost-y',((parseFloat(style.paddingTop)||0)+1).toFixed(1)+'px');
+    }
     el.appendChild(cap);
+    if(el.matches('.site-header .avatar-button')){
+      const hat=elt('span',{'class':'as-santa-hat','aria-hidden':'true'});
+      hat.innerHTML='<svg viewBox="0 0 112 84" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
+        '<defs><linearGradient id="as-hat-felt" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#ff5c5e"/><stop offset=".47" stop-color="#c82335"/><stop offset="1" stop-color="#730c24"/></linearGradient><linearGradient id="as-hat-wool" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#b8d2dc"/></linearGradient></defs>'+
+        '<path d="M18 56 C25 23 46 5 67 9 C83 10 92 26 96 43 C101 46 105 43 104 40 C109 51 104 60 95 60 C83 57 75 47 65 47 C51 44 38 50 18 56Z" fill="url(#as-hat-felt)" stroke="#77263e" stroke-width="1.2"/>'+
+        '<path d="M33 38 C42 20 54 15 67 15" fill="none" stroke="#ffabb0" stroke-width="3.2" opacity=".5" stroke-linecap="round"/>'+
+        '<circle cx="98" cy="52" r="10.5" fill="url(#as-hat-wool)"/><circle cx="93.6" cy="47" r="3.3" fill="#fff" opacity=".8"/>'+
+        '<path d="M12 55 Q38 45 59 47 Q79 47 88 58 Q91 67 82 67 Q47 58 18 68 Q9 67 12 55 Z" fill="url(#as-hat-wool)" stroke="#c5dfec" stroke-width="1"/>'+
+        '<path d="M18 57 Q43 49 66 53" fill="none" stroke="white" stroke-width="2.5" opacity=".92" stroke-linecap="round"/>'+
+        '</svg>';
+      el.appendChild(hat);
+    }
     detailCount++;
   }
   function decorateSite(){
