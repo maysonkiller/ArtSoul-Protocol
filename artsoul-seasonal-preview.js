@@ -46,7 +46,7 @@
   BODY.appendChild(panel);
   const scene=elt('section',{id:'as-solstice-scene','aria-label':'ArtSoul New Year light installation'});
   scene.innerHTML='<div class="as-scene-copy"><div class="as-scene-kicker" id="as-scene-cap"></div><h2 class="as-scene-title" id="as-scene-title"></h2><p class="as-scene-desc" id="as-scene-desc"></p></div><canvas id="as-tree-canvas" aria-hidden="true" width="255" height="226"></canvas><div class="as-scene-side" id="as-scene-side"></div>';
-  const hero=DOC.querySelector('.home-hero');if(hero)hero.insertAdjacentElement('afterend',scene);
+  const hero=DOC.querySelector('.home-hero');if(hero){hero.insertAdjacentElement('afterend',scene)}else{scene.classList.add('as-scene-internal');BODY.appendChild(scene)}
   const byId=id=>DOC.getElementById(id);
   const modeButtons=[...panel.querySelectorAll('[data-mode]')];
   let panelOpen=false,lastFocus=null;
@@ -73,7 +73,7 @@
   function stopTree(){if(treeId)cancelAnimationFrame(treeId);treeId=0;if(tctx)tctx.clearRect(0,0,tw,th)}
   function resizeTree(){if(!tctx)return;({w:tw,h:th}=resizeCanvas(tree,tctx,1.7));const n=tw<190?300:450;treePoints=Array.from({length:n},(_,i)=>({theta:i*2.39996*4.1,level:1-(i+.5)/n,spread:Math.pow((i+.5)/n,.75),size:rand(.65,1.8),pulse:rand(0,6.28),warm:i%6===0}))}
   function drawTree(now){treeId=0;if(mode!=='newyear'||!tctx)return;const time=now*.001,spin=reduce.matches?.26:time*.17,center=tw*.5,foot=th*.88,h=th*.75,radius=tw*.39;tctx.clearRect(0,0,tw,th);const g=tctx.createRadialGradient(center,foot-9,2,center,foot-9,tw*.5);g.addColorStop(0,'rgba(241,184,103,.3)');g.addColorStop(1,'rgba(241,184,103,0)');tctx.fillStyle=g;tctx.beginPath();tctx.ellipse(center,foot,tw*.47,18,0,0,Math.PI*2);tctx.fill();for(let band=0;band<2;band++){tctx.beginPath();for(let i=0;i<115;i++){const v=i/114,a=v*16.5+spin+band*2.9,rr=radius*Math.pow(v,.9);const x=center+Math.cos(a)*rr,y=foot-v*h+Math.sin(a)*rr*.12;if(i===0)tctx.moveTo(x,y);else tctx.lineTo(x,y)}tctx.strokeStyle=band?'rgba(132,241,200,.27)':'rgba(255,207,139,.40)';tctx.lineWidth=1;tctx.stroke()}for(const p of treePoints){const a=p.theta+spin,depth=Math.sin(a),rr=radius*p.spread,x=center+Math.cos(a)*rr,y=foot-p.level*h+depth*rr*.13,alpha=(.32+.44*Math.max(0,depth))*(reduce.matches?1:.8+.2*Math.sin(time*2.1+p.pulse));tctx.fillStyle=p.warm?`rgba(255,214,140,${alpha+.14})`:`rgba(150,235,207,${alpha})`;tctx.shadowColor=p.warm?'#fad88c':'#9de8d3';tctx.shadowBlur=p.warm?8:3;tctx.beginPath();tctx.arc(x,y,p.size*(1+depth*.15),0,Math.PI*2);tctx.fill()}tctx.shadowBlur=0;tctx.fillStyle='#f9e9af';tctx.shadowBlur=14;tctx.shadowColor='#f9dba0';tctx.beginPath();tctx.arc(center,foot-h-3,4.3,0,Math.PI*2);tctx.fill();tctx.shadowBlur=0;if(!reduce.matches&&!document.hidden)treeId=requestAnimationFrame(drawTree)}
-  function updateMotion(){stopWeather();stopTree();if(mode==='newyear'&&tree){resizeTree();if(tctx)drawTree(performance.now())}if(!document.hidden&&!reduce.matches&&snow&&mode!=='original'&&wctx){weatherLast=performance.now();weatherId=requestAnimationFrame(weatherFrame)}}
+  function updateMotion(){stopWeather();stopTree();if(mode==='newyear'&&tree&&hero){resizeTree();if(tctx)drawTree(performance.now())}if(!document.hidden&&!reduce.matches&&snow&&mode!=='original'&&wctx){weatherLast=performance.now();weatherId=requestAnimationFrame(weatherFrame)}}
   function applyMode(){BODY.dataset.asSeason=mode;ROOT.dataset.asSeason=mode;BODY.dataset.asSnow=snow?'on':'off';applyControlLabels();updateMotion();updateHeaderOffset()}
   const fctx=fire.getContext('2d',{alpha:true});let fw=0,fh=0,particles=[],fireId=0,lastFrame=0,toastTimeout=0;
   const colors=['#f7deb0','#eac0a2','#9fe4df','#e75e85','#bcd2ff','#fff9e6'];
@@ -89,6 +89,91 @@
   reduce.addEventListener?.('change',()=>{applyControlLabels();updateMotion()});
   new MutationObserver(()=>{const next=language();if(next!==locale)updateLabels()}).observe(ROOT,{attributes:true,attributeFilter:['lang']});
   window.addEventListener('storage',ev=>{if(ev.key==='artsoul_language'||ev.key==='artsoul_lang')updateLabels()});
+  /* ArtSoul Solstice v2: reversible snow details on every route.
+     This touches only visual nodes, not business event handlers. */
+  const scrollMist=elt('div',{id:'as-scroll-mist','aria-hidden':'true'});
+  BODY.insertBefore(scrollMist,BODY.firstChild);
+  const nodesSeen=new WeakSet();
+  const selectors=[
+    '.site-header .logo-link',
+    '.site-header .site-primary-nav a',
+    '.site-header .site-header-actions button',
+    '.site-header .avatar-button',
+    '.site-header .site-header-nav button',
+    '.site-header .menu-button',
+    '.site-header .mobile-menu-button',
+    '.site-header .mobile-nav a',
+    '.home-hero-actions a',
+    '.site-page-container a.btn-main',
+    '.site-page-container a.btn-secondary',
+    '.site-page-container button.btn-main',
+    '.site-page-container button.btn-secondary',
+    '.site-page-container :is(.home-showcase,.profile-card,.auction-card,.collection-card,.artwork-card,.nft-card,.artwork-tile,.artwork-detail-card)',
+    '.site-page-container .gallery article',
+    '.site-page-container .gallery [data-artwork-id]',
+    '.site-page-container .gallery [data-artwork-card]',
+    '.site-page-container :is(.docs-card,.info-card,.feature-card,.collection-tile)'
+  ];
+  const targetSelector=selectors.join(',');
+  function crownClass(el){
+    if(el.matches('.site-header a,.site-header button'))return 'as-trim-nav';
+    if(el.matches('a,button'))return 'as-trim-button';
+    if(el.matches('.home-showcase,.docs-card,.info-card'))return 'as-trim-panel';
+    return 'as-trim-card';
+  }
+  let detailCount=0;
+  function decorateNode(el){
+    if(nodesSeen.has(el)||el.closest('#as-scene-panel,#as-countdown-ribbon,#as-solstice-scene'))return;
+    if(detailCount>175)return;
+    nodesSeen.add(el);
+    if(!el.isConnected||el.closest('[hidden],[aria-hidden="true"],dialog,[role="dialog"]'))return;
+    const style=getComputedStyle(el);
+    if(style.display==='none')return;
+    // Never rewrite or remove existing text, links, focus or handlers.
+    const kind=crownClass(el);
+    if(style.position==='static')el.style.position='relative';
+    el.classList.add('as-snow-trim',kind);
+    const cap=elt('span',{'class':'as-snow-crown','aria-hidden':'true'});
+    cap.innerHTML='<svg viewBox="0 0 320 34" preserveAspectRatio="none" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
+      '<path class="as-cap-base" d="M0 11 C15 9 27 5 40 9 C55 1 69 2 83 9 C99 5 113 3 124 8 C141 2 153 6 164 9 C180 2 197 3 209 8 C225 5 239 3 254 10 C268 4 287 6 297 9 C308 6 317 10 320 10 L320 16 C306 20 304 18 295 17 C292 27 286 28 283 18 C272 22 259 18 251 18 C243 23 230 19 219 18 C207 22 197 18 186 17 C180 30 170 30 172 17 C157 22 141 18 130 18 C116 23 107 20 95 18 C84 21 76 19 66 17 C60 30 53 31 53 18 C37 22 20 19 0 17 Z"/>'+
+      '<path class="as-cap-shade" d="M0 16 C22 20 37 18 53 18 C53 31 60 30 66 17 C84 22 104 19 130 18 C142 21 157 22 172 17 C170 30 180 30 186 17 C205 22 222 18 251 18 C260 22 273 22 283 18 C286 28 292 27 295 17 C304 18 310 20 320 16 L320 19 C295 23 283 23 270 20 C249 26 238 22 219 22 C199 25 182 23 165 22 C141 24 111 25 95 21 C74 24 45 25 23 22 L0 20 Z"/>'+
+      '<path class="as-cap-highlight" d="M12 11 C23 8 31 8 41 10 M112 9 C126 6 140 7 150 10 M218 10 C233 7 240 8 250 10 M286 10 C299 8 306 9 315 11"/>'+
+      '</svg>';
+    el.appendChild(cap);
+    detailCount++;
+  }
+  function decorateSite(){
+    const elements=DOC.querySelectorAll(targetSelector);
+    for(const el of elements)decorateNode(el);
+    for(const el of DOC.querySelectorAll('.site-page-container')){
+      if(el.querySelector(':scope > .as-page-halo'))continue;
+      if(getComputedStyle(el).position==='static')el.style.position='relative';
+      el.prepend(elt('div',{'class':'as-page-halo','aria-hidden':'true'}));
+    }
+  }
+  let decorTimer=0;
+  function scheduleDecoration(){
+    if(decorTimer)return;
+    decorTimer=setTimeout(()=>{decorTimer=0;decorateSite()},210);
+  }
+  decorateSite();
+  const domObserver=new MutationObserver(records=>{
+    if(records.some(record=>[...record.addedNodes].some(n=>n.nodeType===1&&!n.matches?.('.as-snow-crown,.as-page-halo'))))scheduleDecoration();
+  });
+  domObserver.observe(BODY,{childList:true,subtree:true});
+  /* Additional near/far snow depth, respecting device capacity. */
+  const originalResizeWeather=resizeWeather;
+  resizeWeather=function(){
+    originalResizeWeather();
+    const density=ww<620?Math.min(78,Math.max(42,Math.round(ww*wh/7900))):Math.min(148,Math.max(65,Math.round(ww*wh/9200)));
+    flakes=Array.from({length:density},(_,i)=>({
+      x:rand(0,ww),y:rand(-30,wh),r:rand(.65,i%10===0?3.2:2.35),
+      speed:rand(i%5===0?18:11,i%5===0?54:39),
+      depth:rand(.44,1.1),phase:rand(0,6.28)
+    }));
+  };
+  resizeWeather();
+
   resizeWeather();updateLabels();applyMode();tick();setInterval(tick,1000);clockSync().then(tick);
   window.ArtSoulSeasonalPreview={getState:()=>({mode,snow,locale,timezone:'Europe/Warsaw',targetUtc:new Date(TARGET).toISOString(),clockSynced}),previewFireworks:()=>showFireworks(false),setMode:x=>{if(modes.includes(x)){mode=x;applyMode()}}};
 })();
