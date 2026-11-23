@@ -144,8 +144,74 @@
     if(el.matches('.home-showcase,.docs-card,.info-card,.publish-panel,.launch-hero'))return 'as-trim-panel';
     return 'as-trim-card';
   }
+  // The account controller may regenerate the avatar button contents after wallet
+  // connection. The seasonal ornaments live OUTSIDE that mutable button, anchored
+  // to the stable .avatar-plaque instead. No wallet state is read or modified.
+  let avatarSizeObserver=null;
+  let observedAccountButton=null;
+  let accountSyncFrame=0;
+  function syncAccountOrnaments(el){
+    if(!el || !el.isConnected || !el.matches('.site-header .avatar-button'))return;
+    const host=el.closest('.avatar-plaque')||el.parentElement;
+    if(!host)return;
+    if(getComputedStyle(host).position==='static')host.style.position='relative';
+    host.classList.add('as-seasonal-ornament-host');
+    el.classList.add('as-santa-anchor');
+    if(!host.querySelector(':scope > .as-santa-hat')){
+      const hat=elt('span',{'class':'as-santa-hat','aria-hidden':'true'});
+      // Full folded felt cone, physical cuff overlapping the circle, and rounded pom.
+      // The design is an original inline vector; pointer-events stay disabled.
+      hat.innerHTML='<svg viewBox="0 0 150 122" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
+        '<defs><linearGradient id="as-v4-felt" x1=".18" y1="0" x2=".86" y2="1"><stop stop-color="#ff6563"/><stop offset=".42" stop-color="#c91b34"/><stop offset="1" stop-color="#6e081c"/></linearGradient><linearGradient id="as-v4-fur" x1="0" y1="0" x2=".15" y2="1"><stop stop-color="#fff"/><stop offset=".42" stop-color="#fffafa"/><stop offset="1" stop-color="#c9d5df"/></linearGradient><radialGradient id="as-v4-pom" cx=".28" cy=".23" r=".85"><stop stop-color="#fff"/><stop offset=".5" stop-color="#f5f4f0"/><stop offset="1" stop-color="#bdccd6"/></radialGradient></defs>'+
+        '<path d="M25 83 C32 52 48 18 77 12 C96 7 105 19 109 32 C112 49 124 48 133 58 L126 80 C108 68 93 62 76 64 C52 67 38 78 25 83Z" fill="url(#as-v4-felt)" stroke="#7a1b2a" stroke-width="1.4"/>'+
+        '<path d="M83 16 C104 12 108 38 118 50 C127 57 136 58 139 65 Q126 78 116 73 C111 53 100 47 88 44 C101 36 92 23 83 16Z" fill="#870c23" opacity=".61"/>'+
+        '<path d="M35 72 C49 34 62 21 82 18" fill="none" stroke="#ffb1ab" opacity=".5" stroke-linecap="round" stroke-width="4.4"/>'+
+        '<path d="M57 47 C65 37 73 36 83 37" stroke="#ef7180" stroke-width="1.4" opacity=".6" fill="none"/>'+
+        '<path d="M124 65 C129 57 137 57 141 63 C148 64 151 72 146 79 C150 86 144 94 137 92 C132 99 121 95 120 89 C112 88 111 79 118 75 C116 70 119 65 124 65Z" fill="url(#as-v4-pom)" stroke="#b9c7d0" stroke-width="1.1"/>'+
+        '<path d="M123 73 Q131 65 139 69" stroke="#fff" stroke-width="3.8" stroke-linecap="round" opacity=".93" fill="none"/>'+
+        '<path d="M19 80 C29 72 44 68 61 69 C79 65 97 69 108 79 Q113 86 108 95 C94 92 82 85 67 88 Q44 91 21 99 Q15 98 17 90 Q14 86 19 80Z" fill="url(#as-v4-fur)" stroke="#c1d1d8" stroke-width="1.4"/>'+
+        '<path d="M20 80 C29 77 33 77 39 79 C49 74 52 75 60 77 C71 74 78 75 88 78 C95 77 101 80 107 82" stroke="#fff" fill="none" stroke-width="4.5" stroke-linecap="round" opacity=".97"/>'+
+        '<path d="M22 95 Q39 88 54 87 Q78 83 101 92" stroke="#a9bccb" fill="none" stroke-width="2.6" opacity=".57"/>'+
+        '<path d="M34 80l2-3m14 3l2-3m17 1l1-2m17 5l1-2" stroke="#fff" stroke-width="1.2" opacity=".9"/>'+
+        '<g fill="#fff" opacity=".76"><circle cx="65" cy="29" r="1.3"/><circle cx="48" cy="55" r=".9"/><circle cx="89" cy="30" r="1.1"/></g></svg>';
+      host.appendChild(hat);
+    }
+    if(!host.querySelector(':scope > .as-winter-crest')){
+      const crest=elt('span',{'class':'as-winter-crest','aria-hidden':'true'});
+      // Original frosted glass ridge with three natural hanging icicles.
+      crest.innerHTML='<svg viewBox="0 0 92 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">'+
+        '<defs><linearGradient id="as-winter-crest-ice" x1=".2" y1="0" x2=".65" y2="1"><stop stop-color="#fff"/><stop offset=".38" stop-color="#d9f5ff"/><stop offset=".8" stop-color="#8bc5e1"/><stop offset="1" stop-color="#4484ad"/></linearGradient></defs>'+
+        '<path d="M8 28 Q12 17 24 17 Q30 9 42 13 Q54 5 64 16 Q77 12 84 27 Q68 24 59 28 Q45 24 35 29 Q20 24 8 28Z" fill="url(#as-winter-crest-ice)" stroke="#b9e9ff" stroke-width="1.2"/>'+
+        '<path d="M22 26 Q22 36 27 42 Q29 44 30 37 L31 27 M45 27 Q45 37 47 52 Q49 56 51 48 L55 26 M68 27 Q69 34 73 41 Q76 44 76 36 L77 25" fill="url(#as-winter-crest-ice)" stroke="#a6def9" stroke-width="1.1" stroke-linejoin="round"/>'+
+        '<path d="M15 23 Q27 14 37 17 M43 14 Q54 12 63 19 M47 29 L48 43" fill="none" stroke="#fff" stroke-width="2.2" opacity=".87" stroke-linecap="round"/>'+
+        '<circle cx="38" cy="17" r="1.5" fill="#fff"/><circle cx="63" cy="20" r="1" fill="#fff"/></svg>';
+      host.appendChild(crest);
+    }
+    const rect=el.getBoundingClientRect(), parentRect=host.getBoundingClientRect();
+    if(rect.width>0 && parentRect.width>0){
+      host.style.setProperty('--as-account-ornament-x',(rect.left+rect.width*.5-parentRect.left).toFixed(1)+'px');
+      host.style.setProperty('--as-account-ornament-y',(rect.top-parentRect.top).toFixed(1)+'px');
+    }
+    if(typeof ResizeObserver==='function' && observedAccountButton!==el){
+      avatarSizeObserver?.disconnect();
+      avatarSizeObserver=new ResizeObserver(()=>{
+        if(accountSyncFrame)return;
+        accountSyncFrame=requestAnimationFrame(()=>{
+          accountSyncFrame=0;
+          const current=DOC.querySelector('.site-header .avatar-button');
+          if(current)syncAccountOrnaments(current);
+        });
+      });
+      avatarSizeObserver.observe(el);
+      avatarSizeObserver.observe(host);
+      observedAccountButton=el;
+    }
+  }
   let detailCount=0;
   function decorateNode(el){
+    // Independent of physicalSurface/WeakSet: keep the account ornament alive
+    // when disconnected, connected, or the avatar is re-rendered in place.
+    if(el.matches('.site-header .avatar-button'))syncAccountOrnaments(el);
     if(nodesSeen.has(el)||el.closest('#as-scene-panel,#as-countdown-ribbon,#as-solstice-scene'))return;
     if(detailCount>175)return;
     if(!el.isConnected||el.closest('[hidden],[aria-hidden="true"],dialog,[role="dialog"]'))return;
@@ -228,26 +294,7 @@
       }
       el.appendChild(gala);
     }
-    if(el.matches('.site-header .avatar-button')){
-      el.classList.add('as-santa-anchor');
-      const hat=elt('span',{'class':'as-santa-hat','aria-hidden':'true'});
-      // Full folded felt cone, physical cuff overlapping the circle, and rounded pom.
-      // The design is an original inline vector; pointer-events stay disabled.
-      hat.innerHTML='<svg viewBox="0 0 150 122" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">'+
-        '<defs><linearGradient id="as-v4-felt" x1=".18" y1="0" x2=".86" y2="1"><stop stop-color="#ff6563"/><stop offset=".42" stop-color="#c91b34"/><stop offset="1" stop-color="#6e081c"/></linearGradient><linearGradient id="as-v4-fur" x1="0" y1="0" x2=".15" y2="1"><stop stop-color="#fff"/><stop offset=".42" stop-color="#fffafa"/><stop offset="1" stop-color="#c9d5df"/></linearGradient><radialGradient id="as-v4-pom" cx=".28" cy=".23" r=".85"><stop stop-color="#fff"/><stop offset=".5" stop-color="#f5f4f0"/><stop offset="1" stop-color="#bdccd6"/></radialGradient></defs>'+
-        '<path d="M25 83 C32 52 48 18 77 12 C96 7 105 19 109 32 C112 49 124 48 133 58 L126 80 C108 68 93 62 76 64 C52 67 38 78 25 83Z" fill="url(#as-v4-felt)" stroke="#7a1b2a" stroke-width="1.4"/>'+
-        '<path d="M83 16 C104 12 108 38 118 50 C127 57 136 58 139 65 Q126 78 116 73 C111 53 100 47 88 44 C101 36 92 23 83 16Z" fill="#870c23" opacity=".61"/>'+
-        '<path d="M35 72 C49 34 62 21 82 18" fill="none" stroke="#ffb1ab" opacity=".5" stroke-linecap="round" stroke-width="4.4"/>'+
-        '<path d="M57 47 C65 37 73 36 83 37" stroke="#ef7180" stroke-width="1.4" opacity=".6" fill="none"/>'+
-        '<path d="M124 65 C129 57 137 57 141 63 C148 64 151 72 146 79 C150 86 144 94 137 92 C132 99 121 95 120 89 C112 88 111 79 118 75 C116 70 119 65 124 65Z" fill="url(#as-v4-pom)" stroke="#b9c7d0" stroke-width="1.1"/>'+
-        '<path d="M123 73 Q131 65 139 69" stroke="#fff" stroke-width="3.8" stroke-linecap="round" opacity=".93" fill="none"/>'+
-        '<path d="M19 80 C29 72 44 68 61 69 C79 65 97 69 108 79 Q113 86 108 95 C94 92 82 85 67 88 Q44 91 21 99 Q15 98 17 90 Q14 86 19 80Z" fill="url(#as-v4-fur)" stroke="#c1d1d8" stroke-width="1.4"/>'+
-        '<path d="M20 80 C29 77 33 77 39 79 C49 74 52 75 60 77 C71 74 78 75 88 78 C95 77 101 80 107 82" stroke="#fff" fill="none" stroke-width="4.5" stroke-linecap="round" opacity=".97"/>'+
-        '<path d="M22 95 Q39 88 54 87 Q78 83 101 92" stroke="#a9bccb" fill="none" stroke-width="2.6" opacity=".57"/>'+
-        '<path d="M34 80l2-3m14 3l2-3m17 1l1-2m17 5l1-2" stroke="#fff" stroke-width="1.2" opacity=".9"/>'+
-        '<g fill="#fff" opacity=".76"><circle cx="65" cy="29" r="1.3"/><circle cx="48" cy="55" r=".9"/><circle cx="89" cy="30" r="1.1"/></g></svg>';
-      el.appendChild(hat);
-    }
+
     detailCount++;
   }
   function decorateSite(){
@@ -265,8 +312,12 @@
     decorTimer=setTimeout(()=>{decorTimer=0;decorateSite()},210);
   }
   decorateSite();
+  window.addEventListener('resize',()=>{
+    const account=DOC.querySelector('.site-header .avatar-button');
+    if(account)syncAccountOrnaments(account);
+  },{passive:true});
   const domObserver=new MutationObserver(records=>{
-    if(records.some(record=>[...record.addedNodes].some(n=>n.nodeType===1&&!n.matches?.('.as-snow-crown,.as-holiday-detail,.as-santa-hat,.as-page-halo'))))scheduleDecoration();
+    if(records.some(record=>[...record.addedNodes].some(n=>n.nodeType===1&&!n.matches?.('.as-snow-crown,.as-holiday-detail,.as-santa-hat,.as-winter-crest,.as-page-halo'))))scheduleDecoration();
   });
   domObserver.observe(BODY,{childList:true,subtree:true});
   /* Additional near/far snow depth, respecting device capacity. */
