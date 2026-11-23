@@ -334,3 +334,92 @@ body[data-as-season="newyear"] #as-scroll-mist::before {
   #as-scroll-mist::before,#as-scroll-mist::after{animation:none!important;will-change:auto!important}
 }
 @media(forced-colors:active){.as-santa-hat,#as-scroll-mist::before,#as-scroll-mist::after{display:none!important}}
+
+/* ArtSoul Solstice V4 / GLACIER x GALA. Two physically distinct material systems.
+   Additive preview-only decorations; no wallet or auction interaction. */
+
+/* Shared display gate: do not stack Winter's ice bank on Gala's fine trim. */
+.as-holiday-detail{position:absolute!important;display:block!important;pointer-events:none!important;user-select:none!important;opacity:0;z-index:7;overflow:visible;left:0;right:0;top:-8px;height:22px;filter:drop-shadow(0 2px 2px rgba(26,12,17,.55));transition:opacity .2s ease}
+.as-holiday-detail svg{display:block;width:100%;height:100%;overflow:visible}
+body[data-as-season="newyear"] .as-holiday-detail{opacity:1}
+body[data-as-season="winter"] .as-holiday-detail,body[data-as-season="original"] .as-holiday-detail{opacity:0!important}
+body[data-as-season="newyear"] .as-snow-trim > .as-snow-crown{opacity:0!important;visibility:hidden!important}
+.as-holiday-detail .as-gala-powder{fill:#f6f2e8}
+.as-holiday-detail .as-gala-shadow{fill:#aebbc1;opacity:.65}
+.as-holiday-detail .as-gala-vine{fill:none;stroke:#315c49;stroke-width:3.4;stroke-linecap:round}
+.as-holiday-detail .as-gala-needle{fill:none;stroke:#537b5e;stroke-width:2;stroke-linecap:round}
+.as-holiday-detail .as-gala-wire{fill:none;stroke:#cda76d;stroke-width:1.8;stroke-linecap:round}
+.as-holiday-detail .as-gala-lamp{fill:#ffe0a4;filter:drop-shadow(0 0 3px rgba(255,197,96,.72))}
+.as-holiday-detail .as-gala-ruby{fill:#d84f68;filter:drop-shadow(0 0 3px rgba(243,63,113,.5))}
+.as-trim-round>.as-holiday-detail{top:-10px;height:23px;left:3%;right:3%}
+.site-primary-nav .as-trim-text>.as-holiday-detail,.site-header .mobile-nav .as-trim-text>.as-holiday-detail{top:auto!important;bottom:-5px!important;height:10px!important;left:2%!important;right:2%!important;filter:drop-shadow(0 0 2px rgba(249,182,97,.18))}
+.as-trim-button>.as-holiday-detail,.home-hero-actions a>.as-holiday-detail{top:-7px;height:24px;left:0;right:0}
+.as-trim-card>.as-holiday-detail,.as-trim-panel>.as-holiday-detail{top:-7px;height:24px;left:0;right:0}
+/* The brand text is ink, not a physical shelf. No hovering strip over PROTOCOL. */
+.site-header .logo-link.as-trim-logo>.as-snow-crown,.site-header .logo-link>.as-holiday-detail{display:none!important}
+body[data-as-season="winter"] .site-header .site-wordmark{background:linear-gradient(180deg,#f8fdff 0%,#bce9ff 45%,#7dbdc8 100%);background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 3px rgba(175,239,255,.4))}
+body[data-as-season="newyear"] .site-header .site-wordmark{background:linear-gradient(135deg,#fff4d4 3%,#f2d49a 43%,#f5b9ac 80%,#fff0db);background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 8px rgba(247,119,103,.3))}
+body[data-as-season="winter"] .site-header .site-logo{filter:drop-shadow(0 0 4px rgba(179,236,254,.66)) saturate(.85)}
+body[data-as-season="newyear"] .site-header .site-logo{filter:drop-shadow(0 0 5px rgba(246,143,132,.52)) saturate(1.12)}
+
+/* WINTER / GLACIER: compacted snow with blue compressed lower layers,
+   crystalline facets, thicker lips and a cold, frost-breath air mass. */
+body[data-as-season="winter"] .as-snow-trim>.as-snow-crown{filter:drop-shadow(0 2px 1px rgba(46,93,117,.72)) drop-shadow(0 0 7px rgba(170,227,248,.34))!important}
+body[data-as-season="winter"] .as-trim-button>.as-snow-crown,body[data-as-season="winter"] .home-hero-actions .as-snow-crown{height:19px!important;top:-9px!important}
+body[data-as-season="winter"] .as-trim-card>.as-snow-crown,body[data-as-season="winter"] .as-trim-panel>.as-snow-crown{height:29px!important;top:-9px!important}
+body[data-as-season="winter"] .as-trim-round>.as-snow-crown{height:26px!important;top:-14px!important}
+body[data-as-season="winter"] .as-cap-base{fill:#f0fcff!important;stroke:#c5eefa;stroke-width:.8}
+body[data-as-season="winter"] .as-cap-shade{fill:#81bdcf!important;opacity:.78!important}
+body[data-as-season="winter"] .as-cap-highlight{stroke:#fff!important;stroke-width:2.1!important;opacity:1!important}
+/* Text glyphs receive crystalline tint, not a floating shelf. */
+body[data-as-season="winter"] .site-primary-nav .as-trim-text>.as-snow-crown,body[data-as-season="winter"] .site-header .mobile-nav .as-trim-text>.as-snow-crown{visibility:hidden!important;opacity:0!important}
+body[data-as-season="winter"] .site-primary-nav a,body[data-as-season="winter"] .site-header .mobile-nav a{color:#d5f5ff!important;text-shadow:0 -1px 1px #fff5,0 2px 6px #73c9f344!important}
+body[data-as-season="winter"] .site-header{background:linear-gradient(155deg,rgba(8,29,46,.98),rgba(15,35,55,.97) 55%,rgba(6,22,41,.98))!important;border-bottom:1px solid rgba(158,215,244,.43)!important;box-shadow:inset 0 1px 0 rgba(235,251,255,.12),0 10px 34px rgba(65,151,189,.14)!important}
+/* Winter ornament is now an attached ice cornice with irregular icicles, NOT a light string. */
+body[data-as-season="winter"] #as-header-ornament{height:30px!important;bottom:-14px!important;overflow:visible!important;background:none!important;z-index:2}
+body[data-as-season="winter"] #as-header-ornament :is(.as-wire,.as-bulb){display:none!important}
+body[data-as-season="winter"] #as-header-ornament::before{content:"";position:absolute;left:0;right:0;top:3px;height:14px;background:linear-gradient(180deg,#f8fdff,#b8dfed 53%,rgba(80,151,180,.58) 93%,transparent);clip-path:polygon(0 0,100% 0,100% 60%,96% 67%,93% 47%,89% 73%,85% 49%,81% 65%,77% 52%,73% 73%,68% 45%,64% 64%,59% 56%,55% 70%,50% 46%,46% 72%,41% 52%,36% 69%,32% 50%,27% 73%,22% 46%,18% 62%,13% 50%,9% 68%,4% 51%,0 70%);opacity:.93;filter:drop-shadow(0 2px 3px #23618455)}
+body[data-as-season="winter"] #as-header-ornament::after{content:"";position:absolute;left:0;right:0;top:9px;height:19px;background:linear-gradient(180deg,rgba(221,247,255,.85),rgba(110,190,222,.34) 50%,transparent);clip-path:polygon(4% 0,4.5% 55%,5% 0,16% 0,16.3% 75%,16.8% 0,29% 0,29.3% 45%,29.8% 0,45% 0,45.4% 72%,45.9% 0,58% 0,58.6% 57%,59.1% 0,74% 0,74.6% 94%,75.1% 0,90% 0,90.4% 72%,90.9% 0);opacity:.95}
+body[data-as-season="winter"] #as-scroll-mist{z-index:18!important;opacity:1!important;background-size:100% 760px!important;mix-blend-mode:screen;background-image:radial-gradient(ellipse 55% 24% at 3% 23%,rgba(140,211,243,.22),transparent 83%),radial-gradient(ellipse 52% 30% at 96% 71%,rgba(126,194,229,.18),transparent 82%),linear-gradient(90deg,rgba(167,222,248,.035),transparent 26%,transparent 75%,rgba(154,210,240,.055))!important}
+body[data-as-season="winter"] #as-scroll-mist::before{width:155%!important;height:clamp(170px,34vh,320px)!important;left:-31%!important;top:18%!important;opacity:.95!important;background:radial-gradient(ellipse 55% 50%,rgba(185,230,250,.3),rgba(150,214,238,.15) 43%,transparent 84%)!important;filter:blur(23px)!important;animation:as-cold-fog-drift 21s ease-in-out infinite alternate!important}
+body[data-as-season="winter"] #as-scroll-mist::after{width:162%!important;height:clamp(160px,27vh,280px)!important;left:-41%!important;top:66%!important;opacity:.83!important;background:radial-gradient(ellipse 56% 49%,rgba(192,230,249,.28),rgba(160,216,240,.09) 45%,transparent 85%)!important;filter:blur(24px)!important;animation:as-cold-fog-drift 31s ease-in-out infinite alternate-reverse!important}
+body[data-as-season="winter"] :is(.as-trim-card,.as-trim-panel){border-color:rgba(160,221,246,.29);box-shadow:inset 0 1px 0 rgba(243,253,255,.1),0 13px 44px rgba(84,155,204,.11)!important}
+
+/* NEW YEAR / GARNET GALA: snow is sparse, luxurious and held by pine needles,
+   while the header becomes a warm illuminated wreath. No cold icicle fringe. */
+body[data-as-season="newyear"] .site-header{background:linear-gradient(120deg,rgba(27,10,24,.98),rgba(50,15,31,.97) 45%,rgba(24,9,22,.98))!important;border-bottom:1px solid rgba(240,186,113,.38)!important;box-shadow:inset 0 1px 0 rgba(255,223,171,.08),0 12px 40px rgba(171,25,63,.25)!important}
+body[data-as-season="newyear"] #as-header-ornament{height:30px!important;bottom:-17px!important;background:linear-gradient(180deg,rgba(50,92,68,.22),transparent 88%)!important;overflow:visible!important}
+body[data-as-season="newyear"] #as-header-ornament::before{content:"";position:absolute;inset:2px 0 10px;background:repeating-linear-gradient(110deg,transparent 0 10px,rgba(26,93,63,.62) 10px 12px,transparent 12px 21px),linear-gradient(180deg,rgba(20,82,54,.48),rgba(16,56,38,.16));clip-path:polygon(0 0,100% 0,100% 82%,93% 67%,86% 91%,78% 66%,71% 89%,63% 74%,55% 96%,47% 69%,40% 87%,32% 71%,25% 89%,16% 64%,8% 87%,0 71%);opacity:.8}
+body[data-as-season="newyear"] #as-header-ornament .as-wire{border-bottom-color:rgba(223,177,105,.82)!important;border-bottom-width:1.4px!important}
+body[data-as-season="newyear"] #as-header-ornament .as-bulb{width:7px;height:10px;box-shadow:0 0 8px 2px var(--bulb),0 0 23px var(--bulb);animation:as-bulb 4s ease-in-out infinite}
+body[data-as-season="newyear"] :is(.as-trim-card,.as-trim-panel){border-color:rgba(218,157,127,.25);box-shadow:inset 0 1px 0 rgba(255,212,158,.1),0 16px 38px rgba(138,21,59,.16)!important}
+body[data-as-season="newyear"] .site-primary-nav a,body[data-as-season="newyear"] .site-header .mobile-nav a{color:#ffe5ce!important;text-shadow:0 0 9px rgba(255,162,123,.28)!important}
+body[data-as-season="newyear"] .site-header :is(.site-search-button,.site-theme-toggle,.notification-toggle,.avatar-button){border-color:rgba(248,188,125,.38)!important;box-shadow:inset 0 1px 0 rgba(255,231,189,.1),0 0 11px rgba(183,44,83,.22)}
+body[data-as-season="newyear"] .as-trim-button{box-shadow:0 1px 0 rgba(240,187,122,.17),0 7px 22px rgba(185,42,67,.12)}
+body[data-as-season="newyear"] #as-scroll-mist{z-index:3!important;opacity:.88!important;mix-blend-mode:screen}
+body[data-as-season="newyear"] #as-scroll-mist::after{opacity:0!important}
+
+/* Felt hat: a real long drooping silhouette, brim seats on the avatar's upper rim. */
+.as-santa-hat{width:73px!important;height:61px!important;top:-49px!important;left:51%!important;transform:translateX(-50%) rotate(-10deg)!important;filter:drop-shadow(2px 4px 2px rgba(0,0,0,.66)) drop-shadow(0 0 5px rgba(199,29,50,.26))!important}
+.as-santa-hat svg{overflow:visible}
+body[data-as-season="newyear"] .avatar-button.as-santa-anchor>.as-santa-hat{display:block!important}
+body[data-as-season="winter"] .avatar-button.as-santa-anchor>.as-santa-hat,body[data-as-season="original"] .avatar-button.as-santa-anchor>.as-santa-hat{display:none!important}
+body[data-as-season="newyear"] .avatar-button.as-santa-anchor>.as-snow-crown{visibility:hidden!important}
+@media(max-width:640px){.as-santa-hat{width:63px!important;height:53px!important;top:-42px!important;left:53%!important}body[data-as-season="winter"] #as-scroll-mist::before{height:190px!important;opacity:.78!important;filter:blur(20px)!important}body[data-as-season="winter"] #as-scroll-mist::after{height:168px!important;opacity:.73!important;filter:blur(22px)!important}body[data-as-season="winter"] .as-trim-card>.as-snow-crown{height:23px!important}body[data-as-season="newyear"] #as-header-ornament{height:26px!important;bottom:-14px!important}}
+@media(prefers-reduced-motion:reduce){body[data-as-season="winter"] #as-scroll-mist::before,body[data-as-season="winter"] #as-scroll-mist::after{animation:none!important}}
+@media(forced-colors:active){.as-holiday-detail,.as-santa-hat{display:none!important}}
+
+/* V4 QA corrections: immediate mutually exclusive material visibility.
+   No left-over ice bank during a switch to the holiday installation. */
+body[data-as-season="winter"] .as-snow-trim>.as-snow-crown{display:block!important;visibility:visible!important;opacity:1!important;transform:translateY(0)!important;transition:none!important}
+body[data-as-season="newyear"] .as-snow-trim>.as-snow-crown,body[data-as-season="original"] .as-snow-trim>.as-snow-crown{display:none!important;visibility:hidden!important;opacity:0!important;transition:none!important}
+body[data-as-season="newyear"] .as-holiday-detail{display:block!important;opacity:1!important;transition:none!important}
+body[data-as-season="winter"] .as-holiday-detail,body[data-as-season="original"] .as-holiday-detail{display:none!important;opacity:0!important;transition:none!important}
+/* Raise the REAL header contents so the folded red felt cone is visible,
+   rather than clipped off the top of the first device row. */
+body[data-as-season="newyear"] .site-header .site-header-shell{padding-top:32px!important}
+.as-santa-hat{left:calc(50% - 14px)!important;top:-41px!important}
+@media(max-width:640px){body[data-as-season="newyear"] .site-header .site-header-shell{padding-top:29px!important}.as-santa-hat{top:-36px!important}}
+/* Keep the pompon inside narrow 320px viewports without clipping the hat. */
+@media(max-width:355px){.as-santa-hat{left:calc(50% - 19px)!important}}
+#as-header-ornament .as-bulb{margin-left:-4px}
