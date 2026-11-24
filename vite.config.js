@@ -185,6 +185,8 @@ function copyLegacyRuntimeAssets() {
             // Keep old shared links compatible without retaining a second banner source.
             await copyFile(path.join(root, 'artsoul-social-preview-v2.png'),
                 path.join(outDir, 'artsoul-social-preview.png'));
+            await copyFile(path.join(root, 'artsoul-social-preview-v2.png'),
+                path.join(outDir, 'artsoul-social-preview-v3.png'));
             await Promise.all(legacyClientTrees.map(async (relativePath) => {
                 const destination = path.join(outDir, relativePath);
                 await mkdir(path.dirname(destination), { recursive: true });
@@ -194,6 +196,33 @@ function copyLegacyRuntimeAssets() {
             const outputPages = new Set(await readdir(outDir));
             for (const page of Object.values(pageInputs)) {
                 if (!outputPages.has(page)) throw new Error(`Missing built page: ${page}`);
+            }
+        }
+    };
+}
+
+// Put social metadata ahead of the large inline first-paint stylesheet so
+// crawlers that read only an initial HTML window can discover the full card.
+// Keep the original image bytes and old URLs; use a fresh cache key for shares.
+function socialPreviewMetadataPlugin() {
+    return {
+        name: 'artsoul-social-preview-metadata',
+        apply: 'build',
+        transformIndexHtml: {
+            order: 'post',
+            handler(html) {
+                const headEnd = html.indexOf('</head>');
+                if (headEnd < 0) throw new Error('Social metadata: missing head');
+                const head = html.slice(0, headEnd);
+                const tags = [];
+                const rest = head.replace(/^[ \t]*(<meta\b[^>\r\n]*\b(?:property|name)=["'](?:og:|twitter:)[^>\r\n]*>)[ \t]*\r?$/gmi, (_, tag) => {
+                    tags.push(tag.replace('https://artsoulprotocol.com/artsoul-social-preview-v2.png', 'https://artsoulprotocol.com/artsoul-social-preview-v3.png'));
+                    return '';
+                });
+                if (!tags.length) return html;
+                const charset = /<meta\s+charset=["']utf-8["'][^>]*>/i;
+                if (!charset.test(rest)) throw new Error('Social metadata: missing UTF-8 declaration');
+                return rest.replace(charset, match => match + '\n    ' + tags.join('\n    ')) + html.slice(headEnd);
             }
         }
     };
@@ -235,7 +264,7 @@ export default defineConfig({
     plugins: [
         react(),
         { name: 'local-artwork-route', configureServer: serveArtworkPage, configurePreviewServer: serveArtworkPage },
-        inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets(), seasonalPreviewOnlyPlugin()
+        inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets(), seasonalPreviewOnlyPlugin(), socialPreviewMetadataPlugin()
     ],
     build: {
         outDir,
