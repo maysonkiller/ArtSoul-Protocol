@@ -64,4 +64,4 @@ These are conceptual references; the skill text and ArtSoul SVG/CSS code are ori
 
 ## Adoption status
 
-This is a supplemental candidate, not a claim to have installed a tool or synchronized every ChatGPT Space. Keep the original Atlas unchanged and reference `artsoul-living-reality` alongside the selected seasonal and verification modules. Promote it after real design review, evidence and owner approval. 
+This is a supplemental candidate, not a claim to have installed a tool or synchronized every ChatGPT Space. Keep the original Atlas unchanged and reference `artsoul-living-reality` alongside the selected seasonal and verification modules. Promote it after real design review, evidence and owner approval.
