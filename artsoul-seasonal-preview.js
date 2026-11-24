@@ -220,6 +220,49 @@
     const viewH=18+Math.min(h*.45,32)+5;
     return '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" viewBox="0 0 '+fmt(w)+' '+fmt(viewH)+'" width="'+fmt(w)+'" height="'+fmt(viewH)+'"><defs><linearGradient id="'+id+'" x1="0" y1="0" x2="0" y2="1"><stop stop-color="'+(festive?'#fffaf0':'#fbfeff')+'"/><stop offset=".43" stop-color="'+(festive?'#f2ede6':'#e4f3f9')+'"/><stop offset=".82" stop-color="'+(festive?'#d4d5d5':'#aecfdf')+'"/><stop offset="1" stop-color="'+shade+'"/></linearGradient></defs>'+paths+grains+'</svg>';
   }
+  /* v8.1 — a separate renderer for circular tools. Geometry lives in a CSS
+     background, so site rules targeting button SVG icons cannot shrink it.
+     All visible material is inside the measured outer ellipse. */
+  function roundMaterialMarkup(w,h,seed,holiday){
+    const n=v=>Number(v.toFixed(3)),random=rng(seed+(holiday?0x40f:0x921));
+    const rx=w/2,ry=h/2,min=Math.min(w,h),rim=clamp(min*.046,1.15,2.5);
+    const xy=(deg,inset)=>{const a=deg*Math.PI/180;return [rx+(rx-inset)*Math.cos(a),ry+(ry-inset)*Math.sin(a)];};
+    const pair=p=>p.map(n).join(' ');
+    const arc=(a,b,inset)=>'M'+pair(xy(a,inset))+' A'+n(rx-inset)+' '+n(ry-inset)+' 0 '+(Math.abs(b-a)>180?1:0)+' '+(b>a?1:0)+' '+pair(xy(b,inset));
+    const ell=(inset)=>' cx="'+n(rx)+'" cy="'+n(ry)+'" rx="'+n(rx-inset)+'" ry="'+n(ry-inset)+'"';
+    let out='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+n(w)+' '+n(h)+'" preserveAspectRatio="none"><defs>';
+    if(holiday){
+      out+='<linearGradient id="metal" x1=".18" y1="0" x2=".78" y2="1"><stop stop-color="#fff0ba"/><stop offset=".17" stop-color="#c79452"/><stop offset=".36" stop-color="#6d412d"/><stop offset=".59" stop-color="#a66b3f"/><stop offset=".80" stop-color="#e8b46e"/><stop offset="1" stop-color="#805034"/></linearGradient></defs>';
+      // Lacquered brass bezel and directional, warm reflections; deliberately
+      // NO white powder arc or snow decal in the holiday circle material.
+      out+='<ellipse'+ell(.70)+' fill="none" stroke="#3a1f19" stroke-width="1.4"/>'+
+        '<ellipse'+ell(rim*.83)+' fill="none" stroke="url(#metal)" stroke-width="'+n(rim)+'"/>'+
+        '<path d="'+arc(-142,-76,rim*1.23)+'" fill="none" stroke="#ffe4a5" stroke-opacity=".88" stroke-width=".82" stroke-linecap="round"/>'+
+        '<path d="'+arc(36,113,rim*.85)+'" fill="none" stroke="#7c402b" stroke-width=".95" stroke-linecap="round"/>'+
+        '<path d="'+arc(-58,-29,rim*1.40)+'" fill="none" stroke="#e59a63" stroke-opacity=".8" stroke-width=".7" stroke-linecap="round"/>';
+    }else{
+      out+='<linearGradient id="ice" x1=".25" y1="0" x2=".65" y2="1"><stop stop-color="#f6fdff"/><stop offset=".30" stop-color="#d7edf6"/><stop offset=".72" stop-color="#8ebbd2"/><stop offset="1" stop-color="#4c7c9c"/></linearGradient><linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#cceefa"/><stop offset=".48" stop-color="#55809a"/><stop offset="1" stop-color="#355268"/></linearGradient></defs>';
+      out+='<ellipse'+ell(rim*.66)+' fill="none" stroke="url(#rim)" stroke-width="'+n(rim*.85)+'"/>';
+      // Asymmetric settled frost: the lower seam overlaps the upper rim and
+      // never separates from it. Thickness tapers as the slope gets steeper.
+      const start=-153+random()*11,end=-29-random()*12,outer=[],inner=[],grains=[];
+      const thickness=clamp(min*.11,2.55,5.2),samples=18;
+      for(let i=0;i<=samples;i++){
+        const t=i/samples,a=start+(end-start)*t,fade=Math.pow(Math.sin(Math.PI*t),.7),j=.77+random()*.43;
+        outer.push(xy(a,.38));inner.push(xy(a,.55+thickness*fade*j));
+        if(i>1&&i<samples-1&&random()>.30){const g=xy(a,.50+thickness*fade*(.20+random()*.40));grains.push('<circle cx="'+n(g[0])+'" cy="'+n(g[1])+'" r="'+n(.25+random()*.32)+'" fill="#fff" opacity=".78"/>');}
+      }
+      const seam=smooth(inner),shape=smooth(outer)+' L'+inner.slice().reverse().map(pair).join(' L')+' Z';
+      out+='<path d="'+seam+'" fill="none" stroke="#102c3f" stroke-width="1.5" stroke-opacity=".82" stroke-linecap="round"/>'+
+        '<path d="'+shape+'" fill="url(#ice)" stroke="#9bc4da" stroke-width=".30" stroke-linejoin="round"/>'+
+        '<path d="'+smooth(outer.map(([x,y])=>[x,y+.36]))+'" fill="none" stroke="#fff" stroke-width=".62" stroke-linecap="round" opacity=".86"/>'+grains.join('');
+      // A couple of tiny tapered melt ridges cling to the steep side rather
+      // than hanging across the readable center of the icon.
+      const a=end-5,p=xy(a,1.0),q=xy(a,2.9),len=clamp(min*.065,1.4,3.4);
+      out+='<path d="M'+pair(p)+' Q'+n(p[0]+.15)+' '+n(p[1]+len*.6)+' '+n(p[0]-.8)+' '+n(p[1]+len)+' Q'+n(q[0]-.5)+' '+n(q[1]+len*.2)+' '+pair(q)+' Z" fill="#bbdfef" opacity=".85"/>';
+    }
+    return out+'</svg>';
+  }
   let accountHost=null,accountButton=null,accountSizeObserver=null;
   function removeAccount(){if(accountHost){accountHost.querySelectorAll(':scope > [data-as-living-account]').forEach(x=>x.remove());accountHost.classList.remove('as-living-account-host','as-living-account-position');}accountSizeObserver?.disconnect();accountHost=null;accountButton=null;}
   function accountMarkup(holiday,id){
@@ -245,7 +288,7 @@
     ornament.style.setProperty('--as-wear-x',x.toFixed(2)+'px');ornament.style.setProperty('--as-wear-y',y.toFixed(2)+'px');ornament.style.setProperty('--as-wear-w',width.toFixed(2)+'px');ornament.style.setProperty('--as-wear-h',height.toFixed(2)+'px');
   }
   const sizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(()=>scheduleDecoration()):null;
-  function cleanup(el,rec){rec?.node?.remove();el.classList.remove('as-living-surface','as-living-position','as-living-ink');sizeObserver?.unobserve(el);surfaceRecords.delete(el);}
+  function cleanup(el,rec){rec?.node?.remove();el.classList.remove('as-living-surface','as-living-position','as-living-ink','as-living-round-control');sizeObserver?.unobserve(el);surfaceRecords.delete(el);}
   function decorateNode(el){
     if(el.matches('.site-header .avatar-button'))return;
     const st=getComputedStyle(el),r=el.getBoundingClientRect(),kind=surfaceType(el,st,r),old=surfaceRecords.get(el);
@@ -257,9 +300,16 @@
     if(old?.key===key&&old.node?.parentNode===el)return;
     if(old)cleanup(el,old);if(surfaceRecords.size>=180)return;
     const clipped=[st.overflowX,st.overflowY].some(s=>s==='hidden'||s==='clip'||s==='auto'||s==='scroll');
-    const markup=bankMarkup(topGeometry(st,r,kind),kind,signature(el,r.width,r.height),mode==='newyear',clipped);if(!markup)return;
-    el.classList.add('as-living-surface');if(getComputedStyle(el).position==='static')el.classList.add('as-living-position');
-    const node=elt('span',{'class':'as-living-bank as-living-'+kind,'data-as-living-decor':'true','aria-hidden':'true'});node.style.setProperty('--as-bank-x',(-(parseFloat(st.borderLeftWidth)||0))+'px');node.style.setProperty('--as-bank-y',(-18-(parseFloat(st.borderTopWidth)||0))+'px');node.innerHTML=markup;el.appendChild(node);surfaceRecords.set(el,{kind,key,node});sizeObserver?.observe(el);
+    const round=kind==='round',seed=signature(el,r.width,r.height);
+    const markup=round?roundMaterialMarkup(r.width,r.height,seed,mode==='newyear'):bankMarkup(topGeometry(st,r,kind),kind,seed,mode==='newyear',clipped);if(!markup)return;
+    el.classList.add('as-living-surface');if(round)el.classList.add('as-living-round-control');if(getComputedStyle(el).position==='static')el.classList.add('as-living-position');
+    const node=elt('span',{'class':'as-living-bank as-living-'+kind+(round?' as-living-ring':''),'data-as-living-decor':'true','aria-hidden':'true'});node.style.setProperty('--as-bank-x',(-(parseFloat(st.borderLeftWidth)||0))+'px');node.style.setProperty('--as-bank-y',((round?0:-18)-(parseFloat(st.borderTopWidth)||0))+'px');
+    if(round){
+      node.style.setProperty('--as-ring-w',r.width+'px');node.style.setProperty('--as-ring-h',r.height+'px');
+      node.dataset.asRingMaterial=mode==='newyear'?'brass':'ice';
+      node.style.backgroundImage='url("data:image/svg+xml,'+encodeURIComponent(markup)+'")';
+    }else node.innerHTML=markup;
+    el.appendChild(node);surfaceRecords.set(el,{kind,key,node});sizeObserver?.observe(el);
   }
   function decorateSite(){
     if(document.hidden)return;
