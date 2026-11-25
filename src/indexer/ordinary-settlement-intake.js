@@ -30,6 +30,14 @@ export async function ingestOrdinarySettlement(pool, listener, options) {
 }
 
 // The ordinary receipt reader supplies decimal strings for every uint256 field.
+export function appendOrdinaryRegistration(client, work) {
+    return appendExact(client, 'ordinary_registrations', {
+        chain_id: work.chainId, core_address: work.coreAddress, artwork_id: work.artworkId, creator: work.creator,
+        metadata_uri: Buffer.from(work.metadataUriHex.slice(2), 'hex'), transaction_hash: work.transactionHash,
+        block_number: work.blockNumber, block_hash: work.blockHash, log_index: work.logIndex
+    });
+}
+
 export function appendOrdinaryResalePurchase(client, sale) {
     return appendExact(client, 'ordinary_resale_purchases', {
         chain_id: sale.chainId, core_address: sale.coreAddress, token_id: sale.tokenId, listing_version: sale.version,

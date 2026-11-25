@@ -1,5 +1,6 @@
-import { Interface, keccak256 } from 'ethers';
+import { AbiCoder, Interface, keccak256 } from 'ethers';
 import { parseOrdinaryResale, parseOrdinarySettlement } from './ordinary-settlement.js';
+import { checkReceipt, receiptLogIndex, verifyTransactionPosition } from './settlement-receipt.js';
 
 const getters = new Interface([
     'function nftContract() view returns (address)',
@@ -8,6 +9,9 @@ const getters = new Interface([
     'function totalSupply() view returns (uint256)',
     'function protocolTreasury() view returns (address)',
     'function ecosystemTreasury() view returns (address)',
+    // Solidity strings use the same ABI representation as bytes.
+    'function works(uint256) view returns (address creator, bytes metadata, uint256 activeAuction, uint256 floor)',
+    'event ArtworkRegistered(uint256 indexed artworkId,address indexed creator,string metadataURI)',
     'function getActiveResale(uint256 tokenId) view returns (bool active, address seller, uint256 price, uint256 version)',
     'function auctions(uint256 id) view returns (uint256 artworkId, uint256 startPrice, uint256 originalEnd, uint256 end, uint256 paymentDeadline, address highestBidder, uint256 price, uint256 deposit, uint8 state, address firstCollector)',
     'function runnerUpOffers(uint256 id) view returns (address bidder, uint256 price, uint256 deadline)'
@@ -144,14 +148,6 @@ async function readOrdinaryAuctionField(send, proof, block, auctionId, method) {
     return result;
 }
 
-function verifyTransactionPosition(receipt, header, transactionHash) {
-    const position = Number(BigInt(receipt.transactionIndex));
-    if (!Number.isSafeInteger(position) || !Array.isArray(header.transactions) ||
-        header.transactions[position]?.toLowerCase?.() !== transactionHash) {
-        throw new Error('Ordinary settlement transaction is absent at its finalized block position');
-    }
-}
-
 // Read one sale on the reviewed replacement pair without modifying the prototype cursor.
 export async function readOrdinarySettlement(listener, options) {
     const tx = options?.transactionHash;
@@ -185,6 +181,41 @@ async function readField(send, address, block, abi, name, args) {
     const result = abi.decodeFunctionResult(name, raw);
     if (abi.encodeFunctionResult(name, result) !== raw.toLowerCase()) throw new Error('Invalid ordinary token encoding');
     return result;
+}
+
+export async function readOrdinaryRegistration(listener, options) {
+    const tx = options?.transactionHash, logIndex = options?.logIndex;
+    if (!matches(hashPattern, tx) || !nonzero(tx) || !Number.isSafeInteger(logIndex) || logIndex < 0) {
+        throw new Error('Invalid ordinary registration location');
+    }
+    const transactionHash = tx.toLowerCase();
+    return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
+        const receipt = await send('eth_getTransactionReceipt', [transactionHash]);
+        checkReceipt(receipt, proof, transactionHash, 'ordinary registration');
+        verifyTransactionPosition(receipt, header, transactionHash);
+        const logs = receipt.logs.filter(log => log.logIndex?.toLowerCase() === '0x' + logIndex.toString(16));
+        const event = getters.getEvent('ArtworkRegistered');
+        if (logs.length !== 1 || logs[0].address?.toLowerCase() !== proof.coreAddress ||
+            logs[0].topics?.[0]?.toLowerCase() !== event.topicHash) throw new Error('Missing or ambiguous ordinary registration');
+        const [log] = logs;
+        receiptLogIndex(log, receipt);
+        // Two ABI words precede the padded URI. Bound the payload before decoding it.
+        if (typeof log.data !== 'string' || log.data.length > 2 + 2 * (64 + 2048) || log.topics.length !== 3) {
+            throw new Error('Invalid ordinary registration event');
+        }
+        const { artworkId, creator } = getters.decodeEventLog(event, log.data, log.topics);
+        const topics = getters.encodeFilterTopics(event, [artworkId, creator]);
+        // The contract accepts up to 2048 URI bytes, including non-UTF-8 and NUL.
+        const coder = AbiCoder.defaultAbiCoder();
+        const [metadataUriHex] = coder.decode(['bytes'], log.data);
+        if (!artworkId || !nonzero(creator) ||
+            topics.some((topic, i) => topic !== log.topics[i].toLowerCase()) ||
+            metadataUriHex.length <= 2 || metadataUriHex.length > 2 + 2048 * 2 ||
+            coder.encode(['bytes'], [metadataUriHex]) !== log.data.toLowerCase()) throw new Error('Invalid ordinary registration event');
+        const work = await readField(send, proof.coreAddress, block, getters, 'works', [artworkId]);
+        if (work.creator !== creator || work.metadata !== metadataUriHex) throw new Error('Registration and finalized work disagree');
+        return { ...proof, transactionHash, logIndex, artworkId: artworkId.toString(), creator: creator.toLowerCase(), metadataUriHex };
+    }, 'nft');
 }
 
 export async function readOrdinaryResalePurchase(listener, options) {

@@ -65,6 +65,7 @@ export async function confirmFinalizedBlock(rpc, head, block) {
     const canonical = await rpc('eth_getBlockByNumber', [block.number, false]);
     check(hash(canonical?.hash) && /^0x[0-9a-f]+$/i.test(canonical.number) && BigInt(canonical.number) === height &&
         canonical.hash.toLowerCase() === block.hash.toLowerCase(), 'Providers disagree on the finalized block');
+    return canonical;
 }
 
 export async function verifyTreasurySafes(register, rpc, expectedBlock) {

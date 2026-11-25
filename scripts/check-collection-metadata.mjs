@@ -7,6 +7,7 @@ import { allowedArtworkUrl, fetchArtworkResource } from '../src/api/safe-artwork
 import { MAX_METADATA_BYTES } from '../src/config/upload-policy.js';
 import { hasFirstWorkMint, parseDraft, parseEth, reviewConfig, safeUrl } from '../src/features/collections/launch-config.js';
 import { confirmFinalizedBlock, finalizedBlock, readRpc, requireIndependentProviders } from './verify-treasury-safes.mjs';
+import { readCollectionOpeningReceipts } from './read-collection-opening-receipts.mjs';
 
 // Read only the URI that the collection builder previews for its first ERC-721 token.
 export async function checkCollectionMetadata(draftJson, expectedSha256) {
@@ -18,8 +19,10 @@ export async function checkCollectionMetadata(draftJson, expectedSha256) {
 
 // A reviewed runtime identifies the template. An auction winner may mint to a
 // different recipient, and the resulting NFT may have changed hands since.
-export async function checkIssuedFirstWork(draftJson, collection, runtimeHash, expectedSha256, providers) {
+export async function checkIssuedFirstWork(draftJson, collection, runtimeHash, expectedSha256, providers, receiptHashes) {
     requireIndependentProviders(providers);
+    const transactions = receiptHashes === undefined ? undefined :
+        { settlement: receiptHashes.settlement, issuance: receiptHashes.issuance };
     const draft = parseDraft(draftJson);
     if (Number(draft.chainId) !== 84532 || !hasFirstWorkMint(draft)) throw new Error('Choose a Base Sepolia first-work draft.');
     const { tokenOneMetadataURI } = reviewConfig(draft);
@@ -52,11 +55,19 @@ export async function checkIssuedFirstWork(draftJson, collection, runtimeHash, e
     if (first.royaltyReceiver !== first.creator || first.royaltyAmount !== 550n) {
         throw new Error('The issued NFT does not report the reviewed 5.5% creator royalty.');
     }
+    let provenance;
+    if (transactions) {
+        const readings = await Promise.all(providers.map(rpc =>
+            readCollectionOpeningReceipts(rpc, block, address, runtimeHash, first, transactions)));
+        if (!isDeepStrictEqual(readings[0], readings[1])) throw new Error('Independent providers disagree on collection provenance.');
+        provenance = readings[0];
+    }
     const metadata = await checkPublishedTokenMetadata(first.uri, '1', expectedSha256);
     await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
     return { chainId: 84532, collection: address, runtimeHash: runtimeHash.toLowerCase(), block, rpcReadings: 2,
         creator: first.creator, firstCollector: first.firstCollector, owner: first.owner, supply,
-        openingReserveWei: reserve.toString(), publicMintPriceWei: first.price.toString(), metadata };
+        openingReserveWei: reserve.toString(), publicMintPriceWei: first.price.toString(), metadata,
+        ...(provenance && { provenance }) };
 }
 
 async function readFirstWork(rpc, address, runtimeHash, block) {
@@ -129,13 +140,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
         const args = process.argv.slice(2);
         const issued = args[0] === '--issued';
-        const [file, digest, address, runtimeHash] = issued ? args.slice(1) : args;
-        if (!file || (issued ? args.length !== 5 : args.length > 2)) throw new Error(
-            'Usage: check-collection-metadata.mjs draft.json [sha256] | --issued draft.json sha256 address runtime-keccak256');
+        const [file, digest, address, runtimeHash, settlement, issuance] = issued ? args.slice(1) : args;
+        if (!file || (issued ? ![5, 7].includes(args.length) : args.length > 2)) throw new Error(
+            'Usage: check-collection-metadata.mjs draft.json [sha256] | --issued draft.json sha256 address runtime-keccak256 [settlement-tx mint-tx]');
         const draft = await readFile(file, 'utf8');
         const report = issued
             ? await checkIssuedFirstWork(draft, address, runtimeHash, digest,
-                [readRpc(process.env.ARTSOUL_COLLECTION_RPC_URL), readRpc(process.env.ARTSOUL_COLLECTION_RPC_CHECK_URL)])
+                [readRpc(process.env.ARTSOUL_COLLECTION_RPC_URL), readRpc(process.env.ARTSOUL_COLLECTION_RPC_CHECK_URL)],
+                settlement === undefined ? undefined : { settlement, issuance })
             : await checkCollectionMetadata(draft, digest);
         console.log(JSON.stringify(report, null, 2));
     } catch (error) {
