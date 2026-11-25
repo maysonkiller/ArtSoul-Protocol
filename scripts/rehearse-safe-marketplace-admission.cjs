@@ -54,10 +54,39 @@ async function main() {
         return { provider, evm, relayer, accounts, owners, addresses, deploy, safes };
     }
 
-    const { provider, evm, relayer, accounts, owners, addresses, deploy, safes: allSafes } = await createRehearsalNetwork(84532, 11);
-    const safes = allSafes.slice(0, 3);
-    const bidderSafes = allSafes.slice(3);
-    const security = safes[2];
+    const { provider, evm, relayer, accounts, owners, addresses, deploy, safes: allSafes } = await createRehearsalNetwork(84532, 9);
+    const [security, ...bidderSafes] = allSafes;
+    // Exercise the exact treasury handoff calldata on an isolated EVM at the published Safe addresses.
+    const { buildRehearsalRequests, rehearsalSafeRelease } = await import('./prepare-rehearsal-safes.mjs');
+    const components = [
+        ['proxies/SafeProxyFactory', 'factory', 'factoryCodeHash'],
+        ['SafeL2', 'singleton', 'singletonCodeHash'],
+        ['handler/CompatibilityFallbackHandler', 'fallbackHandler', 'fallbackCodeHash']
+    ];
+    for (const [contractPath, address, digest] of components) {
+        const { deployedBytecode } = safeArtifact(contractPath);
+        assert.equal(ethers.keccak256(deployedBytecode), rehearsalSafeRelease[digest]);
+        await evm.send('hardhat_setCode', [rehearsalSafeRelease[address], deployedBytecode]);
+    }
+    const treasuryPlan = buildRehearsalRequests({
+        adminSafe: security.target, payer: relayer.address, owners: addresses,
+        proxyCreationCode: safeArtifact('proxies/SafeProxy').bytecode
+    });
+    const rehearsalTreasuries = {};
+    for (const request of treasuryPlan.roleRequests) {
+        const receipt = await mine(relayer.sendTransaction(request.transaction));
+        const factoryAbi = new ethers.Interface(safeArtifact('proxies/SafeProxyFactory').abi);
+        const created = receipt.logs.filter(log => log.address === rehearsalSafeRelease.factory)
+            .map(log => factoryAbi.parseLog(log)).find(log => log?.name === 'ProxyCreation');
+        assert.equal(created.args.proxy, request.safe);
+        const account = security.attach(request.safe);
+        assert.equal(await account.getThreshold(), 2n);
+        assert.deepEqual([...(await account.getOwners())], [...addresses].sort());
+        assert.equal(ethers.keccak256(await provider.getCode(request.safe)), rehearsalSafeRelease.proxyCodeHash);
+        rehearsalTreasuries[request.role] = account;
+    }
+    const safes = [rehearsalTreasuries.protocolTreasury, rehearsalTreasuries.ecosystemTreasury, security];
+    console.log('PASS: both unsigned treasury requests created the predicted distinct Safe addresses with the selected three test owners.');
     const coreArtifact = await artifacts.readArtifact('OrdinaryMarket');
     const factoryCore = new ethers.ContractFactory(coreArtifact.abi, coreArtifact.bytecode);
     const nonce = await provider.getTransactionCount(relayer.address);
@@ -72,12 +101,13 @@ async function main() {
     const limits = [8, 30_000];
     const creation = await factoryCore.getDeployTransaction(...safes.map(safe => safe.target), ...limits);
     const { prepareOrdinaryDeployment } = await import('./prepare-ordinary-deployment.mjs');
-    const plan = prepareOrdinaryDeployment(coreArtifact, {
+    const review = {
         chainId: 84532, payer: relayer.address, nonce, expectedCore, expectedNFT,
         contract: coreArtifact.sourceName + ':' + coreArtifact.contractName,
         constructorArgs: [...roleNames.map(role => '$' + role), ...limits],
         initCodeHash: ethers.keccak256(creation.data)
-    }, custody);
+    };
+    const plan = prepareOrdinaryDeployment(coreArtifact, review, custody);
     const deployment = await mine(relayer.sendTransaction(plan.transaction));
     assert.equal(deployment.contractAddress, plan.core);
     const engine = new ethers.Contract(plan.core, coreArtifact.abi, relayer);
@@ -85,10 +115,17 @@ async function main() {
     assert.equal(await engine.refundBatchLimit(), BigInt(limits[0]));
     assert.equal(await engine.refundTransferGas(), BigInt(limits[1]));
     assert.deepEqual(await Promise.all(roleNames.map(role => engine[role]())), safes.map(safe => safe.target));
+    const { expectedRehearsalPairRegister } = await import('./prepare-rehearsal-core.mjs');
+    const nftArtifact = await artifacts.readArtifact('SettledArtworkNFT');
+    const runtimeRegister = expectedRehearsalPairRegister(custody, review,
+        require('../docs/security/C12_ORDINARY_AUDIT_MANIFEST.json'),
+        require('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json'), coreArtifact, nftArtifact);
+    assert.equal(ethers.keccak256(await provider.getCode(plan.core)), runtimeRegister.core.codeHash);
+    assert.equal(ethers.keccak256(await provider.getCode(plan.nft)), runtimeRegister.nft.codeHash);
     console.log('PASS: unsigned OrdinaryMarket creation produced the reviewed pair and three Safe bindings on an isolated EVM.');
     const market = await deploy(await artifacts.readArtifact('SettledArtworkSourceFixture'));
     const [artist, collector, buyer] = accounts.slice(3);
-    const nft = new ethers.Contract(await engine.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, collector);
+    const nft = new ethers.Contract(await engine.nft(), nftArtifact.abi, collector);
     assert.equal(await nft.core(), engine.target);
     const bid = ethers.parseEther('0.01');
     await mine(engine.connect(artist).registerArtwork('ipfs://local-safe-rehearsal'));
