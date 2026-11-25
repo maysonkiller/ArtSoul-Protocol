@@ -468,6 +468,7 @@ Goal: launch Base mainnet without a single-day Core-plus-Genesis big bang.
 - [ ] **D4 — Core stability window.** Observe production through a launch-readiness window approved at the go/no-go review. The duration is operational and is not frozen canon.
 - [ ] **D5 — Separate Genesis pilot.** Activate a bounded pilot only after Core stability is demonstrated. Expand grants through the audited path; cadence remains tunable and recorded.
 - [ ] **D6 — Controlled growth.** Review distinct paying collectors, repeat purchases, actual fees and operating costs. Use these results to decide whether to expand, seek investment or wind down with withdrawals and refund access preserved. Complete the full independent audit and retest its findings before closing D.
+  The [ordinary demand report](../../scripts/report-ordinary-demand.mjs) counts unique and repeat paying wallets within a selected issuer and block interval and totals the indexed primary and secondary sales. It reports exact secondary treasury credits separately. Missing issuer data and an empty indexed interval have distinct results. Interpreting business demand still requires complete receipt coverage, operating costs and actual mainnet activity.
 
 Phase D exit requires stable Base mainnet operations, verified treasury activity, controlled Genesis rollout, monitored public metrics, and a completed independent full audit with disposition of its findings.
 
