@@ -19,9 +19,9 @@ This is the repository's durable work register. It consolidates verified complet
 
 ### November 25 test deployment and dependency review
 
-C13 has a [public test deployment and read-only auction rehearsal](testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md). D2 intake now accepts its reviewed register directly. Signed settlement, hosted indexing and production custody remain open. The [dependency triage](audits/DEPENDENCY_TRIAGE_2026-09-23.md#november-25-dependency-recheck) reconciles the November 21 and 25 package counts with the separately tested security draft.
+C13 has a [public test deployment and read-only auction rehearsal](testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md). D2 intake now accepts its reviewed register directly. Signed settlement, hosted indexing and production custody remain open. The [dependency triage](audits/DEPENDENCY_TRIAGE_2026-09-23.md#november-25-dependency-recheck) reconciles the November 21 and 25 package counts through the security release.
 
-The reviewed [dependency candidate](audits/npm-2026-11-25/RESIDUAL_FOLLOWUP.md) reduced the full inventory from 50 to 18 affected package names and the production-scope inventory from 41 to nine. The nine high records share one wallet dependency. The [wallet compatibility and contract checks](audits/npm-2026-11-25/SECURITY_RESIDUAL_RISK.md) record the remaining release work.
+[PR #520](https://github.com/maysonkiller/ArtSoul-Protocol/pull/520) shipped after wallet compatibility, bytecode and build checks passed. The release audit recorded zero production findings and nine development findings (eight low, one moderate). The earlier nine high wallet records were resolved by preserving Reown message validation on the supported schema library. [Release audit](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/45655666606)
 
 ### November 20 phase acceptance
 
