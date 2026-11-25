@@ -45,6 +45,36 @@ async function verifyLocalReference(page, reference) {
 }
 
 await Promise.all(pages.map(page => access(path.join(dist, page))));
+const manifest = JSON.parse(await readFile(path.join(dist, '.vite/manifest.json'), 'utf8'));
+const sdkKeys = ['scripts/browser-sdks/wallet.mjs', 'scripts/browser-sdks/supabase.mjs'];
+for (const key of sdkKeys) {
+    const chunk = manifest[key];
+    if (!chunk?.isDynamicEntry || !/^assets\/[\w-]+\.js$/.test(chunk.file)) {
+        throw new Error(`Missing deferred same-origin browser SDK: ${key}`);
+    }
+    await verifyLocalReference(key, chunk.file);
+}
+if (manifest['supabase-client.js']?.file !== 'supabase-client.js') {
+    throw new Error('Legacy pages require the stable Supabase client URL.');
+}
+const staticEntries = new Set();
+function visitStaticEntry(key) {
+    if (staticEntries.has(key)) return;
+    staticEntries.add(key);
+    for (const dependency of manifest[key]?.imports || []) visitStaticEntry(dependency);
+}
+for (const key of [...pages, 'supabase-client.js']) visitStaticEntry(key);
+if (sdkKeys.some(key => staticEntries.has(key))) {
+    throw new Error('A browser SDK was moved onto the initial page load path.');
+}
+const browserLicenses = await readFile(path.join(dist, 'assets/third-party-licenses.txt'), 'utf8');
+const browserNotice = await readFile(path.join(dist, 'third-party-notices.txt'), 'utf8');
+if (!browserLicenses.includes('## @walletconnect/ethereum-provider -') ||
+    !browserLicenses.includes('## @supabase/supabase-js -') ||
+    !browserLicenses.includes('WALLETCONNECT COMMUNITY LICENSE AGREEMENT') ||
+    !browserNotice.includes('Portions © 2025 Reown, Inc. All Rights Reserved')) {
+    throw new Error('The browser SDK distributions require their bundled third-party notices.');
+}
 // These legacy modules are copied verbatim. An external import here would
 // sidestep the dependency lock even when the bundled wallet passes its audit.
 const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));

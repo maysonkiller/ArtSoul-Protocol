@@ -32,6 +32,9 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            scripts/browser-sdks/package-lock.json
 
       # package-lock.json is generated with npm 11. Node 22 bundles npm 10,
       # which computes the optional-dependency tree differently and would

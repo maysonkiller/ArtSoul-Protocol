@@ -52,7 +52,7 @@ test('the on-screen wallet debug overlay is fully removed', () => {
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
     assert.match(coreWallet, /WC_ETHEREUM_PROVIDER_VERSION = '2\.23\.10'/);
-    assert.match(coreWallet, /esm\.sh\/@walletconnect\/ethereum-provider@\$\{WC_ETHEREUM_PROVIDER_VERSION\}/);
+    assert.match(coreWallet, /await import\('\.\/scripts\/browser-sdks\/wallet\.mjs'\)/);
     assert.match(coreWallet, /const REQUIRED_CHAIN_IDS = \[BASE_SEPOLIA_CHAIN_ID\]/);
     assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[8453, 1,/);
     assert.match(coreWallet, /const REQUIRED_METHODS = \['personal_sign', 'eth_sendTransaction'\]/);
