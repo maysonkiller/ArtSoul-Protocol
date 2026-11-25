@@ -1,18 +1,9 @@
 /**
  * Snapshot A — the community record of the public testnet.
  *
- * Bible section 16 point 1 requires an export that is versioned, reproducible,
- * machine-readable and durable; that carries the source cut-off, participating
- * addresses, qualifying public events with timestamps, aggregate counts and a
- * cryptographic manifest; and that is verified from at least two independent
- * durable locations. Point 2 requires proving it can be read and independently
- * validated **after the application database is reset**.
- *
- * Everything in this file follows from that last sentence. The export is the
- * only artifact that survives the reset, it is captured once on an announced
- * date, and it cannot be recaptured afterwards. So the format has to be
- * verifiable by someone holding the directory and nothing else - no database,
- * no API, no access to this repository.
+ * Historical, optional export of selected public projections. It can be
+ * checked offline against a trusted manifest with no database or API.
+ * Full service recovery uses operational backups and isolated restore checks.
  *
  * Two rules this file does not break:
  *
@@ -47,7 +38,7 @@ export const ENTITLEMENT_NOTICE =
  * `deposit_amount`, and a `source` column on the floor history that has never
  * existed. The fixtures had been written from this list rather than from the
  * schema, so fifteen green tests could not see any of it, and the capture would
- * have failed on the announced cut-off date - the one day it cannot be retried.
+ * have failed on a real database despite those green fixture tests.
  */
 export const EXPORTED_TABLES = Object.freeze([
     Object.freeze({

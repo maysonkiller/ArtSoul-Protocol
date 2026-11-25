@@ -1,9 +1,6 @@
 // B-05: the Snapshot A exporter and verifier.
 //
-// Snapshot A is captured once, on an announced date, before a destructive
-// reset, and it cannot be recaptured afterwards. Every test here exists because
-// the failure it guards against would be discovered on the one day nothing can
-// be done about it.
+// Historical archives must remain independently verifiable across releases.
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -472,8 +469,11 @@ test('both independently restored directories must verify against one supplied r
   writeSnapshotFiles(announced, archive.files);
   writeSnapshotFiles(announcedCopy, archive.files);
   const at = (...extra) => run(announced, '--second-copy', announcedCopy, '--expected-root', archive.rootHash,
-    '--announced-cut-off', ...extra);
-  assert.equal(at('2001-01-02T01:00:00.123456+01:00').status, 0);
+    '--expected-cut-off', ...extra);
+  const withoutNotice = at('2001-01-02T01:00:00.123456+01:00');
+  assert.equal(withoutNotice.status, 0, withoutNotice.stderr);
+  assert.doesNotMatch(withoutNotice.stdout, /notice|cutover/i);
+  assert.equal(run(announced, '--expected-root', archive.rootHash, '--announced-cut-off', '2001-01-02T00:00:00.123456Z').status, 0);
   const withNotice = (...extra) => at('2001-01-02T01:00:00.123456+01:00', '--notice-published-at', ...extra);
   const fullNotice = withNotice('2000-12-19T00:00:00.123456Z');
   assert.equal(fullNotice.status, 0, fullNotice.stderr);
@@ -486,7 +486,7 @@ test('both independently restored directories must verify against one supplied r
   assert.equal(run(announced, '--expected-root', archive.rootHash, '--notice-published-at', '2000-12-19T00:00:00Z').status, 1);
   const wrongInstant = at('2001-01-02T00:00:00.123455Z');
   assert.equal(wrongInstant.status, 1);
-  assert.equal(wrongInstant.stdout.match(/does not match the announced Base Sepolia cut-off/g).length, 2);
+  assert.equal(wrongInstant.stdout.match(/does not match the expected Base Sepolia cut-off/g).length, 2);
   assert.equal(at('2001-02-29T00:00:00Z').status, 1);
   assert.equal(at('2001-01-02T00:00:00Z', '--announced-cut-off', '2001-01-02T00:00:00Z').status, 1);
   assert.equal(run(announced, '--announced-cut-off', '2001-01-02T00:00:00.123456Z').status, 1);
@@ -496,7 +496,7 @@ test('both independently restored directories must verify against one supplied r
   writeSnapshotFiles(retiredDir, retired.files);
   const wrongChain = run(retiredDir, '--expected-root', retired.rootHash, '--announced-cut-off', '2001-01-02T00:00:00.123456Z');
   assert.equal(wrongChain.status, 1);
-  assert.match(wrongChain.stdout, /does not match the announced Base Sepolia cut-off/);
+  assert.match(wrongChain.stdout, /does not match the expected Base Sepolia cut-off/);
   assert.equal(run(first, '--second-copy', second).status, 1);
   assert.equal(run(first, '--expected-root', capture.rootHash, '--expected-root', capture.rootHash).status, 1);
 

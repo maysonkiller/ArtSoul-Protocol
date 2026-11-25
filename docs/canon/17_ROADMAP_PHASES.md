@@ -10,8 +10,8 @@ The active canonical model is A–D:
 | --- | --- | --- |
 | A — Stabilize Public Testnet | Close production-testnet blockers | Repository/security cleanup, wallet stabilization, diagnostics cleanup, testnet/indexer verification, moderation MVP, Base commitments |
 | B — Public Beta | Validate with real users | Tester onboarding, monitoring, defect correction, snapshot tooling readiness, build-in-public |
-| C — Mainnet Preparation | Build and audit the final system | Contract rework, Genesis, Collections, pool, admin controls, auras, legal/domain/treasury readiness, fresh Base Sepolia rehearsal and final-testnet Snapshot A |
-| D — Staged Mainnet Launch | Migrate and activate safely | Snapshot verification, data reset, Base deployment, Core stability window, separate Genesis pilot, controlled growth |
+| C — Mainnet Preparation | Build and audit the final system | Contract rework, Genesis, Collections, pool, admin controls, auras, legal/domain/treasury readiness, fresh Base Sepolia rehearsal |
+| D — Staged Mainnet Launch | Migrate and activate safely | Recovery verification before destructive changes, clean mainnet catalog, Base deployment, Core stability window, separate Genesis pilot, controlled growth |
 
 Earlier informal A–G plans are historical, not parallel active roadmaps. Token mechanics remain unapproved. The founder-authorized future contract and cross-chain payment research belongs to C, may proceed alongside B, and does not activate new networks. Stabilization/testnet items belong to A; beta/growth validation to B; contract, security, Genesis, Collections, legal, and final visual work to C; migration/deployment/activation to D. Current founder priorities may revise this scheduling.
 
@@ -35,11 +35,11 @@ will resume on a separate schedule.
 
 Goal: validate the complete user journey on testnet with a controlled real cohort.
 
-Run publish → auction → settlement → mint → resale journeys; operate monitoring and incident response; process moderation cases and beta defects; report progress through verified cached metrics; and keep snapshot tooling ready. The October 28 founder amendment moved actual Snapshot A capture to the end of the full final-contract testnet in late Phase C. Its cut-off remains unset.
+Run publish → auction → settlement → mint → resale journeys; operate monitoring and incident response; process moderation cases and beta defects; report progress through verified cached metrics; and keep snapshot tooling ready.
 
-Snapshot A is a community record only. It survives later database reset through versioned machine-readable data, a cryptographic manifest, independent durable copies, and a documented verification procedure. It creates no Genesis, token, points, airdrop, or other entitlement.
+The historical archive format remains readable. Testnet participation creates no mainnet entitlements.
 
-Public-beta acceptance requires a stable cohort, processed feedback, moderation evidence, snapshot tooling and Phase C inputs. The cohort and its feedback remain outstanding. Snapshot A capture belongs to late C.
+Public-beta acceptance requires a stable cohort, processed feedback, moderation evidence, snapshot tooling and Phase C inputs. The cohort and its feedback remain outstanding.
 
 ## Phase C — Mainnet Preparation
 
@@ -65,17 +65,17 @@ The following remain explicit planning inputs rather than frozen canon:
 
 Genesis administration must use public eligibility categories, durable grant records, an audit log, and multisig-authorized controls. Losing-bidder refunds use deterministic obligations, bounded batch execution, and withdrawable-credit fallback; no unbounded loop or unmotivated bidder may be required to finalize an auction.
 
-After the final topology has completed its full public-testnet validation, capture Snapshot A at the final cut-off announced at least two weeks ahead. Verify two independent durable copies and independent readability before Phase D. Earlier rehearsal exports are not the final Snapshot A.
+The November 25 decision retired the public-testnet archive and its two-week announcement. Keep testnet records and backups.
 
-Exit: independent audit passed, fresh rehearsal green, treasuries/domain/legal ready, final-testnet Snapshot A and migration evidence verified, and launch approval recorded.
+Phase C exit requires reviewed internal security evidence, a fresh successful Base Sepolia rehearsal, verified treasury and authority roles, and founder review.
 
 ## Phase D — Staged Mainnet Launch
 
 Goal: launch on Base without combining every risk into one event.
 
-Re-verify Snapshot A, execute the Bible §16 reset, deploy the audited Core topology, transfer roles, and pass production smoke tests. Observe Core through the approved stability window. Run Genesis as a separate bounded pilot only after Core stability is demonstrated, then expand through the audited grant path.
+Prepare a clean mainnet catalog under Bible §16, verify the recovery procedure before any destructive change, deploy the reviewed Core topology, transfer roles, and pass production smoke tests. Observe Core through the approved stability window. Run Genesis as a separate bounded pilot only after Core stability is demonstrated, then expand through the audited grant path.
 
-Exit: stable Base mainnet operations, verified treasuries, monitored public metrics, and controlled Genesis rollout.
+Phase D exit requires stable Base mainnet operations, verified treasury activity, controlled Genesis rollout, monitored public metrics and an independent full audit with disposition of its findings.
 
 ## Delivery sequence for the first Base release (November 19, 2026)
 
@@ -92,7 +92,7 @@ For a short demo that requires no wallet signature:
 | Scope | Addresses and implementation | Release dependency |
 | --- | --- | --- |
 | Ordinary artworks, primary auctions and resale | Two new application contracts. The engine creates its permanently paired [NFT](../../contracts/replacement/OrdinaryArtAuctions.sol) in its constructor. It also owns the shared ETH ledger, including the ecosystem resale allocation. | Release and verify the exact pair together. [Safe binding](../../contracts/replacement/TreasuryBoundOrdinaryArt.sol) currently supplies abstract policy hooks. Only reviewed production policy and bytecode qualify for deployment. |
-| Custody and emergency pause | Three existing Base mainnet Safe accounts receive protocol fees, receive ecosystem allocations, and administer entry pause and delayed external marketplace admission respectively. | Recheck the [custody register and on-chain configuration](../RESOURCE_GATED_WORK.md#checking-the-three-contract-custody-roles) for all roles at cutover. Actual binding happens when the replacement engine is deployed. The keeper calls the engine using a gas-only account with ordinary caller permissions. |
+| Custody and emergency pause | The release assigns distinct Safes for protocol fees, ecosystem allocations and administration of the entry pause and external marketplace admission. | Select and verify fresh Base mainnet wallets before binding the three roles. Keep rehearsal wallets and the gas-only keeper separate. [Custody register](../RESOURCE_GATED_WORK.md#checking-the-three-contract-custody-roles) |
 | Voluntary creator support | At first mainnet launch, supporters copy the original creator’s address and send ETH from their own wallet on Base. This requires no additional deployment. | Preserve the Base Sepolia donation history. Revisit artwork-linked support if users need public attribution or messages. A later activation requires its own review and rehearsal. [Support decision and gas measurements](SUPPORT_THE_ARTIST_DESIGN.md) |
 | Genesis | One dedicated soulbound contract for the bounded post-stability pilot. The transferable testnet ProjectNFT is retired at migration. | C4 grant controls, public eligibility categories and an audited register precede D5 activation. |
 | Partner Collections | C5 needs a reviewed template with the single first auction, attempt and cooldown rules, and flat remaining mint price. Factory and per-collection address counts follow the selected design. | Rehearse its first successful and failed auction paths before opening a collection. Generic [Launch](../../contracts/launch/CollectionLaunch.sol) and [Forge](../../contracts/launch/CollectionForge.sol) are separate local scaffolds with their own product and audit decisions. |
@@ -109,17 +109,17 @@ On November 19, a Base Sepolia read of [Music 2, token 5](https://sepolia.basesc
 | --- | --- | --- |
 | 1. Prepare and demonstrate the testnet product | Product and support | Assemble the walkthrough above, give visitors a testnet entry point, record feedback by journey, and distinguish testnet volume from revenue. Keep the currently available voice helper. Broader voice and WebMCP parity stays on its separate track. |
 | 2. Freeze the release candidate | Contract and application maintainers | Resolve remaining [policy decisions](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md), compile the concrete engine, and pin constructor inputs, build identity, paired NFT, and event ABI. Indexer and UI must distinguish deployments even when artwork IDs repeat. Evidence covers no-bid close, winner payment and default, runner-up expiry or purchase, refunds and credits, resale and provenance. |
-| 3. Rehearse on fresh Base Sepolia and finish independent review | Release operator, independent reviewer and cohort lead | Use rehearsal Safes and the exact candidate. Run C13 with artists and collectors, save receipts and support outcomes, and verify the page updates without a reload. Exercise [keeper restart and gas limits](../runbooks/ORDINARY_AUCTION_KEEPER.md), a manual close during an outage, pause, withdrawals, event replay and recovery. Record costs and alarms. Resolve C12 findings and rerun affected journeys on the final build. |
-| 4. Complete the launch decision | Founder, counsel, finance and operations | Confirm independently recoverable signer custody, organization and contracting authority, terms and privacy, IP and complaint handling, audit and recurring operating budget, domain ownership and incident coverage. Keep company fundraising outside the [protocol and ecosystem treasuries](14_PROTOCOL_REVENUE_AND_TEAM.md). Announce the final testnet cutoff at least two weeks ahead, produce Snapshot A, and independently read and verify both durable copies. Record scope and go/no-go against C0–C15. |
+| 3. Rehearse on fresh Base Sepolia and review the exact build | Release operator, internal security reviewer and cohort lead | Use rehearsal Safes and the exact candidate. Run C13 with artists and collectors, save receipts and support outcomes, and verify the page updates without a reload. Exercise [keeper restart and gas limits](../runbooks/ORDINARY_AUCTION_KEEPER.md), a manual close during an outage, pause, withdrawals, event replay and recovery. Record costs and alarms. Resolve C12 findings and rerun affected journeys on the final build. |
+| 4. Complete the launch decision | Founder, finance and operations | Confirm independently recoverable signer custody, lawful operator and contracting authority for the actual service, terms and privacy, IP and complaint handling, audit and recurring operating budget, domain ownership and incident coverage. Keep company fundraising outside the [protocol and ecosystem treasuries](14_PROTOCOL_REVENUE_AND_TEAM.md). Preserve testnet data and verify recovery from operational backups before any destructive action. Record scope and go/no-go against C0–C15. |
 | 5. Open ordinary trading on Base in stages | Release operator and authorized Safe signers | Publish chain, deployment blocks, addresses and verified source. Check the immutable pair, all three Safe bindings, indexer reconciliation and recovery access before enabling writes. Keep testnet history separately identified. Observe real settlements, withdrawals and service costs through the agreed Core stability window before Genesis grants or further public activation. |
 
-The [public roadmap](https://artsoulprotocol.com/docs-protocol#roadmap) shares its content with Guide search and the table of contents. It directs visitors to the Base Sepolia gallery and the browser-based collection draft. The next milestones are the replacement-contract rehearsal, independent audit, announced final testnet snapshot, staged Base mainnet opening and subsequent Genesis pilot. Publish confirmed public deployment addresses as those milestones are reached.
+The [public roadmap](https://artsoulprotocol.com/docs-protocol#roadmap) shares its content with Guide search and the table of contents. It directs visitors to the Base Sepolia gallery and the browser-based collection draft. The next milestones are the replacement-contract rehearsal, internal security review, staged Base mainnet opening, separate Genesis pilot and independent full audit before Phase D closes. Publish confirmed public deployment addresses as those milestones are reached.
 
 ## Founder-Owned Inputs
 
 - Safes and signer policy.
 - Domain and project email.
-- Counsel-approved entity, jurisdiction, ToS, Privacy/GDPR, and IP assignment.
+- Lawful basis to operate and collect fees, applicable terms, privacy, IP and accounting. Revisit company formation at first revenue or sooner if legally required.
 - External audit procurement.
 - Go/no-go and public-role decisions.
 
@@ -127,7 +127,7 @@ These are surfaced when their phase needs them. Roadmap placeholders do not deci
 
 ## Out Of Scope
 
-- Any non-Base product chain.
+- Activating additional write networks. [Future Robinhood and Arc work](../architecture/ROBINHOOD_AND_ARC_LAUNCH_READINESS.md) has separate acceptance criteria.
 - Token, points, airdrop, or passive-income mechanics.
 - Fee waivers or fee discounts.
 - Unapproved economic changes.

@@ -1,5 +1,7 @@
 # Post-Phase-A product direction
 
+The November 25 founder decision supersedes the public archive and advance-notice requirement recorded here. The [current migration policy](../canon/ARTSOUL_CANON_BIBLE_FULL.md#16-pre-mainnet-migration-and-data-reset) retains operational backup and restore verification.
+
 Reviewed: October 24, 2026. Source revision: `46b385fcfdc231c17b70bcb86fffc88e37dfe45e`.
 
 Status: **DRAFTED decision brief**, not an implementation, deployment, approved

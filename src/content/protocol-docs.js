@@ -158,12 +158,12 @@ const sections = [
                 },
                 {
                     question: "What is in preparation?",
-                    answer: "ArtSoul is testing the new auction contract together with the NFT contract that mints the artwork. Before launch, artists and collectors will rehearse the full trading flow on Base Sepolia, including refunds and resale. The contracts also need an independent security audit. Authors can already plan a collection and save the draft in their browser.",
+                    answer: "ArtSoul is testing the new auction and NFT contracts on the way to a Base Sepolia rehearsal with artists and collectors. The rehearsal covers refunds and resale. The full independent security audit is planned for the end of the staged launch. Authors can already plan a collection and save the draft in their browser.",
                     link: { text: "Create a collection draft", href: "/collection-builder" }
                 },
                 {
                     question: "How will the move to Base mainnet work?",
-                    answer: "ArtSoul will announce the final testnet cutoff at least two weeks in advance. Snapshot A will preserve a record of testnet activity. After launch approval, auctions and sales of individual artworks open first on Base mainnet. Genesis grants have a separate pilot that follows a period of stable trading."
+                    answer: "Mainnet starts with an empty catalog. Creators can publish their work again on Base. Testnet activity stays separate. After launch approval, auctions and sales of individual artworks open first on Base mainnet. Genesis grants have a separate pilot that follows a period of stable trading."
                 }
             ]
         }]

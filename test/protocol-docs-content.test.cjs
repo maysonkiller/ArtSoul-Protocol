@@ -64,7 +64,8 @@ test('the public roadmap opens from search and contents at the same accessible G
   const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
   assert.match(html, /href="\/gallery"/);
   assert.match(html, /href="\/collection-builder"/);
-  for (const query of ['roadmap', 'Snapshot A', 'independent security audit']) {
+  assert.doesNotMatch(html, /Snapshot A|two weeks in advance/i);
+  for (const query of ['roadmap', 'empty catalog', 'independent security audit']) {
     const results = searchSiteContent(query, 'docs').docs.items;
     assert.equal(results.find(item => item.id === section.id)?.url, '/docs-protocol#roadmap');
   }

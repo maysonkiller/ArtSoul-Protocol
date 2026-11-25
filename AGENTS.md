@@ -12,6 +12,7 @@ Founder clarification, 2026-11-02: the Bible and canon are a maintained record o
 - Standing spending, credential, data-preservation and environment limits remain in force. Do not bypass service limits, fabricate acceptance, or silently activate mainnet writes.
 
 ## IMPLEMENTATION DISCIPLINE
+Use the locally installed ArtSoul Universal Skill Atlas Adaptive FAST v1.1.1 to select one primary workflow and up to two supporting skills per task. Consult the full Atlas and Classic reference when needed. Verify conclusions against project evidence.
 Workspace ownership (founder instruction, 2026-09-23): continue this project in
 `C:\Projects\ArtSoul`. Do not create another checkout/worktree unless the founder
 requests isolation. Other registered worktrees are historical/recovery copies,
@@ -64,6 +65,6 @@ When you notice an obvious closely-related bug in the same area you are editing,
 ## v1.2 DELTAS (read in addition to above)
 - Moderation is SIMPLIFIED as summarized in rule 12. Do not reintroduce the superseded 3-factor social-login gate or upload fingerprinting plan.
 - Promoted banners: full Bible §6.1 records the v1.2 design. Of 12 homepage slots, at most 3 may be sold by slot auction and labeled "Promoted". At least 9 are merit-ranked by community signal. Slot proceeds go to ProtocolTreasury. Paid placement has no weight in organic discovery, Trust, artwork price, floor or settlement. The estimate of ~0.05 ETH/day is for planning. The reserve amount, fixed or tunable treatment and activation remain undecided. C10 implementation awaits the reserve decision.
-- Current decisions (Bible §16): EcosystemPool stays 1%; active chain = Base; Base Sepolia is the operational write testnet; Snapshot A = last day of public testnet, announced at least 2 weeks ahead. Snapshot A must be a versioned, machine-readable, hashed export stored and verified in at least two independent durable locations before destructive reset; it creates no entitlement. Additional network activation is separate from authorized future contract/payment research.
+- Current decisions (Bible §16): EcosystemPool stays 1%; active chain = Base; Base Sepolia is the operational write testnet. The public-testnet Snapshot A and its notice period were retired November 25. Preserve testnet data. Before any separately approved destructive action, verify a recoverable backup and a successful isolated restore covering the affected data and media. Testnet activity creates no mainnet entitlement. Additional network activation is separate from authorized future contract/payment research.
 - Badge "First Collector of the Collection" (doc 05 v1.2): NOT a stored image — contract stores firstCollector address; frontend renders the badge component automatically; optionally bake as NFT metadata trait. Shown on the COLLECTION card only.
 - Treasuries (doc 14 §9): ProtocolTreasury (on-chain, fees) and EcosystemTreasury (on-chain, 1% pool) are separate from company operating capital (bank/investments). Never mix investments into ProtocolTreasury.

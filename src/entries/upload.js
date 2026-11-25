@@ -182,6 +182,11 @@ let selectedFile = null;
             }
         }
 
+        function openRegisteredArtwork(artworkId) {
+            // Registration and recovery both verify this deployment before returning an ID.
+            navigateAfterPublish(window.ArtSoulArtworkUrl.artworkPath(`v41:${BASE_SEPOLIA_CHAIN_ID}:${artworkId}`));
+        }
+
         function validateArtworkFile(file) {
             if (!file) {
                 return { code: 'FILE_REQUIRED', message: 'Select an artwork file before continuing.' };
@@ -468,8 +473,8 @@ let selectedFile = null;
             return {
                 temp_id: crypto.randomUUID?.() || `pending-${Date.now()}`,
                 id: `pending:${Date.now()}`,
-                chain_id: window.ArtSoulContracts?.currentNetwork?.chainId || 84532,
-                network: window.ArtSoulContracts?.currentNetwork?.key || 'baseSepolia',
+                chain_id: BASE_SEPOLIA_CHAIN_ID,
+                network: 'baseSepolia',
                 wallet_address: walletAddress.toLowerCase(),
                 creator: walletAddress,
                 creator_id: walletAddress,
@@ -1161,7 +1166,7 @@ let selectedFile = null;
                 const result = await checkBrowserPublication({ ...attempt, assertCurrent });
                 assertCurrent();
                 if (result.recovery?.state === 'registered') {
-                    navigateAfterPublish(window.ArtSoulArtworkUrl.artworkPath(`v41:${BASE_SEPOLIA_CHAIN_ID}:${result.recovery.registered_artwork_id}`));
+                    openRegisteredArtwork(result.recovery.registered_artwork_id);
                     return;
                 }
                 attempt.message = publicationCheckMessage(result);
@@ -1335,7 +1340,7 @@ let selectedFile = null;
                     if (attempt) attempt.message = publicationCheckMessage(preparation);
                     if (preparation.recovery?.state === 'registered') {
                         assertCurrent();
-                        navigateAfterPublish(window.ArtSoulArtworkUrl.artworkPath(`v41:${BASE_SEPOLIA_CHAIN_ID}:${preparation.recovery.registered_artwork_id}`));
+                        openRegisteredArtwork(preparation.recovery.registered_artwork_id);
                         return;
                     }
                     if (preparation.recovery?.state === 'conflict' || preparation.claim_status === 'conflict') {
@@ -1415,7 +1420,7 @@ let selectedFile = null;
                 console.log('Legacy artwork DB write skipped; v41 indexer will project registration.', {
                     artworkId: result.artworkId,
                     txHash: result.txHash,
-                    network: window.ArtSoulContracts.currentNetwork
+                    chainId: BASE_SEPOLIA_CHAIN_ID
                 });
 
                 // Step 7: Create the initial auction using the required creator-selected duration.
@@ -1520,8 +1525,7 @@ let selectedFile = null;
                 }
 
                 // Success - redirect to the new artwork detail page.
-                const chainId = window.getCurrentChainId?.() || window.ArtSoulContracts?.chainId || 84532;
-                navigateAfterPublish(window.ArtSoulArtworkUrl.artworkPath(`v41:${chainId}:${result.artworkId}`));
+                openRegisteredArtwork(result.artworkId);
 
             } catch (error) {
                 console.error('Publish failed:', error);

@@ -1,5 +1,7 @@
 # Voice, agent tools and future network scope
 
+The November 25 founder decision supersedes the public archive and advance-notice requirement recorded here. The [current migration policy](canon/ARTSOUL_CANON_BIBLE_FULL.md#16-pre-mainnet-migration-and-data-reset) retains operational backup and restore verification.
+
 Status: text/header, explicit Saved and global search slices released October 26;
 Donate/Report review released October 28; publication draft review released
 October 28 in PR #380 / `26883c59`, with exact CI and hosted-browser evidence in
