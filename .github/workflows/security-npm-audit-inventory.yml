@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: artsoul-npm-audit-inventory
+  group: artsoul-npm-audit-inventory-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Node.js 22
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
@@ -38,8 +39,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm audit --json --package-lock-only > npm-audit-full.json || true
-          npm audit --json --package-lock-only --omit=dev > npm-audit-prod.json || true
+          full_status=0
+          prod_status=0
+          npm audit --json --package-lock-only > npm-audit-full.json || full_status=$?
+          npm audit --json --package-lock-only --omit=dev > npm-audit-prod.json || prod_status=$?
+          {
+            git rev-parse HEAD
+            sha256sum package-lock.json npm-audit-full.json npm-audit-prod.json
+            node --version
+            npm --version
+            printf 'full_exit=%s\nomit_dev_exit=%s\n' "$full_status" "$prod_status"
+          } > npm-audit-provenance.txt
+          test "$full_status" -le 1 && test "$prod_status" -le 1
 
       - name: Print exact list and render summary
         shell: bash
@@ -57,5 +68,6 @@ jobs:
             npm-audit-full.json
             npm-audit-prod.json
             npm-audit-inventory.md
+            npm-audit-provenance.txt
           if-no-files-found: error
           retention-days: 14

@@ -10,7 +10,18 @@ const [fullPath='npm-audit-full.json',prodPath='npm-audit-prod.json'] = process.
 const safe = value => String(value ?? '').replace(/[\r\n|<>]/g,' ').slice(0,240);
 async function load(p) {
   const raw=JSON.parse(await readFile(p,'utf8'));
-  if(raw.error || !raw.vulnerabilities || !raw.metadata?.vulnerabilities) throw new Error('audit_report_missing_or_invalid');
+  const totals = raw.metadata?.vulnerabilities;
+  if(raw.auditReportVersion !== 2 || raw.error || !raw.vulnerabilities || Array.isArray(raw.vulnerabilities) ||
+     typeof raw.vulnerabilities !== 'object' || !totals) throw new Error('audit_report_missing_or_invalid');
+  const counts = { info: 0, low: 0, moderate: 0, high: 0, critical: 0 };
+  const records = Object.entries(raw.vulnerabilities);
+  for (const [name, record] of records) {
+    if (record?.name !== name || !Object.hasOwn(counts, record.severity)) throw new Error('invalid_package_record');
+    counts[record.severity]++;
+  }
+  if (records.length !== totals.total || Object.entries(counts).some(([severity, count]) => count !== totals[severity])) {
+    throw new Error('audit_counts_do_not_match_package_records');
+  }
   return raw;
 }
 function numbers(report) {
@@ -43,7 +54,6 @@ function formatList(report,prod) {
 }
 const [full,prod]=await Promise.all([load(fullPath),load(prodPath)]);
 const fullNums=numbers(full),prodNums=numbers(prod),records=formatList(full,prod);
-if(records.length!==fullNums.total) console.error('Note: count of affected package records differs from metadata.total');
 const rows=[
   '# ArtSoul Protocol — npm vulnerability inventory (lockfile only)',
   '',

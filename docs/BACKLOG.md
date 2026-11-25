@@ -17,6 +17,8 @@ This is the repository's durable work register. It consolidates verified complet
 
 ## Canonical Phase Mapping
 
+The November 25 [dependency review](audits/npm-2026-11-25/DATA.md) tracks 79 affected package names across five snapshots. The revised lock retains 11 high-severity records and requires real-device wallet acceptance and the independent C12 review.
+
 ### November 20 phase acceptance
 
 The [numbered checklist](canon/12_IMPLEMENTATION_BACKLOG.md) has 17 of 40 accepted items. B engineering is closed. Its named public-beta journeys are tracked in C13. The ordinary-market candidate passed C2 auction Core implementation, C3 artwork NFT implementation, C6 pool accounting and C11 contract and invariant testing. The independent review, fresh hosted rehearsal, announced Snapshot A, production custody and mainnet go/no-go are still open.

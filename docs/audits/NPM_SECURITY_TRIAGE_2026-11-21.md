@@ -2,6 +2,8 @@
 
 **Status: SOURCE_ONLY / TEST_ONLY — NOT RELEASED.**
 
+The [November 25 comparison](npm-2026-11-25/DATA.md) preserves these historical counts, rechecks the same locks and records the revised candidate.
+
 ## Ground truth
 
 - Base MAIN: `9f72dbbd972fc29ad8095c0ca549650bbf2af637`.
