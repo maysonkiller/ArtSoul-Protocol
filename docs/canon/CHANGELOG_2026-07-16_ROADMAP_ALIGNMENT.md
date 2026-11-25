@@ -1,5 +1,7 @@
 # Roadmap Alignment — 2026-07-16
 
+The November 25 founder decision supersedes the public archive and advance-notice requirement recorded here. The [current migration policy](ARTSOUL_CANON_BIBLE_FULL.md#16-pre-mainnet-migration-and-data-reset) retains operational backup and restore verification.
+
 Authority: founder approval after review of the proposed 2026-07-16 planning files.
 
 ## Adopted

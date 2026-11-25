@@ -159,6 +159,26 @@ test('internal redirects release the native beforeunload guard first', () => {
   assert.match(navigate, /published=1/);
 });
 
+test('confirmed registration keeps its network when the wallet switches before navigation', () => {
+  const window = {
+    getCurrentChainId: () => 4663,
+    ArtSoulContracts: { currentNetwork: { chainId: 4663, key: 'robinhood' } },
+    location: { assign: url => { window.destination = url; } }
+  };
+  const sandbox = vm.createContext({ window, BASE_SEPOLIA_CHAIN_ID: 84532, crypto: { randomUUID: () => 'draft' } });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/ui/artwork-url.js'), 'utf8'), sandbox);
+  for (const name of ['navigateAfterPublish', 'openRegisteredArtwork', 'createPendingArtworkDraft']) {
+    vm.runInContext(extractFunction(name), sandbox);
+  }
+  const args = {walletAddress:'0x' + '11'.repeat(20), file:{}, fileUpload:{}};
+  const pending = sandbox.createPendingArtworkDraft(args);
+  assert.equal(pending.chain_id, 84532);
+  assert.equal(pending.network, 'baseSepolia');
+  assert.match(extractFunction('handleUpload'), /openRegisteredArtwork\(result\.artworkId\)/);
+  sandbox.openRegisteredArtwork('7');
+  assert.equal(window.destination, '/artwork/7?published=1');
+});
+
 test('Publish stays clickable and explains what is blocking it', () => {
   // A disabled submit swallows the click, so the person gets no answer at all.
   assert.match(source, /button\.disabled = uploading;/);
@@ -214,7 +234,7 @@ function loadPublicationCheck(check) {
   });
   for (const name of ['createUploadError', 'currentPublicationAttempt', 'publicationCheckMessage',
     'setTransactionButtonProcessing', 'restoreTransactionButton', 'updatePublishReadiness',
-    'checkSavedPublication', 'handleUpload']) {
+    'openRegisteredArtwork', 'checkSavedPublication', 'handleUpload']) {
     vm.runInContext(extractFunction(name), sandbox);
   }
   return { sandbox, button, hint, attempt, wallet };

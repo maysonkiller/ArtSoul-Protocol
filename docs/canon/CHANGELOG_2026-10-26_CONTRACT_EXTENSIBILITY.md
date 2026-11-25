@@ -1,5 +1,7 @@
 # Future contract extensibility direction — 2026-10-26
 
+The November 25 founder decision supersedes the public archive and advance-notice requirement recorded here. The [current migration policy](ARTSOUL_CANON_BIBLE_FULL.md#16-pre-mainnet-migration-and-data-reset) retains operational backup and restore verification.
+
 Status: **approved research direction; proposed architecture; no activation**.
 
 The founder requests that the replacement contracts account for current resale

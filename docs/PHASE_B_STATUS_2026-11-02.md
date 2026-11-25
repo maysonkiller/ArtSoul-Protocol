@@ -82,7 +82,7 @@ once the final testnet contracts, participants, operator, support channel and
 pause owner are available. For subsequent decisions use the [C1 architecture
 review](architecture/C1_DECISION_INVARIANTS_2026-11-02.md), the [C12 independent
 review and C13 Safe handover criteria](canon/12_IMPLEMENTATION_BACKLOG.md),
-and the [final Snapshot A and independent-copy runbook](SNAPSHOT_A.md).
+and the [optional historical archive runbook](SNAPSHOT_A.md).
 
 ## Current interface
 
@@ -494,7 +494,4 @@ credits and isolated solvency. Linux/Windows/static checks passed. Validated
 settlement and refund eligibility remain inputs; this does not prove replacement
 bytecode or select unresolved governance, pause or financial policy. C1 stays open.
 
-Actual Snapshot A remains at the end of the final public testnet, announced in
-advance and independently stored/verified before any destructive reset. Export
-tooling readiness is separate from capturing that final snapshot. Mainnet,
-legal, external audit and launch operations retain their own acceptance gates.
+On November 25 the founder retired the final public archive and announcement. Operational backups and isolated restoration remain mandatory before any destructive change. Mainnet, legal, external audit and launch operations retain their own acceptance steps.

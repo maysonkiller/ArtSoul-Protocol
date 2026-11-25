@@ -334,11 +334,11 @@ record the dependencies and acceptance criteria for each phase.
 
 When the reworked contracts are deployed and testnet validation is complete, a **full migration is performed once, before public launch** (start of Phase D). It is mandatory:
 
-1. Freeze and export **Snapshot A** before any destructive reset. The export must be versioned, reproducible, machine-readable, and durable; include the source cut-off, participating addresses, qualifying public events with timestamps, aggregate counts, and a cryptographic manifest/hash; and be verified from at least two independent durable storage locations. Snapshot A is a community record only and creates no Genesis, token, points, airdrop, or other entitlement.
-2. Prove that the Snapshot A export can be read and independently validated after the application database is reset. Record the verification result and export schema in the migration runbook.
-3. Purge all legacy testnet product data from the live database — artworks, auctions, bids, signals, and derived profile stats — so no stale records remain. The separately preserved Snapshot A export is not re-imported as live product state.
+1. Keep the current testnet application data, media and backups. Prepare the mainnet catalog in a separate, clean environment.
+2. Before any separately approved destructive change, record the affected scope, verify a recoverable backup and successfully restore the affected database and media into an isolated environment. Retain the recovery evidence privately.
+3. Start the mainnet catalog without testnet artworks, auctions, bids, signals, or derived profile stats. Existing testnet records and public-chain history create no mainnet allocation or eligibility.
 4. Remove all old contract addresses from config and UI.
-5. Storage: legacy testnet media is removed or archived; freed names may be reused (the same artwork titles can be created fresh on the new contracts).
+5. Keep testnet media separate from mainnet Storage. Creators may publish the same titles afresh.
 6. The indexer resets to the new contracts from their deploy block; no legacy chain is indexed for writes (Ethereum Sepolia stays fully retired).
 7. Verification pass: no leftover connections, endpoints, env vars, or UI references to old contracts or networks remain.
 8. Exercise a full publish → auction → settle → mint → resale cycle on the fresh deployment.
@@ -346,13 +346,7 @@ When the reworked contracts are deployed and testnet validation is complete, a *
 
 This is the mandatory pre-mainnet migration checklist. It runs after the reworked contracts pass a fresh public-testnet cycle and before any mainnet marketing.
 
-*Scheduling amendment — October 28, 2026, founder decision.* Snapshot A is taken
-at the end of the full public testnet of the final contracts, in late Phase C,
-before the Phase D reset and mainnet launch. It is not a capture or exit gate for
-the current Phase B beta. Announce that final cut-off at least two weeks ahead;
-keep the exporter and verifier ready meanwhile. No cut-off is assigned now.
-This changes timing only: the two independent verified durable copies,
-post-reset readability and absence of entitlement above remain mandatory.
+*Founder decision, November 25, 2026.* The public-testnet Snapshot A and its two-week announcement were retired. C16 and D1 remain historical identifiers. A public archive or notice period is no longer a condition for any phase, cutover or launch. The existing read-only archive tools remain available for historical files. Operational backups and tested restoration still precede any destructive action.
 
 *Launch presentation clarification — November 19, 2026.* ArtSoul opens its
 Base mainnet catalog with works published on that deployment. Before the first
@@ -362,12 +356,13 @@ metrics use mainnet records from launch, including genuine early activity.
 Testnet examples, owners, prices, sales and volume stay out of those surfaces.
 A creator may publish their own work afresh on mainnet with the ordinary
 publication flow. Testnet ownership and floor history do not transfer with it.
-Snapshot A preserves the approved testnet record; the application cutover
-cannot erase transactions or NFTs already recorded on a test blockchain.
+The application cutover cannot erase transactions or NFTs already recorded on a test blockchain.
 Retiring this testnet is a separate decision from upgrading a future mainnet
 deployment with outstanding payouts and NFTs.
 
 ## 17. Phase Status And Canonical Phase Model
+
+The [November 25 release decision](CHANGELOG_2026-11-25_RELEASE_SEQUENCE.md) governs testnet custody, production wallet selection, audit timing, operating readiness and the use of actual demand when deciding whether to expand.
 
 September 30 scheduling amendment: the founder requests implementation of the
 previously approved artist-support feature now, as an isolated, tested addition.

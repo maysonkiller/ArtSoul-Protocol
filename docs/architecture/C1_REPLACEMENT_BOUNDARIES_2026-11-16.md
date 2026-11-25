@@ -84,7 +84,7 @@ contract and token ID on its chain. [OpenSea migration](https://opensea.io/blog/
 and [ERC-721](https://eips.ethereum.org/EIPS/eip-721#nft-identifiers).
 
 Base Sepolia and Base mainnet have separate ledgers. The testnet catalog
-retirement at initial launch follows the [snapshot and clean-catalog decision](../canon/ARTSOUL_CANON_BIBLE_FULL.md#16-pre-mainnet-migration-and-data-reset).
+retirement at initial launch follows the [retention and clean-catalog decision](../canon/ARTSOUL_CANON_BIBLE_FULL.md#16-pre-mainnet-migration-and-data-reset).
 This future same-mainnet upgrade policy starts with the first genuine mainnet
 publication. [Base network details](https://docs.base.org/get-started/connect-to-base).
 
