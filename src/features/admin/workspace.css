@@ -50,16 +50,6 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-overview strong { fo
     min-height: 44px;
     margin: 1rem max(.75rem, var(--site-shell-pad, 30px), calc((100% - 1440px) / 2)) max(1rem, env(safe-area-inset-bottom)) auto;
 }
-/* Float in the outer gutter when there is room. Otherwise reserve space in the heading. */
-@media (max-width: 1599px) {
-    .admin-workspace-frame { position: relative; }
-    .protocol-admin-page .admin-workspace-frame [data-admin-assistant-shortcut]:not([hidden]) {
-        position: absolute;
-        inset: clamp(1rem, 2vw, 1.75rem) max(.75rem, var(--site-shell-pad, 30px), calc((100% - 1440px) / 2)) auto auto;
-        z-index: 1;
-    }
-    body:is(.classic, .future) .admin-workspace .protocol-admin-heading { padding-inline-end: 4rem; }
-}
 body:is(.classic, .future) .admin-workspace .protocol-admin-tabs {
     grid-template-columns: minmax(0, 1fr);
     margin: 0;
