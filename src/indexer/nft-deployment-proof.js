@@ -272,7 +272,15 @@ export async function readOrdinaryRunnerUpOffers(listener, options, ids) {
 
 // A bounded, read-only batch. Persistence must independently require this range
 // to follow the same deployment's committed coverage; a read is not a cursor.
-export async function readNftTransferRange(listener, options) {
+export function readNftTransferRange(listener, options) {
+    return readTransferRange(listener, options, 'nftContract');
+}
+
+export function readOrdinaryTransferRange(listener, options) {
+    return readTransferRange(listener, options, 'nft');
+}
+
+async function readTransferRange(listener, options, coreGetter) {
     // Normal catch-up stays at 1,000 blocks. A reviewed historical replay may
     // request larger sparse windows, with the same log, source and fork checks.
     // This bounds RPC work without repeating deployment reads for every empty
@@ -370,5 +378,5 @@ export async function readNftTransferRange(listener, options) {
         }
         return Object.freeze({ ...proof, fromBlock, previousBlockHash, bootstrap,
             events: Object.freeze(events.map(event => Object.freeze({ ...event, timestamp: timestamps.get(event.blockNumber) }))) });
-    });
+    }, coreGetter);
 }
