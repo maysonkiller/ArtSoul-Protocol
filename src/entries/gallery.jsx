@@ -438,7 +438,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     aria-label="Filter artworks loaded in this gallery"
                                     className="gallery-search-input rounded-lg"
                                 />
-                                <button type="button" className="gallery-search-all" onClick={() => window.dispatchEvent(new CustomEvent('artsoul:open-search', { detail: { query: searchQuery } }))}>Find more art or artists</button>
+                                <button type="button" className="gallery-search-all" title="Find more art or artists" onClick={() => window.dispatchEvent(new CustomEvent('artsoul:open-search', { detail: { query: searchQuery } }))}>Search ArtSoul</button>
                                 </div>
 
                                 {/* Status Filter */}

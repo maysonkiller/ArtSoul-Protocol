@@ -66,6 +66,8 @@ Both providers returned `workCount = 1`, `auctionCount = 0` and NFT `totalSupply
 
 The [indexer's event reader](../../src/indexer/event-listener.js) independently decoded a single `ArtworkRegistered` from each provider at block log index 2, with artwork ID 1 and creator `0xE6d6658DD5013B30Ab8cA9CBD667D0b5a5A1b215`. The [metadata reader](../../src/api/safe-artwork-fetch.js) decoded the title **ArtSoul Base Sepolia Rehearsal**, media type `image/jpeg` and image URL `https://artsoulprotocol.com/favicon.jpg`. Hosted indexer persistence and the public artwork card still require separate verification.
 
+The receipt command also runs the [publication recovery reader](../../src/api/upload-registration-evidence.js) with the reviewed payout Core and this specific receipt. Base and PublicNode returned matching evidence for work 1 under that issuer, with a common finalized anchor at block 63,541,026 (`0x5efc7ecdd7e2c78216f7fff866d187dd3368e833d01545944cff234de79759e1`). The report includes the NFT address and runtime hash, the event's block and log position, and the work state **at the registration block**. The Core reported no active auction and zero floor. The paired NFT's `artworkToToken(1)` returned zero. This command reads the ledger and returns the evidence locally.
+
 ```sh
 node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> --plan
 node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json>
@@ -73,3 +75,25 @@ node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair
 ```
 
 Open the loopback address printed by the second command. Review the payer, Base Sepolia, the payout Core and the zero-value registration in the wallet. A matching existing registration disables the request. If someone registered a different first work, the page stops and the public transaction hash can be checked independently. The verifier uses the actual ID from the finalized receipt, confirms the single event, its emitter and stored creator/URI, and rechecks the contract pair and its custody at the inclusion block through two providers. Auction, settlement, refunds, hosted indexing and UI acceptance have separate evidence.
+
+## Opening the registered work in a read-only simulation
+
+At finalized block 63,558,247 (`0x48c1082c1d07d686d6916ea98a1e2daf2c789d289e84ffb4df62175e6ad98425`), Base and PublicNode agreed on the payout pair, custody, and the creator and metadata of work 1. The work had zero floor, zero token ID and no active auction. Both nodes simulated a 24-hour opening at 0.001 test ETH from the registered creator and returned auction ID 1. The calldata hash was `0x08130d8ab39d1264a70fbf21cfb22dd88f926ba91952124a6e0a782db8ee8a14`. This specific price and duration were simulation inputs. The call produced no auction, deadline or receipt.
+
+```sh
+node scripts/review-rehearsal-artwork.mjs review.json register.json --check-opening 1000000000000000 24
+```
+
+The command uses ordinary read RPCs at a common finalized block. It checks the reviewed test deployment, rejects a mismatched creator or URI, an active auction or a minted work, and compares the returned ID to the next auction counter. The hosted public indexer still reported the earlier test Core during the same evening's operator check. Use the issuing Core as well as the artwork ID when verifying later hosted journeys.
+
+## First NFT transfer range on the payout pair
+
+Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.
+
+The [ordinary transfer reader](../../scripts/read-ordinary-transfer-range.mjs) checks `Core.nft()`, `NFT.core()`, both runtime hashes and endpoint finality. The first range uses the creation block as its zero-supply predecessor. Both nodes independently returned an empty batch for block 63,494,033. To repeat the read, set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to independent HTTPS endpoints for Base Sepolia and supply the reviewed payout pair register.
+
+```sh
+node scripts/read-ordinary-transfer-range.mjs <payout-pair-register.json> bootstrap 63494033 0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df 63494033 0x3868ea2419c15a5bf9ee332628da9776f8828ff3f1fc67033c8b2c204a1f79e4
+```
+
+For a contiguous follow-up, use `continuation` with the next block number, the previous report's endpoint hash, and the new endpoint number and hash. The command returns a read-only observation. Hosted transfer persistence and the first minted token still need independent acceptance.

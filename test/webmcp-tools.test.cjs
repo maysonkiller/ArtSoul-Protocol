@@ -1003,7 +1003,7 @@ test('an unknown connected address leaves the decision to the contract', async (
   assert.deepEqual(wallet.calls, [['31', '0.5']]);
 });
 
-function connectedBrowserWithdrawal({ accounts, chainId = '0x14a34', duringInit } = {}) {
+function connectedBrowserWithdrawal({ accounts, chainId = '0x14a34', duringInit, loadGallery } = {}) {
   const address = '0x1111111111111111111111111111111111111111';
   const calls = [];
   const requests = [];
@@ -1039,6 +1039,14 @@ function connectedBrowserWithdrawal({ accounts, chainId = '0x14a34', duringInit 
     withdraw: async () => { calls.push('withdraw'); return '0xwithdraw'; }
   };
   const win = load({ contracts });
+  if (loadGallery) {
+    win.ArtSoulContracts = null;
+    win.loadArtSoulGalleryContracts = async () => {
+      calls.push('gallery');
+      await loadGallery(state);
+      win.ArtSoulContracts = contracts;
+    };
+  }
   win.ArtSoulWalletRuntime = { load: async () => { calls.push('runtime'); } };
   win.getCurrentWalletAddress = () => state.address;
   win.web3Modal = { getWalletProvider: async () => state.provider };
@@ -1085,6 +1093,24 @@ test('browser withdrawal does not initialize or prompt when the selected wallet 
   assert.equal((await fixture.run()).submitted, false);
   assert.deepEqual(fixture.calls, ['runtime']);
   assert.ok(fixture.requests.includes('eth_accounts'));
+});
+
+test('the first gallery assistant request waits for the adapter and uses the selected provider', async () => {
+  const fixture = connectedBrowserWithdrawal({ loadGallery: () => {} });
+  assert.equal((await fixture.run()).submitted, true);
+  assert.deepEqual(fixture.calls, ['runtime', 'gallery', 'init', 'pending', 'consent', 'withdraw']);
+});
+
+test('a wallet or network switch while gallery services load prevents reviews and writes', async () => {
+  for (const change of [
+    state => { state.address = '0x2222222222222222222222222222222222222222'; state.accounts = [state.address]; },
+    state => { state.chainId = '0x1'; },
+    state => { state.provider = { request: state.provider.request }; }
+  ]) {
+    const fixture = connectedBrowserWithdrawal({ loadGallery: change });
+    assert.equal((await fixture.run()).submitted, false);
+    assert.deepEqual(fixture.calls, ['runtime', 'gallery']);
+  }
 });
 
 test('browser withdrawal does not initialize or switch a selected wallet on another chain', async () => {

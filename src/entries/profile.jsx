@@ -6,6 +6,7 @@ import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { EmailConnection } from '../features/profile/email-connection.jsx';
+import { GenesisStatus } from '../features/profile/genesis-status.jsx';
 import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
 import { WalletNfts, useWalletNftsEnabled } from '../features/profile/wallet-nfts.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
@@ -150,6 +151,7 @@ const { useState, useEffect, useRef } = React;
             const [profileEditError, setProfileEditError] = useState('');
             const [profileEditErrorIsNotice, setProfileEditErrorIsNotice] = useState(false);
             const [profileReportingEnabled, setProfileReportingEnabled] = useState(false);
+            const [genesisProfileEnabled, setGenesisProfileEnabled] = useState(false);
             const [profileReportOpen, setProfileReportOpen] = useState(false);
             const [profileLoadError, setProfileLoadError] = useState(null);
             const [editMode, setEditMode] = useState(false);
@@ -219,6 +221,7 @@ const { useState, useEffect, useRef } = React;
                         if (active) {
                             setEmailVerificationEnabled(config?.emailVerificationEnabled === true);
                             setProfileReportingEnabled(config?.profileReportingEnabled === true);
+                            setGenesisProfileEnabled(config?.genesisProfileEnabled === true);
                         }
                     })
                     .catch(() => {
@@ -814,26 +817,10 @@ const { useState, useEffect, useRef } = React;
                 return [...pending, ...(indexedArtworks || [])];
             }
 
-            async function getGenesisState(walletAddress) {
-                // ProjectNFT is a transferable testnet prototype, not Genesis.
-                // A verified mainnet Genesis source belongs to the later rollout.
-                return {
-                    owned: false,
-                    tokenId: null,
-                    eligibilityHash: null,
-                    source: 'mainnet-not-deployed'
-                };
-            }
-
-            function buildDiscoveryProfile(profileData, fullArtworkCorpus, genesisState) {
+            function buildDiscoveryProfile(profileData, fullArtworkCorpus) {
                 if (!profileData?.wallet_address || !window.ArtSoulDiscovery) return null;
                 const trust = window.ArtSoulDiscovery.computeTrustProfile(profileData, fullArtworkCorpus);
-                const genesisProgress = window.ArtSoulDiscovery.getGenesisProgress(profileData, fullArtworkCorpus, {
-                    auctionParticipations: trust.signals.auctionParticipations,
-                    successfulSettlements: trust.signals.successfulSettlements,
-                    interactionCount: trust.signals.interactionCount
-                });
-                return { trust, genesisState, genesisProgress };
+                return { trust };
             }
 
             async function handleOAuthCallback() {
@@ -1008,8 +995,7 @@ const { useState, useEffect, useRef } = React;
                         db,
                         { limit: FIRST_GALLERY_PAGE }
                     );
-                    const genesisPromise = getGenesisState(walletAddress);
-                    const secondaryResults = Promise.allSettled([artworksPromise, genesisPromise]);
+                    const secondaryResults = Promise.allSettled([artworksPromise]);
                     const profileResult = await Promise.resolve(profilePromise).then(
                         value => ({ status: 'fulfilled', value }),
                         reason => ({ status: 'rejected', reason })
@@ -1040,16 +1026,13 @@ const { useState, useEffect, useRef } = React;
                     }
                     setLoading(false);
 
-                    const [artworksResult, genesisResult] = await secondaryResults;
+                    const [artworksResult] = await secondaryResults;
                     if (requestId !== profileRequestRef.current) return;
                     const galleryAvailable = artworksResult.status === 'fulfilled';
                     const cached = galleryCacheRef.current.get(`${normalizedAddress}:${requestedGallery}`);
                     const artworkData = galleryAvailable
                         ? artworksResult.value
                         : { items: cached || [], corpus: [] };
-                    const genesisState = genesisResult.status === 'fulfilled'
-                        ? genesisResult.value
-                        : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
                     if (artworkRequestId === artworksRequestRef.current) {
                         if (galleryAvailable) galleryCacheRef.current.set(`${normalizedAddress}:${requestedGallery}`, artworkData.items);
                         else setArtworksError('Artworks could not be loaded. Please retry.');
@@ -1058,7 +1041,7 @@ const { useState, useEffect, useRef } = React;
                         setHasSettledArtworks(galleryAvailable || Boolean(cached));
                         setArtworksLoading(false);
                     }
-                    if (galleryAvailable) setDiscoveryProfile(buildDiscoveryProfile(profileData, artworkData.corpus, genesisState));
+                    if (galleryAvailable) setDiscoveryProfile(buildDiscoveryProfile(profileData, artworkData.corpus));
                     loadedProfileAddressRef.current = normalizedAddress;
 
                     // A-79: the frame is published, so the rest of the corpus can
@@ -1085,7 +1068,7 @@ const { useState, useEffect, useRef } = React;
                                 && artworkRequestId === artworksRequestRef.current) {
                                 galleryCacheRef.current.set(`${normalizedAddress}:${requestedGallery}`, full.items);
                                 setMyArtworks(full.items);
-                                setDiscoveryProfile(buildDiscoveryProfile(profileData, full.corpus, genesisState));
+                                setDiscoveryProfile(buildDiscoveryProfile(profileData, full.corpus));
                             }
                         } catch (error) {
                             // The bounded frame is already correct and on screen;
@@ -1198,15 +1181,13 @@ const { useState, useEffect, useRef } = React;
 
                 try {
                     const result = await fetchProfileArtworks(activeProfile, requestedGallery);
-                    const genesisState = requestedGallery === 'created' && activeProfile?.wallet_address
-                        ? await getGenesisState(activeProfile.wallet_address).catch(() => null) : null;
                     if (requestId === artworksRequestRef.current) {
                         galleryCacheRef.current.set(cacheKey, result.items);
                         // One commit: the list and the tab it belongs to.
                         setMyArtworks(result.items);
                         setDisplayedGallery(requestedGallery);
                         setHasSettledArtworks(true);
-                        if (genesisState) setDiscoveryProfile(buildDiscoveryProfile(activeProfile, result.corpus, genesisState));
+                        if (requestedGallery === 'created') setDiscoveryProfile(buildDiscoveryProfile(activeProfile, result.corpus));
                     }
                 } catch (error) {
                     console.error('Error loading artworks:', error);
@@ -1808,7 +1789,7 @@ const { useState, useEffect, useRef } = React;
                                                 )}
                                             </div>
                                             </div>
-                                            {discoveryProfile && (
+                                            {profile?.wallet_address && (discoveryProfile || genesisProfileEnabled) && (
                                                 <div className={`profile-stat-grid mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm ${
                                                     isClassic ? 'text-gray-200' : 'text-cyan-100'
                                                 }`}>
@@ -1816,25 +1797,20 @@ const { useState, useEffect, useRef } = React;
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
                                                     }`}>
                                                         <div className="context-help-label"><span>Trust score</span><ContextHelp topic="trust" /></div>
-                                                        <div className="text-xl font-bold">{discoveryProfile.trust.score}</div>
-                                                        <div className="text-xs opacity-70">{discoveryProfile.trust.tier}</div>
+                                                        <div className="text-xl font-bold">{discoveryProfile?.trust.score ?? '—'}</div>
+                                                        <div className="text-xs opacity-70">{discoveryProfile?.trust.tier}</div>
                                                     </div>
                                                     <div className={`profile-stat-card p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-purple-900/20 border border-purple-500/30'
                                                     }`}>
                                                         <div className="context-help-label"><span>Genesis</span><ContextHelp topic="genesis" /></div>
-                                                        <div className="text-lg font-bold">
-                                                            Mainnet only
-                                                        </div>
-                                                        <div className="text-xs opacity-70">
-                                                            Testnet does not qualify.
-                                                        </div>
+                                                        <GenesisStatus key={profile.wallet_address} wallet={profile.wallet_address} enabled={genesisProfileEnabled} />
                                                     </div>
                                                     <div className={`profile-stat-card p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
                                                     }`}>
                                                         <div className="context-help-label"><span>Discovery</span><ContextHelp topic="trust" /></div>
-                                                        <div className="text-xl font-bold">{discoveryProfile.trust.influenceWeight}x</div>
+                                                        <div className="text-xl font-bold">{discoveryProfile ? `${discoveryProfile.trust.influenceWeight}x` : '—'}</div>
                                                         <div className="text-xs opacity-70">Ranking only. No price impact.</div>
                                                     </div>
                                                 </div>

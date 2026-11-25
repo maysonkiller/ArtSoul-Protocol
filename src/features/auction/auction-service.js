@@ -1,4 +1,4 @@
-import { ethers } from 'https://esm.sh/ethers@6.7.0';
+import { ethers } from '/assets/ethers-6.17.0.min.js';
 import { RPC_CONFIG, CACHE_CONFIG, DEBUG_CONFIG, RPC_CLIENT_CONFIG } from '../../core/config/system-config.js';
 import AuctionMetrics from '../../core/metrics/auction-metrics.js';
 import RPCClient from '../../core/rpc/rpc-client.js';

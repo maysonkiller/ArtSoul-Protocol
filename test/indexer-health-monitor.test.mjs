@@ -112,6 +112,21 @@ test('supports explicit environment thresholds and rejects invalid values', () =
         () => loadMonitorConfig({ ARTSOUL_MONITOR_MAX_BLOCKS_BEHIND: '-1' }),
         /must be a non-negative number/
     );
+    for (const value of ['0xinvalid', '0x'+'00'.repeat(20)]) {
+        assert.throws(() => loadMonitorConfig({ARTSOUL_MONITOR_EXPECTED_CORE_ADDRESS: value}), /nonzero Core address/);
+    }
+});
+
+test('a monitor pinned to a Core reads the configured endpoint without following redirects', async () => {
+    const core = '0x'+'ab'.repeat(20);
+    const pinned = loadMonitorConfig({ARTSOUL_MONITOR_EXPECTED_CORE_ADDRESS: core});
+    const result = await checkIndexerHealth(pinned, {now: NOW, fetchImpl: async (url, init) => {
+        assert.equal(url, pinned.healthUrl);
+        assert.equal(init.redirect, 'error');
+        return Response.json(healthyPayload({indexer: {contractAddress: core, lastConfirmedBlock: 100, lastIndexedBlock: 103, currentBlock: 107}}));
+    }});
+    assert.equal(result.ok, true);
+    assert.equal(result.observed.rpcHead, 107);
 });
 
 test('reports a non-2xx health response without exposing the configured URL', async () => {

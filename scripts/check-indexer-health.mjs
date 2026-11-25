@@ -25,8 +25,13 @@ function readNonNegativeNumber(value, fallback, name) {
 }
 
 export function loadMonitorConfig(env = process.env) {
+    const expectedCoreAddress = env.ARTSOUL_MONITOR_EXPECTED_CORE_ADDRESS;
+    if (expectedCoreAddress && (!/^0x[0-9a-f]{40}$/i.test(expectedCoreAddress) || /^0x0{40}$/i.test(expectedCoreAddress))) {
+        throw new Error('ARTSOUL_MONITOR_EXPECTED_CORE_ADDRESS must be a nonzero Core address');
+    }
     return {
         healthUrl: env.ARTSOUL_INDEXER_HEALTH_URL || DEFAULTS.healthUrl,
+        expectedCoreAddress,
         expectedChainId: readNonNegativeNumber(
             env.ARTSOUL_MONITOR_EXPECTED_CHAIN_ID,
             DEFAULTS.expectedChainId,
@@ -75,6 +80,17 @@ export function evaluateIndexerHealth(payload, config, now = Date.now()) {
     addFailure(failures, payload?.status === 'healthy', 'STATUS', `expected healthy, received ${payload?.status ?? 'missing'}`);
     addFailure(failures, payload?.database?.healthy === true, 'DATABASE', 'database health is not true');
     addFailure(failures, parseHealthCount(indexer?.chainId) === config.expectedChainId, 'CHAIN_ID', `expected ${config.expectedChainId}, received ${indexer?.chainId ?? 'missing'}`);
+    if (config.expectedCoreAddress) {
+        addFailure(failures, typeof indexer?.contractAddress === 'string' &&
+            indexer.contractAddress.toLowerCase() === config.expectedCoreAddress.toLowerCase(),
+            'CORE_ADDRESS', 'worker does not report the reviewed Core');
+        const confirmed = parseHealthCount(indexer?.lastConfirmedBlock);
+        const indexed = parseHealthCount(indexer?.lastIndexedBlock);
+        const head = parseHealthCount(indexer?.currentBlock);
+        addFailure(failures, confirmed >= (config.minConfirmedBlock ?? 0) && indexed >= (config.minIndexedBlock ?? 0) && confirmed <= indexed &&
+            head - indexed === parseHealthCount(indexer?.blocksBehind),
+            'BLOCK_CURSORS', 'confirmed, indexed and RPC head blocks must agree with the expected watermark and lag');
+    }
     addFailure(
         failures,
         parseHealthCount(indexer?.confirmationDepth) === config.expectedConfirmationDepth,
@@ -119,6 +135,12 @@ export function evaluateIndexerHealth(payload, config, now = Date.now()) {
         observed: {
             timestamp: payload?.timestamp ?? null,
             chainId: indexer?.chainId ?? null,
+            ...(config.expectedCoreAddress && {
+                coreAddress: typeof indexer?.contractAddress === 'string' && /^0x[0-9a-f]{40}$/i.test(indexer.contractAddress) ? indexer.contractAddress : null,
+                confirmedBlock: parseHealthCount(indexer?.lastConfirmedBlock),
+                indexedBlock: parseHealthCount(indexer?.lastIndexedBlock),
+                rpcHead: parseHealthCount(indexer?.currentBlock)
+            }),
             confirmationDepth: indexer?.confirmationDepth ?? null,
             blocksBehind: indexer?.blocksBehind ?? null,
             isSynced: indexer?.isSynced ?? null,
@@ -135,6 +157,7 @@ export async function checkIndexerHealth(config, { fetchImpl = fetch, now = Date
     try {
         const response = await fetchImpl(config.healthUrl, {
             headers: { accept: 'application/json' },
+            ...(config.expectedCoreAddress && {redirect: 'error'}),
             signal: controller.signal
         });
 

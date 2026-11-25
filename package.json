@@ -31,7 +31,10 @@
   "description": "Auction-first NFT art discovery protocol on Base.",
   "main": "appkit-init.js",
   "scripts": {
+    "prepare:browser-sdks": "node scripts/browser-sdks/prepare.mjs",
+    "predev": "npm run prepare:browser-sdks",
     "dev": "vite",
+    "prebuild": "npm run prepare:browser-sdks",
     "build": "npm run build:css && vite build && npm run verify:build && npm run verify:tailwind",
     "preview": "vite preview --host 0.0.0.0",
     "verify:build": "node scripts/verify-build.mjs",

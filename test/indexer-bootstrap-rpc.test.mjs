@@ -74,9 +74,9 @@ test('the complete indexer bootstrap supports state hashes without a fixture sch
         assert.equal(state.last_indexed_block, 101);
         assert.equal(state.last_confirmed_block, 101);
         assert.equal(state.state_hash, `0x${crypto.createHash('sha256').update(blockHash).digest('hex')}`);
-        assert.equal(applied.migrations.length, 19);
+        assert.equal(applied.migrations.length, 21);
         const ledger = (await fresh.query('SELECT * FROM artsoul_schema_migrations ORDER BY migration_id')).rows;
-        assert.equal(ledger.length, 19);
+        assert.equal(ledger.length, 21);
         assert.deepEqual(ledger.map(row => [row.migration_id, row.sha256]), migrations.map(row => [row.id, row.checksum]));
         const before = (await fresh.query('SELECT * FROM indexer_state ORDER BY chain_id')).rows;
         const repeated = await applyIndexerMigrations(options);
@@ -88,6 +88,11 @@ test('the complete indexer bootstrap supports state hashes without a fixture sch
             has_table_privilege('authenticated',oid,'SELECT') AS authenticated_read
             FROM pg_class WHERE oid='public.artsoul_schema_migrations'::regclass`)).rows[0];
         assert.deepEqual(access, { relrowsecurity: true, relforcerowsecurity: true, anon_read: false, authenticated_read: false });
+    });
+
+    await t.test('two independent finalized resale readings persist atomically and retain exact credits', async () => {
+        const { checkOrdinaryResalePersistence } = await import('./helpers/ordinary-resale-postgres.mjs');
+        await checkOrdinaryResalePersistence(fresh);
     });
 
     await t.test('state hashing preserves historical digests while returning one row for large histories', async () => {

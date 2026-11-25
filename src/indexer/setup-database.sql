@@ -24,6 +24,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 BEGIN;
 \i src/indexer/migrations/018_ordinary_settlement_evidence.sql
 \i src/indexer/migrations/019_ordinary_runner_up_observations.sql
+\i src/indexer/migrations/020_ordinary_resale_purchases.sql
+\i src/indexer/migrations/021_genesis_grant_evidence.sql
 COMMIT;
 
 -- Verify setup

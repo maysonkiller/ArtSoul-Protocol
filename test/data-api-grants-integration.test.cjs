@@ -62,7 +62,7 @@ test('new table migrations must join the no-default-grant rehearsal', async () =
     'sql/migrations/phase11_ai_core.sql', 'sql/migrations/phase12_correctness.sql',
     'sql/migrations/stabilization_layer.sql'
   ]);
-  const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services',
+  const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services', '20261125210000_banner_schedule_revisions',
     '20261119150000_collection_origin_reviews', ...features]
     .map(name => `sql/migrations/${name}.sql`));
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
@@ -103,20 +103,22 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   `);
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
   for (const migration of listIndexerMigrations()) query(migration.sql);
-  await t.test('ordinary issuer, settlement and runner-up evidence has no effective Data API table privileges', () => {
+  await t.test('ordinary issuer and sale evidence has no effective Data API table privileges', () => {
     for (const role of ['anon', 'authenticated', 'service_role']) {
-      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations']) {
+      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations', 'ordinary_resale_purchases']) {
         assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.${table}',
           'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN');`), 'f', `${role}: ${table}`);
       }
     }
-    const table = 'artsoul_private.ordinary_runner_up_observations';
-    assert.equal(query(`SELECT relrowsecurity FROM pg_class WHERE oid='${table}'::regclass;`), 't');
-    query(`GRANT SELECT ON ${table} TO PUBLIC; GRANT UPDATE ON ${table} TO anon, authenticated, service_role;`);
-    query(fs.readFileSync('src/indexer/migrations/019_ordinary_runner_up_observations.sql', 'utf8'));
-    for (const role of ['anon', 'authenticated', 'service_role']) {
-      assert.equal(query(`SELECT has_table_privilege('${role}', '${table}', 'SELECT,UPDATE');`), 'f', role);
-      assert.throws(() => query(`SET ROLE ${role}; SELECT * FROM ${table} LIMIT 0;`), /permission denied/);
+    for (const migration of ['019_ordinary_runner_up_observations', '020_ordinary_resale_purchases']) {
+      const table = 'artsoul_private.' + migration.slice(4);
+      assert.equal(query(`SELECT relrowsecurity FROM pg_class WHERE oid='${table}'::regclass;`), 't');
+      query(`GRANT SELECT ON ${table} TO PUBLIC; GRANT UPDATE ON ${table} TO anon, authenticated, service_role;`);
+      query(fs.readFileSync(`src/indexer/migrations/${migration}.sql`, 'utf8'));
+      for (const role of ['anon', 'authenticated', 'service_role']) {
+        assert.equal(query(`SELECT has_table_privilege('${role}', '${table}', 'SELECT,UPDATE');`), 'f', role);
+        assert.throws(() => query(`SET ROLE ${role}; SELECT * FROM ${table} LIMIT 0;`), /permission denied/);
+      }
     }
   });
   // Profiles predate the reproducible indexer sequence. Model only its public
@@ -254,6 +256,13 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     query(noImplicitGrants);
     query(fs.readFileSync('sql/migrations/20261119150000_collection_origin_reviews.sql', 'utf8'));
     query(fs.readFileSync('test/fixtures/collection-origin-reviews.sql', 'utf8'));
+  });
+  await t.test('the staged banner schedule grants no access to Data API roles', () => {
+    query(fs.readFileSync('sql/migrations/20261125210000_banner_schedule_revisions.sql', 'utf8'));
+    for (const role of ['anon', 'authenticated', 'service_role']) {
+      assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.banner_schedule_revisions',
+        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')`), 'f');
+    }
   });
   await t.test('read-only verification accepts explicit grants and detects drift in review column permissions', () => {
     const report = fs.readFileSync('sql/verification/phase_a_security_verification.sql', 'utf8');

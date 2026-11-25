@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Before the first mainnet smoke registration, check what an anonymous site visitor can see.
-// node scripts/verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block> [--database <reviewed-pair.json>]
+// node scripts/verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block> [--database <reviewed-pair.json>] [--worker-health]
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 import { readReviewedOrdinaryPair } from './read-reviewed-ordinary-pair.mjs';
+import { checkIndexerHealth, loadMonitorConfig } from './check-indexer-health.mjs';
 
 const mainnet = 8453;
 const catalogTables = ['v41_artworks', 'v41_auctions', 'v41_bids', 'v41_settlements',
@@ -19,7 +21,9 @@ const emptyIndexerTables = [
     'public.v41_resale_listings', 'public.v41_resale_history', 'public.v41_floor_history',
     'public.v41_genesis_holders', 'public.v41_project_eligibility', 'public.v41_trust_signals',
     'public.artwork_social_signals', 'public.v41_public_metric_participants', 'public.v41_public_metric_events',
-    'artsoul_private.ordinary_settlements', 'artsoul_private.ordinary_runner_up_observations'
+    'artsoul_private.ordinary_settlements', 'artsoul_private.ordinary_runner_up_observations',
+    'artsoul_private.ordinary_resale_purchases',
+    'artsoul_private.genesis_grant_batches', 'artsoul_private.genesis_grants'
 ];
 
 export async function verifyMainnetProjectionRows(client, pair, deploymentBlock) {
@@ -57,7 +61,7 @@ export async function verifyMainnetProjectionRows(client, pair, deploymentBlock)
     }
 }
 
-export async function verifyMainnetCatalog(site, expectedCore, deploymentBlock) {
+export async function verifyMainnetCatalog(site, expectedCore, deploymentBlock, { workerMonitor } = {}) {
     const origin = new URL(site);
     assert.ok(['https:', 'http:'].includes(origin.protocol) && !origin.username && !origin.password &&
         origin.pathname === '/' && !origin.search && !origin.hash, 'Expected an HTTP(S) site origin');
@@ -108,19 +112,39 @@ export async function verifyMainnetCatalog(site, expectedCore, deploymentBlock) 
         assert.equal(metrics[name], 0, `Expected zero ${name}`);
     }
     assert.match(String(metrics.settled_volume_eth), /^0(?:\.0+)?$/, 'Expected zero settled volume');
-    return {chainId: mainnet, core: expectedCore, confirmedBlock: chain.last_confirmed_block};
+    const result = {chainId: mainnet, core: expectedCore, confirmedBlock: chain.last_confirmed_block};
+    if (workerMonitor) {
+        assert.equal(workerMonitor.expectedChainId, mainnet, 'The worker monitor must expect Base mainnet');
+        assert.ok(!workerMonitor.expectedCoreAddress || workerMonitor.expectedCoreAddress.toLowerCase() === expectedCore.toLowerCase(),
+            'The worker monitor must expect the reviewed Base mainnet Core');
+        assert.equal(chain.confirmation_depth, workerMonitor.expectedConfirmationDepth,
+            'The public indexer must report the reviewed worker confirmation depth');
+        const worker = await checkIndexerHealth({
+            ...workerMonitor, expectedCoreAddress: expectedCore,
+            minConfirmedBlock: chain.last_confirmed_block, minIndexedBlock: chain.last_indexed_block
+        });
+        assert.ok(worker.ok, 'Worker readiness failed: ' + worker.failures.map(failure => failure.code).join(', '));
+        result.worker = worker.observed;
+    }
+    return result;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     try {
         const [site, core, block, ...extra] = process.argv.slice(2);
-        const withDatabase = extra.length === 2 && extra[0] === '--database' && Boolean(extra[1]);
-        assert.ok(site && core && /^[1-9]\d*$/.test(block) && (!extra.length || withDatabase),
-            'Usage: verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block> [--database <reviewed-pair.json>]');
+        const usage = 'Usage: verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block> [--database <reviewed-pair.json>] [--worker-health]';
+        let flags;
+        try {
+            flags = parseArgs({args: extra, options: {database: {type: 'string', multiple: true}, 'worker-health': {type: 'boolean'}}}).values;
+        } catch {
+            throw new Error(usage);
+        }
+        const pairFile = flags.database?.[0];
+        assert.ok(site && core && /^[1-9]\d*$/.test(block) && (!flags.database || (pairFile && flags.database.length === 1)), usage);
         let pair;
-        if (withDatabase) {
+        if (pairFile) {
             try {
-                pair = await readReviewedOrdinaryPair(extra[1]);
+                pair = await readReviewedOrdinaryPair(pairFile);
             } catch {
                 throw new Error('Could not read the reviewed pair. Check its path, addresses and runtime hashes.');
             }
@@ -128,8 +152,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
                 'The reviewed pair must identify the supplied Base mainnet Core');
             assert.ok(process.env.ARTSOUL_CUTOVER_DATABASE_URL, 'Supply ARTSOUL_CUTOVER_DATABASE_URL for --database');
         }
-        const checked = await verifyMainnetCatalog(site, core, Number(block));
-        if (withDatabase) {
+        let workerMonitor;
+        if (flags['worker-health']) {
+            assert.ok(/^[1-9]\d*$/.test(process.env.ARTSOUL_MONITOR_EXPECTED_CONFIRMATION_DEPTH || ''),
+                'Supply the reviewed ARTSOUL_MONITOR_EXPECTED_CONFIRMATION_DEPTH for --worker-health');
+            workerMonitor = loadMonitorConfig({...process.env, ARTSOUL_MONITOR_EXPECTED_CHAIN_ID:
+                process.env.ARTSOUL_MONITOR_EXPECTED_CHAIN_ID || String(mainnet)});
+        }
+        const checked = await verifyMainnetCatalog(site, core, Number(block), { workerMonitor });
+        if (pairFile) {
             const {Client} = (await import('pg')).default;
             const client = new Client({connectionString: process.env.ARTSOUL_CUTOVER_DATABASE_URL, connectionTimeoutMillis: 10000});
             try {

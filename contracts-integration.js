@@ -1,7 +1,7 @@
 // ArtSoul V4.1 smart contract integration
 // Frontend action adapter for auction-first lazy mint protocol.
 
-import { ethers } from 'https://esm.sh/ethers@6.7.0';
+import { ethers } from '/assets/ethers-6.17.0.min.js';
 import { donationMessageState } from './src/features/artwork/donation-message.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';

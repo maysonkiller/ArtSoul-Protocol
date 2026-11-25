@@ -45,6 +45,51 @@ async function verifyLocalReference(page, reference) {
 }
 
 await Promise.all(pages.map(page => access(path.join(dist, page))));
+const manifest = JSON.parse(await readFile(path.join(dist, '.vite/manifest.json'), 'utf8'));
+const sdkKeys = ['scripts/browser-sdks/wallet.mjs', 'scripts/browser-sdks/supabase.mjs'];
+for (const key of sdkKeys) {
+    const chunk = manifest[key];
+    if (!chunk?.isDynamicEntry || !/^assets\/[\w-]+\.js$/.test(chunk.file)) {
+        throw new Error(`Missing deferred same-origin browser SDK: ${key}`);
+    }
+    await verifyLocalReference(key, chunk.file);
+}
+if (manifest['supabase-client.js']?.file !== 'supabase-client.js') {
+    throw new Error('Legacy pages require the stable Supabase client URL.');
+}
+const staticEntries = new Set();
+function visitStaticEntry(key) {
+    if (staticEntries.has(key)) return;
+    staticEntries.add(key);
+    for (const dependency of manifest[key]?.imports || []) visitStaticEntry(dependency);
+}
+for (const key of [...pages, 'supabase-client.js']) visitStaticEntry(key);
+if (sdkKeys.some(key => staticEntries.has(key))) {
+    throw new Error('A browser SDK was moved onto the initial page load path.');
+}
+const browserLicenses = await readFile(path.join(dist, 'third-party-licenses.txt'), 'utf8');
+const browserNotice = await readFile(path.join(dist, 'third-party-notices.txt'), 'utf8');
+if (!browserLicenses.includes('## @walletconnect/ethereum-provider -') ||
+    !browserLicenses.includes('## @supabase/supabase-js -') ||
+    !browserLicenses.includes('WALLETCONNECT COMMUNITY LICENSE AGREEMENT') ||
+    !browserNotice.includes('Portions © 2025 Reown, Inc. All Rights Reserved')) {
+    throw new Error('The browser SDK distributions require their bundled third-party notices.');
+}
+// These legacy modules are copied verbatim. An external import here would
+// sidestep the dependency lock even when the bundled wallet passes its audit.
+const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
+const ethersVersion = lock.packages['node_modules/ethers'].version;
+const ethersAsset = `/assets/ethers-${ethersVersion}.min.js`;
+const installedEthers = await readFile(path.join(root, 'node_modules/ethers/dist/ethers.min.js'));
+if (!(await readFile(path.join(dist, ethersAsset))).equals(installedEthers)) {
+    throw new Error('The browser ethers asset differs from the locked package.');
+}
+for (const consumer of ['contracts-integration.js', 'src/features/auction/auction-service.js', 'src/core/rpc/rpc-client.js']) {
+    const module = await readFile(path.join(dist, consumer), 'utf8');
+    if (!module.includes(`import { ethers } from '${ethersAsset}';`) || /from\s+['"]https?:/.test(module)) {
+        throw new Error(`${consumer}: expected the locked, same-origin ethers module`);
+    }
+}
 await verifyLocalReference('Audio previews', '/brand/artsoul-audio-cover-384.webp');
 for (const filename of ['robots.txt', 'sitemap.xml']) {
     if (!(await readFile(path.join(dist, filename))).equals(await readFile(path.join(root, 'public', filename)))) {
@@ -108,6 +153,9 @@ for (const page of pages) {
     }
 
     if (page === 'index.html') {
+        if (/<(?:script|link)\b[^>]*\b(?:src|href)=["']\/(?:contracts-integration\.js|assets\/ethers-[^"']+\.js|src\/index\.js|src\/ui\/components\/index\.js)(?:\?[^"']*)?["']/i.test(built)) {
+            throw new Error('The guest homepage must not preload wallet or gallery services');
+        }
         const balancedHero = /<h1\b[^>]*>\s*Discover a work and start its next chapter\s*<\/h1>/;
         if (!balancedHero.test(source) || !balancedHero.test(built)) {
             throw new Error('The homepage headline must be one naturally wrapping phrase without a forced break.');
@@ -145,7 +193,12 @@ for (const page of pages) {
         const contractPosition = built.indexOf('src="/contracts-integration.js');
         const servicePosition = built.indexOf('src="/src/index.js');
         const cardPosition = built.indexOf('src="/src/ui/components/artwork-card.js');
-        if (entryPosition < 0 || contractPosition < entryPosition || servicePosition < entryPosition) {
+        if (page === 'gallery.html') {
+            const galleryRuntime = built.indexOf('src="/src/features/discovery/gallery-contract-runtime.js');
+            if (entryPosition < 0 || galleryRuntime < entryPosition || contractPosition >= 0 || servicePosition >= 0) {
+                throw new Error('The gallery must mount before its wallet loader and keep contract services off the guest path');
+            }
+        } else if (entryPosition < 0 || contractPosition < entryPosition || servicePosition < entryPosition) {
             throw new Error(`${page}: public entry must precede legacy contract/service modules`);
         }
         if (cardPosition < 0 || cardPosition > entryPosition) {

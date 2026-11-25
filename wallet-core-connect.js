@@ -37,7 +37,6 @@
 import { WalletConnectModal } from '@walletconnect/modal';
 
 const WC_ETHEREUM_PROVIDER_VERSION = '2.23.10';
-const WC_ETHEREUM_PROVIDER_URL = `https://esm.sh/@walletconnect/ethereum-provider@${WC_ETHEREUM_PROVIDER_VERSION}?bundle`;
 const WC_MODAL_VERSION = '2.7.0';
 // Keep the external-mobile WalletConnect client in one stable ArtSoul-owned
 // storage namespace. Older builds shared the SDK default namespace with
@@ -95,8 +94,7 @@ let settings = {
     log: null,
     onLifecycle: null,
     onSessionAdopted: null,
-    // Test seam only. Production leaves this undefined and the pinned CDN
-    // module below is imported instead.
+    // The production path imports the locked browser SDK on demand.
     createProvider: null
 };
 let providerInstance = null;
@@ -1010,8 +1008,7 @@ export async function getCoreEthereumProvider() {
                 instance = await settings.createProvider(options);
             } else {
                 coreLog('core provider module import started', { version: WC_ETHEREUM_PROVIDER_VERSION });
-                const module = await import(WC_ETHEREUM_PROVIDER_URL);
-                const EthereumProvider = module.EthereumProvider || module.default;
+                const { EthereumProvider } = await import('./scripts/browser-sdks/wallet.mjs');
                 instance = await EthereumProvider.init(options);
             }
             bindProviderDiagnostics(instance);

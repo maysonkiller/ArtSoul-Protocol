@@ -3,11 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { version as ethersVersion } from 'ethers';
 import { reownFrameCompatibility } from './scripts/reown-frame-compatibility.mjs';
 import { inlineCriticalFirstPaint } from './scripts/critical-first-paint.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(root, 'dist');
+const ethersAsset = `/assets/ethers-${ethersVersion}.min.js`;
+const ethersPackage = path.join(root, 'node_modules/ethers');
+const ethersBrowserFile = path.join(ethersPackage, 'dist/ethers.min.js');
 
 const pageInputs = {
     index: 'index.html',
@@ -68,7 +72,6 @@ const legacyRootAssets = [
     'webmcp-tools.js',
     // Voice commands. The same shape as the agent tools, which it drives.
     'voice-commands.js',
-    'supabase-client.js',
     'theme-sync.js',
     'ui-core.css',
     'unified-styles.css'
@@ -99,7 +102,7 @@ export function prioritizePublicPageEntry(html, page) {
     if (!['gallery.html', 'profile.html', 'artwork.html'].includes(page)) return html;
     const name = page.slice(0, -5);
     const entry = html.match(new RegExp(`<script type="module"[^>]*src="/assets/${name}-[^"<>]+\\.js"[^>]*><\\/script>`))?.[0];
-    const legacy = html.match(/<script type="module"[^>]*src="\/contracts-integration\.js(?:\?[^"<>]*)?"[^>]*><\/script>/)?.[0];
+    const legacy = html.match(/<script type="module"[^>]*src="\/(?:contracts-integration|src\/features\/discovery\/gallery-contract-runtime)\.js(?:\?[^"<>]*)?"[^>]*><\/script>/)?.[0];
     if (!entry || !legacy || html.indexOf(entry) < html.indexOf(legacy)) return html;
     // Public projections do not need the legacy ethers/service graph. Keep
     // earlier classic scripts in place and let the public page evaluate first.
@@ -183,6 +186,8 @@ function copyLegacyRuntimeAssets() {
         apply: 'build',
         async closeBundle() {
             await Promise.all([...legacyRootAssets, ...legacyClientFiles].map(copyRelative));
+            await copyFile(ethersBrowserFile, path.join(outDir, ethersAsset));
+            await copyFile(path.join(ethersPackage, 'LICENSE.md'), path.join(outDir, 'assets/ethers-' + ethersVersion + '-LICENSE.txt'));
             // Keep old shared links compatible without retaining a second banner source.
             await copyFile(path.join(root, 'artsoul-social-preview-v2.png'),
                 path.join(outDir, 'artsoul-social-preview.png'));
@@ -262,6 +267,7 @@ function serveArtworkPage(server) {
 
 export default defineConfig({
     appType: 'mpa',
+    resolve: { alias: { [ethersAsset]: ethersBrowserFile } },
     optimizeDeps: { rolldownOptions: { plugins: [reownFrameCompatibility()] } },
     plugins: [
         reownFrameCompatibility(), react(),
@@ -272,13 +278,18 @@ export default defineConfig({
         outDir,
         emptyOutDir: true,
         manifest: true,
+        license: { fileName: 'third-party-licenses.txt' },
         sourcemap: false,
         target: 'es2020',
         rollupOptions: {
-            input: Object.fromEntries(
-                Object.entries(pageInputs).map(([name, page]) => [name, path.join(root, page)])
-            ),
+            input: {
+                ...Object.fromEntries(Object.entries(pageInputs).map(([name, page]) => [name, path.join(root, page)])),
+                'supabase-client': path.join(root, 'supabase-client.js')
+            },
             output: {
+                // Preserve the staff, collection and help pages' existing
+                // module URL while Vite resolves its deferred authentication SDK.
+                entryFileNames: chunk => chunk.name === 'supabase-client' ? 'supabase-client.js' : 'assets/[name]-[hash].js',
                 manualChunks(id) {
                     if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
                         return 'vendor-react';

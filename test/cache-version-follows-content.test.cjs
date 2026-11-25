@@ -19,15 +19,17 @@ const fs = require('node:fs');
  */
 const RUNTIME = {
   'src/features/discovery/discovery-service.js': { version: 2, sha256: 'c9a152e266934f4f' },
+  'src/features/discovery/gallery-contract-runtime.js': { version: 3, sha256: '5f1e3a95ef176761' },
+  'src/features/discovery/public-contract-runtime.js': { version: 1, sha256: '16ace3baeafdae78' },
   'unified-styles.css': { version: 101, sha256: '1ea1ad0a64e318c6' },
   'mobile-no-motion.css': { version: 3, sha256: '88eb61864da7f616' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 8, sha256: '618e006edefcf241' },
   'src/ui/components/artwork-card.js': { version: 43, sha256: '2cfc25d3f8705b62' },
-  'contracts-integration.js': { version: 21, sha256: '36189171dbb31867' },
+  'contracts-integration.js': { version: 22, sha256: 'fe7434b072e2fd55' },
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
-  'webmcp-tools.js': { version: 37, sha256: '52cdce33e7f3dbd9' },
+  'webmcp-tools.js': { version: 38, sha256: '72dd3109f7cba203' },
   'voice-commands.js': { version: 22, sha256: 'cf51c59c88f26908' },
   'avatar-dropdown.js': { version: 75, sha256: '84d81c7a1e4a28da' },
   'header-prepaint.js': { version: 12, sha256: '13b9bd8192b2ce51' },
@@ -88,6 +90,14 @@ test('on-demand command imports use the same card policy version as page scripts
   const match = fs.readFileSync('webmcp-tools.js', 'utf8').match(/import\('\/src\/ui\/components\/artwork-card\.js\?v=(\d+)'\)/);
   assert.ok(match, 'non-card command pages must reuse the shared action policy');
   assert.equal(Number(match[1]), RUNTIME[file].version, 'commands must not load an obsolete card policy');
+});
+
+test('public browsing loads the same contract adapter version as the other pages', () => {
+  const shared = 'src/features/discovery/public-contract-runtime.js';
+  const loader = fs.readFileSync(shared, 'utf8');
+  assert.ok(loader.includes(`'/contracts-integration.js?v=${RUNTIME['contracts-integration.js'].version}'`));
+  const gallery = fs.readFileSync('src/features/discovery/gallery-contract-runtime.js', 'utf8');
+  assert.ok(gallery.includes(`'./public-contract-runtime.js?v=${RUNTIME[shared].version}'`));
 });
 
 test('no page loads one of these without a version at all', () => {

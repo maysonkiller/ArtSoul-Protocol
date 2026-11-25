@@ -3,6 +3,7 @@ import { readReportingConfig } from '../../reporting-config.js';
 import { readDonationConfig } from '../../donation-config.js';
 import { readSavedConfig } from '../../saved-config.js';
 import { readProfileLayoutConfig } from '../../profile-layout-config.js';
+import { profileGenesisDeployment } from '../../profile-genesis.js';
 import { readAuctionNotificationConfig } from '../../auction-notification-config.js';
 
 function readPublicConfig() {
@@ -27,6 +28,7 @@ function readPublicConfig() {
     externalBaseNftsEnabled: process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED === 'true',
     multichainWalletAssetsEnabled: process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED === 'true' && process.env.ARTSOUL_MULTICHAIN_ASSETS_ENABLED === 'true',
     profileLayout: readProfileLayoutConfig(),
+    genesisProfileEnabled: Boolean(profileGenesisDeployment()),
     auctionNotifications: readAuctionNotificationConfig()
   };
 }
