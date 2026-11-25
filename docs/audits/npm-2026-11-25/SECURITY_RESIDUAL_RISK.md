@@ -1,6 +1,6 @@
 # Residual dependency risk, November 25, 2026
 
-The latest candidate reports 18 affected package names in the full audit and nine with dev dependencies omitted. The nine production entries all follow the Reown wallet dependency on Zod. The detailed inventory and compatibility checks are in the [residual follow-up](RESIDUAL_FOLLOWUP.md).
+The wallet candidate pins Reown’s validator to Zod 4.6.7. The November 25 registry returned **zero affected production packages** and nine development-only rows (eight low and one moderate). [Wallet compatibility and evidence](WALLET_SCHEMA.md).
 
 The [follow-up check](TOOLCHAIN_FOLLOWUP.md) removed the serializer, temporary-file and inherited solc entries. The nine high-rated records still in the lock are Zod and eight Reown packages. The sections below describe the preceding 53-entry candidate.
 

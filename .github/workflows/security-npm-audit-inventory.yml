@@ -58,6 +58,7 @@ jobs:
           set -euo pipefail
           node scripts/security/npm-audit-inventory.mjs npm-audit-full.json npm-audit-prod.json
           cat npm-audit-inventory.md >> "$GITHUB_STEP_SUMMARY"
+          node -e 'const {metadata} = require("./npm-audit-prod.json"); if (metadata.vulnerabilities.total !== 0) process.exit(1)'
 
       - name: Preserve exact raw evidence
         if: always()

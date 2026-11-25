@@ -1,6 +1,6 @@
 # Dependency audit evidence, November 25, 2026
 
-The [latest runtime and toolchain follow-up](RESIDUAL_FOLLOWUP.md) reduced the full report from 50 to 18 package names and the omit-dev report from 41 to nine. The confirmed comparisons and the [wallet compatibility and contract evidence](SECURITY_RESIDUAL_RISK.md) apply to the lock identified in that follow-up.
+The wallet candidate pins Reown’s validator to Zod 4.6.7. The November 25 registry returned **zero affected production packages** and nine development-only rows (eight low and one moderate). [Wallet compatibility and evidence](WALLET_SCHEMA.md).
 
 The [Mocha and solc follow-up](TOOLCHAIN_FOLLOWUP.md) records the next lock with 50 affected packages, including nine high and zero critical. The table below preserves the earlier snapshots.
 
