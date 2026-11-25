@@ -162,4 +162,36 @@ test('profile notices support existing private inbox operations (PostgreSQL 17)'
             assert.deepEqual(rows(), before);
         }
     });
+
+    await t.test('unread summary proves eligible auction rows and skips read or dismissed rows', () => {
+        const guard = read('20261125175447_notification_summary_skip_read_proofs.sql');
+        const core = `0x${'4'.repeat(40)}`;
+        const permissions = () => catalog().map(({ body, ...identity }) => identity);
+        const before = permissions();
+        sql(guard);
+        sql(guard);
+        assert.deepEqual(permissions(), before);
+        sql(`CREATE TABLE public.indexer_state(chain_id bigint,contract_address text);
+            CREATE TABLE public.artwork_media_chain_revisions(chain_id bigint,revision bigint);
+            CREATE TABLE public.outbox_events(id bigint PRIMARY KEY,event_type text,payload jsonb);
+            CREATE TABLE public.auction_notification_reads(wallet_address text,core_address text,outbox_id bigint,read boolean,dismissed_at timestamptz);
+            INSERT INTO public.indexer_state VALUES(84532,'${core}');
+            INSERT INTO public.artwork_media_chain_revisions VALUES(84532,1);
+            INSERT INTO public.outbox_events SELECT id,'notification',jsonb_build_object('type','auction_created','recipient','${A}')
+              FROM generate_series(1,4) id;
+            INSERT INTO public.auction_notification_reads VALUES
+              ('${A}','${core}',1,true,NULL),('${A}','${core}',2,false,now()),('${B}','${core}',3,true,NULL);
+            CREATE TABLE public.fixture_proof_calls(id bigint);
+            CREATE FUNCTION public.canonical_auction_notifications_v2(text,text,bigint,bigint[],boolean,boolean,boolean)
+              RETURNS TABLE(id bigint) LANGUAGE plpgsql AS $body$
+              BEGIN
+                INSERT INTO public.fixture_proof_calls SELECT unnest($4);
+                -- The fourth synthetic event has no canonical receipt.
+                RETURN QUERY SELECT value FROM unnest($4) value WHERE value<>4;
+              END $body$;`);
+        const result = service(`SELECT public.read_notification_summary('${A}','${core}',true,true,false);`);
+        assert.equal(result.auctionCount, 1);
+        assert.deepEqual(json('SELECT jsonb_agg(id ORDER BY id) FROM public.fixture_proof_calls;'), [3, 4]);
+        sql(fs.readFileSync(path.join(ROOT,'test/fixtures/notification-summary-proof-pages.sql'),'utf8'));
+    });
 });
