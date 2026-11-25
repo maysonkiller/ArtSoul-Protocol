@@ -12,7 +12,7 @@ function start(state, loadContracts, loadServices) {
         addEventListener: (name, callback) => listeners.set(name, callback)
     };
     const script = source.replace("import '../../ui/components/index.js';", '')
-        .replace("import('/contracts-integration.js?v=21')", 'loadContracts()')
+        .replace("import('/contracts-integration.js?v=22')", 'loadContracts()')
         .replace("import('../../index.js')", 'loadServices()');
     new Function('window', 'loadContracts', 'loadServices', script)(window, loadContracts, loadServices);
     return { load: window.loadArtSoulGalleryContracts, change: detail => listeners.get('artsoul:wallet-state-changed')({ detail }) };

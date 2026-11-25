@@ -52,3 +52,11 @@ On November 25, native Solidity 0.8.24 reproduced both contracts from the 22 sou
 | What if a funded contract account cannot call the market or receive its NFT? | Routing ETH requires the credited account to initiate the call. Settlement requires its NFT receiver to accept delivery. A rejected NFT mint rolls back the sale, mint and credits, and the published payment deadline still applies. Reuse the [settlement and rejected-delivery checks](../../test/OrdinaryArtAuctions.test.cjs) when qualifying wallet integrations. |
 
 The reviewed contract scope is the native ordinary-artwork pair on Base Sepolia. The application wallet and privileged integrations need finding dispositions on the final release revision. C13 covers signed participant journeys and hosted results. C0 and D3 cover separately selected production custody. The full independent audit remains at the end of D.
+
+### Browser wallet and staff integrations
+
+Three browser modules previously fetched ethers 6.7.0 from a third-party CDN, outside the application's audited lockfile. The build now ships the locked 6.17.0 browser distribution and license on the ArtSoul origin. The build verifier compares the served file with the installed package and checks all three imports. A Vite development request also resolved it locally. The production dependency audit returned zero advisories on November 25.
+
+In isolated Chrome with external ethers blocked, a read-only wallet fixture exercised first connect, restored-wallet startup and retry after HTTP 503. The page formatted 42 wei as 0.000000000000000042 ETH, rejected a mismatched network and selected the new signer after an account change. The catalog, staff-authority session, passkey, WebMCP and gallery loader regression suites passed 156 checks. Public registrations and signed journeys have separate evidence in the [rehearsal record](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md).
+
+Two external browser dependencies remain in the review inventory: the optional mobile WalletConnect loader in `wallet-core-connect.js` and the Supabase client loader in `supabase-client.js`. The npm audit covers installed packages. A release review must also cover the delivered mobile and authentication modules and exercise the selected release with a real device.

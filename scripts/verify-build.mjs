@@ -45,6 +45,21 @@ async function verifyLocalReference(page, reference) {
 }
 
 await Promise.all(pages.map(page => access(path.join(dist, page))));
+// These legacy modules are copied verbatim. An external import here would
+// sidestep the dependency lock even when the bundled wallet passes its audit.
+const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
+const ethersVersion = lock.packages['node_modules/ethers'].version;
+const ethersAsset = `/assets/ethers-${ethersVersion}.min.js`;
+const installedEthers = await readFile(path.join(root, 'node_modules/ethers/dist/ethers.min.js'));
+if (!(await readFile(path.join(dist, ethersAsset))).equals(installedEthers)) {
+    throw new Error('The browser ethers asset differs from the locked package.');
+}
+for (const consumer of ['contracts-integration.js', 'src/features/auction/auction-service.js', 'src/core/rpc/rpc-client.js']) {
+    const module = await readFile(path.join(dist, consumer), 'utf8');
+    if (!module.includes(`import { ethers } from '${ethersAsset}';`) || /from\s+['"]https?:/.test(module)) {
+        throw new Error(`${consumer}: expected the locked, same-origin ethers module`);
+    }
+}
 await verifyLocalReference('Audio previews', '/brand/artsoul-audio-cover-384.webp');
 for (const filename of ['robots.txt', 'sitemap.xml']) {
     if (!(await readFile(path.join(dist, filename))).equals(await readFile(path.join(root, 'public', filename)))) {

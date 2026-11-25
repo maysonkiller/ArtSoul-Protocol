@@ -3,11 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { version as ethersVersion } from 'ethers';
 import { reownFrameCompatibility } from './scripts/reown-frame-compatibility.mjs';
 import { inlineCriticalFirstPaint } from './scripts/critical-first-paint.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(root, 'dist');
+const ethersAsset = `/assets/ethers-${ethersVersion}.min.js`;
+const ethersPackage = path.join(root, 'node_modules/ethers');
+const ethersBrowserFile = path.join(ethersPackage, 'dist/ethers.min.js');
 
 const pageInputs = {
     index: 'index.html',
@@ -183,6 +187,8 @@ function copyLegacyRuntimeAssets() {
         apply: 'build',
         async closeBundle() {
             await Promise.all([...legacyRootAssets, ...legacyClientFiles].map(copyRelative));
+            await copyFile(ethersBrowserFile, path.join(outDir, ethersAsset));
+            await copyFile(path.join(ethersPackage, 'LICENSE.md'), path.join(outDir, 'assets/ethers-' + ethersVersion + '-LICENSE.txt'));
             // Keep old shared links compatible without retaining a second banner source.
             await copyFile(path.join(root, 'artsoul-social-preview-v2.png'),
                 path.join(outDir, 'artsoul-social-preview.png'));
@@ -262,6 +268,7 @@ function serveArtworkPage(server) {
 
 export default defineConfig({
     appType: 'mpa',
+    resolve: { alias: { [ethersAsset]: ethersBrowserFile } },
     optimizeDeps: { rolldownOptions: { plugins: [reownFrameCompatibility()] } },
     plugins: [
         reownFrameCompatibility(), react(),
