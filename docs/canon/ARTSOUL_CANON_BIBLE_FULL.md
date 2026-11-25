@@ -125,16 +125,21 @@ Hidden anti-sybil implementation details, private scoring, operational review ru
 
 ### 6.1 Promoted homepage banners
 
-The approved v1.2 design provides 12 homepage banner slots. Community signals
-rank at least nine of them on merit. Up to three may be sold by slot auction,
-each visibly labeled **Promoted**. Slot-auction proceeds go to ProtocolTreasury.
-Buying placement affects only the designated banner. Organic discovery rankings,
-Trust, artwork price, canonical floor and settlement are independent of that payment.
+Of 12 homepage banner positions, community signals rank at least nine on merit.
+Up to three **Promoted** positions may be allocated by public slot auction, free partner
+placement or individually negotiated sponsorship. Free and in-kind placements use
+the same allocation. Cash proceeds belong to ProtocolTreasury. Publish the sponsor,
+relationship and consideration. Placement affects only the designated banner.
+Organic discovery, Trust, verification, artwork price, canonical floor and settlement
+remain independent.
 
-The November 18 consolidation records the design for C10. Approximately
-0.05 ETH per day is a planning estimate. The reserve amount remains undecided.
-C10 implementation awaits the founder's decision on whether the reserve is
-fixed or tunable. Activation remains pending.
+The November 25 decision allows the operator to set a public reserve for each new
+banner-slot auction. Publish it before bidding opens and keep it fixed for that
+auction. Artwork and collection starting prices are separate. Publish agreed direct
+terms before delivery. Each placement has a finite period and an independent reviewer.
+Related sponsors share a one-position limit during overlapping periods. The offline
+[schedule preflight](../runbooks/PROMOTED_BANNER_SCHEDULE.md) checks those rules.
+Live allocation, payments and delivery remain pending.
 
 ## 7. Genesis And Top-100k
 

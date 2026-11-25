@@ -54,7 +54,7 @@ in Phase A; contract custody remains separate. See the October 11 moderation
 acceptance record. Isolated checks never count as native enrollment or phone
 acceptance. This status correction does not introduce a new recovery policy.
 
-Complete the Core, ArtworkNFT, ArtSoulGenesis, Partner Collections, Ecosystem Pool, indexer/database, admin/eligibility, and aura/badge work defined in the backlog and `CONTRACT_REWORK_PLAN.md`. [Bible §6.1](ARTSOUL_CANON_BIBLE_FULL.md#61-promoted-homepage-banners) records the promoted-banner rules. The reserve policy still needs a decision before implementation. Rehearse the final topology on fresh Base Sepolia contracts and hand privileged roles to rehearsal Safes.
+Complete the Core, ArtworkNFT, ArtSoulGenesis, Partner Collections, Ecosystem Pool, indexer/database, admin/eligibility, and aura/badge work defined in the backlog and `CONTRACT_REWORK_PLAN.md`. [Bible §6.1](ARTSOUL_CANON_BIBLE_FULL.md#61-promoted-homepage-banners) records the per-auction banner reserve and shared promotional capacity. The offline schedule check is available. Live acceptance still requires protected publication, settlement and labeled delivery. Rehearse the final topology on fresh Base Sepolia contracts and hand privileged roles to rehearsal Safes.
 
 The following remain explicit planning inputs rather than frozen canon:
 
