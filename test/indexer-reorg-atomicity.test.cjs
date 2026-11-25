@@ -137,6 +137,28 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
         VALUES ($1,$2,172,170,now(),now(),'running')`, [chain,address]);
       await seedCursor(8453,CORE);
       assert.ok(await verify() > 20);
+      const fixtureKey = 'pre-smoke-queue';
+      const outbox = await pool.query(`INSERT INTO public.outbox_events
+        (aggregate_type,aggregate_id,event_type,payload,idempotency_key)
+        VALUES ('auction','old','notification','{}',$1) RETURNING id`, [fixtureKey]);
+      const spill = await pool.query(`INSERT INTO public.event_queue_spillover (event_data,idempotency_key)
+        VALUES ('{}',$1) RETURNING id`, [fixtureKey]);
+      try {
+        for (const status of ['pending','processing']) {
+          await pool.query('UPDATE public.outbox_events SET processing_status=$1 WHERE id=$2',[status,outbox.rows[0].id]);
+          await pool.query('UPDATE public.event_queue_spillover SET status=$1 WHERE id=$2',[status,spill.rows[0].id]);
+          await assert.rejects(verify(), error => error.message.includes('public.outbox_events') &&
+            error.message.includes('public.event_queue_spillover'));
+        }
+        await pool.query("UPDATE public.event_queue_spillover SET status='completed' WHERE id=$1",[spill.rows[0].id]);
+        await pool.query("UPDATE public.outbox_events SET processing_status='failed' WHERE id=$1",[outbox.rows[0].id]);
+        await assert.rejects(verify(), /public.outbox_events/);
+        await pool.query("UPDATE public.outbox_events SET processing_status='completed' WHERE id=$1",[outbox.rows[0].id]);
+        assert.ok(await verify() > 20, 'completed queue history is not runnable work');
+      } finally {
+        await pool.query('DELETE FROM public.outbox_events WHERE id=$1',[outbox.rows[0].id]);
+        await pool.query('DELETE FROM public.event_queue_spillover WHERE id=$1',[spill.rows[0].id]);
+      }
       await pool.query(`INSERT INTO artsoul_private.ordinary_issuers
         (chain_id,core_address,nft_address,core_code_hash,nft_code_hash) VALUES (8453,$1,$2,$3,$4)`,
         [CORE, CREATOR, hash(1), hash(2)]);

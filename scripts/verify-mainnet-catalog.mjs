@@ -34,6 +34,9 @@ export async function verifyMainnetProjectionRows(client, expectedCore, deployme
         assert.equal(state.valid, true, 'The database cursor must identify the same reviewed Base mainnet deployment');
         const conditions = emptyIndexerTables.map(table => [table, 'true']);
         conditions.push(['public.contract_events', 'chain_id IS DISTINCT FROM 8453 OR block_number < $1'],
+            // These workers claim by status across all chains. A retry must not replay earlier product work.
+            ['public.outbox_events', "processing_status IN ('pending', 'processing', 'failed')"],
+            ['public.event_queue_spillover', "status IN ('pending', 'processing')"],
             ['public.v41_public_metrics', 'chain_id IS DISTINCT FROM 8453 OR artists_onboarded <> 0 OR auctions_completed <> 0 OR unique_collectors <> 0 OR settled_volume_wei <> 0'],
             ['artsoul_private.ordinary_issuers', 'chain_id IS DISTINCT FROM 8453 OR core_address IS DISTINCT FROM lower($2)']);
         // Identifiers and predicates above are fixed here. Addresses and blocks are bound values.
