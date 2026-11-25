@@ -15,7 +15,8 @@ class Element {
   setAttribute(key, value) { this.attributes[key] = value; }
 }
 
-function homeHarness(read) {
+async function homeHarness(read) {
+  const { discloseHomePromotion } = await import('../src/ui/components/home-banner-card.js');
   const source = fs.readFileSync('src/entries/index.js', 'utf8');
   const ids = Object.fromEntries(['artworkGallery', 'homepageFeedError', 'homepageFeedRetry',
     'homepageFeedErrorMessage', 'homepageMetrics', 'homepageMetricsStatus', 'homepageFeaturedSection',
@@ -29,7 +30,7 @@ function homeHarness(read) {
   } }, ArtSoulArtworkCard: { hasSafeMedia: () => true, createCardElement: art => Object.assign(new Element(), { artwork: art }) } };
   // Slice harness intentionally strips imports; the real showcase has its own
   // focused tests and must not override public-feed error semantics here.
-  const context = vm.createContext({ window, renderHomeShowcase: () => {}, document: { getElementById: id => ids[id], createElement: () => new Element() },
+  const context = vm.createContext({ window, discloseHomePromotion, renderHomeShowcase: () => {}, document: { getElementById: id => ids[id], createElement: () => new Element() },
     localStorage: { getItem: () => '[]' }, console: { error() {} } });
   vm.runInContext(source.slice(source.indexOf('        function normalizeProtocolArtworkId'),
     source.indexOf('        // The entry is mounted')), context);
@@ -40,7 +41,7 @@ test('homepage cold failure is unavailable, not empty; retry recovers cards and 
   let fail = true;
   const data = [row('v41:84532:38')];
   data.public_metrics = { artists_onboarded: 5, auctions_completed: 45, unique_collectors: 5, settled_volume_eth: '0.0265' };
-  const h = homeHarness(() => { if (fail) throw unavailable(); return data; });
+  const h = await homeHarness(() => { if (fail) throw unavailable(); return data; });
   await h.load();
   assert.equal(h.ids.homepageFeedError.hidden, false);
   assert.match(h.ids.homepageFeedErrorMessage.textContent, /temporarily unavailable/);
@@ -63,7 +64,7 @@ test('homepage cold failure is unavailable, not empty; retry recovers cards and 
 
 test('homepage successful empty response remains distinct and can later populate', async () => {
   let data = [];
-  const h = homeHarness(() => data);
+  const h = await homeHarness(() => data);
   await h.load();
   assert.equal(h.ids.homepageFeedError.hidden, true);
   assert.equal(h.ids.artworkGallery.children[0].textContent, 'Awaiting live testnet artworks');
@@ -77,7 +78,7 @@ test('homepage ignores an older failed request after a newer successful response
   let reject;
   const pending = new Promise((_, fail) => { reject = fail; });
   let reads = 0;
-  const h = homeHarness(() => ++reads === 1 ? pending : [row('v41:84532:38')]);
+  const h = await homeHarness(() => ++reads === 1 ? pending : [row('v41:84532:38')]);
   const older = h.load();
   await h.load();
   reject(unavailable());
