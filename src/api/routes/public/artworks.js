@@ -2,6 +2,7 @@ import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../
 import { getModerationAccess } from '../../moderation-access.js';
 import { PUBLIC_PROFILE_SOURCE } from '../../profile-fields.js';
 import { readArtworkAuraKinds } from '../../platform-artwork-aura.js';
+import { readAuraBorderSetting } from '../../aura-border-setting.js';
 import { allowedArtworkUrl, readArtworkMetadata } from '../../safe-artwork-fetch.js';
 import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
 import { MULTIMEDIA_NFT_COVER } from '../../../config/upload-policy.js';
@@ -636,7 +637,10 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     auction_winner_address: auctionWinnerAddress,
     current_owner_address: currentOwnerAddress,
     ...(ownershipStatus ? { ownership_status: ownershipStatus } : {}),
-    ...(ownershipStatus === 'verified' && maps.artworkAuraKinds.has(artworkId) ? { aura_kind: maps.artworkAuraKinds.get(artworkId) } : {}),
+    ...(ownershipStatus === 'verified' && maps.artworkAuraKinds.has(artworkId) ? {
+      aura_kind: maps.artworkAuraKinds.get(artworkId),
+      ...(maps.auraBorderEnabled ? { aura_border_text: true } : {})
+    } : {}),
     vote_count: signals.like,
     like_count: signals.like,
     would_buy_count: signals.would_buy,
@@ -758,6 +762,8 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
   const maps = {
     ownership,
     artworkAuraKinds,
+    // Appearance is optional. An empty collection of verified frames needs no settings read.
+    auraBorderEnabled: artworkAuraKinds.size > 0 && await readAuraBorderSetting().then(setting => setting.enabled, () => false),
     publicIdentities,
     includeOwnershipProfiles: preload.includeOwnershipProfiles === true,
     auctions: latestAuctionByArtwork(tableData.v41_auctions),

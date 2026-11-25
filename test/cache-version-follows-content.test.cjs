@@ -19,15 +19,15 @@ const fs = require('node:fs');
  */
 const RUNTIME = {
   'src/features/discovery/discovery-service.js': { version: 2, sha256: 'c9a152e266934f4f' },
-  'unified-styles.css': { version: 98, sha256: '4e8f40f4f8a24d70' },
+  'unified-styles.css': { version: 99, sha256: '1ea1ad0a64e318c6' },
   'mobile-no-motion.css': { version: 3, sha256: '88eb61864da7f616' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 8, sha256: '618e006edefcf241' },
-  'src/ui/components/artwork-card.js': { version: 42, sha256: '57fcd92e83894be1' },
+  'src/ui/components/artwork-card.js': { version: 43, sha256: '2cfc25d3f8705b62' },
   'contracts-integration.js': { version: 21, sha256: '36189171dbb31867' },
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
-  'webmcp-tools.js': { version: 35, sha256: '9f13d82e78eb54ac' },
+  'webmcp-tools.js': { version: 36, sha256: '512702502476b3d8' },
   'voice-commands.js': { version: 19, sha256: '2e9032e7b74fce90' },
   'avatar-dropdown.js': { version: 74, sha256: '5ae029ec40ad3214' },
   'header-prepaint.js': { version: 12, sha256: '13b9bd8192b2ce51' },

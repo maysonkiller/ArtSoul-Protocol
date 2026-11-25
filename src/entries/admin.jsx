@@ -2,6 +2,7 @@ import { React, createRoot } from './react-runtime.js';
 import { StaffPasskeyDialog } from '../features/admin/staff-passkeys.jsx';
 import { StaffFactorDialog } from '../features/admin/staff-factor-dialog.jsx';
 import { StaffAuthority } from '../features/admin/staff-authority.jsx';
+import { AuraAppearance } from '../features/admin/aura-appearance.jsx';
 import { AdminArtworkCatalog, AdminArtworkPreview } from '../features/admin/artwork-catalog.jsx';
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
@@ -532,7 +533,8 @@ function ProtocolAdminPage() {
     const connectedWallet = currentSetupWallet();
     const roleLabel = { admin: 'Administrator', moderator: 'Moderator', team: 'Team' }[access?.role];
     const ready = accessState === 'ready';
-    const activeSection = section === 'staff' && !rosterWallet ? 'queue' : section;
+    const appearanceAllowed = access?.role === 'admin' && access?.dualWallet && access?.stepUpActive;
+    const activeSection = (section === 'staff' && !rosterWallet || section === 'appearance' && !appearanceAllowed) ? 'queue' : section;
     const catalogEpoch = setupEpoch.current, catalogWallet = connectedWallet;
     const catalogSessionCurrent = () => sessionIsCurrent(catalogEpoch,catalogWallet)
         && readySession.current?.epoch === catalogEpoch && readySession.current.wallet === catalogWallet;
@@ -545,6 +547,7 @@ function ProtocolAdminPage() {
     const adminGroups = [
         { title: 'Moderate', items: [['queue', 'Reports'], ['artworks', 'Artworks'], ['hidden', 'Hidden']] },
         { title: 'History', items: [['audit', 'Audit log'], ['notifications', 'Delivery']] },
+        ...(appearanceAllowed ? [{ title: 'Site', items: [['appearance', 'NFT appearance']] }] : []),
         ...(rosterWallet ? [{ title: 'Access', items: [['staff', authorityWallet ? 'Staff access' : 'Team directory']] }] : [])
     ];
 
@@ -601,6 +604,8 @@ function ProtocolAdminPage() {
             {rosterWallet && <div key="staff" hidden={ready && activeSection !== 'staff'}>{authorityControls}</div>}
 
             {ready && message && <p className="protocol-admin-message" role="status">{message}</p>}
+            {ready && appearanceAllowed && activeSection === 'appearance' && <AuraAppearance
+                key={`${catalogEpoch}:${catalogWallet}`} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent} />}
 
             {ready && activeSection === 'artworks' && <AdminArtworkCatalog
                 key={`${catalogEpoch}:${catalogWallet}:${accessRequest.current}`}

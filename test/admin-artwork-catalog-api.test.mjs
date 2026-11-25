@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import auraBorder from '../src/api/routes/moderation/aura-border.js';
 Object.assign(process.env,{
   NODE_ENV:'test',SESSION_SECRET:'catalog-wallet-test',SUPABASE_URL:'https://example.supabase.co',
   SUPABASE_SERVICE_ROLE_KEY:'catalog-test-only',ARTSOUL_PROTOCOL_ADMIN_ENABLED:'true',
@@ -13,8 +14,8 @@ const [{default:catalog},{default:visibility},backend,passkeys]=await Promise.al
 const STAFF=`0x${'1'.repeat(40)}`;
 function response(){return {statusCode:200,headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.statusCode=n;return this;},json(v){this.body=v;return this;},end(){}};}
 function req({cookie='',query={},body,method='GET'}={}){return {method,query,body,headers:{cookie,'user-agent':'catalog-test'},socket:{remoteAddress:'127.0.0.1'}};}
-function cookie(stepUp=true){const res=response();backend.setWalletSession(res,STAFF);const cookies=[res.headers['Set-Cookie'].split(';')[0]];
-  if(stepUp){const factor=response();passkeys.setModerationSession(factor,STAFF,'catalog-key',undefined,'passkey',req());cookies.push(factor.headers['Set-Cookie'].split(';')[0]);}return cookies.join('; ');}
+function cookie(stepUp=true,version){const res=response();backend.setWalletSession(res,STAFF);const cookies=[res.headers['Set-Cookie'].split(';')[0]];
+  if(stepUp){const factor=response();passkeys.setModerationSession(factor,STAFF,'catalog-key',version,'passkey',req());cookies.push(factor.headers['Set-Cookie'].split(';')[0]);}return cookies.join('; ');}
 const json=(data,status=200)=>({ok:status<400,status,text:async()=>JSON.stringify(data)});
 const row=id=>({chain_id:84532,artwork_id:String(id),hidden:id===1,visibility_updated_at:null,
   metadata:{name:`Work ${id}`,image:'https://example.supabase.co/storage/v1/object/public/artworks/image.png'},
@@ -28,6 +29,47 @@ function fixture(t,custom=()=>undefined){const calls=[]; t.mock.method(globalThi
   if(path==='rpc/review_artwork_visibility')return json([{...row(1),hidden:JSON.parse(options.body).p_hidden}]);
   throw new Error(`Unexpected test request ${path}`);
 });return calls;}
+
+test('only the verified current administrator wallet can read and change the border setting', async t => {
+  const old = process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
+  process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = 'true';
+  t.after(() => {
+    if (old === undefined) delete process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
+    else process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = old;
+  });
+  let role = 'admin', saved = { enabled: false, revision: 0 };
+  const calls = fixture(t, (path, options) => {
+    if (path.startsWith('artsoul_staff_roles?')) return json([{role,authorization_version:2}]);
+    if (path === 'rpc/read_aura_border_setting') return json([saved]);
+    if (path === 'rpc/set_aura_border_setting') {
+      const body = JSON.parse(options.body);
+      assert.equal(body.p_wallet, STAFF);
+      assert.equal(body.p_authorization_version, 2);
+      if (body.p_expected_revision !== saved.revision) return json({message:'AURA_REVISION_CONFLICT'},400);
+      saved = {enabled:body.p_enabled,revision:saved.revision+1};
+      return json([saved]);
+    }
+  });
+  const call = async (body, overrides={}) => {
+    const request = req({cookie:cookie(true,2),query:{wallet:STAFF},method:body?'PUT':'GET',body,...overrides});
+    Object.assign(request.headers,{origin:'https://example.com','content-type':'application/json'},overrides.headers);
+    const res = response();
+    await auraBorder(request,res);
+    return res;
+  };
+  for (role of ['moderator','team']) assert.equal((await call()).statusCode,403);
+  role = 'admin';
+  assert.equal((await call(null,{cookie:cookie(false)})).statusCode,403);
+  assert.equal((await call(null,{cookie:cookie(true,1)})).statusCode,403);
+  assert.equal((await call(null,{query:{wallet:'0x'+'2'.repeat(40)}})).statusCode,403);
+  assert.equal(calls.some(c=>c.path.includes('rpc/')),false);
+  assert.deepEqual((await call()).body,saved);
+  assert.equal((await call({enabled:true,revision:0},{headers:{origin:'https://unrelated.example'}})).statusCode,403);
+  assert.equal((await call({enabled:1,revision:0})).statusCode,400);
+  assert.deepEqual((await call({enabled:true,revision:0})).body,{enabled:true,revision:1});
+  assert.equal((await call({enabled:false,revision:0})).statusCode,409);
+  assert.deepEqual((await call()).body,{enabled:true,revision:1});
+});
 test('catalog requires current wallet, staff role and factor before reading any artwork',async t=>{
   const calls=fixture(t);
   for(const auth of ['',cookie(false)]){const res=response();await catalog(req({cookie:auth}),res);assert.ok([401,403].includes(res.statusCode));assert.equal(res.body.data,undefined);}

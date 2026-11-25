@@ -47,7 +47,9 @@ One aura can be auto-assigned to an NFT by priority:
 3. Partner collection aura: cyan/blue.
 4. None.
 
-Users do not pick aura colors. The planned running border text is Future-only. It stays off until the application has an explicitly authorized appearance-setting writer and durable storage for this boolean with a revision and an audit trail. The current moderation role handles complaints, and the signed staff action list covers role changes, authority rotation and sign-in setup. Neither grants a visual-setting write. When enabled, reduced motion must keep the label stationary.
+Users do not pick aura colors. The Future border label defaults to off. The admin panel's **NFT appearance** setting applies to verified frames on cards and artwork details. Platform and Partner labels move along the bottom edge. Genesis and reduced-motion labels stay stationary. Classic retains its static frame.
+
+The [appearance migration](../../sql/migrations/20261125170000_aura_border_setting.sql) stores each change with its revision, verified administrator and staff authorization version. The current role-bound staff sign-in is required. The database rechecks the active administrator grant and expected revision in the write transaction. The public artwork API reads the boolean only for already verified frames. Missing settings storage leaves labels off. Apply the migration to the intended database before using the control there.
 
 ### Evidence for each frame
 

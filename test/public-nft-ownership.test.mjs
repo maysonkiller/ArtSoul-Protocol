@@ -81,6 +81,7 @@ test('public NFT consumers use one verified history across cards, filters, saved
       const body = calls.at(-1).body;
       let result;
       if (name === 'rpc/read_verified_nft_boundary') result = [{ ...marker }];
+      else if (name === 'rpc/read_aura_border_setting') result = [{enabled: true, revision: 1}];
       else if (name === 'rpc/read_verified_nft_cards') result = body.p_artwork_ids.map(id => ({ ...owners.find(row => row.artwork_id === id), ...marker }));
       else if (name === 'rpc/read_verified_nft_history') result = { ...history, ownership: { ...owners[0], ...marker } };
       else if (name === 'rpc/read_public_search_cards') result = { artworks: rows.v41_artworks, metadata: [{ name: 'Test' }],
@@ -125,7 +126,10 @@ test('public NFT consumers use one verified history across cards, filters, saved
     designatePlatform();
     const cards = [(await cardRequest({})).body.data[0], (await cardRequest({id:'77'})).body.data[0],
       await readVisibleArtworkCard(84532, '77'), (await readVisibleArtworkCards(84532, ['77'], CORE))[0]];
-    for (const card of cards) assert.equal(card.aura_kind, 'platform');
+    for (const card of cards) {
+      assert.equal(card.aura_kind, 'platform');
+      assert.equal(card.aura_border_text, true);
+    }
     const registrations = calls.filter(call => call.name === 'contract_events');
     assert.equal(registrations.length, 4);
     assert.ok(registrations.every(call => call.query.get('contract_address') === `eq.${CORE}` &&
@@ -166,6 +170,7 @@ test('public NFT consumers use one verified history across cards, filters, saved
       assert.equal((await cardRequest({id:'77'})).body.data[0].aura_kind, undefined);
     }
     assert.equal(calls.filter(call => call.name === 'contract_events').length, 0);
+    assert.equal(calls.filter(call => call.name === 'rpc/read_aura_border_setting').length, 0);
   });
   await t.test('registration-read failure preserves the ordinary card and omits its aura', async () => {
     designatePlatform();
@@ -174,6 +179,14 @@ test('public NFT consumers use one verified history across cards, filters, saved
     assert.equal(res.statusCode, 200);
     assertOwner(res.body.data[0]);
     assert.equal(res.body.data[0].aura_kind, undefined);
+  });
+  await t.test('unavailable appearance storage keeps a verified frame and leaves its label off', async () => {
+    designatePlatform();
+    afterRead = name => { if (name === 'rpc/read_aura_border_setting') throw new Error('Setting unavailable'); };
+    const res = await cardRequest({id:'77'});
+    assert.equal(res.statusCode,200);
+    assert.equal(res.body.data[0].aura_kind,'platform');
+    assert.equal(res.body.data[0].aura_border_text,undefined);
   });
   await t.test('an unminted work or unconfirmed ownership cannot earn a frame', async () => {
     designatePlatform();
