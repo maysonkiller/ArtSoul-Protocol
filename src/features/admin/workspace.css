@@ -1,0 +1,220 @@
+body:is(.classic, .future) .protocol-admin-shell.admin-workspace {
+    max-width: 1440px;
+    padding-top: clamp(1rem, 2vw, 1.75rem);
+}
+
+body:is(.classic, .future) .admin-workspace .protocol-admin-heading {
+    align-items: center;
+    gap: .6rem 1.5rem;
+    margin: 0;
+    padding: 0 0 .8rem;
+}
+
+body:is(.classic, .future) .admin-workspace .protocol-admin-heading h1 {
+    margin: 0;
+    font-size: clamp(1.5rem, 2.5vw, 2.15rem);
+    line-height: 1.15;
+}
+
+body:is(.classic, .future) .admin-workspace .protocol-admin-session { margin-top: .35rem; }
+body:is(.classic, .future) .admin-workspace .protocol-admin-overview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem 1.5rem;
+    margin: 0;
+    padding: .65rem 0;
+    border-bottom: 1px solid var(--c-border-soft);
+}
+body:is(.classic, .future) .admin-workspace .protocol-admin-overview > div {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: .4rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+body:is(.classic, .future) .admin-workspace .protocol-admin-overview strong { font-size: .95rem; }
+.admin-workspace-layout { padding-top: 1rem; }
+.admin-workspace-layout[data-ready="true"] {
+    display: grid;
+    grid-template-columns: clamp(9.5rem, 16vw, 13rem) minmax(0, 1fr);
+    align-items: start;
+    gap: clamp(1rem, 2.5vw, 2.5rem);
+}
+.admin-workspace-content { min-width: 0; }
+/* Keep the seasonal switch reachable after the workspace, clear of the catalog players. */
+.protocol-admin-page > #as-scene-button {
+    position: static;
+    width: fit-content;
+    min-height: 44px;
+    margin: 1rem max(.75rem, var(--site-shell-pad, 30px), calc((100% - 1440px) / 2)) max(1rem, env(safe-area-inset-bottom)) auto;
+}
+/* Float in the outer gutter when there is room. Otherwise reserve space in the heading. */
+@media (max-width: 1599px) {
+    .admin-workspace-frame { position: relative; }
+    .protocol-admin-page .admin-workspace-frame [data-admin-assistant-shortcut]:not([hidden]) {
+        position: absolute;
+        inset: clamp(1rem, 2vw, 1.75rem) max(.75rem, var(--site-shell-pad, 30px), calc((100% - 1440px) / 2)) auto auto;
+        z-index: 1;
+    }
+    body:is(.classic, .future) .admin-workspace .protocol-admin-heading { padding-inline-end: 4rem; }
+}
+body:is(.classic, .future) .admin-workspace .protocol-admin-tabs {
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+    padding: 0 .8rem 0 0;
+    gap: .85rem;
+    border: 0;
+    border-inline-end: 1px solid var(--c-border-soft);
+}
+body:is(.classic, .future) .admin-workspace .protocol-admin-tab-group {
+    display: grid;
+    grid-template-columns: minmax(0,1fr);
+    gap: .125rem;
+}
+body:is(.classic, .future) .admin-workspace .protocol-admin-tab-label { padding-inline: .6rem; }
+body:is(.classic, .future) .admin-workspace .protocol-admin-tab-group > button {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 44px;
+    padding: .4rem .65rem;
+    text-align: start;
+}
+.admin-mobile-section { display: none; }
+.admin-workspace .admin-catalog-intro { margin: .1rem 0 .75rem; color: var(--c-text-muted); font-size: .875rem; }
+.admin-workspace .protocol-admin-catalog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+    align-items: stretch;
+    gap: .85rem;
+}
+.admin-workspace .protocol-admin-catalog-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+    border-radius: .875rem;
+}
+.admin-catalog-card-body { display: flex; flex: 1; flex-direction: column; min-width: 0; padding: .85rem; }
+.admin-workspace .protocol-admin-catalog-card h3 { margin: .4rem 0 .15rem; font-size: 1.025rem; line-height: 1.3; }
+.admin-catalog-card-meta { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.25rem; color:var(--c-text-muted); font-size:.75rem; }
+.admin-catalog-card-meta > span:first-child { text-transform: capitalize; }
+.admin-visibility { padding:.15rem .5rem; border:1px solid var(--c-border-soft); border-radius:1rem; color:var(--c-text); font-weight:600; }
+.admin-visibility[data-hidden="true"] { border-color:var(--c-notification-alert); }
+.admin-workspace .admin-catalog-card-body .protocol-admin-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    align-items: start;
+    margin-top: auto;
+    padding-top: .5rem;
+}
+body:is(.classic, .future) .admin-workspace .admin-catalog-card-body .protocol-admin-card-actions button {
+    width: auto;
+    min-height: 44px;
+    padding: .35rem .55rem;
+    text-align: start;
+    font-size: .8125rem;
+}
+.admin-workspace .protocol-admin-catalog-card > .admin-review-media {
+    aspect-ratio: 4 / 3;
+    border-width: 0 0 1px;
+    border-radius: 0;
+}
+body:is(.classic, .future) .admin-workspace .protocol-admin-group > header .admin-review-media {
+    flex: 0 1 15rem;
+    width: min(100%, 15rem);
+}
+.admin-workspace .admin-review-media > artsoul-media-player {
+    display: grid;
+    grid-template: minmax(0, 1fr) auto / minmax(0, 1fr);
+    width: 100%;
+    height: 100%;
+    align-self: stretch;
+}
+.admin-workspace .admin-review-media :is(.admin-audio-cover, video, .admin-video-hint) {
+    grid-area: 1 / 1;
+}
+.admin-workspace .admin-review-media .admin-audio-cover { object-fit: contain; }
+.admin-workspace .admin-review-media .admin-video-hint {
+    place-self: center;
+    padding: .5rem;
+    font-size: 1.75rem;
+    line-height: 1;
+    color: var(--c-text);
+    pointer-events: none;
+}
+.admin-workspace .admin-review-media artsoul-media-player > .ap-controls {
+    grid-area: 2 / 1;
+    position: relative;
+    inset: auto;
+    grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
+    align-items: center;
+    gap: 0 .125rem;
+    margin: 0;
+    padding: 0 .25rem;
+    border-top: 1px solid var(--c-border-soft);
+    border-radius: 0;
+}
+body:is(.classic, .future) .admin-workspace .admin-review-media .ap-controls > button {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: .5rem;
+    background: transparent;
+    box-shadow: none;
+    line-height: 1;
+}
+.admin-workspace .admin-review-media .ap-controls > span { padding: 0; text-align: start; font-size: .75rem; }
+.admin-workspace .admin-review-media .ap-controls > .ap-time { overflow: hidden; }
+.admin-workspace .admin-review-media .ap-controls > .ap-seek { height: 22px; }
+.admin-workspace .admin-review-media .ap-controls > .ap-message:not(:empty) { padding: .25rem; }
+.admin-workspace .admin-review-media .ap-controls .ap-dialog { grid-column:auto; }
+body:is(.classic, .future) .admin-workspace .admin-review-media .ap-dialog :is(a,button,select) { min-height:44px; }
+
+@container (max-width: 220px) {
+    .admin-workspace .admin-review-media artsoul-media-player > .ap-controls {
+        grid-template-columns: 44px minmax(0, 1fr) 44px;
+    }
+}
+@media (max-width: 800px) {
+    .admin-workspace-layout[data-ready="true"] { grid-template-columns: minmax(0,1fr); gap: .75rem; }
+    body:is(.classic, .future) .admin-workspace .protocol-admin-tabs {
+        padding: 0;
+        border: 0;
+    }
+    body:is(.classic, .future) .admin-workspace .protocol-admin-tab-group { display: none; }
+    .admin-mobile-section {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+        color: var(--c-text-muted);
+        font-size: .875rem;
+    }
+    .admin-mobile-section select {
+        flex: 1 1 auto;
+        max-width: 22rem;
+        min-width: 0;
+        min-height: 44px;
+        padding: .4rem .6rem;
+        border: 1px solid var(--c-border);
+        border-radius: .6rem;
+        background: var(--c-surface);
+        color: var(--c-text);
+        font: inherit;
+        font-size: 1rem;
+    }
+    .admin-mobile-section select:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+}
+@media (max-width: 480px) {
+    body:is(.classic, .future) .protocol-admin-shell.admin-workspace { width: calc(100% - 1.5rem); }
+    body:is(.classic, .future) .admin-workspace .protocol-admin-overview { gap: .2rem .75rem; }
+    body:is(.classic, .future) .admin-workspace .protocol-admin-section-heading { flex-direction: row; align-items: center; flex-wrap: wrap; }
+}

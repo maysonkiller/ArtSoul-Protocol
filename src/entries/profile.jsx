@@ -1,5 +1,6 @@
 import { ProfileEditDialog } from '../features/profile/profile-edit-dialog.jsx';
 import { ProfileContentReport } from '../features/moderation/profile-content-report.jsx';
+import { staffEntryHint } from '../features/admin/staff-entry.js';
 import { ContextHelp } from '../ui/context-help.jsx';
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { decodeAvatar } from '../features/artwork/decoded-image.js';
@@ -57,13 +58,10 @@ const { useState, useEffect, useRef } = React;
             );
         }
 
-        // Protocol Admin belongs to the owner/staff's own Profile controls,
-        // not to the global wallet popover. The sole eligibility authority is
-        // the existing authenticated server access check in AvatarDropdown.
-        // A cached name, a displayed profile or a matching address alone never
-        // grants an administrative shortcut.
+        // Returning staff can reach sign-in even after switching accounts.
+        // Every protected action still requires server authorization.
         function ProfileAdminShortcut({ walletAddress }) {
-            const [authorizedWallet, setAuthorizedWallet] = useState('');
+            const [entry, setEntry] = useState(null);
 
             useEffect(() => {
                 let disposed = false;
@@ -83,20 +81,24 @@ const { useState, useEffect, useRef } = React;
 
                 const refresh = async () => {
                     const epoch = ++generation;
+                    const wallet = String(walletAddress || '').toLowerCase();
                     if (!validSession()) {
-                        if (!disposed) setAuthorizedWallet('');
+                        if (!disposed) setEntry(staffEntryHint(wallet, window) ? { wallet, signIn: true } : null);
                         return;
                     }
                     try {
                         const permitted = await window.AvatarDropdown?.requestProtocolAdminAccessOnce?.();
                         if (disposed || epoch !== generation || !validSession()) return;
-                        setAuthorizedWallet(permitted === true && window.AvatarDropdown?.protocolAdminEligible === true
-                            ? String(walletAddress || '').toLowerCase() : '');
+                        const eligible = permitted === true && window.AvatarDropdown?.protocolAdminEligible === true;
+                        const checked = window.AvatarDropdown?.protocolAdminWallet === wallet &&
+                            window.AvatarDropdown.protocolAdminRoleChecked === true;
+                        const remembered = staffEntryHint(wallet, window, checked ? eligible : undefined);
+                        setEntry(eligible || remembered ? { wallet, signIn: !eligible } : null);
                     } catch {
-                        if (!disposed && epoch === generation) setAuthorizedWallet('');
+                        if (!disposed && epoch === generation) setEntry(null);
                     }
                 };
-                const dismiss = () => { generation++; if (!disposed) setAuthorizedWallet(''); };
+                const dismiss = () => { generation++; if (!disposed) setEntry(null); };
                 const onStorage = event => {
                     if (!event.key || event.key === 'artsoul_authenticated_wallet') dismiss();
                 };
@@ -126,10 +128,10 @@ const { useState, useEffect, useRef } = React;
             ).toLowerCase();
             const signedIn = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
             const expected = String(walletAddress || '').toLowerCase();
-            if (!expected || authorizedWallet !== expected || live !== expected || signedIn !== expected
+            if (!expected || entry?.wallet !== expected || live !== expected
                 || window.artsoulWalletStateSettled !== true
                 || window.artsoulSettledWalletState?.isConnected !== true) return null;
-            return <a href="/admin" className="profile-admin-shortcut">Admin panel</a>;
+            return <a href="/admin" className="profile-admin-shortcut">{signedIn === expected && !entry.signIn ? 'Admin panel' : 'Staff sign-in'}</a>;
         }
 
         function ProfilePage({ initialSkeletonVisible = false }) {

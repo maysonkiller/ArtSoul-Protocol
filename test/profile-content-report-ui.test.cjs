@@ -392,6 +392,7 @@ test('profile review groups keep wallets and captured revisions separate and ren
 test('hidden-profile review navigation requests a wallet target without fabricating artwork identifiers', async () => {
     let path, returned;
     const scope = { useCallback: fn => fn, setupEpoch: { current: 2 }, currentSetupWallet: () => A, queueRequest: { current: 0 }, readySession: { current: { epoch: 2, wallet: A } },
+        queueController: { current: null }, AbortController, setTimeout, clearTimeout,
         queueTargetRef: { current: { target_type: 'profile_content', profile_wallet: B } }, sessionIsCurrent: () => true, api: async value => { path = value; return { data: { reports: [] } }; }, setData: value => { returned = value; } };
     vm.runInNewContext(adminSource.slice(adminSource.indexOf('const loadQueue ='), adminSource.indexOf('const accessFailed =')) + '\nthis.load = loadQueue;', scope);
     assert.equal(await scope.load('actioned'), true);

@@ -36,7 +36,7 @@ test('sign-in controls remain above staff and complaint content with one verific
     for(const state of ['ready','step_up','setup']) {
         const html=render({state});
         const header=html.match(/<header\b[\s\S]*?<\/header>/)[0];
-        const label=state==='ready'?'Sign-in settings':'Verify admin access';
+        const label=state==='ready'?'Account security':'Verify admin access';
         assert.match(header,new RegExp('>'+label+'</button>'));
         assert.equal((html.match(new RegExp('>'+label+'</button>','g'))||[]).length,1);
         assert(html.indexOf('</header>')<html.indexOf('data-fixture="staff"'));
@@ -104,7 +104,8 @@ test('the ready workspace groups moderation, history and authority controls with
     assert.match(html, /Reports in view/);
     assert.match(html, /Hidden works/);
     assert.match(html, /Delivery records/);
-    assert.match(html, /Review reports, manage public content visibility and inspect records/);
+    assert.match(nav, /Workspace section<select/);
+    assert.match(nav, /<option value="queue" selected="">Reports<\/option>/);
 });
 
 test('an ineligible guest never sees protected navigation or workspace counters', () => {

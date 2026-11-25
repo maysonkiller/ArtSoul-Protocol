@@ -1,4 +1,5 @@
 import { React } from '../../entries/react-runtime.js';
+import { repeatsStaffWalletUpdate } from './staff-entry.js';
 
 const { useState, useEffect, useRef } = React;
 
@@ -23,14 +24,15 @@ function AdditionalPasskeyGrant({walletAddress, api, onStepUpRequired}) {
     }
     useEffect(() => {
         const invalidate = () => {clearGrant(); onStepUpRequired();};
+        const walletChanged = event => { if (!repeatsStaffWalletUpdate(event, wallet, window)) invalidate(); };
         const storage = event => {if (!event.key || event.key === 'artsoul_authenticated_wallet') invalidate();};
-        window.addEventListener('artsoul:wallet-state-changed', invalidate);
+        window.addEventListener('artsoul:wallet-state-changed', walletChanged);
         window.addEventListener('artsoul:auth-state-changed', invalidate);
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', clearGrant);
         return () => {
             operationRef.current++; grantRef.current = null;
-            window.removeEventListener('artsoul:wallet-state-changed', invalidate);
+            window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
             window.removeEventListener('artsoul:auth-state-changed', invalidate);
             window.removeEventListener('storage', storage);
             window.removeEventListener('pagehide', clearGrant);
@@ -116,15 +118,16 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
         dialogRef.current?.showModal();
         closeRef.current?.focus();
         const invalidate = () => { clear(); onClose(); };
+        const walletChanged = event => { if (!repeatsStaffWalletUpdate(event, wallet, window)) invalidate(); };
         const storage = event => { if (!event.key || ['artsoul_authenticated_wallet', 'artsoul_wallet'].includes(event.key)) invalidate(); };
-        window.addEventListener('artsoul:wallet-state-changed', invalidate);
+        window.addEventListener('artsoul:wallet-state-changed', walletChanged);
         window.addEventListener('artsoul:auth-state-changed', invalidate);
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', invalidate);
         return () => {
             generation.current++; cancelNative();
             dialogRef.current?.close();
-            window.removeEventListener('artsoul:wallet-state-changed', invalidate);
+            window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
             window.removeEventListener('artsoul:auth-state-changed', invalidate);
             window.removeEventListener('storage', storage);
             window.removeEventListener('pagehide', invalidate);

@@ -542,6 +542,7 @@
         const agent = window.ArtSoulWebMCP;
         const tools = new Map(agent.createTools(agent.browserDependencies()).map(tool => [tool.name, tool]));
         const staffPage = agent.isStaffPage?.() === true;
+        const workspaceShortcut = staffPage ? document.querySelector('[data-admin-assistant-shortcut]') : null;
         const staffHelp = 'Use public catalog commands here. Try “open gallery”, “search moon” or “open artwork 31”.';
 
         let inputLanguage = readStored(LANG_KEY) === 'ru' ? 'ru' : 'en';
@@ -571,6 +572,7 @@
         let wallet = walletIdentity();
 
         const button = launcher || document.createElement('button');
+        let openedBy = button;
         button.dataset.commandsInitialized = 'true';
         button.type = 'button';
         button.className = 'artsoul-voice-button';
@@ -739,11 +741,19 @@
             silence();
         }
 
+        function setPanelOpen(open) {
+            panel.hidden = !open;
+            button.setAttribute('aria-expanded', String(open));
+            if (workspaceShortcut) {
+                workspaceShortcut.hidden = open;
+                workspaceShortcut.setAttribute('aria-expanded', String(open));
+            }
+        }
+
         function closePanel() {
             stopVoice();
-            panel.hidden = true;
-            button.setAttribute('aria-expanded', 'false');
-            button.focus({ preventScroll: true });
+            setPanelOpen(false);
+            openedBy.focus({ preventScroll: true });
         }
 
         function afterPlayback(failed) {
@@ -1080,12 +1090,17 @@
             }
         }
 
-        button.addEventListener('click', () => {
+        function togglePanel(event) {
             if (!panel.hidden) { closePanel(); return; }
-            panel.hidden = false;
-            button.setAttribute('aria-expanded', 'true');
+            openedBy = event?.currentTarget || button;
+            setPanelOpen(true);
             (input.disabled ? close : input).focus({ preventScroll: true });
-        });
+        }
+        button.addEventListener('click', togglePanel);
+        if (workspaceShortcut) {
+            workspaceShortcut.addEventListener('click', togglePanel);
+            workspaceShortcut.hidden = false;
+        }
         mic.addEventListener('click', start);
         chat.addEventListener('click', () => {
             if (handsFree) { stopVoice(); return; }
@@ -1160,16 +1175,14 @@
             }
             clearAccount();
             show('', '');
-            panel.hidden = true;
-            button.setAttribute('aria-expanded', 'false');
+            setPanelOpen(false);
         });
 
         label();
         document.body.appendChild(panel);
         if (!launcher) document.body.appendChild(button);
         if (arrivingFrom && voiceConsent && document.visibilityState === 'visible' && typeof Recognition === 'function') {
-            panel.hidden = false;
-            button.setAttribute('aria-expanded', 'true');
+            setPanelOpen(true);
             show('', TEXT.resumeMic);
             resumeOnArrival();
         } else arrivingFrom = null;

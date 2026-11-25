@@ -19,7 +19,7 @@ const fs = require('node:fs');
  */
 const RUNTIME = {
   'src/features/discovery/discovery-service.js': { version: 2, sha256: 'c9a152e266934f4f' },
-  'unified-styles.css': { version: 99, sha256: '1ea1ad0a64e318c6' },
+  'unified-styles.css': { version: 100, sha256: 'd333ae93fc1d45d8' },
   'mobile-no-motion.css': { version: 3, sha256: '88eb61864da7f616' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
@@ -28,8 +28,8 @@ const RUNTIME = {
   'contracts-integration.js': { version: 21, sha256: '36189171dbb31867' },
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
   'webmcp-tools.js': { version: 37, sha256: '52cdce33e7f3dbd9' },
-  'voice-commands.js': { version: 20, sha256: '564bca5cd3ef5fe0' },
-  'avatar-dropdown.js': { version: 74, sha256: '5ae029ec40ad3214' },
+  'voice-commands.js': { version: 21, sha256: '349e392b0a51caa5' },
+  'avatar-dropdown.js': { version: 75, sha256: '84d81c7a1e4a28da' },
   'header-prepaint.js': { version: 12, sha256: '13b9bd8192b2ce51' },
   'data-prefetch.js': { version: 7, sha256: '4e6178a279896ae9' },
   'base-network.js': { version: 2, sha256: 'bc527f32ea3df5f9' },

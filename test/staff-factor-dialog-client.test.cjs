@@ -16,7 +16,9 @@ function harness() {
   const values=[], refs=[], effects=[], timers=new Map(), listeners=new Map();
   let si,ri,ei,pending;
   const scope={
-    window:{getCurrentWalletAddress:()=>state.wallet,addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name)},
+    repeatsStaffWalletUpdate: require('../src/features/admin/staff-entry.js').repeatsStaffWalletUpdate,
+    window:{getCurrentWalletAddress:()=>state.wallet,artsoulWalletStateSettled:true,SupabaseAuth:{getAuthenticatedWallet:()=>state.wallet},
+      addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name)},
     document:{activeElement:{isConnected:true,focus(){}}},
     loadQRCode:()=>state.loadQRCode ? state.loadQRCode() : Promise.resolve({default:require('qrcode')}),
     setTimeout:fn=>{const key={};timers.set(key,fn);return key;},clearTimeout:key=>timers.delete(key),
@@ -63,6 +65,16 @@ test('closing after completed native verification does not cancel an unrelated l
   assert.equal(h.state.cancelled,0);
   assert.equal(h.state.refreshed,1);
   assert(h.state.calls.includes('passkey-auth-verify'));
+});
+
+test('a same-wallet chain update preserves one pending passkey verification',async()=>{
+  const h=harness();await tick();h.render();
+  let approve;h.state.nativeResult=()=>new Promise(resolve=>{approve=resolve;});
+  const request=h.actions.passkey(false);await tick();
+  for(const chainId of [84532,8453,8453])h.event('artsoul:wallet-state-changed',{detail:{address:WALLET,isConnected:true,chainId}});
+  assert.equal(h.state.cancelled,0);assert.equal(h.state.closed,0);assert.equal(h.state.native,1);
+  approve({id:'verified'});await request;
+  assert.equal(h.state.refreshed,1);assert.equal(h.state.calls.filter(r=>r==='passkey-auth-verify').length,1);
 });
 
 test('successful factor login refreshes confirmed access before an optional factor-status reload',async()=>{

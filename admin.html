@@ -22,7 +22,7 @@
     <script src="/header-prepaint.js?v=12"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=99">
+    <link rel="stylesheet" href="/unified-styles.css?v=100">
     <link rel="stylesheet" href="/button-effects.css?v=6">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=3">
     <script src="/storage-image.js?v=3" defer></script>
@@ -34,12 +34,12 @@
     <script type="module" src="/supabase-client.js"></script>
     <script type="module" src="/supabase-auth.js?v=2"></script>
     <script src="/data-prefetch.js?v=7" async></script>
-    <script src="/avatar-dropdown.js?v=74" defer></script>
+    <script src="/avatar-dropdown.js?v=75" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <script type="module" src="/src/entries/header-notifications.js"></script>
     <script type="module" src="/src/entries/search.js"></script>
     <script src="/webmcp-tools.js?v=37" defer></script>
-    <script src="/voice-commands.js?v=20" defer></script>
+    <script src="/voice-commands.js?v=21" defer></script>
 </head>
 <body class="protocol-admin-page">
     <script>document.body.classList.add(document.documentElement.classList.contains('future') ? 'future' : 'classic');</script>
@@ -104,7 +104,12 @@
     </header>
     <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
 
-    <main id="app" class="protocol-admin-root"></main>
+    <div class="admin-workspace-frame">
+        <button type="button" data-admin-assistant-shortcut hidden aria-label="Open ArtSoul assistant" title="Open ArtSoul assistant" aria-haspopup="dialog" aria-controls="artsoulVoicePanel" aria-expanded="false">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></svg>
+        </button>
+        <main id="app" class="protocol-admin-root"></main>
+    </div>
     <script type="module" src="/src/entries/admin.jsx"></script>
 </body>
 </html>

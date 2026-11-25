@@ -753,6 +753,7 @@
             this.protocolAdminGeneration += 1;
             this.protocolAdminWallet = null;
             this.protocolAdminEligible = false;
+            this.protocolAdminRoleChecked = false;
             this.protocolAdminRequest = null;
             this.updateProtocolAdminSlot();
         }
@@ -814,6 +815,7 @@
                     const result = await response.json().catch(() => ({}));
                     if (!isCurrent()) return false;
                     this.protocolAdminWallet = wallet;
+                    this.protocolAdminRoleChecked = response.ok && result.authenticated === true && typeof result.eligible === 'boolean';
                     this.protocolAdminEligible = response.ok
                         && (result.enabled === true || result.setupEnabled === true)
                         && result.authenticated === true
@@ -825,6 +827,7 @@
                     if (!isCurrent()) return false;
                     this.protocolAdminWallet = wallet;
                     this.protocolAdminEligible = false;
+                    this.protocolAdminRoleChecked = false;
                     this.updateProtocolAdminSlot();
                     return false;
                 })

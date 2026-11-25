@@ -6780,6 +6780,27 @@ body.future .publish-step-wanted {
     outline-offset: 3px;
 }
 
+.protocol-admin-page [data-admin-assistant-shortcut]:not([hidden]) {
+    position: fixed;
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    z-index: 105;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface-strong);
+    color: var(--c-accent);
+    cursor: pointer;
+}
+.protocol-admin-page [data-admin-assistant-shortcut]:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 3px;
+}
+
 /* Listening must be unmistakable: the microphone is open. */
 .artsoul-voice-button.is-listening {
     border-color: var(--c-accent);

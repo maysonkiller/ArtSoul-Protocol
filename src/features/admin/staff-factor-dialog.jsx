@@ -1,4 +1,5 @@
 import { React } from '../../entries/react-runtime.js';
+import { repeatsStaffWalletUpdate } from './staff-entry.js';
 
 const { useEffect, useRef, useState } = React;
 
@@ -47,14 +48,15 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
         dialog.current?.showModal(); closeButton.current?.focus();
         run(refresh);
         const invalidate = () => close();
+        const walletChanged = event => { if (!repeatsStaffWalletUpdate(event, wallet, window)) invalidate(); };
         const storage = event => { if (!event.key || ['artsoul_authenticated_wallet', 'artsoul_wallet'].includes(event.key)) invalidate(); };
-        window.addEventListener('artsoul:wallet-state-changed', invalidate);
+        window.addEventListener('artsoul:wallet-state-changed', walletChanged);
         window.addEventListener('artsoul:auth-state-changed', invalidate);
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', invalidate);
         return () => {
             epoch.current++; cancelNative(); dialog.current?.close();
-            window.removeEventListener('artsoul:wallet-state-changed', invalidate);
+            window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
             window.removeEventListener('artsoul:auth-state-changed', invalidate);
             window.removeEventListener('storage', storage);
             window.removeEventListener('pagehide', invalidate);
