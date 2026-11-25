@@ -694,8 +694,17 @@
         return url && !poster && !url.includes('#') ? url + '#t=0.1' : url;
     }
 
+    function retryVideoPreview(video, url, poster) {
+        const preview = videoPreviewSource(url, poster);
+        if (preview === url || video.getAttribute('src') !== preview) return false;
+        // Some WebKit builds can decode the original but reject the generated time fragment.
+        video.src = url;
+        return true;
+    }
+
     function startVideoFromPreview(video, url, poster) {
-        if (video.dataset.artsoulPlayedSource === url || videoPreviewSource(url, poster) === url) return;
+        if (video.dataset.artsoulPlayedSource === url || videoPreviewSource(url, poster) === url ||
+            video.getAttribute?.('src') === url) return;
         video.dataset.artsoulPlayedSource = url;
         // Preserve the very start of the soundtrack. An explicit scrub to a
         // different time before the first Play takes precedence.
@@ -819,7 +828,9 @@
             });
             video.addEventListener('pause', sync);
             video.addEventListener('ended', sync);
-            video.addEventListener('error', () => onUnavailable?.());
+            video.addEventListener('error', () => {
+                if (!retryVideoPreview(video, url, descriptor.poster)) onUnavailable?.();
+            });
             video.addEventListener('volumechange', () => syncMuteButton(mute, video, 'video preview'));
             controls.append(toggle, mute);
             container.append(video, badge, controls, createVideoFirstPaintGuard(video, descriptor));
@@ -1074,7 +1085,9 @@
                     pauseOtherMedia(event.currentTarget); setPlaying(true); setStarted(true);
                 },
                 onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
-                onError: onUnavailable || undefined,
+                onError: event => {
+                    if (!retryVideoPreview(event.currentTarget, url, poster)) onUnavailable?.(event);
+                },
                 onVolumeChange: event => setMuted(event.currentTarget.muted) }),
             h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO'),
             h('div', { className: 'artsoul-card-media-controls', draggable: false,
@@ -1292,6 +1305,7 @@
         hasSafeMedia,
         detailHref,
         videoPreviewSource,
+        retryVideoPreview,
         startVideoFromPreview,
         reviveMediaPreviews,
         signalsText,

@@ -198,11 +198,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 setIsImageFullscreen(true);
             };
 
-            const renderMediaFallback = (message = 'Media unavailable') => (
+            const renderMediaFallback = () => (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-black p-8 text-center">
-                    <div className="text-2xl mb-3 opacity-60">{message}</div>
+                    <div className="text-2xl mb-3 opacity-60">Media unavailable</div>
                     <div className="text-sm opacity-50 max-w-sm">
-                        This legacy artwork record is available, but its media cannot be displayed safely.
+                        {isSafeMediaUrl ? 'The browser could not load this media.' : 'This artwork has no supported media URL.'}
                     </div>
                 </div>
             );
@@ -229,7 +229,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             onPlay={(event) => window.ArtSoulArtworkCard?.startVideoFromPreview?.(event.currentTarget, url, poster)}
                             onSeeked={() => setVideoLoaded(true)}
                             onPlaying={() => setVideoLoaded(true)}
-                            onError={() => setMediaError(true)}
+                            onError={event => {
+                                if (!window.ArtSoulArtworkCard?.retryVideoPreview?.(event.currentTarget, url, poster)) setMediaError(true);
+                            }}
                         >
                             Your browser does not support video playback.
                         </video>

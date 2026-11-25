@@ -91,9 +91,9 @@ for (const consumer of ['contracts-integration.js', 'src/features/auction/auctio
     }
 }
 await verifyLocalReference('Audio previews', '/brand/artsoul-audio-cover-384.webp');
-for (const filename of ['robots.txt', 'sitemap.xml']) {
+for (const filename of ['robots.txt', 'sitemap.xml', '.well-known/security.txt']) {
     if (!(await readFile(path.join(dist, filename))).equals(await readFile(path.join(root, 'public', filename)))) {
-        throw new Error(`Search discovery asset differs from its source: ${filename}`);
+        throw new Error(`Public discovery file differs from its source: ${filename}`);
     }
 }
 await access(path.join(dist, 'src/config/upload-policy.js')).catch(() => {

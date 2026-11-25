@@ -697,7 +697,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                         <artsoul-media-player key={artwork.file_url}>
                                                             <video
                                                                 src={window.ArtSoulArtworkCard?.videoPreviewSource?.(artwork.file_url) || artwork.file_url}
-                                                                onError={() => hideFailedPreview(artwork)}
+                                                                onError={event => {
+                                                                    if (!window.ArtSoulArtworkCard?.retryVideoPreview?.(event.currentTarget, artwork.file_url)) hideFailedPreview(artwork);
+                                                                }}
                                                                 className="w-full h-full object-contain"
                                                                 preload="metadata"
                                                                 muted

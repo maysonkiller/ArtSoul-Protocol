@@ -34,6 +34,14 @@ A local Chrome comparison used the same static shell and a single synthetic Disc
 
 At 320 pixels the text field measured 158×50 and the Search ArtSoul button measured 111×44, separated by eight pixels. The button forwarded the typed query to site search. The gallery search tests also passed. These figures measure the candidate locally, pending published-build verification.
 
+## Media playback in WebKit
+
+Playwright's WebKit 26.0 for Windows reproduced a video failure on the production page for work 7. The generated `#t=0.1` preview produced media error 4 and the page removed its player. A standalone HTML video using the same public MP4 and fragment also failed. Removing only the fragment loaded the 11.128-second video. Audio work 32 played on the production page.
+
+The [shared preview handler](../../src/ui/components/artwork-card.js) now retries the original media URL once when a generated time fragment fails. Authored fragments and poster-backed videos retain their original behavior. The gallery, profile and homepage cards, gallery preview and artwork detail use the same recovery rule. A final load failure keeps the normal unavailable state.
+
+WebKit loaded the candidate's built assets against the real guest artwork API and both public media files. At 320×700 and 390×844 in Classic and Future, all eight combinations restored their initial mute state, advanced the media timeline after a tap, and held a stable time for 300 ms after pause. Play, Mute and Playback options each received hit testing at their center, with zero document-level horizontal overflow. This desktop WebKit run measured playback state. Physical iPhone Safari, audible output, and foreground recovery remain open.
+
 ## Remaining evidence
 
 - No classified artwork was present in the sampled home, gallery or profile cards. The Guide examples and nine local tests covering verified aura sources and controls supplement the guest check. An actual qualifying minted item rendered from the production projection remains a separate check.

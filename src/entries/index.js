@@ -1,5 +1,6 @@
 import '../../supabase-client.js';
 import { renderHomeShowcase } from '../ui/home-showcase.js';
+import { discloseHomePromotion } from '../ui/components/home-banner-card.js';
 import { wrapArtworkMedia } from '../ui/components/artwork-player.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
@@ -744,7 +745,7 @@ let morphActive = false;
                                 minimal: true,
                                 surface: 'homepage'
                             });
-                            if (sharedCard) gallery.appendChild(sharedCard);
+                            if (sharedCard) gallery.appendChild(discloseHomePromotion(sharedCard, slot.promotion));
                             continue;
                         }
                         const socialSignals = window.ArtSoulDiscovery?.getSocialSignals?.(art) || {
