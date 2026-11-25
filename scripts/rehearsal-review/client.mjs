@@ -64,7 +64,7 @@ export async function walletRequest(provider, plan) {
 }
 
 export function sameReview(first, next) {
-    return !next.complete && first.chainId === next.chainId && first.operation === next.operation &&
+    return !next.complete && !next.waitingForFinality && first.chainId === next.chainId && first.operation === next.operation &&
         first.payer === next.payer && first.nonce === next.nonce && first.target === next.target &&
         first.dataHash === next.dataHash && first.dataSha256 === next.dataSha256 &&
         JSON.stringify(first.deployments) === JSON.stringify(next.deployments) &&
@@ -151,6 +151,12 @@ export async function start() {
         if (!response.ok) throw new Error(await response.text());
         return response.json();
     }
+    function showWaiting(current) {
+        const { role, address } = current.waitingForFinality;
+        ++stateRevision; plan = undefined; connected = undefined; wrongChain = false;
+        byId('review').hidden = true;
+        status(roleName[role] + ' · ' + address + '. Both providers see the expected Safe proxy. Waiting for Base Sepolia finality. Refresh chain evidence later.');
+    }
     async function refresh() {
         busy = true; ++stateRevision; connected = undefined; wrongChain = false; plan = undefined;
         const previous = byId('data').textContent;
@@ -158,7 +164,13 @@ export async function start() {
         status('Verifying chain evidence…');
         try {
             const current = await fetchPlan();
-            if (current.complete) { status('Both treasury Safes were verified at a finalized block.'); return; }
+            if (current.complete) {
+                status(current.finalizedTreasury
+                    ? roleName[current.finalizedTreasury] + ' Safe verified at a finalized block.'
+                    : 'Both treasury Safes were verified at a finalized block.');
+                return;
+            }
+            if (current.waitingForFinality) { showWaiting(current); return; }
             plan = current;
             if (previous !== plan.data) submitted = false;
             const create = plan.operation === 'OrdinaryMarket';
@@ -188,7 +200,7 @@ export async function start() {
     }
     byId('refresh').onclick = refresh;
     byId('connect').onclick = async () => {
-        if (busy || submitted) return;
+        if (busy || submitted || !plan) return;
         busy = true; buttons(); connected = undefined;
         try {
             const provider = wallets.get(picker.value);
@@ -220,6 +232,7 @@ export async function start() {
             const provider = connected;
             walletStatus('Checking current custody, nonce and deployment addresses…');
             const fresh = await fetchPlan();
+            if (fresh.waitingForFinality) { showWaiting(fresh); return; }
             check(sameReview(plan, fresh), 'Deployment or payer state changed. Refresh and review the new request.');
             const tx = await walletRequest(provider, fresh);
             submitted = true;

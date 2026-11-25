@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { request } from 'node:http';
+import { keccak256 } from 'ethers';
 import { sameReview, start, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { listenForReview, verifyReference } from '../scripts/serve-rehearsal-review.mjs';
+import { chooseTreasury, listenForReview, safeAwaitingFinality, verifyReference } from '../scripts/serve-rehearsal-review.mjs';
 
 const payer = '0x' + '1'.repeat(40), safe = '0x' + '2'.repeat(40), admin = '0x' + '3'.repeat(40);
 const target = '0x4e1dcf7ad4e460cfd30791ccc4f9c8a4f820ec67';
@@ -55,7 +56,7 @@ test('private custody review binds all owners, role addresses, payer and pending
         adminSecurity: { ...account, owners: [safe, target, admin] } } }), /owners changed/);
     assert.throws(() => verifyReference(original, { ...original, roleRequests: [{ ...roleRequests[0], dataHash: 'other' }] }), /request changed/);
 });
-async function renderReview(t, provider) {
+async function renderReview(t, provider, current = () => ({ ...plan, roles: {}, owners: [], block: { number: '0x1' } })) {
     const fields = new Map();
     function field(id) {
         if (!fields.has(id)) fields.set(id, { textContent: '', value: '', append() {}, replaceChildren() {},
@@ -66,9 +67,7 @@ async function renderReview(t, provider) {
     globalThis.window = Object.assign(new EventTarget(), { ethereum: provider });
     globalThis.Option = class { constructor(name, value) { this.text = name; this.value = value; } };
     t.after(() => { delete globalThis.document; delete globalThis.window; delete globalThis.Option; });
-    t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({
-        ...plan, roles: {}, owners: [], block: { number: '0x1' }
-    }) }));
+    t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: current }));
     await start();
     return field;
 }
@@ -138,6 +137,43 @@ test('wallet discovery explains an empty picker and picks up a late-injected ext
     assert.equal(field('connect').disabled, false);
     assert.equal(field('submit').disabled, true);
     assert.deepEqual(provider.calls, []);
+});
+test('only the agreed expected Safe runtime with a nonzero account nonce counts as waiting for finality', async () => {
+    function rpc(code, accountNonce) {
+        return async method => method === 'eth_getCode' ? code : accountNonce;
+    }
+    const code = '0x60016000', hash = keccak256(code);
+    assert.equal(await safeAwaitingFinality([rpc(code, '0x1'), rpc(code, '0x1')], safe, hash), true);
+    assert.equal(await safeAwaitingFinality([rpc('0x', '0x0'), rpc('0x', '0x0')], safe, hash), false);
+    for (const [first, second, pin] of [
+        [rpc(code, '0x1'), rpc('0x', '0x1'), hash], [rpc(code, '0x1'), rpc(code, '0x2'), hash],
+        [rpc(code, '0x0'), rpc(code, '0x0'), hash], [rpc('0xaa', '0x1'), rpc('0xaa', '0x1'), hash],
+        [rpc(code, '0x1'), rpc(code, '0x1'), undefined], [rpc('0x', '0x1'), rpc('0x', '0x1'), hash]
+    ]) await assert.rejects(safeAwaitingFinality([first, second], safe, pin), /disagree|occupied/);
+});
+test('explicit treasury selection leaves an independently reviewed request available until that role finalizes', () => {
+    const protocol = { role: 'protocolTreasury', dataHash: 'first' }, ecosystem = { role: 'ecosystemTreasury', dataHash: 'second' };
+    assert.equal(chooseTreasury([protocol, ecosystem]), protocol);
+    assert.equal(chooseTreasury([protocol, ecosystem], 'ecosystemTreasury'), ecosystem);
+    assert.equal(chooseTreasury([protocol], 'ecosystemTreasury'), undefined);
+    assert.throws(() => chooseTreasury([protocol, ecosystem], 'adminSecurity'), /Choose/);
+});
+test('newly included Safe suppresses all wallet actions on refresh and on the final preflight', async t => {
+    const waiting = { waitingForFinality: { role: 'protocolTreasury', address: safe } };
+    let response = { ...plan, block: { number: '0x1' }, roles: {}, owners: [] };
+    const provider = wallet({ eth_requestAccounts: () => [payer] });
+    const field = await renderReview(t, provider, () => response);
+    await field('connect').onclick();
+    response = waiting;
+    await field('submit').onclick();
+    assert.equal(field('submit').disabled, true);
+    assert.equal(field('review').hidden, true);
+    assert.match(field('status').textContent, /Waiting for Base Sepolia finality/);
+    assert.ok(field('status').textContent.includes(safe));
+    await field('refresh').onclick();
+    assert.equal(field('connect').disabled, true);
+    assert.equal(field('review').hidden, true);
+    assert.ok(!provider.calls.includes('eth_sendTransaction'));
 });
 test('loopback server serves only token-bound read routes on the exact origin', async t => {
     let reads = 0;

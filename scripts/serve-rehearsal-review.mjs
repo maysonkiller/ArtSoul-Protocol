@@ -36,6 +36,16 @@ async function agreed(providers, method, params) {
     return first;
 }
 
+export async function safeAwaitingFinality(providers, address, expectedProxyHash) {
+    const [code, nonce] = await Promise.all([
+        agreed(providers, 'eth_getCode', [address, 'latest']),
+        agreed(providers, 'eth_getTransactionCount', [address, 'pending'])
+    ]);
+    if (code === '0x' && BigInt(nonce) === 0n) return false;
+    if (code !== '0x' && BigInt(nonce) > 0n && expectedProxyHash && keccak256(code) === expectedProxyHash) return true;
+    throw new Error('The predicted deployment address is occupied or pending with unverified code. Refresh after finality.');
+}
+
 export function verifyReference(reference, plan) {
     check(reference?.chainId === 84532 && plan.chainId === 84532 && reference.payer === plan.payer,
         'Reviewed payer or chain changed. Stop and review the custody register.');
@@ -51,7 +61,13 @@ export function verifyReference(reference, plan) {
     }
 }
 
-export async function buildReview({ adminSafe, payer, reference, coreReview, providers = [
+export function chooseTreasury(roleRequests, treasury) {
+    if (treasury === undefined) return roleRequests[0];
+    check(roles.slice(0, 2).includes(treasury), 'Choose protocolTreasury or ecosystemTreasury.');
+    return roleRequests.find(request => request.role === treasury);
+}
+
+export async function buildReview({ adminSafe, payer, reference, coreReview, treasury, providers = [
     sequencedRead('https://sepolia.base.org'), sequencedRead('https://base-sepolia-rpc.publicnode.com')
 ] }) {
     const safePlan = await prepareRehearsalSafes({ adminSafe, payer, providers });
@@ -63,6 +79,7 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, pro
     const reviewedCode = [[release.factory, release.factoryCodeHash], [release.singleton, release.singletonCodeHash],
         [release.fallbackHandler, release.fallbackCodeHash], [adminSafe, release.proxyCodeHash]];
     if (coreReview) {
+        check(treasury === undefined, 'Core review cannot select a treasury.');
         check(roleRequests.length === 0, 'Wait until both treasury Safes are deployed and finalized.');
         check(coreReview.chainId === 84532 && getAddress(coreReview.payer) === base.payer &&
             coreReview.constructorArgs?.slice(3).map(String).join(',') === '8,30000',
@@ -82,8 +99,8 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, pro
         deployments = [plan.core, plan.nft];
         for (const role of roles.slice(0, 2)) reviewedCode.push([custody[role].address, release.proxyCodeHash]);
     } else {
-        if (!roleRequests.length) return { ...base, complete: true };
-        const next = roleRequests[0];
+        const next = chooseTreasury(roleRequests, treasury);
+        if (!next) return { ...base, complete: true, finalizedTreasury: treasury };
         operation = next.role;
         target = release.factory;
         tx = next.transaction;
@@ -94,7 +111,7 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, pro
     }
     check(tx.from === base.payer && tx.chainId === chainHex && tx.value === '0x0' &&
         keccak256(tx.data) === dataHash, 'Unrecognized rehearsal transaction.');
-    const [latest, pending, payerCode, codeChecks] = await Promise.all([
+    const [latest, pending, payerCode, codeChecks, awaitingFinality] = await Promise.all([
         agreed(providers, 'eth_getTransactionCount', [base.payer, 'latest']),
         agreed(providers, 'eth_getTransactionCount', [base.payer, 'pending']),
         agreed(providers, 'eth_getCode', [base.payer, 'latest']),
@@ -103,15 +120,10 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, pro
             check(keccak256(code) === expected, 'Unexpected code at ' + address);
             return { address, sha256: sha256Hex(code) };
         })),
-        ...deployments.map(async address => {
-            const [code, nonce] = await Promise.all([
-                agreed(providers, 'eth_getCode', [address, 'latest']),
-                agreed(providers, 'eth_getTransactionCount', [address, 'pending'])
-            ]);
-            check(code === '0x' && BigInt(nonce) === 0n, 'Deployment already exists or is pending. Wait for finality and refresh.');
-        })
+        Promise.all(deployments.map(address => safeAwaitingFinality(providers, address, coreReview ? undefined : release.proxyCodeHash)))
     ]);
     check(latest === pending && payerCode === '0x', 'Payer is not a settled externally owned account.');
+    if (awaitingFinality.includes(true)) return { ...base, waitingForFinality: { role: operation, address: deployments[0] } };
     const nonce = toQuantity(BigInt(pending));
     check(!coreReview || tx.nonce === nonce, 'Core payer nonce changed. A new independent review is required.');
     return { ...base, operation, target, deployments, codeChecks, nonce, dataHash, data: tx.data, dataSha256: sha256Hex(tx.data) };
@@ -161,14 +173,16 @@ export async function listenForReview(loadPlan) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     try {
-        const [referencePath, flag, reviewPath] = process.argv.slice(2);
-        check(process.argv.length === 3 || (process.argv.length === 5 && flag === '--core'),
-            'Usage: node scripts/serve-rehearsal-review.mjs <private-approved-safe-plan.json> [--core <private-core-review.json>]');
+        const [referencePath, flag, value] = process.argv.slice(2);
+        check(process.argv.length === 3 || (process.argv.length === 5 && (flag === '--core' ||
+            (flag === '--treasury' && roles.slice(0, 2).includes(value)))),
+            'Usage: node scripts/serve-rehearsal-review.mjs <approved-safe-plan.json> [--core <core-review.json> | --treasury protocolTreasury|ecosystemTreasury]');
         const reference = await json(referencePath);
         check(reference?.chainId === 84532 && reference?.custody?.chainId === 84532,
             'The approved Safe register must be for Base Sepolia.');
         const args = { reference, adminSafe: getAddress(reference.custody.adminSecurity.address),
-            payer: getAddress(reference.payer), coreReview: reviewPath ? await json(reviewPath) : undefined };
+            payer: getAddress(reference.payer), coreReview: flag === '--core' ? await json(value) : undefined,
+            treasury: flag === '--treasury' ? value : undefined };
         const result = await listenForReview(() => buildReview(args));
         console.log('Open the private Base Sepolia rehearsal page on this computer:\n' + result.url);
     } catch (error) {
