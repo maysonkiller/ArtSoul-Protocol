@@ -66,6 +66,8 @@ Both providers returned `workCount = 1`, `auctionCount = 0` and NFT `totalSupply
 
 The [indexer's event reader](../../src/indexer/event-listener.js) independently decoded a single `ArtworkRegistered` from each provider at block log index 2, with artwork ID 1 and creator `0xE6d6658DD5013B30Ab8cA9CBD667D0b5a5A1b215`. The [metadata reader](../../src/api/safe-artwork-fetch.js) decoded the title **ArtSoul Base Sepolia Rehearsal**, media type `image/jpeg` and image URL `https://artsoulprotocol.com/favicon.jpg`. Hosted indexer persistence and the public artwork card still require separate verification.
 
+The receipt command also runs the [publication recovery reader](../../src/api/upload-registration-evidence.js) with the reviewed payout Core and this specific receipt. Base and PublicNode returned matching evidence for work 1 under that issuer, with a common finalized anchor at block 63,541,026 (`0x5efc7ecdd7e2c78216f7fff866d187dd3368e833d01545944cff234de79759e1`). The report includes the NFT address and runtime hash, the event's block and log position, and the work state **at the registration block**. The Core reported no active auction and zero floor. The paired NFT's `artworkToToken(1)` returned zero. This command reads the ledger and returns the evidence locally.
+
 ```sh
 node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> --plan
 node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json>
