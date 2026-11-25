@@ -1041,3 +1041,41 @@ test('RU microphone can still parse a Latin-recognized command with an English a
  assert.match(h.get('.artsoul-voice-answer').textContent,/Profile/,
    'Microphone language must not change the product language');
 });
+
+test('only a wallet tool with a transaction hash can report a submission', async () => {
+  const hash = '0x' + 'ab'.repeat(32);
+  for (const [request, transactionHash, expectedText, expectedDraft] of [
+    ['search moon', hash, /check your wallet activity/i, 'search moon'],
+    ['buy artwork 31', null, /check your wallet activity/i, ''],
+    ['buy artwork 31', [hash], /check your wallet activity/i, '']
+  ]) {
+    const h = harness({audio: true, execute: async () => JSON.stringify({
+      submitted: true, confirmed: true, transaction_hash: transactionHash, url: '/artwork/31'
+    })});
+    h.open(); h.submit(request); await flush();
+    assert.match(h.get('.artsoul-voice-answer').textContent, expectedText);
+    assert.equal(h.get('.artsoul-voice-results').children.length, 0);
+    assert.equal(h.get('input').value, expectedDraft);
+    assert.equal(h.plays.length, 0);
+  }
+});
+
+test('a missing speech score allows manual review and keeps a dictated title as data', async () => {
+  const {parsePublicationTurn} = await import('../src/features/artwork/command-draft.js');
+  for (const field of [undefined, 'title']) {
+    const h = harness({speech: true});
+    h.open();
+    if (field) {
+      h.window.ArtSoulPublicationDraft = {parseTurn: parsePublicationTurn};
+      h.submit(field); await flush();
+    }
+    h.get('.artsoul-voice-mic').fire('click'); await flush();
+    h.sessions[0].onresult({results: [[{transcript: 'buy artwork 31'}]]}); await flush();
+    assert.deepEqual(h.calls, []);
+    assert.match(h.get('.artsoul-voice-answer').textContent, /send/i);
+    h.get('form').fire('submit'); await flush();
+    assert.deepEqual(h.calls, [field
+      ? {name: 'revise_publication_draft', args: {field, value: 'buy artwork 31'}}
+      : {name: 'buy_resale_listing', args: {artwork_id: '31'}}]);
+  }
+});

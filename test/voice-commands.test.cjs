@@ -320,14 +320,18 @@ test('an unknown sentence is nothing, not a nearest guess', () => {
   assert.deepEqual({ ...parse('помощь', 'ru') }, { help: true });
 });
 
-test('a low-confidence wallet command is not run; a read is', () => {
-  const bid = parse('bid 0.05 on artwork 31');
-  assert.equal(voice.mayRun(bid, 0.3), false, 'misheard money is asked again');
-  assert.equal(voice.mayRun(bid, 0.9), true);
-  for (const unknown of [0, undefined, null, NaN, Infinity, -1, 1.01]) {
-    assert.equal(voice.mayRun(bid, unknown), false);
+test('sensitive voice commands require a measured confidence within range', () => {
+  const commands = [parse('bid 0.05 on artwork 31'), parse('save artwork 34'),
+    parse('prepare artwork titled Moon'), {tool: 'prepare_donation'},
+    {tool: 'revise_publication_draft', input: {field: 'title', value: 'Moon'}}];
+  for (const command of commands) {
+    for (const score of [undefined, null, 0, -1, 0.59, 1.01, NaN, Infinity, '1', true]) {
+      assert.equal(voice.mayRun(command, score), false, command.tool);
+    }
+    for (const score of [.6, .9, 1]) assert.equal(voice.mayRun(command, score), true, command.tool);
   }
-  assert.equal(voice.mayRun(parse('what auctions are open'), 0.1), true);
+  assert.equal(voice.mayRun(parse('what auctions are open'), undefined), true);
+  assert.equal(voice.mayRun({tool: 'revise_publication_draft', input: {field: 'title'}}, 0), true);
 });
 
 test('voice writes are exactly the agent writes, so neither can grow alone', () => {

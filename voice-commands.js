@@ -267,7 +267,9 @@
 
     /** Whether a heard command may run, given the recogniser's own confidence. */
     function mayRun(command, confidence) {
-        if (!isWrite(command) && !SAVED_TOOLS.includes(command?.tool) && !REVIEW_TOOLS.includes(command?.tool) && command?.tool !== DRAFT_TOOL) return true;
+        const tool = command?.tool;
+        const draftEdit = tool === 'revise_publication_draft' && command.input?.value !== undefined;
+        if (!isWrite(command) && !SAVED_TOOLS.includes(tool) && !REVIEW_TOOLS.includes(tool) && tool !== DRAFT_TOOL && !draftEdit) return true;
         return Number.isFinite(confidence) && confidence >= WRITE_CONFIDENCE && confidence <= 1;
     }
 
@@ -300,7 +302,7 @@
         options: 'You can open the gallery, find artwork, or ask about your activity.',
         askSearch: 'What would you like to find?', askTitle: 'What is the title?',
         otherRequest: 'Try “open NFTs”, “search moon”, or “my activity”.',
-        unsure: heard => `I am not sure I heard "${heard}" correctly. Please repeat the action.`,
+        unsure: 'I am not sure I heard that correctly. Check the text and press Send, or repeat your request.',
         heard: heard => `Heard: "${heard}"`,
         unavailable: 'Commands are not available on this page.',
         notice: 'Your browser may send microphone audio to its speech service for transcription. ArtSoul receives no microphone audio.\n\nTurn on the microphone?',
@@ -414,7 +416,7 @@
      */
     function walletSubmitted(tool, data) {
         return WRITE_TOOLS.includes(tool) && data?.submitted === true &&
-            /^0x[0-9a-f]{64}$/i.test(data.transaction_hash || '');
+            typeof data.transaction_hash === 'string' && /^0x[0-9a-f]{64}$/i.test(data.transaction_hash);
     }
 
     function describeResult(tool, result) {
@@ -1009,8 +1011,8 @@
                 return;
             }
             const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, parseLang, pendingDraftField);
-            pendingDraftField = draftTurn?.nextField || null;
             if (draftTurn?.message) {
+                pendingDraftField = draftTurn.nextField || null;
                 reply(transcript, draftTurn.message, pendingDraftField === 'title' ? t.askTitle : draftTurn.message);
                 return;
             }
@@ -1056,10 +1058,13 @@
                 return;
             }
             if (spoken && !mayRun(command, confidence)) {
-                const text = t.unsure(transcript);
-                reply(transcript, text);
+                // Preserve the field so manual Send keeps a dictated title as data.
+                pendingPrompt = previousPrompt;
+                handsFree = false;
+                reply(transcript, t.unsure);
                 return;
             }
+            pendingDraftField = null;
             if (spoken && (isWrite(command) || (handsFree && !CHAT_TOOLS.has(command.tool)))) {
                 handsFree = false;
                 reply(transcript, t.reviewCommand);
@@ -1080,9 +1085,10 @@
                 const result = JSON.parse(await tool.execute(command.input));
                 if (current !== generation || currentWallet !== walletIdentity()) return;
                 dialogue?.observe(command.tool,result);
-                if (!result.error && (walletSubmitted(command.tool, result) || result.updated === true || result.revoked === true)) {
-                    // A finished action must not remain armed in the composer.
-                    // Declines/errors retain the draft for a deliberate retry.
+                if (!result.error && ((isWrite(command) && result.submitted === true) ||
+                    (SAVED_TOOLS.includes(command.tool) && result.updated === true) ||
+                    (command.tool === 'revoke_wallet_access' && result.revoked === true))) {
+                    // Disarm a possibly sent wallet action even when its hash is missing.
                     input.value = '';
                     input.placeholder = t.next;
                 }
