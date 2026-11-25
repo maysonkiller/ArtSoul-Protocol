@@ -103,20 +103,22 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   `);
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
   for (const migration of listIndexerMigrations()) query(migration.sql);
-  await t.test('ordinary issuer, settlement and runner-up evidence has no effective Data API table privileges', () => {
+  await t.test('ordinary issuer and sale evidence has no effective Data API table privileges', () => {
     for (const role of ['anon', 'authenticated', 'service_role']) {
-      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations']) {
+      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations', 'ordinary_resale_purchases']) {
         assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.${table}',
           'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN');`), 'f', `${role}: ${table}`);
       }
     }
-    const table = 'artsoul_private.ordinary_runner_up_observations';
-    assert.equal(query(`SELECT relrowsecurity FROM pg_class WHERE oid='${table}'::regclass;`), 't');
-    query(`GRANT SELECT ON ${table} TO PUBLIC; GRANT UPDATE ON ${table} TO anon, authenticated, service_role;`);
-    query(fs.readFileSync('src/indexer/migrations/019_ordinary_runner_up_observations.sql', 'utf8'));
-    for (const role of ['anon', 'authenticated', 'service_role']) {
-      assert.equal(query(`SELECT has_table_privilege('${role}', '${table}', 'SELECT,UPDATE');`), 'f', role);
-      assert.throws(() => query(`SET ROLE ${role}; SELECT * FROM ${table} LIMIT 0;`), /permission denied/);
+    for (const migration of ['019_ordinary_runner_up_observations', '020_ordinary_resale_purchases']) {
+      const table = 'artsoul_private.' + migration.slice(4);
+      assert.equal(query(`SELECT relrowsecurity FROM pg_class WHERE oid='${table}'::regclass;`), 't');
+      query(`GRANT SELECT ON ${table} TO PUBLIC; GRANT UPDATE ON ${table} TO anon, authenticated, service_role;`);
+      query(fs.readFileSync(`src/indexer/migrations/${migration}.sql`, 'utf8'));
+      for (const role of ['anon', 'authenticated', 'service_role']) {
+        assert.equal(query(`SELECT has_table_privilege('${role}', '${table}', 'SELECT,UPDATE');`), 'f', role);
+        assert.throws(() => query(`SET ROLE ${role}; SELECT * FROM ${table} LIMIT 0;`), /permission denied/);
+      }
     }
   });
   // Profiles predate the reproducible indexer sequence. Model only its public

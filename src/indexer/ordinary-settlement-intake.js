@@ -56,3 +56,14 @@ export async function ingestOrdinarySettlement(pool, listener, options) {
     }));
     return { inserted, sale };
 }
+
+// The ordinary receipt reader supplies decimal strings for every uint256 field.
+export function appendOrdinaryResalePurchase(client, sale) {
+    return appendExact(client, 'ordinary_resale_purchases', {
+        chain_id: sale.chainId, core_address: sale.coreAddress, token_id: sale.tokenId, listing_version: sale.version,
+        artwork_id: sale.artworkId, price_wei: sale.priceWei, seller: sale.seller, buyer: sale.buyer,
+        creator: sale.creator, first_collector: sale.firstCollector, protocol_treasury: sale.protocol, ecosystem_treasury: sale.ecosystem,
+        seller_wei: sale.sellerWei, creator_wei: sale.creatorWei, protocol_wei: sale.protocolWei, ecosystem_wei: sale.ecosystemWei,
+        transaction_hash: sale.transactionHash, block_number: sale.blockNumber, block_hash: sale.blockHash, log_index: sale.logIndex
+    });
+}

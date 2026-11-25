@@ -211,6 +211,14 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       await assert.rejects(verify(), error => error.code === '42501');
       await reader.query('RESET ROLE');
       assert.ok(await verify() > 20, 'a failed check ends its read-only transaction');
+      // This is the final prepublication check in the disposable database. A
+      // finalized resale cannot be removed to make a contaminated launch pass.
+      await pool.query(`INSERT INTO artsoul_private.ordinary_resale_purchases
+        (chain_id,core_address,token_id,listing_version,artwork_id,price_wei,seller,buyer,creator,first_collector,
+         protocol_treasury,ecosystem_treasury,seller_wei,creator_wei,protocol_wei,ecosystem_wei,transaction_hash,block_number,block_hash,log_index)
+        VALUES (8453,$1,1,1,1,200,$2,$3,$2,$2,$2,$3,185,11,2,2,$4,170,$5,1)`,
+      [CORE, CREATOR, WINNER, hash(170), hash(1170)]);
+      await assert.rejects(verify(), /artsoul_private\.ordinary_resale_purchases/);
     } finally {
       await reader.query('RESET ROLE');
       reader.release();
