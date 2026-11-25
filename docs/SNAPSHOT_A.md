@@ -141,8 +141,14 @@ and its indexer database from the same operator session. Set
 Use an existing operator role with unfiltered read access. Keep credentials
 out of command arguments and verification records.
 
+Run the following check from the candidate worker host, or set
+`ARTSOUL_INDEXER_HEALTH_URL` to the operator's private health endpoint.
+Set `ARTSOUL_MONITOR_EXPECTED_CONFIRMATION_DEPTH` to the independently reviewed
+mainnet depth and use the deployment's approved monitor thresholds. The worker
+health URL defaults to `http://127.0.0.1:3001/health`.
+
 ```bash
-node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-address> <deployment-block> --database <reviewed-mainnet-pair.json>
+node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-address> <deployment-block> --database <reviewed-mainnet-pair.json> --worker-health
 ```
 
 The command compares the database cursor with the reviewed Base mainnet Core
@@ -152,6 +158,16 @@ settlement evidence and the counters backing public metrics. Supply the reviewed
 mainnet custody register or compact pair file used by the settlement intake.
 Before the first publication the issuer table can be empty. Any issuer already present
 must match the reviewed chain, Core, NFT and both initialized runtime hashes.
+
+With `--worker-health`, the command also reads the live worker after reading the
+public catalog. Both must identify the reviewed Core, Base chain ID and confirmation
+depth. The worker must have reached both the confirmed and indexed blocks the site reported.
+Its confirmed block, indexed block and RPC head must agree with its reported lag.
+A worker serving another deployment on the same chain fails with `CORE_ADDRESS`.
+An inconsistent or regressed checkpoint fails with `BLOCK_CURSORS`. During a reorg,
+repeat the check once both observations stabilize. Preserve the timestamp and
+watermarks from a successful run. Without this flag the command verifies only
+its selected public and database sources.
 
 Keep the old workers stopped while checking. Pending or in-flight work in the persistent event queue
 or outbox, and retryable failed outbox effects, block acceptance even when the
@@ -167,6 +183,10 @@ cause the command to fail. It reports table names without printing row data.
 Retain the result with the public catalog check and the isolated database and media restore evidence. Also verify browser configuration,
 legacy media storage and cache behavior against the release candidate. A quiet
 database sampled before writers are switched does not prove the launch state.
+
+After the first publication, use the [infrastructure health monitor](runbooks/A9_INFRA_COST_MONITORING.md#repository-health-check)
+with the reviewed Core, chain, confirmation depth and lag threshold throughout
+the approved D4 window. The catalog emptiness check applies only before that publication.
 
 ## Verifying a copy years later
 
