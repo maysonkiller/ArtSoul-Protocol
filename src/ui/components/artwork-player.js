@@ -81,26 +81,59 @@ class ArtworkMediaPlayer extends HTMLElement {
             seek.max = seek.disabled ? 0 : duration;
             seek.value = media.currentTime;
             const position = mediaTime(media.currentTime);
-            clock.textContent = position + ' / ' + mediaTime(duration);
-            seek.setAttribute('aria-valuetext', clock.textContent);
+            const displayed = position + ' / ' + mediaTime(duration);
+            if (clock.textContent !== displayed) {
+                clock.textContent = displayed;
+                seek.setAttribute('aria-valuetext', displayed);
+            }
         };
+        let clockTimer, waitingAt = null;
+        const stopClock = () => {
+            clearInterval(clockTimer);
+            clockTimer = undefined;
+        };
+        const sampleClock = () => {
+            if (waitingAt !== null && waitingAt !== media.currentTime) waitingAt = null;
+            if (waitingAt === null && message.textContent === 'Buffering…') report('');
+            syncTime();
+        };
+        const updateClock = event => {
+            const type = event?.type;
+            if (type === 'waiting' && media.readyState < 3 && !media.paused) {
+                waitingAt = media.currentTime;
+                report('Buffering…');
+            } else if (type === 'playing' || type === 'emptied' || media.paused || media.ended) {
+                waitingAt = null;
+            }
+            if (media.paused || media.ended || media.error || document.hidden || type === 'emptied') stopClock();
+            else if (clockTimer === undefined) clockTimer = setInterval(sampleClock, 1000);
+            sampleClock();
+        };
+        this.events.signal.addEventListener('abort', stopClock, { once: true });
+        const startPlayback = () => media.play().catch(error => {
+            if (error.name !== 'AbortError') report('Playback could not start. Try again.');
+        });
         const togglePlay = () => {
             report('');
-            if (media.paused || media.ended) media.play().catch(() => report('Playback could not start. Try again.'));
+            if (media.paused || media.ended) startPlayback();
             else media.pause();
         };
         listen(play, 'click', togglePlay);
         if (isVideo) listen(media, 'click', event => { event.preventDefault(); event.stopPropagation(); togglePlay(); });
         listen(mute, 'click', () => {
+            const wasPlaying = !media.paused && !media.ended;
             if (media.volume === 0) { media.volume = 1; media.muted = false; }
             else media.muted = !media.muted;
+            if (wasPlaying && media.paused && !media.ended && media.isConnected && !document.hidden) startPlayback();
             syncVolume();
         });
         listen(volume, 'input', () => { media.volume = Number(volume.value); media.muted = media.volume === 0; syncVolume(); });
         listen(seek, 'input', () => { if (!seek.disabled) { media.currentTime = Number(seek.value); syncTime(); } });
         listen(speed, 'change', () => { media.playbackRate = Number(speed.value); });
         listen(media, 'ratechange', () => { speed.value = media.playbackRate; });
-        for (const event of ['loadedmetadata', 'durationchange', 'timeupdate', 'seeked', 'emptied']) listen(media, event, syncTime);
+        for (const event of ['loadedmetadata', 'durationchange', 'timeupdate', 'seeked']) listen(media, event, sampleClock);
+        for (const event of ['play', 'playing', 'waiting', 'pause', 'ended', 'emptied', 'error']) listen(media, event, updateClock);
+        listen(document, 'visibilitychange', updateClock);
         for (const event of ['play', 'pause', 'ended', 'emptied']) listen(media, event, syncPlay);
         listen(media, 'volumechange', syncVolume);
         listen(media, 'play', () => {
@@ -156,7 +189,7 @@ class ArtworkMediaPlayer extends HTMLElement {
             event.stopPropagation();
             if (!event.target.closest('a, select, input, form button')) event.preventDefault();
         });
-        syncPlay(); syncTime(); syncVolume();
+        syncPlay(); updateClock(); syncVolume();
     }
 }
 

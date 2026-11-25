@@ -43,14 +43,18 @@ async function checkEngine(engine, origin) {
                 return route.fulfill({ contentType: 'text/javascript', body: storagePolicy });
             if (!url.pathname.startsWith('/api/')) return route.continue();
             let data = {};
-            if (url.pathname === '/api/public/artworks')
-                data = { data: rows.slice(0, Number(url.searchParams.get('limit') || 200)) };
+            if (url.pathname === '/api/public/artworks') {
+                const workId = url.searchParams.get('artwork_id');
+                const items = workId ? rows.filter(work => work.artwork_id === Number(workId)) : rows;
+                data = { data: items.slice(0, Number(url.searchParams.get('limit') || 200)) };
+            }
             if (url.pathname === '/api/public/profile')
                 data = { profile: { id: 1, wallet_address: owner, username: 'Studio' } };
             return route.fulfill({ json: data });
         });
         const page = await context.newPage();
         page.setDefaultTimeout(12000);
+        await checkDetailControls(page, origin, engine.name());
         for (const route of ['/profile.html?address=' + owner, '/gallery.html#discover']) {
             await page.goto(origin + route, { waitUntil: 'domcontentloaded' });
             await page.waitForFunction(() => document.querySelectorAll('.artsoul-artwork-card audio').length === 28);
@@ -59,8 +63,6 @@ async function checkEngine(engine, origin) {
             const item = page.locator('.artsoul-artwork-card').nth(13);
             const start = await item.evaluate((card) => {
                 const media = card.querySelector('audio');
-                media.muted = true;
-                media.loop = true;
                 window.themeProbe = { card, media };
                 scrollTo({ top: card.getBoundingClientRect().top + scrollY - 210, behavior: 'instant' });
                 return {
@@ -69,10 +71,37 @@ async function checkEngine(engine, origin) {
                     document: performance.timeOrigin,
                 };
             });
-            await item.locator('.artsoul-media-toggle').tap();
-            await page.waitForFunction(() => window.themeProbe.media.currentTime > 0.15);
+            const play = item.locator('.artsoul-media-toggle');
+            const sound = item.locator('.artsoul-media-mute');
+            const checkClock = async (muted) => {
+                const before = await item.locator('.artsoul-card-audio-label').textContent();
+                await page.waitForFunction(({ muted, before }) => {
+                    const { card, media } = window.themeProbe;
+                    const label = card.querySelector('.artsoul-card-audio-label').textContent;
+                    return media.isConnected && !media.paused && media.muted === muted &&
+                        /^\d+:\d{2}$/.test(label) && label !== before;
+                }, { muted, before }).catch(async error => {
+                    const state = await item.evaluate(card => {
+                        const media = card.querySelector('audio');
+                        return { connected: media.isConnected, paused: media.paused, muted: media.muted,
+                            duration: media.duration, time: media.currentTime, ready: media.readyState,
+                            label: card.querySelector('.artsoul-card-audio-label').textContent, theme: document.body.className };
+                    });
+                    throw new Error(JSON.stringify({ browser: engine.name(), route, muted, before, state }), { cause: error });
+                });
+            };
+            await play.tap();
+            await checkClock(false);
+            // iPhone can continue decoding audio between UI time notifications.
+            await item.evaluate(card => {
+                const audio = card.querySelector('audio');
+                document.addEventListener('timeupdate', event => {
+                    if (event.target === audio) event.stopImmediatePropagation();
+                }, true);
+            });
+            await sound.tap();
+            await checkClock(true);
             for (const theme of ['future', 'classic']) {
-                const before = await page.evaluate(() => window.themeProbe.media.currentTime);
                 await page.locator('[data-artsoul-theme-toggle]').tap();
                 await page.waitForFunction((theme) => document.body.classList.contains(theme), theme);
                 const state = await item.evaluate((card) => {
@@ -88,15 +117,25 @@ async function checkEngine(engine, origin) {
                     };
                 });
                 assert(
-                    state.same && state.playing && state.muted && state.time >= before,
+                    state.same && state.playing && state.muted,
                     JSON.stringify({ route, theme, state })
                 );
                 assert.equal(state.document, start.document);
                 assert.equal(state.title, start.title);
                 assert(Math.abs(start.top - state.top) <= 1, JSON.stringify({ route, theme, start, state }));
                 if (gallery) assert(await page.getByRole('button', { name: 'Hide price range' }).isVisible());
+                await checkClock(true);
+                await sound.tap();
+                await checkClock(false);
+                await sound.tap();
+                await checkClock(true);
             }
-            await page.evaluate(() => window.themeProbe.media.pause());
+            await play.tap();
+            await sound.tap();
+            assert(await item.locator('audio').evaluate(media => media.paused && !media.muted));
+            await play.tap();
+            await checkClock(false);
+            await play.tap();
             console.log(
                 engine.name(),
                 route.split('?')[0],
@@ -108,9 +147,63 @@ async function checkEngine(engine, origin) {
     }
 }
 
+async function checkDetailControls(page, origin, engine) {
+    await page.goto(origin + '/artwork/8', { waitUntil: 'domcontentloaded' });
+    const player = page.locator('artsoul-media-player:has(audio)');
+    const play = player.locator('.artsoul-media-toggle');
+    const mute = player.locator('.artsoul-media-mute');
+    const clock = player.locator('.ap-time');
+    await player.evaluate(player => {
+        const media = player.querySelector('audio');
+        window.detailProbe = { media, controls: player.querySelector('.ap-controls') };
+        // Exercise a sparse native event stream without stopping the real decoder.
+        document.addEventListener('timeupdate', event => {
+            if (event.target === media) event.stopImmediatePropagation();
+        }, true);
+    });
+    const width = await player.evaluate(element => element.clientWidth);
+    await play.tap();
+    await page.waitForFunction(() => window.detailProbe.media.currentTime >= 2.1);
+    assert.match(await clock.innerText(), /^0:0[1-3] \/ /, engine + ' detail clock during playback');
+    for (const theme of ['future', 'classic']) {
+        if (theme === 'classic') {
+            // Simulate an interruption inside the unmute gesture on a real playing media element.
+            await player.locator('audio').evaluate(media => {
+                const nativeMute = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'muted');
+                Object.defineProperty(media, 'muted', {
+                    configurable: true,
+                    get() { return nativeMute.get.call(this); },
+                    set(value) {
+                        delete this.muted;
+                        nativeMute.set.call(this, value);
+                        this.pause();
+                    },
+                });
+            });
+        }
+        await mute.tap();
+        await page.locator('[data-artsoul-theme-toggle]').tap();
+        await page.waitForFunction(theme => document.body.classList.contains(theme), theme);
+        assert(await player.evaluate((player, muted) => {
+            const { media, controls } = window.detailProbe;
+            return player.querySelector('audio') === media && player.querySelector('.ap-controls') === controls &&
+                !media.paused && media.muted === muted;
+        }, theme === 'future'));
+        const position = await player.locator('audio').evaluate(media => media.currentTime);
+        await page.waitForFunction(previous => window.detailProbe.media.currentTime !== previous, position);
+    }
+    await play.tap();
+    await page.waitForFunction(() => window.detailProbe.media.paused);
+    await mute.tap();
+    await page.waitForFunction(() => window.detailProbe.media.paused && window.detailProbe.media.muted);
+    await player.evaluate(element => { element.style.width = '200px'; });
+    assert(await clock.isVisible(), 'The compact player retains the playback clock');
+    console.log(engine, '/artwork/8', width + 'px player kept its real clock, controls and audio across both themes');
+}
+
 (async () => {
     const { preview } = await import('vite');
-    const silence = await readSilentAudio();
+    const silence = await readSilentAudio(30);
     const fixture = {
         name: 'silent-audio',
         configurePreviewServer(server) {

@@ -159,12 +159,16 @@ const sections = [
                 {
                     question: "How can I reach a person?",
                     answer: "The founder handles support at the project mailbox. Describe what happened and which page you used. This link opens a draft in your mail app. You choose what to send. Keep recovery phrases, private keys and sign-in codes to yourself.",
-                    link: { text: "artsoulprotocol@gmail.com", href: "mailto:artsoulprotocol@gmail.com" }
+                    link: { text: "Email artsoulprotocol@gmail.com", href: "mailto:artsoulprotocol@gmail.com" }
                 },
                 {
-                    question: "How do I report an artwork or a security issue?",
-                    answer: "For copyright or abusive content, open the artwork and choose Report. If reporting is unavailable, email the founder with the artwork link. For a security issue, contact the founder privately with a short description.",
-                    link: { text: "Security reporting contact", href: "/.well-known/security.txt" }
+                    question: "How do I report an artwork?",
+                    answer: "For copyright or abusive content, open the artwork and choose Report. If reporting is unavailable, use the project email above and include the artwork link."
+                },
+                {
+                    question: "How do I report a security issue privately?",
+                    answer: "Open an email draft and describe what happened. If your mail app doesn’t open, copy the address below into a new message.",
+                    link: { text: "Email a security report to artsoulprotocol@gmail.com", href: "mailto:artsoulprotocol@gmail.com?subject=Security%20report" }
                 }
             ]
         }]

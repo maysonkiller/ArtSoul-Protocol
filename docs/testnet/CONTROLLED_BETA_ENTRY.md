@@ -16,7 +16,9 @@ are recorded separately from the decision to open a cohort window. The
 lists the three remaining observations on the current prototype. The C13
 cohort will use the checklist below with its own deployment and participants.
 
-The [security reporting contact](https://artsoulprotocol.com/.well-known/security.txt) uses the same project mailbox as the homepage. Reconfirm the monitored address and renew its published expiry before October 31, 2027, or update it immediately when the contact changes. The founder owns incident intake under the [solo support procedure](../runbooks/B3_INCIDENT_RESPONSE.md#solo-founder-support-and-incident-ownership). Reply coverage, mailbox recovery and retention still need operating evidence before mainnet. [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116.html)
+Security reports go to the project mailbox. [Email a security report to artsoulprotocol@gmail.com](mailto:artsoulprotocol@gmail.com?subject=Security%20report).
+
+The [machine-readable security.txt](https://artsoulprotocol.com/.well-known/security.txt) publishes the same address. Reconfirm the monitored address and renew its published expiry before October 31, 2027, or update it immediately when the contact changes. The founder owns incident intake under the [solo support procedure](../runbooks/B3_INCIDENT_RESPONSE.md#solo-founder-support-and-incident-ownership). Reply coverage, mailbox recovery and retention still need operating evidence before mainnet. [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116.html)
 
 A8 operating/test evidence and the subsequent UI repair are accepted October 15
 after PR #309 / #310, the owner's single-passkey confirmation and actual apex
