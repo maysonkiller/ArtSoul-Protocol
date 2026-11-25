@@ -99,7 +99,7 @@ export function prioritizePublicPageEntry(html, page) {
     if (!['gallery.html', 'profile.html', 'artwork.html'].includes(page)) return html;
     const name = page.slice(0, -5);
     const entry = html.match(new RegExp(`<script type="module"[^>]*src="/assets/${name}-[^"<>]+\\.js"[^>]*><\\/script>`))?.[0];
-    const legacy = html.match(/<script type="module"[^>]*src="\/contracts-integration\.js(?:\?[^"<>]*)?"[^>]*><\/script>/)?.[0];
+    const legacy = html.match(/<script type="module"[^>]*src="\/(?:contracts-integration|src\/features\/discovery\/gallery-contract-runtime)\.js(?:\?[^"<>]*)?"[^>]*><\/script>/)?.[0];
     if (!entry || !legacy || html.indexOf(entry) < html.indexOf(legacy)) return html;
     // Public projections do not need the legacy ethers/service graph. Keep
     // earlier classic scripts in place and let the public page evaluate first.

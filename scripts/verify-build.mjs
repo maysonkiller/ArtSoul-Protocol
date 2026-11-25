@@ -145,7 +145,12 @@ for (const page of pages) {
         const contractPosition = built.indexOf('src="/contracts-integration.js');
         const servicePosition = built.indexOf('src="/src/index.js');
         const cardPosition = built.indexOf('src="/src/ui/components/artwork-card.js');
-        if (entryPosition < 0 || contractPosition < entryPosition || servicePosition < entryPosition) {
+        if (page === 'gallery.html') {
+            const galleryRuntime = built.indexOf('src="/src/features/discovery/gallery-contract-runtime.js');
+            if (entryPosition < 0 || galleryRuntime < entryPosition || contractPosition >= 0 || servicePosition >= 0) {
+                throw new Error('The gallery must mount before its wallet loader and keep contract services off the guest path');
+            }
+        } else if (entryPosition < 0 || contractPosition < entryPosition || servicePosition < entryPosition) {
             throw new Error(`${page}: public entry must precede legacy contract/service modules`);
         }
         if (cardPosition < 0 || cardPosition > entryPosition) {

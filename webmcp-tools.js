@@ -1816,10 +1816,12 @@
             readContracts: () => window.ArtSoulContracts || null,
             prepareContracts: async () => {
                 await window.ArtSoulWalletRuntime?.load?.();
-                const contracts = window.ArtSoulContracts;
                 const address = text(window.getCurrentWalletAddress?.()).toLowerCase();
                 const provider = await window.web3Modal?.getWalletProvider?.();
-                if (!contracts || !/^0x[0-9a-f]{40}$/.test(address) || !provider?.request) return null;
+                if (!/^0x[0-9a-f]{40}$/.test(address) || !provider?.request) return null;
+                await window.loadArtSoulGalleryContracts?.();
+                const contracts = window.ArtSoulContracts;
+                if (!contracts) return null;
 
                 // Only the selected provider may supply this account. These
                 // passive reads never connect, switch chains or request consent.

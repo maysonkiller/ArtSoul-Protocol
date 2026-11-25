@@ -24,9 +24,9 @@ function sourceFiles(dir, found = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) continue;
     // Local browser evidence and dependency caches are never build inputs.
-    // Exclude only the root evidence directory, not a source directory with this name.
     if (dir === ROOT && entry.name === 'output') continue;
     const full = path.join(dir, entry.name);
+    if (full === path.join(ROOT, 'docs', 'private')) continue;
     if (entry.isDirectory()) {
       sourceFiles(full, found);
     } else if (/\.(js|jsx|mjs|cjs|html)$/.test(entry.name)) {
