@@ -258,9 +258,9 @@
     "contracts/replacement/TreasuryBoundOrdinaryArt.sol": "0cdb9a3a58c516c1aac6e5caac01b68e716caf3721f9e2b38d36154746f1822e"
   },
   "toolchain": {
-    "hardhat": "2.28.6",
+    "hardhat": "2.29.2",
     "localConfigLfSha256": "d9538322e98a41ad2899ddf7e00bd57a42a1c9edf86e9fd83d7e7f24fdbb5767",
     "openZeppelinContracts": "5.0.0",
-    "packageLockLfSha256": "3cc70a68bed3dfeea23497fa208b5cebd8cd51141bb783ac47df9a480e0482d1"
+    "packageLockLfSha256": "02beaac49d5dfd0952c2405de34eeef361f893403055c6eec669e71f062328d4"
   }
 }
