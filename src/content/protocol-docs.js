@@ -79,9 +79,9 @@ const sections = [
         id: "collection-verification",
         title: "Collection verification",
         blocks: [
-            {"type":"verification-mark","text":"Blue check — verified collection origin"},
+            {"type":"verification-mark","text":"Example blue check for a verified collection origin"},
             {"type":"paragraph","text":"Any artist or project team can publish an artwork or prepare a collection draft without a blue check or Partner status."},
-            {"type":"paragraph","text":"On a collection cover, the blue check identifies the artist or project whose connection to that collection was reviewed. Each review covers a specific blockchain and collection contract and can be revoked."},
+            {"type":"paragraph","text":"Public collection covers are in development. A blue check will identify the artist or project whose connection to that collection was reviewed. Each review covers a specific blockchain and collection contract and can be revoked."},
             {"type":"paragraph","text":"Sales volume plays no part in this review. It carries no Trust weight or fee benefit and makes no claim about ownership, copyright or future value. Permission for a marketplace to transfer an NFT comes from its owner’s wallet."}
         ]
     },
