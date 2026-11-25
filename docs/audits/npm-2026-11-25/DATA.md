@@ -1,5 +1,7 @@
 # Dependency audit evidence, November 25, 2026
 
+The [latest runtime and toolchain follow-up](RESIDUAL_FOLLOWUP.md) reduced the full report from 50 to 18 package names and the omit-dev report from 41 to nine. The confirmed comparisons and the [wallet compatibility and contract evidence](SECURITY_RESIDUAL_RISK.md) apply to the lock identified in that follow-up.
+
 The [Mocha and solc follow-up](TOOLCHAIN_FOLLOWUP.md) records the next lock with 50 affected packages, including nine high and zero critical. The table below preserves the earlier snapshots.
 
 The historical baseline workflow ran at `42dd819be00f0cd6d83a8a34c8cf226cd97fd215`. Its package lock is byte-identical to `ef17eeabe21255b2be41008e74b5f9044b8e187e` on main. The historical security candidate is `023faed9e4ffe4ea7263efce535044522f49e98e`. The revised candidate is identified by the lock SHA-256 below.
