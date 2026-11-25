@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { getAddress, keccak256, toQuantity } from 'ethers';
 import { prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
-import { expectedRehearsalPairRegister } from './prepare-rehearsal-core.mjs';
+import { expectedRehearsalPairRegister, loadReviewedPair } from './prepare-rehearsal-core.mjs';
 import { prepareRehearsalSafes, rehearsalSafeRelease as release } from './prepare-rehearsal-safes.mjs';
 import { readRpc, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
@@ -99,17 +99,12 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, tre
         check(coreReview.chainId === 84532 && getAddress(coreReview.payer) === base.payer &&
             coreReview.constructorArgs?.slice(3).map(String).join(',') === '8,30000',
             'Expected the Base Sepolia rehearsal payer and reviewed refund limits 8 and 30000.');
-        const [artifact, nftArtifact, layout, manifest] = await Promise.all([
-            json(new URL('../artifacts/contracts/replacement/OrdinaryMarket.sol/OrdinaryMarket.json', import.meta.url)),
-            json(new URL('../artifacts/contracts/replacement/SettledArtworkNFT.sol/SettledArtworkNFT.json', import.meta.url)),
-            json(new URL('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json', import.meta.url)),
-            json(new URL('../docs/security/C12_ORDINARY_AUDIT_MANIFEST.json', import.meta.url))
-        ]);
+        const { core: artifact, nft: nftArtifact, layout, manifest } = await loadReviewedPair(coreReview.contract);
         const register = expectedRehearsalPairRegister(custody, coreReview, manifest, layout, artifact, nftArtifact);
         const pairStatus = await reviewedPairStatus(providers, register, block);
         if (pairStatus) return { ...base, ...pairStatus };
         const plan = prepareOrdinaryDeployment(artifact, coreReview, custody);
-        operation = 'OrdinaryMarket';
+        operation = artifact.contractName;
         target = 'Direct contract creation';
         tx = plan.transaction;
         dataHash = plan.initCodeHash;

@@ -4,6 +4,8 @@ This backlog tracks the A–D phase model in `ARTSOUL_CANON_BIBLE_FULL.md` §17.
 
 Work proceeds one contained task at a time. One backlog item normally equals one focused PR. Contract changes require focused tests and explicit storage-layout review.
 
+**C1 / C12 / C13, November 25.** The [ordinary payout candidate](../security/C12_ORDINARY_AUDIT_HANDOFF.md) implements delivery of accrued credits to a creditor-selected address. Release tooling distinguishes its bytecode and paired NFT from the existing Base Sepolia deployment. Public rehearsal of the new candidate and independent audit acceptance are outstanding.
+
 **November 25 acceptance count.** Of 38 active numbered items, 17 are accepted (44.7%) and 21 remain. Phase A has 12 of 12 accepted, B has 1 of 5 (B4), C has 4 of 16 (C2, C3, C6 and C11), and D has 0 of 5. C16 and D1 were retired without completion credit. Each active item carries equal weight. The founder closed the B engineering workstream on November 18. Open public-beta journeys carry into C13.
 
 The five fixes from the November 19 recording reached artsoulprotocol.com in [PR #500](https://github.com/maysonkiller/ArtSoul-Protocol/pull/500), main commit `32511226`. On November 20, guest Chromium checks on the public domain covered the Favorites entry, gallery refresh with delayed scripts, collection draft save/undo/load, and artworks 7 and 12 in Classic and Future. Artwork 12 showed its original creator value of 0.00001 test ETH separately from its auction start of 0.0005 test ETH. The real-wallet sign-in and saving a private favorite still need a connected-wallet check.

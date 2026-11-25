@@ -9,7 +9,10 @@ const { execFileSync } = require('node:child_process');
 const { keccak256 } = require('ethers');
 
 const rootDir = path.resolve(__dirname, '..');
-const targets = ['OrdinaryMarket', 'SettledArtworkNFT'];
+function pairTargets(coreName) {
+  assert(['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(coreName), 'Unrecognized ordinary Core');
+  return [coreName, 'SettledArtworkNFT'];
+}
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const readJSON = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const textDigest = file => sha256(fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n'));
@@ -34,7 +37,7 @@ function bytecodeRecord(compiled, artifactHex, name) {
   return { bytes: compiled.object.length / 2, keccak256: keccak256(artifactHex) };
 }
 
-function buildOrdinaryAuditManifest(root = rootDir) {
+function buildOrdinaryAuditManifest(root = rootDir, coreName = 'OrdinaryMarket') {
   const configPath = path.join(root, 'hardhat.local.config.cjs');
   const config = require(configPath).solidity;
   const lockPath = path.join(root, 'package-lock.json');
@@ -45,7 +48,7 @@ function buildOrdinaryAuditManifest(root = rootDir) {
   let compiler;
   let settings;
 
-  for (const name of targets) {
+  for (const name of pairTargets(coreName)) {
     const source = `contracts/replacement/${name}.sol`;
     const dir = path.join(root, 'artifacts', source);
     const artifact = readJSON(path.join(dir, name + '.json'));
@@ -104,9 +107,9 @@ function buildOrdinaryAuditManifest(root = rootDir) {
       hardhat: packages['node_modules/hardhat'].version, openZeppelinContracts: packages['node_modules/@openzeppelin/contracts'].version } });
 }
 
-function rebuildOrdinaryAuditManifest(manifest, executable, root = rootDir) {
+function rebuildOrdinaryAuditManifest(manifest, executable, root = rootDir, coreName = 'OrdinaryMarket') {
   assert.equal(manifest.schemaVersion, 1);
-  assert.deepEqual(Object.keys(manifest.contracts).sort(), targets.map(n => `contracts/replacement/${n}.sol:${n}`));
+  assert.deepEqual(Object.keys(manifest.contracts).sort(), pairTargets(coreName).map(n => `contracts/replacement/${n}.sol:${n}`));
   assert.equal(textDigest(path.join(root, 'package-lock.json')), manifest.toolchain.packageLockLfSha256, 'Dependency lock differs');
   assert.equal(textDigest(path.join(root, 'hardhat.local.config.cjs')), manifest.toolchain.localConfigLfSha256, 'Compiler config differs');
   const sources = {};
@@ -141,14 +144,17 @@ function rebuildOrdinaryAuditManifest(manifest, executable, root = rootDir) {
 if (require.main === module) {
   try {
     const args = process.argv.slice(2);
+    const payout = args[0] === '--payout';
+    if (payout) args.shift();
+    const coreName = payout ? 'OrdinaryPayoutMarket' : 'OrdinaryMarket';
     const rebuild = args[0] === '--rebuild' && args.length === 3;
     assert(args.length === 0 || rebuild || (args.length === 2 && ['--write', '--check'].includes(args[0])),
-      'Usage: node scripts/ordinary-audit-manifest.cjs [--write <new-file.json> | --check <manifest.json> | --rebuild <manifest.json> <trusted-solc>]');
-    const manifest = rebuild ? readJSON(args[1]) : buildOrdinaryAuditManifest();
+      'Usage: node scripts/ordinary-audit-manifest.cjs [--payout] [--write <new-file.json> | --check <manifest.json> | --rebuild <manifest.json> <trusted-solc>]');
+    const manifest = rebuild ? readJSON(args[1]) : buildOrdinaryAuditManifest(rootDir, coreName);
     const serialized = JSON.stringify(manifest, null, 2) + '\n';
     if (!args.length) process.stdout.write(serialized);
     else {
-      if (rebuild) rebuildOrdinaryAuditManifest(manifest, args[2]);
+      if (rebuild) rebuildOrdinaryAuditManifest(manifest, args[2], rootDir, coreName);
       else if (args[0] === '--write') fs.writeFileSync(args[1], serialized, { flag: 'wx' });
       else assert.deepEqual(readJSON(args[1]), manifest, 'Audit manifest differs from current sources, build or dependency lock');
       console.log(`${args[0]} ${Object.keys(manifest.sourceSha256).length} sources, ${Object.keys(manifest.contracts).length} contracts, sha256 ${sha256(serialized)}`);

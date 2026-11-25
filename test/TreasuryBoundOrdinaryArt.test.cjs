@@ -35,6 +35,63 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         engine = await deployMarket(protocol.target, ecosystem.target, security.target);
     });
 
+    it('matches the reviewed payout Core and NFT runtime hashes after actual local deployment', async () => {
+        const { loadReviewedPair, buildRehearsalCoreReview, expectedRehearsalPairRegister } = await import('../scripts/prepare-rehearsal-core.mjs');
+        const { payoutCore } = await import('../scripts/prepare-ordinary-deployment.mjs');
+        const { buildOrdinaryAuditManifest } = require('../scripts/ordinary-audit-manifest.cjs');
+        const { core, nft, layout, manifest } = await loadReviewedPair(payoutCore);
+        assert.deepEqual(buildOrdinaryAuditManifest(undefined, 'OrdinaryPayoutMarket'), manifest);
+        const roles = { protocolTreasury: protocol, ecosystemTreasury: ecosystem, adminSecurity: security };
+        const custody = { chainId: 84532 };
+        for (const [role, safe] of Object.entries(roles)) {
+            custody[role] = { address: safe.target, threshold: 2, owners: [...await safe.getOwners()] };
+        }
+        const nonce = await provider.getTransactionCount(deployer.address);
+        const review = buildRehearsalCoreReview(core, manifest, custody, deployer.address, nonce);
+        const register = expectedRehearsalPairRegister(custody, review, manifest, layout, core, nft);
+        const deployed = await deploy(core.contractName, protocol.target, ecosystem.target, security.target, 8, 30_000);
+        assert.equal(deployed.target, register.core.address);
+        assert.equal(await deployed.nft(), register.nft.address);
+        for (const entry of [register.core, register.nft]) {
+            assert.equal(ethers.keccak256(await provider.getCode(entry.address)), entry.codeHash);
+        }
+    });
+
+    it('lets only the credited wallet route a rejected refund, including while entries are paused', async () => {
+        engine = await deploy('OrdinaryPayoutMarket', protocol.target, ecosystem.target, security.target, 2, 30_000);
+        const wallet = await deploy('OrdinaryBidderFixture');
+        const startPrice = ethers.parseEther('0.1');
+        const credit = await engine.requiredDepositForBid(startPrice);
+        await mine(engine.connect(artist).registerArtwork('ipfs://refund-work'));
+        await mine(engine.connect(artist).createAuction(1, startPrice, day));
+        await mine(wallet.bid(engine.target, 1, startPrice, { value: credit }));
+        const next = await engine.minimumBid(1);
+        const heldDeposit = await engine.requiredDepositForBid(next);
+        await mine(engine.connect(collector).placeBid(1, next, { value: heldDeposit }));
+        await network.provider.send('evm_setNextBlockTimestamp', [Number((await engine.auctions(1)).end)]);
+        await mine(engine.closeAuction(1));
+        await mine(engine.processRefunds(1, 2));
+        await mine(security.setPause(engine.target, true));
+        assert.equal(await engine.credits(wallet.target), credit);
+        await rejects(engine.connect(buyer).withdrawTo.staticCall(buyer.address), 'NoCredit');
+        await rejects(wallet.withdraw.staticCall(engine.target), 'CreditTransferFailed');
+        for (const recipient of [ethers.ZeroAddress, engine.target]) {
+            await rejects(wallet.withdrawTo.staticCall(engine.target, recipient), 'InvalidCreditRecipient');
+        }
+        await rejects(wallet.withdrawTo(engine.target, wallet.target, { gasLimit: 200_000 }).then(mine), 'CreditTransferFailed');
+        assert.equal(await engine.credits(wallet.target), credit);
+        const before = await provider.getBalance(buyer.address);
+        const receipt = await mine(wallet.withdrawTo(engine.target, buyer.address));
+        const logs = receipt.logs.map(log => engine.interface.parseLog(log));
+        assert.deepEqual(logs.map(log => [log.name, ...log.args]), [
+            ['CreditRouted', wallet.target, buyer.address], ['CreditWithdrawn', wallet.target, credit]
+        ]);
+        assert.equal(await provider.getBalance(buyer.address), before + credit);
+        assert.equal(await provider.getBalance(engine.target), heldDeposit);
+        assert.equal(await engine.credits(wallet.target), 0n);
+        await rejects(wallet.withdrawTo.staticCall(engine.target, buyer.address), 'NoCredit');
+    });
+
     it('requires three distinct two-of-three accounts and explicit refund limits at creation', async () => {
         assert.deepEqual([await engine.protocolTreasury(), await engine.ecosystemTreasury(), await engine.adminSecurity()],
             [protocol.target, ecosystem.target, security.target]);

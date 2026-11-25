@@ -61,11 +61,12 @@ function replacementBuild(root, targets) {
 function main() {
   const [buildFile, compilerFile, outputFile, mode, ...extra] = process.argv.slice(2);
   assert(buildFile && compilerFile && outputFile && !extra.length && (!mode || mode === '--check'),
-    'Usage: node scripts/export-contract-storage.cjs <build-info.json|--replacement|--ordinary> <trusted-solc-executable> <output.json> [--check]');
+    'Usage: node scripts/export-contract-storage.cjs <build-info.json|--replacement|--ordinary|--ordinary-payout> <trusted-solc-executable> <output.json> [--check]');
   const root = path.resolve(__dirname, '..');
-  const ordinary = buildFile === '--ordinary';
+  const ordinary = ['--ordinary', '--ordinary-payout'].includes(buildFile);
+  const coreName = buildFile === '--ordinary-payout' ? 'OrdinaryPayoutMarket' : 'OrdinaryMarket';
   const replacement = ordinary || buildFile === '--replacement';
-  const targets = ordinary ? [['contracts/replacement/OrdinaryMarket.sol', 'OrdinaryMarket'], replacementTargets[0]]
+  const targets = ordinary ? [[`contracts/replacement/${coreName}.sol`, coreName], replacementTargets[0]]
     : replacement ? replacementTargets : legacyTargets;
   const build = replacement ? replacementBuild(root, targets) : JSON.parse(fs.readFileSync(buildFile, 'utf8'));
   if (!replacement) verifyBuild(build);

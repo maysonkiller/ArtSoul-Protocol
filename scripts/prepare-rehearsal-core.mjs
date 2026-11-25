@@ -4,11 +4,10 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { AbiCoder, concat, getAddress, getBytes, getCreateAddress, isHexString, keccak256, toBeHex, toQuantity } from 'ethers';
 import { buildOrdinaryAuditManifest } from './ordinary-audit-manifest.cjs';
-import { prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
+import { historicalCore, payoutCore, prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
 import { prepareRehearsalSafes } from './prepare-rehearsal-safes.mjs';
 import { readRpc, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
-const qualified = 'contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket';
 const roles = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
 const rehearsalLimits = [8, 30_000];
 const load = async file => JSON.parse((await readFile(file, 'utf8')).trimStart());
@@ -16,6 +15,8 @@ const defaultProviders = () => [readRpc('https://sepolia.base.org'), readRpc('ht
 
 export function buildRehearsalCoreReview(artifact, manifest, custody, payer, nonce) {
     assert.equal(custody.chainId, 84532, 'Select the Base Sepolia rehearsal register');
+    const qualified = artifact.sourceName + ':' + artifact.contractName;
+    assert([historicalCore, payoutCore].includes(qualified), 'Unknown Core artifact');
     const record = manifest.contracts[qualified];
     assert.equal(keccak256(artifact.bytecode), record.creation.keccak256, 'Core creation bytecode differs from C12');
     assert.equal(keccak256(artifact.deployedBytecode), record.runtimeTemplate.keccak256, 'Core runtime template differs from C12');
@@ -130,39 +131,48 @@ export async function verifyRehearsalCoreReceipt(txHash, review, register, provi
         initCodeHash: review.initCodeHash, core: register.core.address, nft: register.nft.address, rpcReadings: 2 };
 }
 
-export async function prepareRehearsalCore(savedPlan) {
-    const manifest = await load(new URL('../docs/security/C12_ORDINARY_AUDIT_MANIFEST.json', import.meta.url));
-    assert.deepEqual(buildOrdinaryAuditManifest(), manifest, 'C12 source, compiler or artifact verification failed');
-    const artifact = await load(new URL('../artifacts/contracts/replacement/OrdinaryMarket.sol/OrdinaryMarket.json', import.meta.url));
+export async function loadReviewedPair(qualified) {
+    assert([historicalCore, payoutCore].includes(qualified), 'Unrecognized reviewed Core');
+    const payout = qualified === payoutCore;
+    const [source, name] = qualified.split(':');
+    const [core, nft, layout, manifest] = await Promise.all([
+        load(new URL(`../artifacts/${source}/${name}.json`, import.meta.url)),
+        load(new URL('../artifacts/contracts/replacement/SettledArtworkNFT.sol/SettledArtworkNFT.json', import.meta.url)),
+        load(new URL('../docs/architecture/' + (payout ? 'C1_ORDINARY_PAYOUT_STORAGE.json' : 'C1_ORDINARY_PAIR_STORAGE_2026-11-20.json'), import.meta.url)),
+        load(new URL('../docs/security/' + (payout ? 'C12_ORDINARY_PAYOUT_MANIFEST.json' : 'C12_ORDINARY_AUDIT_MANIFEST.json'), import.meta.url))
+    ]);
+    return { core, nft, layout, manifest };
+}
+
+export async function prepareRehearsalCore(savedPlan, qualified = historicalCore) {
+    const { core, manifest } = await loadReviewedPair(qualified);
+    assert.deepEqual(buildOrdinaryAuditManifest(undefined, core.contractName), manifest, 'C12 source, compiler or artifact verification failed');
     const providers = defaultProviders();
     const { payer, custody } = savedPlan;
     const verified = await prepareRehearsalSafes({ adminSafe: custody.adminSecurity.address, payer, providers });
     assert.deepEqual(verified.custody, custody, 'Reviewed treasury addresses or owner sets have changed');
     assert.equal(verified.roleRequests.length, 0, 'Both verified treasury Safe proxies must be finalized before preparing the Core review');
     const nonce = await readUnusedCoreNonce(payer, providers);
-    return buildRehearsalCoreReview(artifact, manifest, custody, payer, nonce);
+    return buildRehearsalCoreReview(core, manifest, custody, payer, nonce);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     try {
         const [, , planFile, option, reviewFile, txHash] = process.argv;
-        assert(process.argv.length === 3 || (process.argv.length === 5 && option === '--register') ||
+        assert(process.argv.length === 3 || (process.argv.length === 4 && option === '--payout') || (process.argv.length === 5 && option === '--register') ||
             (process.argv.length === 6 && option === '--verify-receipt'),
-            'Usage: node scripts/prepare-rehearsal-core.mjs <approved-test-safe-plan.json> [--register <core-review.json> | --verify-receipt <core-review.json> <transaction-hash>]');
+            'Usage: node scripts/prepare-rehearsal-core.mjs <approved-test-safe-plan.json> [--payout | --register <core-review.json> | --verify-receipt <core-review.json> <transaction-hash>]');
         const saved = await load(planFile);
-        if (option) {
-            const manifest = await load(new URL('../docs/security/C12_ORDINARY_AUDIT_MANIFEST.json', import.meta.url));
-            assert.deepEqual(buildOrdinaryAuditManifest(), manifest, 'C12 manifest verification failed');
-            const layout = await load(new URL('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json', import.meta.url));
-            const [core, nft] = await Promise.all(['OrdinaryMarket', 'SettledArtworkNFT'].map(name =>
-                load(new URL('../artifacts/contracts/replacement/' + name + '.sol/' + name + '.json', import.meta.url))));
+        if (reviewFile) {
             const review = await load(reviewFile);
+            const { core, nft, layout, manifest } = await loadReviewedPair(review.contract);
+            assert.deepEqual(buildOrdinaryAuditManifest(undefined, core.contractName), manifest, 'C12 manifest verification failed');
             assert.equal(getAddress(saved.payer), getAddress(review.payer), 'Unexpected deployment payer');
             const register = expectedRehearsalPairRegister(saved.custody, review, manifest, layout, core, nft);
             const result = option === '--verify-receipt' ? await verifyRehearsalCoreReceipt(txHash, review, register) : register;
             console.log(JSON.stringify(result, null, 2));
         } else {
-            console.log(JSON.stringify(await prepareRehearsalCore(saved), null, 2));
+            console.log(JSON.stringify(await prepareRehearsalCore(saved, option === '--payout' ? payoutCore : historicalCore), null, 2));
         }
     } catch (error) {
         console.error('Core rehearsal preparation stopped:', error.shortMessage ?? error.message.split('\n')[0]);
