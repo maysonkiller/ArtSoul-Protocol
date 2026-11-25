@@ -58,6 +58,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
             const isClassic = theme === 'classic';
             const isGlobalSearch = debouncedSearchQuery.trim() !== '';
+            const collectionOverview = activeTab === 'collections' && !isGlobalSearch;
             const isSearchPending = searchQuery.trim() !== debouncedSearchQuery.trim();
             const activeFilters = useMemo(() => ({
                 activeTab,
@@ -246,15 +247,6 @@ const { useState, useEffect, useMemo, useRef } = React;
                         title: 'No artworks awaiting auction',
                         detail: 'Published artworks waiting to be auctioned or re-auctioned will appear here.',
                         cta: true
-                    };
-                }
-
-                if (tabId === 'collections') {
-                    return {
-                        title: 'Collections are not live yet',
-                        detail: 'Real collection pages will appear after collection data is available.',
-                        verificationGuide: true,
-                        cta: false
                     };
                 }
 
@@ -450,6 +442,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </div>
 
                                 {/* Status Filter */}
+                                {!collectionOverview && <>
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
@@ -505,8 +498,10 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         Clear filters
                                     </button>
                                 </div>
+                                </>}
                             </div>
 
+                            {!collectionOverview && <>
                             {/* Price Range */}
                             {filtersOpen && (
                                 <div id="gallery-price-filters" className="gallery-price-grid">
@@ -564,9 +559,18 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     ? `Showing ${filteredArtworks.length} loaded ${artworkNoun} for “${debouncedSearchQuery.trim()}”. Filtering loaded artworks. Use the header search for all art and artist profiles.`
                                     : `Showing ${filteredArtworks.length} ${artworkNoun} in ${GALLERY_TABS.find(tab => tab.id === activeTab)?.label || 'Discover'}`}
                             </div>
+                            </>}
                         </div>
 
                         {/* Gallery Grid */}
+                        {collectionOverview ? (
+                            <div className="gallery-empty-state">
+                                <h2>Collections are not live yet</h2>
+                                <p>Collection publishing is in development. You can save a draft in the builder.</p>
+                                <p><a className="inline-block mt-4 underline" href="/collection-builder">Prepare a collection draft</a></p>
+                                <p><a className="inline-block mt-4 underline" href="/docs-protocol#collection-verification">How collection verification works</a></p>
+                            </div>
+                        ) : <>
                         {failedPreviewCount > 0 && (
                             <div className="home-protocol-section mb-4" role="status">
                                 <p>{failedPreviewCount === 1 ? '1 artwork preview could not load.' : `${failedPreviewCount} artwork previews could not load.`}</p>
@@ -594,9 +598,6 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         <>
                                             <h2>{emptyState.title}</h2>
                                             <p>{emptyState.detail}</p>
-                                            {emptyState.verificationGuide && (
-                                                <a className="inline-block mt-4 underline" href="/docs-protocol#collection-verification">How collection verification works</a>
-                                            )}
                                             {emptyState.cta && (
                                     <button
                                         onClick={() => window.location.href = '/upload'}
@@ -861,6 +862,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 })}
                             </div>
                         )}
+                        </>}
                 </>
             );
         }

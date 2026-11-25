@@ -98,7 +98,8 @@ test('the collection gallery links to a readable key for the origin mark', async
   const section = sections.find(item => item.id === 'collection-verification');
   const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
   assert.match(html, /<svg[^>]*aria-hidden="true"/);
-  assert.match(html, /Blue check[^<]+verified collection origin/);
+  assert.match(html, /Example blue check for a verified collection origin/);
+  assert.match(html, /Public collection covers are in development/);
   assert.match(section.text, /specific blockchain and collection contract/);
   assert.match(section.text, /revoked/);
   assert.match(section.text, /Sales volume plays no part/);

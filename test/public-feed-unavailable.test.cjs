@@ -91,7 +91,7 @@ const descendants = node => !node || typeof node !== 'object' ? [] :
 const text = node => typeof node === 'string' ? node : typeof node === 'number' ? String(node) :
   node && typeof node === 'object' ? [node.props?.children].flat(Infinity).map(text).join('') : '';
 
-async function galleryHarness(read) {
+async function galleryHarness(read, hash = '#discover') {
   const source = fs.readFileSync('src/entries/gallery.jsx', 'utf8');
   const { transformWithOxc } = await import('vite');
   const { code } = await transformWithOxc(source.slice(0, source.lastIndexOf('        createRoot('))
@@ -106,7 +106,7 @@ async function galleryHarness(read) {
     useMemo: fn => fn(),
     useEffect(fn) { if (!mounted) effects.push(fn); }
   };
-  const window = { location: { hash: '#discover' }, addEventListener: (key, fn) => { listeners[key] = fn; },
+  const window = { location: { hash }, addEventListener: (key, fn) => { listeners[key] = fn; },
     ArtSoulDB: { getPublicProjectionArtworks: async (options, strict) => { assert.equal(strict, true); return read(options); } },
     ArtSoulArtworkCard: { hasSafeMedia: () => true, ReactCard: () => null, detailHref: art => '/artwork/' + art.id },
     ArtSoulDiscovery: { filterForGalleryTab: rows => rows } };
@@ -141,6 +141,20 @@ test('gallery genuine empty success retains its usual empty-state messaging', as
   await tick(); h.update();
   assert.match(h.text(), /Showing 0 artworks/);
   assert.doesNotMatch(h.text(), /temporarily unavailable/);
+});
+
+test('Collections links to drafting and verification regardless of artwork feed state or legacy labels', async () => {
+  for (const read of [() => { throw unavailable(); }, () => [{ ...row('legacy-artwork'), is_collection: true }]]) {
+    const h = await galleryHarness(read, '#collections');
+    for (const phase of ['loading', 'settled']) {
+      if (phase === 'settled') { await tick(); h.update(); }
+      assert.match(h.text(), /Collections are not live yet/);
+      assert.ok(h.nodes().some(node => node.props.href === '/collection-builder'));
+      assert.ok(h.nodes().some(node => node.props.href === '/docs-protocol#collection-verification'));
+      assert.doesNotMatch(h.text(), /Loading artworks|temporarily unavailable|Showing [01] artwork/);
+      assert.ok(!h.nodes().some(node => node.props?.artwork || node.type?.name === 'CardGridSkeleton'));
+    }
+  }
 });
 
 test('a gallery refresh keeps the current results visible, including an empty selection', async () => {
