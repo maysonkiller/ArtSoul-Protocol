@@ -29,6 +29,19 @@ test('banner delivery preview protects nine ranked positions and discloses exact
     assert.match(preview(schedule)[11].promotion.consideration, /0\.000000000000000001 ETH/);
 });
 
+test('only the recorded terms can supply the visitor-facing sponsor identity', () => {
+    const creatives = new Map(sampleCreatives);
+    creatives.set('sample-partner', { ...creatives.get('sample-partner'), name:'Unreviewed alias', relationship:'Unknown' });
+    assert.equal(preview(sampleSchedule, creatives)[9].promotion.sponsor, 'Print Room');
+    const legacy = structuredClone(sampleSchedule);
+    delete legacy.placements[0].sponsorName;
+    delete legacy.placements[0].relationship;
+    assert.equal(preview(legacy, creatives)[9].promotion, undefined);
+    const halfNamed = structuredClone(sampleSchedule);
+    delete halfNamed.awards[0].relationship;
+    assert.throws(() => checkBannerSchedule(halfNamed, halfNamed, sampleTime), /public sponsor relationship/);
+});
+
 test('ineligible and unavailable promotion slots return to organic works in their original order', () => {
     const ids = catalog.slice(0,12).map(art => art.id);
     assert.deepEqual(positions(preview(null)), ids);

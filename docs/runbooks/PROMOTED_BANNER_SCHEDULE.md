@@ -21,7 +21,7 @@ node --test test/banner-schedule.test.mjs
 
 The report counts an auction during its delivery period only after an award has been recorded. All planned periods still reserve their lane for collision checks. An award record alone supplies no proof of payment. An occupied lane is available again at its exact end time.
 
-| Record | Required public terms |
+| Record | Schedule intake fields |
 | --- | --- |
 | Every placement | Stable `id`, `kind`, promotion `slot` (1–3), `publishedAt`, `startsAt`, `endsAt`, HTTPS `termsUrl`, separate `proposedBy` and `approvedBy` groups. |
 | `auction` | `opensAt`, `closesAt`, exact `reserveWei`, `payee: "ProtocolTreasury"`. The auction opens to eligible bidders without a named sponsor. |
@@ -30,6 +30,8 @@ The report counts an auction during its delivery period only after an award has 
 | Auction award | Add one entry to `awards` with `placementId`, winning `sponsorGroup`, `winningBidWei`, `decidedAt` and HTTPS `recordUrl`. Publish the result once bidding closes and by the scheduled start. |
 
 UTC timestamps use whole seconds. Prices use decimal strings denominated in wei to preserve exact amounts. Executable sample schedules use synthetic prices in [the regression tests](../../test/banner-schedule.test.mjs).
+
+Use `sponsorName` and `relationship` together for the visitor-facing sponsor identification on a free or negotiated placement or an auction award. Keep `sponsorGroup`, `proposedBy` and `approvedBy` for internal conflict checks. Older schedules still pass validation with the original fields. Their private group identifiers cannot substitute for a reviewed public name.
 
 ## Fair allocation and review
 
@@ -52,6 +54,12 @@ node scripts/record-banner-schedule.mjs 0 proposed.json --persist
 ```
 
 Supply the entire schedule and the revision reviewed by the operator (zero for the first intake). The command locks the schedule, reads its committed terms and time from PostgreSQL, validates all placements and awards, and appends only new entries. An identical retry returns the existing revision. Conflicting terms or a new entry based on a stale revision require a fresh review. The ledger retains the recorder's database login and the recording time. It has no Data API grants. This is a private recording step. Public disclosure, verification of proposer and reviewer affiliations, collection of payment, refunds and homepage delivery still require their own integrations.
+
+## Preview the terms recorded for one placement
+
+Run `node scripts/read-banner-terms.mjs REVISION PLACEMENT_ID` with the same database setting and a private reporting login. The command reads one placement at a chosen revision and includes any award recorded by that revision. It emits the actual database recording times. A free placement shows zero cash, no in-kind consideration, the public sponsor name, its relationship and the placement reason. An auction shows its reserve and bidding window before an award. A negotiated placement shows its exact fee and in-kind terms.
+
+The output uses an explicit list of public fields. It excludes reviewer, proposer, internal affiliation identifiers and database login names. Missing public sponsor details, filtered reads, duplicate records, late recording and records above the 16 KiB preview limit stop the export. `recorded_terms_preview` identifies a private rehearsal. Publication still needs an authenticated approval and an externally retrievable, timestamped copy. An auction award still needs evidence of payment. [Read-only command](../../scripts/read-banner-terms.mjs)
 
 ## Industry references
 

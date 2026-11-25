@@ -4,13 +4,15 @@ import { test } from 'node:test';
 import { Interface, keccak256 } from 'ethers';
 import { readArtworkMetadata } from '../src/api/safe-artwork-fetch.js';
 import { rehearsalArtwork as work, rehearsalMetadataUri as uri, rehearsalOpening, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { checkRegistrationPublication, inspectRegistrationReceipt, openingAtHead, registrationAtHead, simulateRegisteredOpening, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
+import { checkRegistrationPublication, inspectOpeningReceipt, inspectRegistrationReceipt, openingAtHead, registrationAtHead, simulateRegisteredOpening, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
 
 const market = new Interface([
     'function registerArtwork(string) returns (uint256)', 'function workCount() view returns (uint256)',
     'function works(uint256) view returns (address,string,uint256,uint256)',
     'function artworkToToken(uint256) view returns(uint256)',
     'function createAuction(uint256,uint256,uint256) returns (uint256)', 'function auctionCount() view returns (uint256)',
+    'function auctions(uint256) view returns(uint256,uint256,uint256,uint256,uint256,address,uint256,uint256,uint8,address)',
+    'event AuctionOpened(uint256 indexed auctionId,uint256 indexed artworkId,uint256 startPrice,uint256 end)',
     'event ArtworkRegistered(uint256 indexed artworkId,address indexed creator,string metadataURI)'
 ]);
 const payer = '0x' + '1'.repeat(40), outsider = '0x' + '2'.repeat(40);
@@ -163,6 +165,43 @@ function receiptRpc(change = {}) {
     };
     return async (method, params) => answers[method](...params);
 }
+
+test('the reviewed zero-value auction opening matches the included transaction, event and block-pinned work', async () => {
+    const reserve = 1000000000000000n, end = 86416n, zero = '0x' + '0'.repeat(40);
+    const txOpen = { ...tx, value:'0x0', nonce:'0x13', input:market.encodeFunctionData('createAuction', [1,reserve,86400]) };
+    const log = { ...receipt.logs[0], ...market.encodeEventLog('AuctionOpened', [1,1,reserve,end]) };
+    const opened = { ...receipt, logs:[log], gasUsed:'0x30200' };
+    function reader(options = {}) {
+        return receiptRpc({
+            eth_getTransactionByHash: () => ({ ...txOpen, ...options.tx }),
+            eth_getTransactionReceipt: () => ({ ...opened, ...options.receipt }),
+            eth_getBlockByNumber: tag => tag === 'finalized' ? { ...block, ...options.head } :
+                { ...block, timestamp:'0x10', transactions:[hash], ...options.block },
+            eth_call: (call, at) => {
+                assert.deepEqual(at, {blockHash:block.hash,requireCanonical:true});
+                const {name,args} = market.parseTransaction({data:call.data});
+                assert.equal(args[0], 1n);
+                if (name === 'artworkToToken') {
+                    assert.equal(call.to, work.nft);
+                    return returned(name, [options.token ?? 0]);
+                }
+                assert.equal(call.to, work.core);
+                if (name === 'works') return returned(name, [payer,uri,1,0]);
+                assert.equal(name,'auctions');
+                return returned(name,[1,reserve,end,options.end ?? end,0,zero,0,0,1,zero]);
+            }
+        });
+    }
+    const result = await inspectOpeningReceipt(reader(), hash, payer);
+    assert.deepEqual([result.auctionId,result.artworkId,result.reserveWei,result.durationSeconds,result.originalEnd],
+        ['1','1',reserve.toString(),'86400',new Date(Number(end) * 1000).toISOString()]);
+    for (const options of [{tx:{from:outsider}}, {tx:{to:work.nft}}, {tx:{value:'0x1'}}, {tx:{input:data}},
+        {receipt:{status:'0x0'}}, {head:{number:'0xf'}}, {block:{transactions:[]}}, {block:{timestamp:'0x11'}},
+        {token:1}, {end:end + 1n}, {receipt:{logs:[{...log,removed:true}]}}, {receipt:{logs:[log,log]}},
+        {receipt:{logs:[{...log,...market.encodeEventLog('AuctionOpened',[1,2,reserve,end])}]}}]) {
+        await assert.rejects(inspectOpeningReceipt(reader(options), hash, payer));
+    }
+});
 
 test('receipt inclusion verifies the real work ID from the event even when another actor took the first ID', async () => {
     const result = await inspectRegistrationReceipt(receiptRpc(), hash, payer);

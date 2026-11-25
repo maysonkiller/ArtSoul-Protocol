@@ -28,9 +28,11 @@ export function previewHomepageBanners(ranked, schedule, creatives, asOf) {
         const award = book.awards.get(placement.id);
         const group = award?.sponsorGroup || placement.sponsorGroup;
         const creative = creatives.get(placement.id);
-        if (!group || !creative || creative.sponsorGroup !== group ||
-            typeof creative.name !== 'string' || !creative.name.trim() ||
-            typeof creative.relationship !== 'string' || !creative.relationship.trim()) continue;
+        if (!group || !creative || creative.sponsorGroup !== group) continue;
+        const disclosure = award ?? placement;
+        const sponsor = disclosure.sponsorName;
+        const relationship = disclosure.relationship;
+        if (typeof sponsor !== 'string' || !sponsor.trim() || typeof relationship !== 'string' || !relationship.trim()) continue;
         const artwork = catalog.get(creative.artworkId);
         if (!artwork || used.has(artwork.id)) continue;
         let consideration = 'Free partner placement';
@@ -42,7 +44,7 @@ export function previewHomepageBanners(ranked, schedule, creatives, asOf) {
         used.add(artwork.id);
         promoted.set(placement.slot, {
             artwork,
-            promotion: { sponsor: creative.name.trim(), relationship: creative.relationship.trim(), consideration }
+            promotion: { sponsor: sponsor.trim(), relationship: relationship.trim(), consideration }
         });
     }
     const remaining = organic.filter(artwork => !used.has(artwork.id));

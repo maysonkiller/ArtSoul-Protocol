@@ -123,6 +123,20 @@ node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair
 
 The first command prints the unsigned plan. The second prints a random URL usable only on the same computer. The page checks the exact origin and refreshes both provider readings when the creator selects **Review in wallet**. The wallet checks its account, chain, current nonce, both runtimes and the pending result of `createAuction(1, 1000000000000000, 86400)`. The request closes once the Core has any auction history, including an expired or completed first auction. A second operation cannot be prepared as a retry. Retain the signed transaction hash to verify the actual auction ID, work, reserve and deadline after inclusion. The unsigned preflight starts no countdown.
 
+**View verified work registration** opens a wallet-free page on this private server. Each visit reads the already signed registration from the two fixed RPC providers, verifies the reviewed pair and the public catalog recovery reader's result, and displays the registered metadata, creator, block, transaction and event index. The auction, mint and floor fields describe the registration block. The URL accepts no alternate deployment, receipt or RPC endpoint.
+
+### Recorded auction opening
+
+The creator opened auction 1 for work 1 on the replacement Core. Both RPCs returned a successful receipt in block 63,601,279 (`0x99a177d8be1681fcbf8138a5ad36a5038b8034e8a3831b0c8d6236f57c65daa5`), transaction index 3, log index 4. The creator sent zero test ETH and used 197,791 gas. The contract emitted an opening reserve of 0.001 test ETH and an initial end of November 26 at 21:28:44 UTC (22:28:44 in Warsaw), exactly 24 hours after the inclusion block. A valid late bid can change the current deadline. [Base Sepolia opening receipt](https://sepolia.basescan.org/tx/0x9c13f650612551c6a13d0be018ce0cdc44036ba43de0e36e7a8b74f29e45d42d)
+
+Use the following read-only verification with the private payout review and pair register.
+
+```sh
+node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> --verify-opening 0x9c13f650612551c6a13d0be018ce0cdc44036ba43de0e36e7a8b74f29e45d42d
+```
+
+At block 63,602,202 both providers reported no bid, an open round, a minimum bid of 0.001 test ETH and a deposit of 0.01 test ETH. A read-only simulation of the first bid by a distinct funded test participant returned successfully on each provider. Subsequent bidders must refresh the minimum bid, deposit and current deadline. The simulation records no bid.
+
 ## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.

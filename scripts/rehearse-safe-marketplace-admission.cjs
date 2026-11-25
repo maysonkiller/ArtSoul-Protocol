@@ -336,6 +336,24 @@ async function main() {
         await assert.rejects(grantSafe.execTransaction.staticCall(...oneApproval), /GS020/);
         assert.equal(await genesis.totalSupply(), 0n);
         const authorized = await signedTransfer(grantSafe, genesis.target, 0n, data, [pilot.owners[0], pilot.owners[2]]);
+        const { verifyGenesisSafeProposal } = await import('./check-genesis-safe-proposal.mjs');
+        const custody = { address: grantSafe.target, owners: pilot.addresses, threshold: 2, modules: [], guard: zero, moduleGuard: zero,
+            singleton: pilot.adminSingleton, fallbackHandler: pilot.adminHandler,
+            proxyCodeHash: ethers.keccak256(await pilot.provider.getCode(grantSafe.target)),
+            singletonCodeHash: ethers.keccak256(await pilot.provider.getCode(pilot.adminSingleton)) };
+        const proposal = args => ({ chainId: 8453, to: grantSafe.target, value: '0',
+            data: grantSafe.interface.encodeFunctionData('execTransaction', args) });
+        await pilot.evm.send('hardhat_mine', ['0x80', '0x0']);
+        const publicViews = () => async (method, params) => {
+            assert(['eth_chainId', 'eth_getBlockByNumber', 'eth_getCode', 'eth_getStorageAt', 'eth_call'].includes(method));
+            assert(!JSON.stringify(params).includes(data.slice(2)), 'Prepared grant data must stay on the reviewer device');
+            assert(!JSON.stringify(params).includes(authorized.at(-1).slice(2)), 'Owner signatures must stay on the reviewer device');
+            return pilot.evm.send(method, params);
+        };
+        await assert.rejects(verifyGenesisSafeProposal(review, custody, proposal(oneApproval), [publicViews(), publicViews()]), /confirmations/);
+        const checked = await verifyGenesisSafeProposal(review, custody, proposal(authorized), [publicViews(), publicViews()]);
+        assert.equal(checked.confirmations, 2);
+        assert.equal(checked.safeTxHash, await grantSafe.getTransactionHash(...authorized.slice(0, 9), await grantSafe.nonce()));
         await pilot.setGrantBlockTime();
         const receipt = await mine(grantSafe.execTransaction(...authorized));
         assert.equal(await genesis.ownerOf(0), founder);
@@ -343,6 +361,8 @@ async function main() {
         assert.equal((await genesis.grantRecord(0)).decisionHash, prepared.grants[0].decisionHash);
         assert.equal(await grantSafe.nonce(), 1n);
         await pilot.evm.send('hardhat_mine', ['0x80', '0x1']);
+        await assert.rejects(verifyGenesisSafeProposal(review, custody, proposal(authorized), [publicViews(), publicViews()]),
+            /owner confirmation/);
         return { evm: pilot.evm, review, hash: receipt.hash };
     }
 }

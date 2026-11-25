@@ -55,3 +55,9 @@ At 19:40 UTC the production domain served the gallery fix from commit `1ea57c60`
 The apex served the homepage. The www gallery URL issued a 308 redirect to the same path on the apex. Both /docs and /auction-system issued 308 redirects to /docs-protocol. The homepage footer supplied a working-format mailto link to the published ArtSoul contact address, plus links to the project on X and GitHub. The Guide explained how copyright complaints are handled. No message was sent.
 
 The conventional paths /terms, /privacy and /.well-known/security.txt returned HTTP 404. No privacy or terms link appeared in the sampled homepage, publish form, builder or detail pages, or in the first-party page entry sources inspected. These observations establish public routing only. Operator identification, applicable legal disclosures, contact coverage, cost coverage and incident readiness remain open under RG-09 and RG-10.
+
+The security contact was subsequently published. On November 25 at 21:26 UTC, the production apex returned HTTP 200 with a plain-text contact, canonical URL and October 31, 2027 expiration. This read did not exercise incident handling.
+
+## Physical iPhone follow-up
+
+The owner used an iPhone 14 Pro Max. On the first attempt MetaMask opened without displaying a connection request. It connected on the second attempt after closing and reopening it. The iOS version was not reported. The owner also reported that play and sound buttons obscured audio and video previews on listing cards. Track wallet pairing separately from the later profile sign-in message and card layout. On the project machine the four mobile-wallet regression suites passed 102 checks. These checks cannot establish why the request did not appear on the phone.
