@@ -472,12 +472,12 @@
                 for (const item of items) {
                     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
                     links.push({ url: item.url, label: ['pages', 'docs'].includes(key)
-                        ? `${labels[key]} · ${typeof item.title === 'string' ? item.title : labels[key]}`
-                        : key === 'artists' ? `${labels[key]} · ${item.name} · ${item.wallet_address}`
-                        : `${labels[key]} · ${item.title} (#${item.artwork_id}) · ${item.creator}` });
+                        ? `${labels[key]} / ${typeof item.title === 'string' ? item.title : labels[key]}`
+                        : key === 'artists' ? `${labels[key]} / ${item.name} / ${item.wallet_address}`
+                        : `${labels[key]} / ${item.title} (#${item.artwork_id}) / ${item.creator}` });
                 }
             }
-            const head = lines.length ? `Shown: ${lines.join(' · ')}.`
+            const head = lines.length ? `Shown: ${lines.join(' / ')}.`
                 : 'No matches. Try another title, artist or artwork number.';
             const tail = more ? 'More matches are available. Open Search ArtSoul and choose a category.' : '';
             const warning = typeof data.warning === 'string' && data.warning.trim()
@@ -511,7 +511,7 @@
         }
         case 'get_artwork_provenance': {
             const short = value => (value ? `${String(value).slice(0, 6)}…${String(value).slice(-4)}` : '—');
-            const show = `Creator ${short(data.creator)} · First Collector ${short(data.first_collector)} · Owner ${short(data.owner)}`;
+            const show = `Creator ${short(data.creator)} / First Collector ${short(data.first_collector)} / Owner ${short(data.owner)}`;
             return { say: 'Creator, First Collector and Owner are shown on screen.', show };
         }
         case 'get_my_activity': {

@@ -165,7 +165,7 @@ test('global search distinguishes grouped matches shown from totals and does not
     artists: {items: [{name: 'Vera', wallet_address: wallet, url: '/profile?address=' + wallet}], hasMore: false}
   }};
   const reply = voice.describeResult('search_catalog', result, 'en');
-  assert.match(reply.show, /Shown: Artworks: 1 · Artists: 1/);
+  assert.match(reply.show, /Shown: Artworks: 1 \/ Artists: 1/);
   assert.match(reply.show, /More matches/);
   assert.doesNotMatch(reply.say, /Vera|0x|img/);
   assert.equal(reply.links.length, 2);
@@ -189,7 +189,7 @@ test('public page and documentation replies label partial results without speaki
     assert.match(reply.links[1].label, /<img src=x> Fees/);
     assert.doesNotMatch(reply.links[1].label, /undefined|#fees/);
     assert.doesNotMatch(reply.say, /Explore Art|<img|Fees/);
-    assert.match(reply.show, /Pages: 1 · Documentation: 1/);
+    assert.match(reply.show, /Pages: 1 \/ Documentation: 1/);
     assert.match(reply.show, /Only matching pages and documentation/);
     assert.match(reply.show, /More matches/);
   }

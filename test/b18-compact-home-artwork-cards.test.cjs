@@ -100,8 +100,8 @@ const cases = [
 ];
 
 test('Home retains the approved discovery-first promise', () => {
-    assert.match(homeSource, /Art first\. Ownership next\./);
-    assert.match(homeSource, /Discover a work\.\s*<br class="home-hero-break">Start its next chapter\./);
+    assert.match(homeSource, /Art comes first/);
+    assert.match(homeSource, /<h1\b[^>]*>\s*Discover a work and start its next chapter\s*<\/h1>/);
     assert.match(homeSource, /Meet independent artists\. Support the work you love\. Collector demand comes before minting\. An NFT is created only after successful settlement\./);
 });
 

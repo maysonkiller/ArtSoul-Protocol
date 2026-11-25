@@ -1002,7 +1002,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             <OwnershipIdentity
                                 key={address.toLowerCase()}
                                 source={identityResolved ? getProfileAvatarUrl(resolvedProfile, address) : ''}
-                                label={currentOwner ? `${label} · Owner` : label}
+                                label={currentOwner ? `${label} / Owner` : label}
                                 name={getProfileDisplayName(resolvedProfile, address)}
                                 nameStyle={nameStyle}
                                 isClassic={isClassic}
@@ -4021,7 +4021,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             </p>
                                             <p>
                                                 Suggested start: {formatAIPrice(reauctionEstimate.suggested_start_price_eth)} ETH
-                                                {' · '}{reauctionEstimate.confidence || 'medium'} confidence
+                                                {' / '}{reauctionEstimate.confidence || 'medium'} confidence
                                             </p>
                                             {reauctionEstimate.rationale && <p className="reauction-estimate-rationale">{reauctionEstimate.rationale}</p>}
                                         </div>

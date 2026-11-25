@@ -58,7 +58,10 @@ await access(path.join(dist, 'src/config/upload-policy.js')).catch(() => {
 // Cached metadata may still request the original filename on a static host.
 // Both URLs must contain the one approved image, even without Vercel redirects.
 const approvedSocialImage = await readFile(path.join(root, 'artsoul-social-preview-v2.png'));
-for (const filename of ['artsoul-social-preview-v2.png', 'artsoul-social-preview.png']) {
+if (approvedSocialImage.length < 24 || !approvedSocialImage.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) || approvedSocialImage.readUInt32BE(16) !== 1730 || approvedSocialImage.readUInt32BE(20) !== 909) {
+    throw new Error('Approved social preview must remain a 1730 x 909 PNG');
+}
+for (const filename of ['artsoul-social-preview-v2.png', 'artsoul-social-preview.png', 'artsoul-social-preview-v3.png']) {
     if (!(await readFile(path.join(dist, filename))).equals(approvedSocialImage)) {
         throw new Error(`Obsolete social preview in dist: ${filename}`);
     }
@@ -70,12 +73,45 @@ for (const page of pages) {
         readFile(path.join(dist, page), 'utf8')
     ]);
 
+    // Verify the actual built response, not merely the source HTML. Exact
+    // metadata equivalence also protects artwork-specific tag IDs and URLs.
+    const socialTags = html => (html.slice(0, html.indexOf('</head>')).match(/^[ \t]*<meta\b[^>\r\n]*\b(?:property|name)=["'](?:og:|twitter:)[^>\r\n]*>[ \t]*\r?$/gmi) || []).map(tag => tag.trim());
+    const expectedSocial = socialTags(source).map(tag => tag.replace('https://artsoulprotocol.com/artsoul-social-preview-v2.png', 'https://artsoulprotocol.com/artsoul-social-preview-v3.png'));
+    const actualSocial = socialTags(built);
+    if (JSON.stringify(actualSocial) !== JSON.stringify(expectedSocial)) {
+        throw new Error(page + ': social metadata was lost, duplicated or unexpectedly changed');
+    }
+    if (expectedSocial.length) {
+        const charsetIndex = built.search(/<meta\s+charset=["']utf-8["'][^>]*>/i);
+        if (charsetIndex < 0 || Buffer.byteLength(built.slice(0, charsetIndex)) >= 1024) {
+            throw new Error(page + ': UTF-8 declaration is missing or too late');
+        }
+        for (const tag of actualSocial) {
+            const index = built.indexOf(tag);
+            if (index < 0 || Buffer.byteLength(built.slice(0, index + tag.length)) > 4096) {
+                throw new Error(page + ': social metadata must appear in the first 4 KiB of HTML');
+            }
+        }
+        if (actualSocial.filter(tag => /\bproperty=["']og:image["']/.test(tag)).length !== 1
+            || actualSocial.filter(tag => /\bname=["']twitter:image["']/.test(tag)).length !== 1
+            || !actualSocial.some(tag => /\bname=["']twitter:card["']/.test(tag) && /content=["']summary_large_image["']/.test(tag))) {
+            throw new Error(page + ': incomplete or ambiguous social preview metadata');
+        }
+    }
+
     if (page === 'collection-builder.html' && !/<div id="app">\s*<main\b[^>]*aria-busy="true"/.test(built)) {
         throw new Error('The collection editor must show its initial page while the application loads.');
     }
 
-    if (page === 'gallery.html' && !/<h1>Art worth discovering\.<\/h1>[\s\S]*?<div id="app">/.test(built)) {
+    if (page === 'gallery.html' && !/<h1>Art worth discovering<\/h1>[\s\S]*?<div id="app">/.test(built)) {
         throw new Error('The gallery heading must be visible before the filter and artwork bundle starts.');
+    }
+
+    if (page === 'index.html') {
+        const balancedHero = /<h1\b[^>]*>\s*Discover a work and start its next chapter\s*<\/h1>/;
+        if (!balancedHero.test(source) || !balancedHero.test(built)) {
+            throw new Error('The homepage headline must be one naturally wrapping phrase without a forced break.');
+        }
     }
 
     // Do not replace already painted fallback text when a font arrives late.
@@ -207,6 +243,6 @@ if (duplicateNeutralAvatars.length > 0) {
 }
 
 console.log(
-    `Verified ${pages.length} built HTML routes with no in-browser Babel or async module-entry mount races, `
+    `Verified ${pages.length} built HTML routes, early social metadata and all three original banner URLs, with no in-browser Babel or async module-entry mount races, `
     + `and one shared neutral avatar (${componentNeutralAvatar}) across ${sharedHeaderPages.length} header pages.`
 );

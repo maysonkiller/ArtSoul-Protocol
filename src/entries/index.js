@@ -881,7 +881,7 @@ let morphActive = false;
                             if (socialSignals.likes) parts.push(`${socialSignals.likes} ♥`);
                             if (socialSignals.wouldBuy) parts.push(`${socialSignals.wouldBuy} would buy`);
                             if (socialSignals.watching) parts.push(`${socialSignals.watching} watching`);
-                            signalLine.textContent = parts.length ? parts.join('  ·  ') : '';
+                            signalLine.textContent = parts.length ? parts.join(' / ') : '';
                         }
 
                         info.appendChild(slotLabel);

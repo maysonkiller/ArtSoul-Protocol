@@ -30,7 +30,7 @@ function VisibilityDialog({ artwork, busy, onClose, onSubmit }) {
         onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
         <form method="dialog" onSubmit={event => {event.preventDefault(); onSubmit(reason);}}>
             <h2 id="visibilityDecisionTitle">{artwork.hidden ? 'Restore artwork' : 'Hide artwork'}</h2>
-            <p>{artwork.title} · Artwork {artwork.artwork_id}</p>
+            <p>{artwork.title} / Artwork {artwork.artwork_id}</p>
             <p>{artwork.hidden ? 'Restore public visibility only after all active artwork reports have been resolved.' : 'This removes the work from public discovery. Ownership and contract records remain unchanged.'}</p>
             <label htmlFor="visibilityDecisionReason">Review reason</label>
             <textarea id="visibilityDecisionReason" ref={reasonInput} value={reason} onChange={event => setReason(event.target.value)} required maxLength="500" />
@@ -106,8 +106,8 @@ export function AdminArtworkCatalog({ api, isSessionCurrent, onAccessError, onRe
                 {page.artworks.map(artwork => <article className="protocol-admin-catalog-card" data-pending={artwork.pending_count > 0} key={artwork.artwork_id}>
                     <AdminArtworkPreview artwork={artwork} />
                     <h3 title={artwork.title}>{artwork.title}</h3>
-                    <p>Artwork {artwork.artwork_id} · {artwork.hidden ? 'Hidden' : 'Public'}</p>
-                    <p>{artwork.report_count} artwork reports · {artwork.pending_count} pending · {artwork.actioned_count} active</p>
+                    <p>Artwork {artwork.artwork_id} / {artwork.hidden ? 'Hidden' : 'Public'}</p>
+                    <p>{artwork.report_count} artwork reports / {artwork.pending_count} pending / {artwork.actioned_count} active</p>
                     {artwork.donation_report_count > 0 && <p>{artwork.donation_report_count} donation-message reports</p>}
                     {artwork.hidden && artwork.hidden_reason && <p className="protocol-admin-report-text">Hidden: {artwork.hidden_reason}</p>}
                     <div className="protocol-admin-card-actions">

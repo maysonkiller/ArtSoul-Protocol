@@ -28,9 +28,9 @@ export function artworkShareDetails(artwork, now = Date.now()) {
     } else if (artwork.status === 'settlement_pending') {
         state = 'Artwork awaiting settlement';
     } else if (['auction', 'awaiting_end', 'defaulted'].includes(artwork.status)) {
-        state = 'Artwork · auction ended';
+        state = 'Artwork / auction ended';
     }
-    const context = [state, price && `${priceLabel}: ${price} test ETH`, network].filter(Boolean).join(' · ');
+    const context = [state, price && `${priceLabel}: ${price} test ETH`, network].filter(Boolean).join(' / ');
     // Bound user-controlled text conservatively, including two-column characters.
     const draft = `“${text(title, 32)}” by ${text(creator, 20)}\n${context}\nArtSoul Protocol`;
     return {title, creator, url, context, draft, imageAlt:`${title} — ${creator}`};
