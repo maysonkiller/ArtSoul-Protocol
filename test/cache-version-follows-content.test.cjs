@@ -28,7 +28,7 @@ const RUNTIME = {
   'contracts-integration.js': { version: 21, sha256: '36189171dbb31867' },
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
   'webmcp-tools.js': { version: 35, sha256: '9f13d82e78eb54ac' },
-  'voice-commands.js': { version: 25, sha256: '0c3b29830da8f21d' },
+  'voice-commands.js': { version: 26, sha256: 'da83442b0285204a' },
   'voice-conversation-r2.js': { version: 5, sha256: '0bc206d36f986a40' },
   'voice-audio-bank-r2.js': { version: 1, sha256: 'a3e0768aa60ee094' },
   'avatar-dropdown.js': { version: 74, sha256: '5ae029ec40ad3214' },
