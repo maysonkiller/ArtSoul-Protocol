@@ -65,7 +65,7 @@ export async function verifyTreasurySafes(register, rpc, expectedBlock) {
     return verifyAtBlock(register, rpc, expectedBlock ?? head);
 }
 
-export async function verifyTreasurySafesWithTwoProviders(register, first, second, { requirePair = false } = {}) {
+export async function verifyTreasurySafesWithTwoProviders(register, first, second, { requirePair = false, expectedBlock } = {}) {
     let refundLimits;
     if (requirePair) {
         check(register.core && register.nft, 'The pair check requires reviewed Core and NFT entries');
@@ -83,7 +83,7 @@ export async function verifyTreasurySafesWithTwoProviders(register, first, secon
         }
     }
     const [firstHead, secondHead] = await Promise.all([finalizedBlock(register.chainId, first), finalizedBlock(register.chainId, second)]);
-    const block = BigInt(firstHead.number) <= BigInt(secondHead.number) ? firstHead : secondHead;
+    const block = expectedBlock ?? (BigInt(firstHead.number) <= BigInt(secondHead.number) ? firstHead : secondHead);
     await Promise.all([confirmFinalizedBlock(first, firstHead, block), confirmFinalizedBlock(second, secondHead, block)]);
     const [result] = await Promise.all([verifyAtBlock(register, first, block, refundLimits), verifyAtBlock(register, second, block, refundLimits)]);
     return result;

@@ -5,12 +5,12 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { getAddress, keccak256, toQuantity } from 'ethers';
 import { prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
+import { expectedRehearsalPairRegister } from './prepare-rehearsal-core.mjs';
 import { prepareRehearsalSafes, rehearsalSafeRelease as release } from './prepare-rehearsal-safes.mjs';
-import { readRpc } from './verify-treasury-safes.mjs';
+import { readRpc, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
 const asset = name => new URL('./rehearsal-review/' + name, import.meta.url);
 const json = async path => JSON.parse(await readFile(path, 'utf8'));
-const coreName = 'contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket';
 const chainHex = '0x14a34';
 const roles = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
 const sha256Hex = data => createHash('sha256').update(Buffer.from(data.slice(2), 'hex')).digest('hex');
@@ -36,14 +36,29 @@ async function agreed(providers, method, params) {
     return first;
 }
 
-export async function safeAwaitingFinality(providers, address, expectedProxyHash) {
+export async function reviewedRuntimePresent(providers, address, expectedHash) {
     const [code, nonce] = await Promise.all([
         agreed(providers, 'eth_getCode', [address, 'latest']),
         agreed(providers, 'eth_getTransactionCount', [address, 'pending'])
     ]);
     if (code === '0x' && BigInt(nonce) === 0n) return false;
-    if (code !== '0x' && BigInt(nonce) > 0n && expectedProxyHash && keccak256(code) === expectedProxyHash) return true;
+    if (code !== '0x' && BigInt(nonce) > 0n && expectedHash && keccak256(code) === expectedHash) return true;
     throw new Error('The predicted deployment address is occupied or pending with unverified code. Refresh after finality.');
+}
+
+export async function reviewedPairStatus(providers, register, block) {
+    const entries = [register.core, register.nft];
+    const latest = await Promise.all(entries.map(entry => reviewedRuntimePresent(providers, entry.address, entry.codeHash)));
+    check(latest[0] === latest[1], 'The current block contains only part of the reviewed pair.');
+    if (!latest[0]) return;
+    const at = { blockHash: block.hash, requireCanonical: true };
+    const finalized = await Promise.all(entries.map(entry => agreed(providers, 'eth_getCode', [entry.address, at])));
+    const pair = { core: register.core.address, nft: register.nft.address };
+    if (finalized.every(code => code === '0x')) return { waitingForFinality: { role: 'OrdinaryMarket', ...pair } };
+    check(finalized.every((code, i) => code !== '0x' && keccak256(code) === entries[i].codeHash),
+        'The finalized runtimes do not match both reviewed deployments.');
+    const evidence = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true, expectedBlock: block });
+    return { complete: true, finalizedPair: pair, evidence };
 }
 
 export function verifyReference(reference, plan) {
@@ -84,13 +99,15 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, tre
         check(coreReview.chainId === 84532 && getAddress(coreReview.payer) === base.payer &&
             coreReview.constructorArgs?.slice(3).map(String).join(',') === '8,30000',
             'Expected the Base Sepolia rehearsal payer and reviewed refund limits 8 and 30000.');
-        const [artifact, manifest] = await Promise.all([
+        const [artifact, nftArtifact, layout, manifest] = await Promise.all([
             json(new URL('../artifacts/contracts/replacement/OrdinaryMarket.sol/OrdinaryMarket.json', import.meta.url)),
+            json(new URL('../artifacts/contracts/replacement/SettledArtworkNFT.sol/SettledArtworkNFT.json', import.meta.url)),
+            json(new URL('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json', import.meta.url)),
             json(new URL('../docs/security/C12_ORDINARY_AUDIT_MANIFEST.json', import.meta.url))
         ]);
-        const entry = manifest.contracts[coreName];
-        check(keccak256(artifact.bytecode) === entry.creation.keccak256 &&
-            keccak256(artifact.deployedBytecode) === entry.runtimeTemplate.keccak256, 'Build differs from the C12 release manifest.');
+        const register = expectedRehearsalPairRegister(custody, coreReview, manifest, layout, artifact, nftArtifact);
+        const pairStatus = await reviewedPairStatus(providers, register, block);
+        if (pairStatus) return { ...base, ...pairStatus };
         const plan = prepareOrdinaryDeployment(artifact, coreReview, custody);
         operation = 'OrdinaryMarket';
         target = 'Direct contract creation';
@@ -120,10 +137,10 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, tre
             check(keccak256(code) === expected, 'Unexpected code at ' + address);
             return { address, sha256: sha256Hex(code) };
         })),
-        Promise.all(deployments.map(address => safeAwaitingFinality(providers, address, coreReview ? undefined : release.proxyCodeHash)))
+        coreReview ? false : reviewedRuntimePresent(providers, deployments[0], release.proxyCodeHash)
     ]);
     check(latest === pending && payerCode === '0x', 'Payer is not a settled externally owned account.');
-    if (awaitingFinality.includes(true)) return { ...base, waitingForFinality: { role: operation, address: deployments[0] } };
+    if (awaitingFinality) return { ...base, waitingForFinality: { role: operation, address: deployments[0] } };
     const nonce = toQuantity(BigInt(pending));
     check(!coreReview || tx.nonce === nonce, 'Core payer nonce changed. A new independent review is required.');
     return { ...base, operation, target, deployments, codeChecks, nonce, dataHash, data: tx.data, dataSha256: sha256Hex(tx.data) };

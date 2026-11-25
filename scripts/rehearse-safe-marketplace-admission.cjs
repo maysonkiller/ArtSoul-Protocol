@@ -51,10 +51,12 @@ async function main() {
             assert.deepEqual([...(await safe.getOwners())], addresses);
             safes.push(safe);
         }
-        return { provider, evm, relayer, accounts, owners, addresses, deploy, safes };
+        return { provider, evm, relayer, accounts, owners, addresses, deploy, safes,
+            adminSingleton: singleton.target, adminHandler: handler.target };
     }
 
-    const { provider, evm, relayer, accounts, owners, addresses, deploy, safes: allSafes } = await createRehearsalNetwork(84532, 9);
+    const { provider, evm, relayer, accounts, owners, addresses, deploy, safes: allSafes, adminSingleton, adminHandler } =
+        await createRehearsalNetwork(84532, 9);
     const [security, ...bidderSafes] = allSafes;
     // Exercise the exact treasury handoff calldata on an isolated EVM at the published Safe addresses.
     const { buildRehearsalRequests, rehearsalSafeRelease } = await import('./prepare-rehearsal-safes.mjs');
@@ -93,10 +95,8 @@ async function main() {
     const expectedCore = ethers.getCreateAddress({ from: relayer.address, nonce });
     const expectedNFT = ethers.getCreateAddress({ from: expectedCore, nonce: 1 });
     const roleNames = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
-    const custody = { chainId: 84532 };
-    for (const [i, role] of roleNames.entries()) {
-        custody[role] = { address: safes[i].target, owners: addresses, threshold: 2 };
-    }
+    const custody = { ...treasuryPlan.custody, adminSecurity: { ...treasuryPlan.custody.adminSecurity,
+        singleton: adminSingleton, fallbackHandler: adminHandler } };
     // The independent encoder and the local signer use rehearsal-only refund limits.
     const limits = [8, 30_000];
     const creation = await factoryCore.getDeployTransaction(...safes.map(safe => safe.target), ...limits);
@@ -115,13 +115,19 @@ async function main() {
     assert.equal(await engine.refundBatchLimit(), BigInt(limits[0]));
     assert.equal(await engine.refundTransferGas(), BigInt(limits[1]));
     assert.deepEqual(await Promise.all(roleNames.map(role => engine[role]())), safes.map(safe => safe.target));
-    const { expectedRehearsalPairRegister } = await import('./prepare-rehearsal-core.mjs');
+    const { expectedRehearsalPairRegister, verifyRehearsalCoreReceipt } = await import('./prepare-rehearsal-core.mjs');
     const nftArtifact = await artifacts.readArtifact('SettledArtworkNFT');
     const runtimeRegister = expectedRehearsalPairRegister(custody, review,
         require('../docs/security/C12_ORDINARY_AUDIT_MANIFEST.json'),
         require('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json'), coreArtifact, nftArtifact);
     assert.equal(ethers.keccak256(await provider.getCode(plan.core)), runtimeRegister.core.codeHash);
     assert.equal(ethers.keccak256(await provider.getCode(plan.nft)), runtimeRegister.nft.codeHash);
+    const receiptProof = await verifyRehearsalCoreReceipt(deployment.hash, review, runtimeRegister, [
+        (method, params) => evm.send(method, params), (method, params) => provider.send(method, params)
+    ]);
+    assert.equal(receiptProof.block.hash, deployment.blockHash);
+    assert.equal(receiptProof.nftPairChecked, true);
+    console.log('PASS: the deployment receipt verifier matched the local signed creation, both runtimes and custody at its original block.');
     console.log('PASS: unsigned OrdinaryMarket creation produced the reviewed pair and three Safe bindings on an isolated EVM.');
     const market = await deploy(await artifacts.readArtifact('SettledArtworkSourceFixture'));
     const [artist, collector, buyer] = accounts.slice(3);

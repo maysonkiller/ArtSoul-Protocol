@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { request } from 'node:http';
 import { keccak256 } from 'ethers';
 import { sameReview, start, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { chooseTreasury, listenForReview, safeAwaitingFinality, verifyReference } from '../scripts/serve-rehearsal-review.mjs';
+import { chooseTreasury, listenForReview, reviewedPairStatus, reviewedRuntimePresent, verifyReference } from '../scripts/serve-rehearsal-review.mjs';
 
 const payer = '0x' + '1'.repeat(40), safe = '0x' + '2'.repeat(40), admin = '0x' + '3'.repeat(40);
 const target = '0x4e1dcf7ad4e460cfd30791ccc4f9c8a4f820ec67';
@@ -143,13 +143,45 @@ test('only the agreed expected Safe runtime with a nonzero account nonce counts 
         return async method => method === 'eth_getCode' ? code : accountNonce;
     }
     const code = '0x60016000', hash = keccak256(code);
-    assert.equal(await safeAwaitingFinality([rpc(code, '0x1'), rpc(code, '0x1')], safe, hash), true);
-    assert.equal(await safeAwaitingFinality([rpc('0x', '0x0'), rpc('0x', '0x0')], safe, hash), false);
+    assert.equal(await reviewedRuntimePresent([rpc(code, '0x1'), rpc(code, '0x1')], safe, hash), true);
+    assert.equal(await reviewedRuntimePresent([rpc('0x', '0x0'), rpc('0x', '0x0')], safe, hash), false);
     for (const [first, second, pin] of [
         [rpc(code, '0x1'), rpc('0x', '0x1'), hash], [rpc(code, '0x1'), rpc(code, '0x2'), hash],
         [rpc(code, '0x0'), rpc(code, '0x0'), hash], [rpc('0xaa', '0x1'), rpc('0xaa', '0x1'), hash],
         [rpc(code, '0x1'), rpc(code, '0x1'), undefined], [rpc('0x', '0x1'), rpc('0x', '0x1'), hash]
-    ]) await assert.rejects(safeAwaitingFinality([first, second], safe, pin), /disagree|occupied/);
+    ]) await assert.rejects(reviewedRuntimePresent([first, second], safe, pin), /disagree|occupied/);
+});
+
+test('the Core page distinguishes an unfinalized bound pair from an absent, partial or incorrect pair', async t => {
+    const addresses = [safe, admin], codes = ['0x6001', '0x6002'];
+    const [core, nft] = addresses.map((address, i) => ({ address, codeHash: keccak256(codes[i]) }));
+    function providers(latest, finalized) {
+        const read = async (method, [address, tag]) => {
+            const index = addresses.indexOf(address);
+            assert.notEqual(index, -1);
+            if (method === 'eth_getTransactionCount') return latest[index] === '0x' ? '0x0' : '0x1';
+            return tag === 'latest' ? latest[index] : finalized[index];
+        };
+        return [read, read.bind(null)];
+    }
+    const block = { number: '0x1', hash: '0x' + 'a'.repeat(64) }, empty = ['0x', '0x'];
+    const state = (latest, finalized) => reviewedPairStatus(providers(latest, finalized), { core, nft }, block);
+    assert.equal(await state(empty, empty), undefined);
+    const waiting = await state(codes, empty);
+    assert.deepEqual(waiting, { waitingForFinality: { role: 'OrdinaryMarket', core: safe, nft: admin } });
+    for (const [latest, finalized] of [[['0x1234', codes[1]], empty], [[codes[0], '0x'], empty], [codes, ['0x', codes[1]]]]) {
+        await assert.rejects(state(latest, finalized), /occupied|part of the reviewed|finalized runtimes/);
+    }
+    const provider = wallet();
+    let outcome = waiting;
+    const field = await renderReview(t, provider, () => outcome);
+    assert.ok(field('status').textContent.includes('Waiting for Base Sepolia finality'));
+    outcome = { complete: true, finalizedPair: { core: safe, nft: admin }, evidence: { block } };
+    await field('refresh').onclick();
+    assert.ok(field('status').textContent.includes(block.hash));
+    assert.equal(field('review').hidden, true);
+    assert.equal(field('connect').disabled, true);
+    assert.deepEqual(provider.calls, []);
 });
 test('explicit treasury selection leaves an independently reviewed request available until that role finalizes', () => {
     const protocol = { role: 'protocolTreasury', dataHash: 'first' }, ecosystem = { role: 'ecosystemTreasury', dataHash: 'second' };
