@@ -129,6 +129,8 @@ The first command prints the unsigned plan. The second prints a random URL usabl
 
 The creator opened auction 1 for work 1 on the replacement Core. Both RPCs returned a successful receipt in block 63,601,279 (`0x99a177d8be1681fcbf8138a5ad36a5038b8034e8a3831b0c8d6236f57c65daa5`), transaction index 3, log index 4. The creator sent zero test ETH and used 197,791 gas. The contract emitted an opening reserve of 0.001 test ETH and an initial end of November 26 at 21:28:44 UTC (22:28:44 in Warsaw), exactly 24 hours after the inclusion block. A valid late bid can change the current deadline. [Base Sepolia opening receipt](https://sepolia.basescan.org/tx/0x9c13f650612551c6a13d0be018ce0cdc44036ba43de0e36e7a8b74f29e45d42d)
 
+At 21:49:33 UTC on November 25 the Base public RPC and PublicNode both reported finalized height 63,602,243. By 21:51 UTC the verifier below had independently confirmed the opening on both providers, including wallet nonce 19, the exact `createAuction(1,1000000000000000,86400)` call, the reviewed Core and NFT runtimes, the three Safe configurations and the canonical event position. At the opening block the work had no token or floor and the auction had no bid or deposit. The separate first-bid planner returned `early`.
+
 Use the following read-only verification with the private payout review and pair register.
 
 ```sh
@@ -137,7 +139,7 @@ node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair
 
 At block 63,602,202 both providers reported no bid, an open round, a minimum bid of 0.001 test ETH and a deposit of 0.01 test ETH. A read-only simulation of the first bid by a distinct funded test participant returned successfully on each provider. Subsequent bidders must refresh the minimum bid, deposit and current deadline. The simulation records no bid.
 
-For this auction, `node scripts/review-rehearsal-late-bid.mjs --plan` checks the finalized opening and returns the availability of the first late bid. Use `--serve` to open the private wallet review on the same computer. It becomes available from November 26 at 21:18:44 UTC until 21:28:44 UTC if no other bid has arrived. The request is limited to the reviewed bidder, Core and auction, a bid of 0.001 test ETH and a deposit of 0.01 test ETH. Only the wallet holder submits the transaction. The inclusion block determines whether an extension occurs.
+For this auction, `node scripts/review-rehearsal-late-bid.mjs --plan` checks the finalized opening and returns the availability of the first late bid. Use `--serve` to open the private wallet review on the same computer. It becomes available from November 26 at 21:18:44 UTC until 21:28:44 UTC if no other bid has arrived. The request is limited to the reviewed bidder, Core and auction, a bid of 0.001 test ETH and a deposit of 0.01 test ETH. Only the wallet holder submits the transaction. The inclusion block determines whether an extension occurs. After inclusion and finality, `node scripts/review-rehearsal-late-bid.mjs --verify-receipt HASH` checks the submitted bid and the resulting auction deadline.
 
 ## First NFT transfer range on the payout pair
 
