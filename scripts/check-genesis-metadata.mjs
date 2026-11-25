@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
-import { open, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { Interface } from 'ethers';
 import { fetchArtworkResource } from '../src/api/safe-artwork-fetch.js';
 import { MAX_ARTWORK_UPLOAD_BYTES, MAX_METADATA_BYTES } from '../src/config/upload-policy.js';
 import { parseTokenMetadata } from './check-collection-metadata.mjs';
+import { readReviewedFile } from './security/read-reviewed-file.mjs';
 import { verifyGenesisGrants } from './verify-genesis-grants.mjs';
 import { confirmFinalizedBlock, finalizedBlock, readRpc } from './verify-treasury-safes.mjs';
 
@@ -15,23 +16,6 @@ const tokenViews = new Interface([
     'function ownerOf(uint256) view returns (address)',
     'function locked(uint256) view returns (bool)'
 ]);
-
-async function readReviewedFile(file, limit) {
-    const handle = await open(file, 'r');
-    try {
-        const stat = await handle.stat();
-        if (!stat.isFile() || stat.size < 1 || stat.size > limit) throw new Error('Reviewed file has an invalid size');
-        const bytes = Buffer.alloc(stat.size);
-        let used = 0;
-        while (used < bytes.length) {
-            const { bytesRead } = await handle.read(bytes, used, bytes.length - used, used);
-            if (!bytesRead) throw new Error('Reviewed file changed during verification');
-            used += bytesRead;
-        }
-        if ((await handle.stat()).size !== stat.size) throw new Error('Reviewed file changed during verification');
-        return bytes;
-    } finally { await handle.close(); }
-}
 
 export async function checkGenesisMetadata(prefix, tokenId, files, { published = false } = {}) {
     if (typeof prefix !== 'string' || prefix.length !== 67 || !directory.test(prefix)) {

@@ -58,3 +58,19 @@ This records explicit authorization; it is not mainnet or sale-opening approval.
 
 These interpretations and all remaining decisions are carried into the takeover
 evidence report. No new token, points or volume-based entitlement is introduced.
+
+## Marketplace operator release check
+
+From the repository root with the locked dependencies installed, run:
+
+```sh
+node scripts/check-collection-operator-policy.cjs
+```
+
+The command compiles the current collection contracts and creates disposable editions, first-work and forged tokens on Hardhat chain 31337. The report includes each fixture's runtime hash. For each token it simulates an owner's single-token and collection-wide approval for an unlisted wallet and an unlisted contract. It also transfers each token directly as its owner and checks the recipient. For the optional forge recipe, it attempts crafting with zero, one and two individual ingredient approvals. Only the fully authorized pair may burn and produce an output. No collection-wide grant is needed for that recipe.
+
+The November 25 candidates permitted all twelve unlisted grants. The command exits with status 1 and lists all three affected contracts. Keep collection marketplace release blocked. The ordinary NFT contract and the metadata and primary-launch checks have their own acceptance paths.
+
+A passing run requires a policy-specific rejection on each unlisted grant, successful direct transfers and the owner-authorized forge result. Unrelated reverts and incomplete runs are inconclusive and exit nonzero. The check currently recognizes the ordinary NFT's `MarketplaceNotAllowed(address)` error with the attempted operator. Update that decoder and the characterization test when a reviewed collection policy implements a different denial or a dedicated burn authorization.
+
+Before enabling collection sales on a secondary venue, record the reviewed collection admission authority and operator, wallet consent and revocation behavior, and how the venue pays all required parties. ERC-2981 reports a royalty quote. Its response alone cannot verify proceeds. The [ordinary NFT admission decision](CONTRACT_REWORK_PLAN.md#external-marketplace-admission) and a local fixture hash do not establish a collection's deployed authority or the suitability of a venue.
