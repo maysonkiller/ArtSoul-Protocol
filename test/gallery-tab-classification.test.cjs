@@ -96,10 +96,10 @@ test('moderation-hidden works are excluded from every gallery tab', () => {
 
 test('Discovery cards can show all three persisted signal counts', () => {
     const card = loadArtworkCard({ likes: 2, wouldBuy: 3, watching: 4 });
-    assert.equal(card.signalsText({}, true), '2 likes · 3 would buy · 4 watching');
+    assert.equal(card.signalsText({}, true), '2 likes / 3 would buy / 4 watching');
 
     const emptyCard = loadArtworkCard({ likes: 0, wouldBuy: 0, watching: 0 });
-    assert.equal(emptyCard.signalsText({}, true), '0 likes · 0 would buy · 0 watching');
+    assert.equal(emptyCard.signalsText({}, true), '0 likes / 0 would buy / 0 watching');
 });
 
 test('gallery markup keeps the requested order and default without card signals', () => {

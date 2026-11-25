@@ -96,7 +96,7 @@ function LayoutEditor({state, controller, cards, config, wallet, candidates}) {
         controller.change(value => ({...value, sections: [...value.sections, {id, label: 'Selected artworks', artworks: []}]}));
         setExpandedSection(id); setPicker('');
       }}>Add section</button></div>
-      <p className="profile-layout-help">{draft.sections.length}/{MAX_PROFILE_SECTIONS} sections · {selected.size}/{MAX_PROFILE_WORKS} artworks. Creator credits stay visible.</p>
+      <p className="profile-layout-help">{draft.sections.length}/{MAX_PROFILE_SECTIONS} sections / {selected.size}/{MAX_PROFILE_WORKS} artworks. Creator credits stay visible.</p>
       {draft.sections.map((section, index) => <details key={section.id} className="profile-layout-section-editor" open={expandedSection === section.id}>
         <summary onClick={event => {event.preventDefault(); setExpandedSection(expandedSection === section.id ? '' : section.id);}}><span>{section.label || `Section ${index + 1}`}</span><span>{section.artworks.length} {section.artworks.length === 1 ? 'artwork' : 'artworks'}</span></summary>
         <fieldset disabled={Boolean(state.busy)}><legend className="sr-only">Edit section {index + 1}</legend><label>Section name<input type="text" value={section.label} maxLength={60} onChange={event => changeSection(section.id, value => ({...value, label: event.target.value}))} /></label>

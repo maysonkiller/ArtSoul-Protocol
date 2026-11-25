@@ -89,7 +89,7 @@ function UpcomingReminders({state, model, busy, view = 'all', opened = [], selec
         <MessageSelection id={`activity:${item.id}`} title={`reminder ${item.id}`} selection={selection} />
         <details className="notification-message" onToggle={event => {if (event.currentTarget.open && !item.read) model?.openMessage(item.id);}}>
         <summary><strong>{item.type === 'payment_due' ? 'Payment due soon' : 'Auction ending soon'}</strong><span className="notification-read-label">{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Read' : 'Unread'}</span></summary>
-        {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id} · Auction #{item.auction_id}</a> : <span>Artwork #{item.artwork_id} · Currently unavailable</span>}
+        {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id} / Auction #{item.auction_id}</a> : <span>Artwork #{item.artwork_id} / Currently unavailable</span>}
         <p>{item.message}</p>
         <p className="notification-help">{item.type === 'payment_due' ? 'Payment deadline' : 'Auction ends'}: {validDeadline ? <time dateTime={deadline.toISOString()}>{deadline.toLocaleString('en-US')}</time> : 'Deadline unavailable'}</p>
         </details>
@@ -111,8 +111,8 @@ function AuctionMessage({item, state, model, selection}) {
     <MessageSelection id={`activity:${item.id}`} title={`${notificationHeading(item.type)} ${item.id}`} selection={selection} />
     <details className="notification-message" onToggle={event => {if (event.currentTarget.open && !item.read) model?.openMessage(item.id);}}>
     <summary><strong>{notificationHeading(item.type)}</strong><span className="notification-read-label">{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Read' : 'Unread'}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString('en-US')}</time></summary>
-    {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id}{item.auction_id && ` · Auction #${item.auction_id}`}</a> : <span>Artwork #{item.artwork_id} · Currently unavailable</span>}
-    <p className="notification-help">Base Sepolia{item.token_id != null && ` · NFT #${item.token_id}`}</p>
+    {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id}{item.auction_id && ` / Auction #${item.auction_id}`}</a> : <span>Artwork #{item.artwork_id} / Currently unavailable</span>}
+    <p className="notification-help">Base Sepolia{item.token_id != null && ` / NFT #${item.token_id}`}</p>
     <p>{item.message}</p>
     </details>
   </li>;
@@ -126,7 +126,7 @@ function ReportMessage({item, state, onOpen, selection}) {
     <details className="notification-message" onToggle={event=>{if(event.currentTarget.open && item.read===false)onOpen?.(item.id);}}>
     <summary><strong>{profileTarget ? 'Report and profile update' : 'Report and artwork update'}</strong>{typeof item.read==='boolean' && <span className="notification-read-label">{state.pendingId===item.id?'Saving…':item.read?'Read':'Unread'}</span>}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString('en-US')}</time></summary>
     {profileTarget ? (profileWallet && <a className="underline" href={`/profile?address=${profileWallet}`}>View profile</a>) : <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>
-      Artwork #{item.artwork_id} · {({'84532': 'Base Sepolia', '11155111': 'Ethereum Sepolia (legacy)', '8453': 'Base'})[item.chain_id] || `Chain ${item.chain_id}`}
+      Artwork #{item.artwork_id} / {({'84532': 'Base Sepolia', '11155111': 'Ethereum Sepolia (legacy)', '8453': 'Base'})[item.chain_id] || `Chain ${item.chain_id}`}
     </a>}
     <p>{item.message}</p>
     </details>
@@ -421,7 +421,7 @@ export function NotificationInbox({ wallet, compact = false, header = false }) {
             <p>{state.staffReview.count}{state.staffReview.capped ? '+' : ''} {state.staffReview.count === 1 ? 'report awaits' : 'reports await'} review. <a className="underline" href="/admin">Open Admin panel</a></p>
             {state.staffReview.reports.length > 0 && <ul className="mt-2 space-y-2">
               {state.staffReview.reports.map(report => <li key={report.reference}>
-                <a className="underline" href="/admin">Report {report.reference.slice(0, 8)}</a>{' · '}
+                <a className="underline" href="/admin">Report {report.reference.slice(0, 8)}</a>{' / '}
                 <time dateTime={report.createdAt}>{new Date(report.createdAt).toLocaleString('en-US')}</time>
               </li>)}
             </ul>}

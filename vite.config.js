@@ -45,6 +45,9 @@ const legacyRootAssets = [
     // the built pages and the component disagreed about the same picture: the
     // component saw a "different" src, rewrote the already-rendered image and
     // forced a second request plus a blank bitmap frame on every page load.
+    // Seasonal visual preview, copied verbatim. No contract or wallet changes.
+    'artsoul-seasonal-preview.css',
+    'artsoul-seasonal-preview.js',
     'design-system.css',
     'favicon.jpg',
     'ipfs-client.js',
@@ -182,6 +185,8 @@ function copyLegacyRuntimeAssets() {
             // Keep old shared links compatible without retaining a second banner source.
             await copyFile(path.join(root, 'artsoul-social-preview-v2.png'),
                 path.join(outDir, 'artsoul-social-preview.png'));
+            await copyFile(path.join(root, 'artsoul-social-preview-v2.png'),
+                path.join(outDir, 'artsoul-social-preview-v3.png'));
             await Promise.all(legacyClientTrees.map(async (relativePath) => {
                 const destination = path.join(outDir, relativePath);
                 await mkdir(path.dirname(destination), { recursive: true });
@@ -191,6 +196,54 @@ function copyLegacyRuntimeAssets() {
             const outputPages = new Set(await readdir(outDir));
             for (const page of Object.values(pageInputs)) {
                 if (!outputPages.has(page)) throw new Error(`Missing built page: ${page}`);
+            }
+        }
+    };
+}
+
+// Put social metadata ahead of the large inline first-paint stylesheet so
+// crawlers that read only an initial HTML window can discover the full card.
+// Keep the original image bytes and old URLs; use a fresh cache key for shares.
+function socialPreviewMetadataPlugin() {
+    return {
+        name: 'artsoul-social-preview-metadata',
+        apply: 'build',
+        transformIndexHtml: {
+            order: 'post',
+            handler(html) {
+                const headEnd = html.indexOf('</head>');
+                if (headEnd < 0) throw new Error('Social metadata: missing head');
+                const head = html.slice(0, headEnd);
+                const tags = [];
+                const rest = head.replace(/^[ \t]*(<meta\b[^>\r\n]*\b(?:property|name)=["'](?:og:|twitter:)[^>\r\n]*>)[ \t]*\r?$/gmi, (_, tag) => {
+                    tags.push(tag.replace('https://artsoulprotocol.com/artsoul-social-preview-v2.png', 'https://artsoulprotocol.com/artsoul-social-preview-v3.png'));
+                    return '';
+                });
+                if (!tags.length) return html;
+                const charset = /<meta\s+charset=["']utf-8["'][^>]*>/i;
+                if (!charset.test(rest)) throw new Error('Social metadata: missing UTF-8 declaration');
+                return rest.replace(charset, match => match + '\n    ' + tags.join('\n    ')) + html.slice(headEnd);
+            }
+        }
+    };
+}
+
+// An additive, build-only preview layer for all 11 multi-page entry points.
+function seasonalPreviewOnlyPlugin() {
+    return {
+        name: 'artsoul-solstice-preview-only',
+        apply: 'build',
+        transformIndexHtml: {
+            order: 'post',
+            handler(html) {
+                if (!html.includes('</head>') || !html.includes('</body>')) {
+                    throw new Error('Solstice preview: expected complete HTML document');
+                }
+                if (html.includes('artsoul-seasonal-preview.js')) return html;
+                return html.replace('</head>',
+                    '<link rel="stylesheet" href="/artsoul-seasonal-preview.css?v=81">\n</head>')
+                    .replace('</body>',
+                        '<script src="/artsoul-seasonal-preview.js?v=81" defer></script>\n</body>');
             }
         }
     };
@@ -211,7 +264,7 @@ export default defineConfig({
     plugins: [
         react(),
         { name: 'local-artwork-route', configureServer: serveArtworkPage, configurePreviewServer: serveArtworkPage },
-        inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()
+        inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets(), seasonalPreviewOnlyPlugin(), socialPreviewMetadataPlugin()
     ],
     build: {
         outDir,
