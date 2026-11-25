@@ -233,6 +233,12 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
         const { checkGenesisGrantIntake } = await import('./helpers/genesis-grant-postgres.mjs');
         await checkGenesisGrantIntake(pool);
       });
+      if (process.env.ARTSOUL_TEST_SAFE_ARCHIVE) {
+        await cutover.test('two separately executed Safe batches produce one verified local Genesis grant record', async () => {
+          const { checkMinedGenesisGrant } = await import('./helpers/genesis-grant-postgres.mjs');
+          await checkMinedGenesisGrant(pool, process.env.ARTSOUL_TEST_SAFE_ARCHIVE);
+        });
+      }
       await assert.rejects(verify(), error => error.message.includes('artsoul_private.genesis_grant_batches') &&
         error.message.includes('artsoul_private.genesis_grants'));
       // Finalized evidence stays in this disposable database after a failed preflight.

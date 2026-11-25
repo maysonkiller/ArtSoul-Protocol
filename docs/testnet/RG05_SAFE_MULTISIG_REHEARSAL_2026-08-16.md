@@ -179,3 +179,21 @@ The owner selected the existing rehearsal Safe for test security administration 
 The isolated EVM rehearsal executed the two unsigned treasury requests against the published Safe 1.4.1 factory bytecode. Both receipts emitted the predicted proxy address, and both proxies had the expected signers and threshold. The Core then bound these two proxies, completed an auction, and credited the two treasuries separately on resale.
 
 In the public Base Sepolia rehearsal on November 25, the protocol and ecosystem treasury creations succeeded in blocks 63,462,911 and 63,464,528 respectively. Each used 306,195 gas with zero transfer value. Two RPC providers verified the exact transaction data, factory event, expected Safe runtime, owners, threshold of two, compatibility handler, empty module set and guard settings at each creation block. The private register holds the corresponding receipts. The Core deployment and its settlement rehearsal have separate acceptance evidence.
+
+## 8. Genesis grant from Safe approval to the grant register, November 25
+
+Two independently initialized, unforked Hardhat networks each deployed the published Safe 1.4.1 contracts, created a two-of-three Safe and bound an `ArtSoulGenesis` issuer to it. Both used the same disposable accounts and deterministic block times. One owner signature failed with `GS020`. Two owners signed the reviewed founder grant, and each network executed it in block 6. The resulting token was locked to its designated founder. The Safe nonce advanced from zero to one.
+
+Both networks mined 128 further local blocks. The release verifier read each network's finalized block, outer Safe transaction, inner grant call, issuer runtime and ordered mint, lock and grant logs. The PostgreSQL 18.4 intake test replayed each network's observed RPC responses. Changing one decision hash in the second receipt stopped intake before a grant was recorded. The original receipt inserted one batch and one grant. A second intake retained both counts and returned the same block, transaction and log position for serial zero.
+
+This exercises the Phase C grant controls with a simulated finality tag. The public pilot, its independently operated RPC providers and its live recipient evidence belong to Phase D.
+
+With the local Hardhat artifacts compiled as above, point these two variables at your installed PostgreSQL binaries and the pinned archive. The test starts a disposable loopback PostgreSQL instance.
+
+```powershell
+$env:ARTSOUL_TEST_POSTGRES_BIN = '<local PostgreSQL bin directory>'
+$env:ARTSOUL_TEST_SAFE_ARCHIVE = '<path to safe-contracts-1.4.1.tgz>'
+node --test test/indexer-reorg-atomicity.test.cjs
+```
+
+For the two chain observations alone, run `node scripts/rehearse-safe-marketplace-admission.cjs <path-to-tarball> --genesis-evidence`. The emitted JSON contains the local batch review, transaction hash, block and both sets of RPC responses.

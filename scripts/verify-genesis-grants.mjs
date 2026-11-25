@@ -12,6 +12,9 @@ const abi = new Interface([
     'event Locked(uint256 tokenId)',
     'event GenesisGranted(uint256 indexed tokenId,address indexed recipient,uint8 indexed category,bytes32 decisionHash)'
 ]);
+const safeExecution = new Interface([
+    'function execTransaction(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,bytes signatures)'
+]);
 const quantity = value => typeof value === 'string' && /^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(value);
 const nonzeroHash = value => isHexString(value, 32) && value.toLowerCase() !== ZeroHash;
 
@@ -23,8 +26,8 @@ async function inspectBatch(rpc, prepared, founder, codeHash, hash) {
     const block = { hash: receipt.blockHash.toLowerCase(), number: receipt.blockNumber.toLowerCase() };
     await confirmFinalizedBlock(rpc, head, block);
     const at = { blockHash: block.hash, requireCanonical: true };
-    const [header, code, safeResult, founderResult] = await Promise.all([
-        rpc('eth_getBlockByHash', [block.hash, false]), rpc('eth_getCode', [genesis, at]),
+    const [header, transaction, code, safeResult, founderResult] = await Promise.all([
+        rpc('eth_getBlockByHash', [block.hash, false]), rpc('eth_getTransactionByHash', [hash]), rpc('eth_getCode', [genesis, at]),
         ...['grantAuthority', 'founderRecipient'].map(name => rpc('eth_call', [{ to: genesis, data: abi.encodeFunctionData(name) }, at]))
     ]);
     assert(header?.hash?.toLowerCase() === block.hash && header.number?.toLowerCase() === block.number &&
@@ -56,6 +59,15 @@ async function inspectBatch(rpc, prepared, founder, codeHash, hash) {
         const grantIndex = match('GenesisGranted', [tokenId, recipient, category, decisionHash]);
         return { tokenId, category, recipient, decisionHash, mintIndex, lockIndex, grantIndex };
     });
+    // The pilot proposes one grantBatch CALL through the reviewed Safe. Events by
+    // themselves cannot distinguish this path from execution by a Safe module.
+    assert(transaction?.hash?.toLowerCase() === hash && transaction.to?.toLowerCase() === prepared.safe.toLowerCase() &&
+        transaction.blockHash?.toLowerCase() === block.hash && transaction.blockNumber?.toLowerCase() === block.number &&
+        transaction.transactionIndex?.toLowerCase() === receipt.transactionIndex.toLowerCase(), 'Different Safe execution transaction');
+    const execution = safeExecution.parseTransaction({ data: transaction.input });
+    assert(execution?.name === 'execTransaction' && execution.args.to === genesis && execution.args.value === 0n &&
+        execution.args.operation === 0n && execution.args.data === prepared.transaction.data && execution.args.signatures !== '0x',
+    'Safe execution differs from the reviewed Genesis CALL');
     await confirmFinalizedBlock(rpc, await finalizedBlock(8453, rpc), block);
     return { chainId: 8453, genesis, safe: prepared.safe, transactionHash: hash, block,
         transactionIndex: BigInt(receipt.transactionIndex).toString(), grants };

@@ -25,7 +25,7 @@ C13 has a [public test deployment and read-only auction rehearsal](testnet/ORDIN
 
 ### November 20 phase acceptance
 
-The [numbered checklist](canon/12_IMPLEMENTATION_BACKLOG.md) has 17 of 38 active items accepted; the two retired archive gates receive no completion credit. B engineering is closed. Its named public-beta journeys are tracked in C13. The ordinary-market candidate passed C2 auction Core implementation, C3 artwork NFT implementation, C6 pool accounting and C11 contract and invariant testing. The independent review, fresh hosted rehearsal, production custody and mainnet go/no-go are still open.
+The [numbered checklist](canon/12_IMPLEMENTATION_BACKLOG.md) has 18 of 38 active items accepted. The two retired archive gates receive no completion credit. B engineering is closed. Its named public-beta journeys are tracked in C13. Phase C has accepted the auction Core (C2), artwork NFT (C3), Genesis contract and grant register (C4), pool accounting (C6), and contract and invariant testing (C11). Independent review, fresh hosted rehearsal, production custody and the mainnet launch decision remain open.
 
 The [C5 collection metadata check](canon/CONTRACT_REWORK_PLAN.md#first-work-attempts-for-partner-launches) verifies a minted opening token against its draft at one finalized block. The [regressions](../test/collection-metadata-preflight.test.mjs) cover distinct original buyer and owner, a wrong chain or runtime, a changed URI, an inconsistent collector and a replaced block. Public collection acceptance still needs a reviewed Base Sepolia deployment and settlement.
 

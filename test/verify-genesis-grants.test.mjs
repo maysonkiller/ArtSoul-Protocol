@@ -4,7 +4,7 @@ import { id, keccak256, toQuantity } from 'ethers';
 import { prepareGenesisGrants } from '../scripts/prepare-genesis-grants.mjs';
 import { verifyGenesisGrants } from '../scripts/verify-genesis-grants.mjs';
 
-import { review, tx, block, head, founder, mainnetCollector, receipt, provider } from './helpers/genesis-grant-rpc.mjs';
+import { review, tx, block, head, founder, mainnetCollector, receipt, provider, safeTransaction } from './helpers/genesis-grant-rpc.mjs';
 
 test('two providers confirm only the reviewed Genesis serials including founder zero, preserving all three log positions', async () => {
     const result = await verifyGenesisGrants(review, tx, [provider(), provider()]);
@@ -69,5 +69,17 @@ test('requires finalized inclusion, stable canonical hash on both reads, and agr
         { header: { ...block, transactions: [...block.transactions].reverse() } }, { receipt: { ...receipt(), status: '0x0' } },
         { receipt: changed }]) {
         await assert.rejects(verifyGenesisGrants(review, tx, [provider(), provider(overrides)]));
+    }
+});
+
+test('the recorded pilot grant requires the exact reviewed zero-value CALL via the selected Safe', async () => {
+    const transaction = safeTransaction();
+    for (const replacement of [
+        { ...transaction, to: mainnetCollector }, { ...transaction, transactionIndex: '0x0' },
+        { ...transaction, blockHash: head.hash }, { ...transaction, input: '0x12345678' },
+        ...[{ to: founder }, { value: 1 }, { data: '0x1234' }, { operation: 1 }]
+            .map(changes => safeTransaction(review, tx, block, changes))
+    ]) {
+        await assert.rejects(verifyGenesisGrants(review, tx, [provider(), provider({ transaction: replacement })]), /Safe execution/);
     }
 });
