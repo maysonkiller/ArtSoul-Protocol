@@ -55,15 +55,13 @@ test('private custody review binds all owners, role addresses, payer and pending
         adminSecurity: { ...account, owners: [safe, target, admin] } } }), /owners changed/);
     assert.throws(() => verifyReference(original, { ...original, roleRequests: [{ ...roleRequests[0], dataHash: 'other' }] }), /request changed/);
 });
-test('rendering never connects the wallet; explicit connect then a double click produces one mock submission', async t => {
+async function renderReview(t, provider) {
     const fields = new Map();
     function field(id) {
         if (!fields.has(id)) fields.set(id, { textContent: '', value: '', append() {}, replaceChildren() {},
             add(option) { if (!this.value) this.value = option.value; } });
         return fields.get(id);
     }
-    const sentHash = '0x' + 'a'.repeat(64);
-    const provider = wallet({ eth_requestAccounts: () => [payer], eth_sendTransaction: () => sentHash });
     globalThis.document = { createElement: () => ({}), getElementById: field };
     globalThis.window = Object.assign(new EventTarget(), { ethereum: provider });
     globalThis.Option = class { constructor(name, value) { this.text = name; this.value = value; } };
@@ -72,6 +70,12 @@ test('rendering never connects the wallet; explicit connect then a double click 
         ...plan, roles: {}, owners: [], block: { number: '0x1' }
     }) }));
     await start();
+    return field;
+}
+test('rendering never connects the wallet; explicit connect then a double click produces one mock submission', async t => {
+    const sentHash = '0x' + 'a'.repeat(64);
+    const provider = wallet({ eth_requestAccounts: () => [payer], eth_sendTransaction: () => sentHash });
+    const field = await renderReview(t, provider);
     assert.deepEqual(provider.calls, []);
     assert.equal(field('submit').disabled, true);
     await field('submit').onclick();
@@ -85,6 +89,55 @@ test('rendering never connects the wallet; explicit connect then a double click 
     await field('refresh').onclick();
     assert.equal(field('submit').disabled, true);
     assert.equal(field('connect').disabled, true);
+});
+test('after connecting, changing account and explicitly switching to Base Sepolia enables review without a second connection or a send', async t => {
+    let chain = '0x2105', account = safe;
+    const listeners = new Map();
+    const provider = wallet({
+        eth_requestAccounts: () => [account], eth_accounts: () => [account], eth_chainId: () => chain,
+        wallet_switchEthereumChain: args => {
+            assert.deepEqual(args, { chainId: '0x14a34' });
+            chain = args.chainId;
+            listeners.get('chainChanged')();
+        }
+    });
+    provider.on = (event, callback) => listeners.set(event, callback);
+    provider.removeListener = event => listeners.delete(event);
+    const field = await renderReview(t, provider);
+    await field('connect').onclick();
+    assert.equal(field('submit').disabled, true);
+    assert.ok(field('wallet-status').textContent.includes(payer));
+    assert.ok(field('wallet-status').textContent.includes('8453'));
+    assert.equal(field('switch').hidden, false);
+    assert.ok(!provider.calls.includes('wallet_switchEthereumChain'));
+    await field('switch').onclick();
+    assert.equal(field('submit').disabled, true);
+    assert.equal(field('switch').hidden, true);
+    account = payer;
+    listeners.get('accountsChanged')();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(field('submit').disabled, false);
+    await field('refresh').onclick();
+    assert.equal(field('submit').disabled, false);
+    assert.equal(provider.calls.filter(m => m === 'eth_requestAccounts').length, 1);
+    account = safe;
+    listeners.get('accountsChanged')();
+    assert.equal(field('submit').disabled, true);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(field('submit').disabled, true);
+    assert.ok(!provider.calls.includes('eth_sendTransaction'));
+});
+test('wallet discovery explains an empty picker and picks up a late-injected extension without connecting', async t => {
+    const field = await renderReview(t);
+    assert.equal(field('discover').hidden, false);
+    assert.equal(field('connect').disabled, true);
+    assert.match(field('wallet-status').textContent, /No wallet detected/);
+    const provider = wallet();
+    window.ethereum = provider;
+    await field('discover').onclick();
+    assert.equal(field('connect').disabled, false);
+    assert.equal(field('submit').disabled, true);
+    assert.deepEqual(provider.calls, []);
 });
 test('loopback server serves only token-bound read routes on the exact origin', async t => {
     let reads = 0;
