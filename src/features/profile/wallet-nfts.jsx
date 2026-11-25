@@ -42,7 +42,7 @@ function NftDetails({ item, quote, onClose }) {
   const title = item.name || `Token ${item.tokenId}`;
   return createPortal(<dialog ref={dialog} className="wallet-nft-dialog" aria-labelledby="walletNftTitle"
     onCancel={event => { event.preventDefault(); onClose(); }}>
-    <header className="wallet-nft-dialog-heading"><div><p className="wallet-nfts-note">Base · {item.tokenType}</p><h2 id="walletNftTitle">{title}</h2></div>
+    <header className="wallet-nft-dialog-heading"><div><p className="wallet-nfts-note">Base / {item.tokenType}</p><h2 id="walletNftTitle">{title}</h2></div>
       <button type="button" className="btn-secondary" onClick={onClose} autoFocus>Close</button></header>
     <div className="wallet-nft-detail-layout">
       <NftPreview item={item} />
@@ -54,7 +54,7 @@ function NftDetails({ item, quote, onClose }) {
           <div className="wallet-nft-quote" role="status">
             <span>ETH / USD reference rate</span>
             <strong>{quote?.data ? `1 ETH ≈ ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(quote.data.amount))}` : quote?.status === 'loading' ? 'Loading rate…' : 'Rate unavailable'}</strong>
-            {quote?.data && <small>Coinbase · retrieved <time dateTime={quote.data.fetchedAt}>{new Date(quote.data.fetchedAt).toLocaleString('en-US')}</time></small>}
+            {quote?.data && <small>Coinbase / retrieved <time dateTime={quote.data.fetchedAt}>{new Date(quote.data.fetchedAt).toLocaleString('en-US')}</time></small>}
           </div>
           <p className="wallet-nfts-note">The token rate is not a valuation or offer for this NFT.</p>
         </div>
@@ -191,7 +191,7 @@ function BaseWalletNfts({ wallet }) {
   const previous = () => { if (state.index > 0) void load(cursors.current[state.index - 1], state.index - 1); };
   const next = () => { if (page?.nextCursor) void load(page.nextCursor, state.index + 1); };
   return <section className="wallet-nfts" aria-label="Wallet NFTs" aria-busy={busy}>
-    <div className="wallet-nfts-heading"><div><h3>Wallet NFTs</h3><p>NFTs you hold on Base mainnet.</p></div><span className="wallet-nfts-network">Base · Read only</span></div>
+    <div className="wallet-nfts-heading"><div><h3>Wallet NFTs</h3><p>NFTs you hold on Base mainnet.</p></div><span className="wallet-nfts-network">Base / Read only</span></div>
     <p className="wallet-nfts-note">Separate from ArtSoul listings. Your wallet stays on its selected network. Unsolicited NFTs may appear; collection names are not verification.</p>
     {state.status === 'auth' ? <p role="status">Sign in with this wallet to view its NFTs. <button type="button" className="btn-secondary" onClick={signIn}>Sign in</button></p> :
       <nav className="wallet-nfts-actions" aria-label="Wallet NFT pages">
@@ -202,7 +202,7 @@ function BaseWalletNfts({ wallet }) {
       </nav>}
     {state.message && <p role="status">{state.message}</p>}
     {page && <>
-      <p className="wallet-nfts-note">Indexed by Alchemy · {page.items.length} shown on this page{page.validAt ? ` · Base block ${page.validAt.blockNumber}` : ''}.
+      <p className="wallet-nfts-note">Indexed by Alchemy / {page.items.length} shown on this page{page.validAt ? ` / Base block ${page.validAt.blockNumber}` : ''}.
         {page.omittedCount > 0 && ' Some unsupported items were omitted.'}</p>
       {!page.items.length && <p>No supported NFTs on this page.{page.nextCursor ? ' You can check the next page.' : ''}</p>}
       <div className="wallet-nfts-grid" onTouchStart={event => { const p = event.touches[0]; swipe.current = event.touches.length === 1 && !event.target.closest('button,a') ? { x: p.clientX, y: p.clientY } : null; }}
@@ -217,7 +217,7 @@ function BaseWalletNfts({ wallet }) {
               </span>
             </div>
             <p className="wallet-nft-collection" title={item.collection || ''}>{item.collection || 'Unnamed collection'}</p>
-            <p className="wallet-nfts-note">{item.tokenType}{item.quantity !== '1' ? ` · Quantity ${item.quantity}` : ''}</p>
+            <p className="wallet-nfts-note">{item.tokenType}{item.quantity !== '1' ? ` / Quantity ${item.quantity}` : ''}</p>
             <button type="button" className="btn-secondary" aria-label={`View details for ${item.name || `Token ${item.tokenId}`}`} onClick={() => void openDetails(item)}>View details ↗</button>
           </div>
         </article>)}

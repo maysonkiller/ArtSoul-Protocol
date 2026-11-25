@@ -176,7 +176,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
             <div className="artist-support-content" ref={content}>
             {list && <div id="artistSupportHistory" className="artist-support-history" role="tabpanel" aria-labelledby="artistSupportHistoryTab" tabIndex={0}>
                 <p>This history shows donations sent through ArtSoul for this artwork. You can find direct transfers in your wallet’s activity.</p>
-                {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} test ETH</p>}
+                {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> / {eth(feed.top.amount)} test ETH</p>}
                 {feedError && <p role="status">Support history is unavailable. <button type="button" data-allow-rapid="true" onClick={() => setRefresh(value => value + 1)}>Retry</button></p>}
                 <div className="artist-support-order" role="group" aria-label="Order donation history">
                     <button type="button" data-allow-rapid="true" aria-pressed={sort === 'newest'}
@@ -187,7 +187,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
                 {!feed && !feedError && <p role="status">Loading support…</p>}
                 {feed?.donations?.length === 0 && <p>No support recorded yet.</p>}
                 {feed?.donations?.map(donation => <article key={`${donation.transaction_hash}:${donation.log_index}`}>
-                    <p><Donor donation={donation}/> · {eth(donation.amount)} test ETH</p>
+                    <p><Donor donation={donation}/> / {eth(donation.amount)} test ETH</p>
                     {donation.message && <p className="artist-support-message">{donation.message}</p>}
                     {donation.message && onReportDonation && <button type="button" data-allow-rapid="true" className="btn-secondary"
                         onClick={() => onReportDonation({transaction_hash: donation.transaction_hash, log_index: donation.log_index})}>Report message</button>}
@@ -203,7 +203,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
             </div>}
             <div id="artistSupportDonate" role="tabpanel" aria-labelledby="artistSupportDonateTab" hidden={list}>
             <p>{creatorName || 'Creator'}</p><p className="artist-support-address">{creator}</p>
-            <p>Base Sepolia{walletBalance && ` · Last shown balance: ${walletBalance} test ETH`}</p>
+            <p>Base Sepolia{walletBalance && ` / Last shown balance: ${walletBalance} test ETH`}</p>
             <p>ArtSoul’s support contract sends your full donation to this creator in one transaction. You pay network gas separately.</p>
             {receipt ? <div role="status"><p>{checking ? 'Checking transaction…' : busy ? 'Donation sent. Waiting for confirmation…' : receiptReverted
                 ? 'The transaction reverted. No donation was completed. You can review the details and try again.' : confirmationVerified

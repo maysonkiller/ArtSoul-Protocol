@@ -10456,3 +10456,23 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
         max-width: 100%;
     }
 }
+
+/* Owner copy review 2026-11-22: let headlines wrap naturally.
+   Avoid forced line breaks, stretched word gaps, and single-word orphans.
+   Visual text layout only; Classic/Future colors and motion stay unchanged. */
+body:is(.classic, .future) #homeSection .home-hero-copy h1,
+body:is(.classic, .future) .gallery-page-heading h1,
+body:is(.classic, .future) .launch-hero h1 {
+    text-wrap: balance;
+    white-space: normal;
+    word-spacing: normal;
+    overflow-wrap: break-word;
+}
+body:is(.classic, .future) #homeSection .home-hero-copy > p:not(.home-hero-eyebrow),
+body:is(.classic, .future) .home-section-intro,
+body:is(.classic, .future) .gallery-page-heading p,
+body:is(.classic, .future) .launch-hero p {
+    text-wrap: pretty;
+    white-space: normal;
+    overflow-wrap: break-word;
+}

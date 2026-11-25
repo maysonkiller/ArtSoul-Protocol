@@ -131,7 +131,7 @@ function Builder() {
     return <main className="launch-page">
         <div className="launch-topline">
             <a href="/upload">← Create a single artwork</a>
-            <span className="launch-pill">Local draft · Unpublished</span>
+            <span className="launch-pill">Local draft / Unpublished</span>
         </div>
         <div className="launch-hero">
             <div><h1>Create a collection</h1><p>Choose how collectors get their first NFT and how the remaining mints are priced.</p></div>
@@ -168,13 +168,13 @@ function Builder() {
                             <Field label="Collection name" maxLength={160} value={draft.name} onChange={event => update('name', event.target.value)} />
                             <Field label="Draft network"><select value={draft.chainId} onChange={event => update('chainId', Number(event.target.value))}>
                                 {!COLLECTION_NETWORKS.some(network => network.chainId === Number(draft.chainId)) && <option value={draft.chainId}>Unsupported imported network</option>}
-                                {COLLECTION_NETWORKS.map(network => <option key={network.chainId} value={network.chainId}>{network.name} · draft only</option>)}
+                                {COLLECTION_NETWORKS.map(network => <option key={network.chainId} value={network.chainId}>{network.name} / draft only</option>)}
                             </select></Field>
                         </div>
                         <Field label="Description"><textarea value={draft.description} maxLength={20000} onChange={event => update('description', event.target.value)} /></Field>
                         <div className="launch-grid">
                             <Field label="Maximum supply" inputMode="numeric" value={draft.maxSupply} onChange={event => update('maxSupply', event.target.value)} hint="Choose your own draft supply. This does not lock a contract." />
-                            <Field label="Metadata base URI" placeholder="ipfs://CID/" value={draft.media.metadataBaseURI} onChange={event => updateGroup('media', 'metadataBaseURI', event.target.value)} hint={review.tokenOneMetadataURI ? <>Token #1 metadata URI · <bdi>{review.tokenOneMetadataURI}</bdi></> : 'Enter the prefix for numbered metadata files. For a directory, include the final slash.'} />
+                            <Field label="Metadata base URI" placeholder="ipfs://CID/" value={draft.media.metadataBaseURI} onChange={event => updateGroup('media', 'metadataBaseURI', event.target.value)} hint={review.tokenOneMetadataURI ? <>Token #1 metadata URI / <bdi>{review.tokenOneMetadataURI}</bdi></> : 'Enter the prefix for numbered metadata files. For a directory, include the final slash.'} />
                         </div>
                         <Field label="Holder rights and licensing"><textarea value={draft.holderRights} maxLength={20000} onChange={event => update('holderRights', event.target.value)} /></Field>
                         <details className="launch-details"><summary>Story, artwork references, and links</summary><div className="launch-stack">
@@ -231,7 +231,7 @@ function Builder() {
                 </>}
                 {step === 2 && <>
                     <PanelTitle title="Review the draft">These are deterministic configuration checks, not an AI review or an approval to launch.</PanelTitle>
-                    {review.tokenOneMetadataURI && <p className="launch-note">Token #1 metadata URI · <bdi>{review.tokenOneMetadataURI}</bdi>. Verify the file before launch.</p>}
+                    {review.tokenOneMetadataURI && <p className="launch-note">Token #1 metadata URI / <bdi>{review.tokenOneMetadataURI}</bdi>. Verify the file before launch.</p>}
                     <PhaseTable config={draft} />
                     <div className="launch-footer"><h3>{review.findings.length ? `${review.findings.length} configuration items to review` : 'Configuration checks passed'}</h3>
                         {review.findings.map((finding, index) => <p className="launch-finding" key={finding.code + ':' + index}><strong>{finding.category}</strong>{finding.message}</p>)}
@@ -246,7 +246,7 @@ function Builder() {
                     <details className="launch-details"><summary>Utility and financial declarations</summary><div className="launch-stack">
                         <UtilityList config={draft} />
                         <p className="launch-help">Imported utility, crafting, creator earnings and support fields are preserved in your export. This first draft editor does not activate them or verify their enforcement.</p>
-                        <dl className="launch-definition"><div><dt>Creator earnings proposal</dt><dd>{draft.creatorEarnings.bps} bps{review.contractCompatibility.firstWorkArtifact && !draft.creatorEarnings.recipients.length ? ' to the collection creator' : ''}</dd></div><div><dt>Support proposal</dt><dd>{draft.support.bps} bps · {draft.support.destination}</dd></div><div><dt>Crafting proposal</dt><dd>{draft.crafting.enabled ? `${draft.crafting.inputCount} inputs; ${draft.crafting.outputMaxSupply} outputs maximum` : 'Not enabled'}</dd></div></dl>
+                        <dl className="launch-definition"><div><dt>Creator earnings proposal</dt><dd>{draft.creatorEarnings.bps} bps{review.contractCompatibility.firstWorkArtifact && !draft.creatorEarnings.recipients.length ? ' to the collection creator' : ''}</dd></div><div><dt>Support proposal</dt><dd>{draft.support.bps} bps / {draft.support.destination}</dd></div><div><dt>Crafting proposal</dt><dd>{draft.crafting.enabled ? `${draft.crafting.inputCount} inputs; ${draft.crafting.outputMaxSupply} outputs maximum` : 'Not enabled'}</dd></div></dl>
                     </div></details>
                     <div className="launch-footer"><h3>Publishing is unavailable</h3>{review.deploymentBlockers.map(item => <p className="launch-finding" key={item}>{item}</p>)}<ExplainedAction explanationTitle="This collection is a draft"
                         reason="Collection publishing is not enabled yet. You can review and save this draft. A supported deployment and its launch settings must be verified before a collection can accept payments.">Publish unavailable</ExplainedAction></div>
