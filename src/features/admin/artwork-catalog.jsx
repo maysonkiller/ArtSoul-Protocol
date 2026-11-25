@@ -1,17 +1,25 @@
 import { React } from '../../entries/react-runtime.js';
 import '../../ui/components/artwork-player.js';
+import './workspace.css';
 const { useEffect, useRef, useState } = React;
 
 export function AdminArtworkPreview({ artwork }) {
     const [failed, setFailed] = useState(false);
+    const [started, setStarted] = useState(false);
     const source = artwork?.media_type === 'image' || artwork?.media_type === 'gif'
         ? artwork.media_url : artwork?.poster_url;
-    useEffect(() => setFailed(false), [source]);
-    return <div className="protocol-admin-artwork-preview">
+    useEffect(() => { setFailed(false); setStarted(false); }, [source, artwork?.media_url]);
+    return <div className="protocol-admin-artwork-preview admin-review-media" data-kind={artwork?.media_type}>
         {artwork?.media_type === 'video' && artwork.media_url
-            ? <artsoul-media-player key={'video-' + artwork.media_url}><video src={artwork.media_url} poster={source || undefined} playsInline preload="none" aria-label={artwork.title || 'Video artwork'} /></artsoul-media-player>
+            ? <artsoul-media-player key={'video-' + artwork.media_url}>
+                <video src={artwork.media_url} poster={source || undefined} playsInline preload="none" onPlay={() => setStarted(true)} aria-label={artwork.title || 'Video artwork'} />
+                {!started && !source && <span className="admin-video-hint" aria-hidden="true">▶</span>}
+            </artsoul-media-player>
             : artwork?.media_type === 'audio' && artwork.media_url
-            ? <artsoul-media-player key={'audio-' + artwork.media_url}><audio src={artwork.media_url} preload="none" aria-label={artwork.title || 'Audio artwork'} /></artsoul-media-player>
+            ? <artsoul-media-player key={'audio-' + artwork.media_url}>
+                <img className="admin-audio-cover" src={source && !failed ? source : '/brand/artsoul-audio-cover-384.webp'} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+                <audio src={artwork.media_url} preload="none" aria-label={artwork.title || 'Audio artwork'} />
+            </artsoul-media-player>
             : source && !failed
             ? <img src={source} alt={artwork?.title || 'Artwork preview'} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
             : <span>{artwork?.media_type === 'audio' ? 'Audio artwork' : artwork?.media_type === 'video' ? 'Video artwork' : 'Preview unavailable'}</span>}
@@ -99,23 +107,28 @@ export function AdminArtworkCatalog({ api, isSessionCurrent, onAccessError, onRe
             <h2 id="adminArtworkCatalogTitle">Artworks</h2>
             <button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => load(cursor)}>Refresh artworks</button>
         </div>
-        <p>All indexed Base Sepolia artworks, including hidden works. Review each complaint independently; counts do not decide visibility.</p>
+        <p className="admin-catalog-intro">Base Sepolia · Public and hidden works</p>
         {message && <p className="protocol-admin-message" role="status">{message}</p>}
         {!loaded ? <p role="status">{busy ? 'Loading artworks...' : 'The catalog is unavailable. Retry with Refresh artworks.'}</p> : <>
             <div className="protocol-admin-catalog-grid" aria-busy={busy}>
                 {page.artworks.map(artwork => <article className="protocol-admin-catalog-card" data-pending={artwork.pending_count > 0} key={artwork.artwork_id}>
                     <AdminArtworkPreview artwork={artwork} />
+                    <div className="admin-catalog-card-body">
+                    <div className="admin-catalog-card-meta">
+                        <span>#{artwork.artwork_id}{artwork.media_type && ' · ' + artwork.media_type}</span>
+                        <span className="admin-visibility" data-hidden={artwork.hidden}>{artwork.hidden ? 'Hidden' : 'Public'}</span>
+                    </div>
                     <h3 title={artwork.title}>{artwork.title}</h3>
-                    <p>Artwork {artwork.artwork_id} / {artwork.hidden ? 'Hidden' : 'Public'}</p>
-                    <p>{artwork.report_count} artwork reports / {artwork.pending_count} pending / {artwork.actioned_count} active</p>
-                    {artwork.donation_report_count > 0 && <p>{artwork.donation_report_count} donation-message reports</p>}
+                    <p>{artwork.report_count === 0 ? 'No artwork reports' : `${artwork.report_count} artwork ${artwork.report_count === 1 ? 'report' : 'reports'} · ${artwork.pending_count} pending · ${artwork.actioned_count} active`}</p>
+                    {artwork.donation_report_count > 0 && <p>{artwork.donation_report_count} donation-message {artwork.donation_report_count === 1 ? 'report' : 'reports'}</p>}
                     {artwork.hidden && artwork.hidden_reason && <p className="protocol-admin-report-text">Hidden: {artwork.hidden_reason}</p>}
                     <div className="protocol-admin-card-actions">
-                        <button type="button" disabled={busy || artwork.report_count === 0} onClick={() => onReview(artwork, artwork.actioned_count > 0 ? 'actioned' : artwork.pending_count > 0 ? 'pending_review' : 'all')}>Review artwork reports</button>
+                        {artwork.report_count > 0 && <button type="button" disabled={busy} onClick={() => onReview(artwork, artwork.actioned_count > 0 ? 'actioned' : artwork.pending_count > 0 ? 'pending_review' : 'all')}>Review artwork reports</button>}
                         {artwork.donation_report_count > 0 && <button type="button" disabled={busy} onClick={() => onReview({...artwork,target_type:'donation_message'},'all')}>Review donation reports</button>}
                         {(!artwork.hidden || artwork.actioned_count === 0) && <button type="button" disabled={busy} onClick={() => setDecision(artwork)}>{artwork.hidden ? 'Restore artwork' : 'Hide artwork'}</button>}
                     </div>
                     {artwork.hidden && artwork.actioned_count > 0 && <p>Resolve active artwork reports before restoring.</p>}
+                    </div>
                 </article>)}
             </div>
             {page.artworks.length === 0 && <p>No artworks on this page.</p>}

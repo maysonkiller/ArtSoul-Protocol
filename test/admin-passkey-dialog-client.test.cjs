@@ -15,6 +15,7 @@ function harness(sessionActive = false) {
   const values = [], refs = [], effects = [], listeners = new Map();
   let si, ri, ei, pending;
   const scope = {
+    repeatsStaffWalletUpdate: require('../src/features/admin/staff-entry.js').repeatsStaffWalletUpdate,
     window: {getCurrentWalletAddress: () => state.wallet,
       addEventListener: (name, fn) => listeners.set(name, fn),
       removeEventListener: (name, fn) => { if (listeners.get(name) === fn) listeners.delete(name); }},

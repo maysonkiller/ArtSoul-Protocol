@@ -24,13 +24,14 @@ function harness(response=access(), settled=true) {
     const values=[],refs=[],effects=[],callbacks=[],listeners=new Map();
     let si,ri,ei,ci,pending;
     const scope = {
+        staffEntryHint: require('../src/features/admin/staff-entry.js').staffEntryHint,
         window:{artsoulWalletStateSettled:settled,getCurrentWalletAddress:()=>state.wallet,
             SupabaseAuth:{getAuthenticatedWallet:()=>state.auth},ensureAuthenticated:()=>state.ensureAuthenticated(),
             addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)},
         document:{visibilityState:'visible',
             addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},
             removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)},
-        performance:{now:()=>0}, AbortSignal,
+        performance:{now:()=>0}, AbortController,
         setTimeout:()=>1,clearTimeout:()=>{},
         currentAdminWallet:()=>scope.window.artsoulWalletStateSettled ? state.wallet : '', emptyAdminData:empty, encodeURIComponent,
         api:async(path,options)=>{state.calls.push({path,options});if(state.api)return state.api(path,options);return path.startsWith('access')?state.access:{data:state.queue};},
@@ -90,6 +91,7 @@ test('setup clears on wallet and auth boundaries and ignores stale setup respons
         const h=harness(access({enabled:false,access:{role:'admin',stepUpActive:false}}));await tick();h.render();
         const pending=deferred();h.state.api=()=>pending.promise;const old=h.actions.checkAccess();
         if(event==='artsoul:wallet-state-changed')h.state.wallet='';
+        if(event==='artsoul:auth-state-changed')h.state.auth='';
         h.event(event,{key:'artsoul_authenticated_wallet'});
         assert.equal(h.render().setupAllowed,false);assert.equal(h.render().passkeyOpen,false);
         pending.resolve(access({enabled:false}));await old;assert.equal(h.render().setupAllowed,false);assert.equal(h.render().passkeyOpen,false);

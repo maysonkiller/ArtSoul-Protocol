@@ -1,6 +1,7 @@
 import { React, createRoot } from './react-runtime.js';
 import { StaffPasskeyDialog } from '../features/admin/staff-passkeys.jsx';
 import { StaffFactorDialog } from '../features/admin/staff-factor-dialog.jsx';
+import { staffEntryHint } from '../features/admin/staff-entry.js';
 import { StaffAuthority } from '../features/admin/staff-authority.jsx';
 import { AuraAppearance } from '../features/admin/aura-appearance.jsx';
 import { AdminArtworkCatalog, AdminArtworkPreview } from '../features/admin/artwork-catalog.jsx';
@@ -223,6 +224,7 @@ function ProtocolAdminPage() {
     const signInIntent = useRef('login'), completedSignIn = useRef('');
     const setupEpoch = useRef(0), openedSetupFor = useRef('');
     const accessRequest = useRef(0), queueRequest = useRef(0), readySession = useRef(null);
+    const accessController = useRef(null);
     const checkAccessRef = useRef(null);
     const expiryTimer = useRef(null);
     const accessHeading = useRef(null);
@@ -241,6 +243,7 @@ function ProtocolAdminPage() {
         completedSignIn.current = '';
         setupEpoch.current++;
         accessRequest.current++;
+        accessController.current?.abort();
         clearProtectedView();
         setAccess(current => current ? { ...current, stepUpActive: false } : null);
         setAccessState('step_up');
@@ -251,6 +254,7 @@ function ProtocolAdminPage() {
         let waitingForWallet = window.artsoulWalletStateSettled !== true;
         let lastWallet = currentSetupWallet();
         let lastAuthenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
+        let leftPage = document.visibilityState === 'hidden';
         const walletWait = waitingForWallet ? setTimeout(() => {
             if (waitingForWallet) checkAccessRef.current?.();
         }, 12000) : null;
@@ -260,6 +264,7 @@ function ProtocolAdminPage() {
             setQueueTarget(null);
             setupEpoch.current++;
             accessRequest.current++;
+            accessController.current?.abort();
             openedSetupFor.current = '';
             clearProtectedView();
             setAccess(null);
@@ -273,7 +278,7 @@ function ProtocolAdminPage() {
         const sessionChanged = (walletEvent = false) => {
             const wallet = currentSetupWallet();
             const authenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
-            if (walletEvent && wallet === lastWallet && authenticated === lastAuthenticated &&
+            if ((walletEvent || authenticated) && wallet === lastWallet && authenticated === lastAuthenticated &&
                 waitingForWallet === (window.artsoulWalletStateSettled !== true)) return;
             clearSession();
             const restored = waitingForWallet && window.artsoulWalletStateSettled === true;
@@ -294,9 +299,15 @@ function ProtocolAdminPage() {
             accessRequest.current++;
             clearProtectedView();
             setAccess(current => current ? { ...current, stepUpActive: false } : null);
-            setAccessState('loading');
+            setAccessState(current => ['ready', 'setup_verified', 'authority'].includes(current) ? 'loading' : current);
             checkAccessRef.current?.();
         };
+        const leave = () => { leftPage = true; };
+        const foreground = () => {
+            if (document.visibilityState === 'hidden') { leave(); return; }
+            if (leftPage) { leftPage = false; resume(); }
+        };
+        const restoredPage = event => { if (event.persisted) { leftPage = false; resume(); } };
         const offline = () => {
             expireView();
             setAccessState('error');
@@ -307,16 +318,18 @@ function ProtocolAdminPage() {
         window.addEventListener('hashchange', showLinkedSection);
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', clearSession);
-        window.addEventListener('focus', resume);
+        window.addEventListener('blur', leave);
+        window.addEventListener('focus', foreground);
         window.addEventListener('online', resume);
         window.addEventListener('offline', offline);
-        window.addEventListener('pageshow', resume);
+        window.addEventListener('pageshow', restoredPage);
         const connection = window.navigator?.connection;
         connection?.addEventListener('change', resume);
-        document.addEventListener('visibilitychange', resume);
+        document.addEventListener('visibilitychange', foreground);
         if (!waitingForWallet) checkAccessRef.current?.();
         return () => {
             setupEpoch.current++;
+            accessController.current?.abort();
             readySession.current = null;
             clearTimeout(expiryTimer.current);
             clearTimeout(walletWait);
@@ -325,18 +338,18 @@ function ProtocolAdminPage() {
             window.removeEventListener('hashchange', showLinkedSection);
             window.removeEventListener('storage', storage);
             window.removeEventListener('pagehide', clearSession);
-            window.removeEventListener('focus', resume);
+            window.removeEventListener('blur', leave);
+            window.removeEventListener('focus', foreground);
             window.removeEventListener('online', resume);
             window.removeEventListener('offline', offline);
-            window.removeEventListener('pageshow', resume);
+            window.removeEventListener('pageshow', restoredPage);
             connection?.removeEventListener('change', resume);
-            document.removeEventListener('visibilitychange', resume);
+            document.removeEventListener('visibilitychange', foreground);
         };
     }, []);
 
     useEffect(() => {
-        if (!passkeyOpen && ['unauthenticated', 'step_up', 'error'].includes(accessState)) {
-            accessHeading.current?.scrollIntoView({ block: 'start' });
+        if (!passkeyOpen && document.activeElement === document.body && ['unauthenticated', 'step_up', 'error'].includes(accessState)) {
             accessHeading.current?.focus({ preventScroll: true });
         }
     }, [accessState, passkeyOpen]);
@@ -382,6 +395,7 @@ function ProtocolAdminPage() {
 
     const checkAccess = useCallback(async ({ verified = false } = {}) => {
         const wallet = currentSetupWallet(), epoch = setupEpoch.current, request = ++accessRequest.current;
+        accessController.current?.abort();
         if (verified && signInIntent.current === 'login') completedSignIn.current = wallet;
         const startedAt = performance.now();
         const isCurrent = () => sessionIsCurrent(epoch, wallet) && request === accessRequest.current;
@@ -397,9 +411,14 @@ function ProtocolAdminPage() {
         }
         setBusy(true);
         setMessage('');
+        const controller = new AbortController();
+        accessController.current = controller;
+        const timeout = setTimeout(() => controller.abort(), 15000);
         try {
-            const result = await api(`access?expectedWallet=${encodeURIComponent(wallet)}`, { signal: AbortSignal.timeout(15000) });
+            const result = await api(`access?expectedWallet=${encodeURIComponent(wallet)}`, { signal: controller.signal });
+            clearTimeout(timeout);
             if (!isCurrent()) return;
+            if (controller.signal.aborted) throw new Error('The access check timed out. Retry to confirm your staff session.');
             // Use the server's remaining lifetime and subtract the whole request
             // duration. Client wall-clock skew and slow responses cannot extend it.
             const remaining = Number.isSafeInteger(result.access?.stepUpExpiresAt) && Number.isSafeInteger(result.serverTime)
@@ -407,6 +426,7 @@ function ProtocolAdminPage() {
             if (result.access?.stepUpActive && remaining <= 0) result.access = { ...result.access, stepUpActive: false };
             const canSetup = result.setupEnabled === true && result.authenticated === true && result.eligible === true;
             const canApprove = result.setupEnabled === true && result.authenticated === true && result.authorityEligible === true;
+            if (result.authenticated === true && typeof result.eligible === 'boolean') staffEntryHint(wallet, window, canSetup || canApprove);
             setAuthorityWallet(canApprove ? wallet : '');
             setSetupWallet(canSetup ? wallet : '');
             if (!canSetup) { completedSignIn.current = ''; setPasskeyOpen(false); }
@@ -432,13 +452,15 @@ function ProtocolAdminPage() {
             } else if (!result.access?.stepUpActive) {
                 setAccessState('step_up');
             } else {
-                readySession.current = { epoch, wallet };
+                readySession.current = { epoch, wallet, request };
                 setAccessState('ready');
                 await loadQueue(queueStatusRef.current);
             }
         } catch (error) {
-            if (isCurrent()) accessFailed(error.name === 'TimeoutError' ? new Error('The access check timed out. Retry to confirm your staff session.') : error);
+            if (isCurrent()) accessFailed(controller.signal.aborted ? new Error('The access check timed out. Retry to confirm your staff session.') : error);
         } finally {
+            clearTimeout(timeout);
+            if (accessController.current === controller) accessController.current = null;
             if (isCurrent()) setBusy(false);
         }
     }, [loadQueue]);
@@ -559,15 +581,18 @@ function ProtocolAdminPage() {
         ...(rosterWallet ? [{ title: 'Access', items: [['staff', authorityWallet ? 'Staff access' : 'Team directory']] }] : [])
     ];
 
+    function openWorkspaceSection(value) {
+        setSection(value);
+        if (value === 'appearance' || window.location.hash === '#nft-appearance') {
+            window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (value === 'appearance' ? '#nft-appearance' : ''));
+        }
+    }
+
     return (
-        <div className="protocol-admin-shell">
+        <div className="protocol-admin-shell admin-workspace">
             <header className="protocol-admin-heading" ref={accessHeading} tabIndex={-1}>
                 <div>
-                    <p className="protocol-admin-kicker">ArtSoul / Workspace</p>
                     <h1>Admin panel</h1>
-                    <p className="protocol-admin-description">{ready
-                        ? 'Review reports, manage public content visibility and inspect records.'
-                        : 'Secure moderation tools for verified staff wallets.'}</p>
                     <div className="protocol-admin-session">
                         <span className={`protocol-admin-access-status${ready ? ' is-verified' : ''}`} role="status">{statusLabel}</span>
                         <span>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : accessState === 'loading' ? 'Waiting for your wallet' : 'No staff wallet connected'}{roleLabel ? ` / ${roleLabel}` : ''}</span>
@@ -575,8 +600,8 @@ function ProtocolAdminPage() {
                 </div>
                 <div className="protocol-admin-header-actions">
                     {accessState === 'unauthenticated' && <button type="button" className="protocol-admin-primary" onClick={authenticate} disabled={busy}>{connectedWallet ? 'Verify wallet' : 'Connect staff wallet'}</button>}
-                    {setupWallet && <button type="button" className={ready ? '' : 'protocol-admin-primary'} disabled={busy} onClick={stepUp} aria-haspopup="dialog" aria-expanded={passkeyOpen}>{access?.stepUpActive ? 'Sign-in settings' : 'Verify admin access'}</button>}
-                    <button type="button" onClick={checkAccess} disabled={busy}>{busy ? 'Checking...' : accessState === 'error' ? 'Retry access check' : 'Refresh'}</button>
+                    {setupWallet && <button type="button" className={ready ? '' : 'protocol-admin-primary'} disabled={busy} onClick={stepUp} aria-haspopup="dialog" aria-expanded={passkeyOpen}>{access?.stepUpActive ? 'Account security' : 'Verify admin access'}</button>}
+                    <button type="button" onClick={checkAccess} disabled={busy}>{busy ? 'Checking...' : accessState === 'error' ? 'Retry access check' : 'Refresh access'}</button>
                 </div>
             </header>
 
@@ -586,13 +611,22 @@ function ProtocolAdminPage() {
                 {ready || accessState === 'ineligible' ? 'This staff account does not have permission to manage NFT appearance.' : 'Verify your authorized staff wallet to open NFT appearance.'}
             </p>}
 
-            {ready && <>
+            {ready &&
                 <div className="protocol-admin-overview" role="group" aria-label="Current workspace counts">
                     <div><span>Reports in view</span><strong>{data.reports.length}</strong></div>
                     <div><span>Hidden works</span><strong>{data.hidden.length}</strong></div>
                     <div><span>Delivery records</span><strong>{data.notifications.length}</strong></div>
-                </div>
+                </div>}
+            <div className="admin-workspace-layout" data-ready={ready}>
+                {ready &&
                 <nav className="protocol-admin-tabs" aria-label="Protocol Admin sections">
+                    <label className="admin-mobile-section">Workspace section
+                        <select value={activeSection} onChange={event => openWorkspaceSection(event.target.value)}>
+                            {adminGroups.map(group => <optgroup label={group.title} key={group.title}>
+                                {group.items.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </optgroup>)}
+                        </select>
+                    </label>
                     {adminGroups.map(group => (
                         <div className="protocol-admin-tab-group" key={group.title} role="group" aria-label={group.title}>
                             <span className="protocol-admin-tab-label" aria-hidden="true">{group.title}</span>
@@ -602,29 +636,25 @@ function ProtocolAdminPage() {
                                     type="button"
                                     className={activeSection === value ? 'is-active' : ''}
                                     aria-current={activeSection === value ? 'page' : undefined}
-                                    onClick={() => {
-                                        setSection(value);
-                                        if (value === 'appearance' || window.location.hash === '#nft-appearance') {
-                                            window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (value === 'appearance' ? '#nft-appearance' : ''));
-                                        }
-                                    }}
+                                    onClick={() => openWorkspaceSection(value)}
                                 >
                                     {label}
                                 </button>
                             ))}
                         </div>
                     ))}
-                </nav>
-            </>}
+                </nav>}
+                <div className="admin-workspace-content">
 
-            {rosterWallet && <div key="staff" hidden={ready && activeSection !== 'staff'}>{authorityControls}</div>}
+            {rosterWallet && ['ready', 'step_up', 'setup', 'setup_verified', 'authority'].includes(accessState) &&
+                <div key="staff" hidden={ready && activeSection !== 'staff'}>{authorityControls}</div>}
 
             {ready && message && <p className="protocol-admin-message" role="status">{message}</p>}
             {ready && appearanceAllowed && activeSection === 'appearance' && <AuraAppearance
                 key={`${catalogEpoch}:${catalogWallet}`} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent} />}
 
             {ready && activeSection === 'artworks' && <AdminArtworkCatalog
-                key={`${catalogEpoch}:${catalogWallet}:${accessRequest.current}`}
+                key={`${catalogEpoch}:${catalogWallet}:${readySession.current?.request}`}
                 api={api} isSessionCurrent={catalogSessionCurrent} onAccessError={accessFailed}
                 onReview={reviewArtwork} onChanged={() => {
                     void loadQueue(queueStatusRef.current).catch(error => { if (catalogSessionCurrent()) accessFailed(error); });
@@ -760,6 +790,8 @@ function ProtocolAdminPage() {
                 </section>
             )}
 
+                </div>
+            </div>
             {ready && decision && <DecisionDialog decision={decision} onClose={() => !busy && setDecision(null)} onSubmit={submitDecision} busy={busy} />}
         </div>
     );

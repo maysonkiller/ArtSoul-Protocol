@@ -9,6 +9,8 @@
   const reduceQuery=window.matchMedia('(prefers-reduced-motion: reduce)');
   function shouldReduceMotion(){return reduceQuery.matches || !ROOT.classList.contains('future')}
   let staticScene=shouldReduceMotion();
+  const ambientIdleDelay = 20000;
+  let ambientIdle = false, idleTimer = 0, lastInteraction = performance.now();
   const store={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
   const labels={open:'Atmosphere',original:'Original',winter:'Winter',newyear:'New Year',snow:'Snowfall',on:'Snow on',off:'Snow off',close:'Close atmosphere settings',title:'Seasonal studio',test:'See New Year fireworks',note:'Visual atmosphere only. Wallets and auctions continue to work as usual.',ribbon:'WARSAW MIDNIGHT 2027',zone:'Europe/Warsaw / 01 Jan 2027',days:'DAYS',hours:'HRS',minutes:'MIN',seconds:'SEC',year:'A new chapter in art',scene:'Digital light becomes a celebration',sceneCap:'A COLLECTOR STORY CONTINUES',sceneSide:'UNTIL THE NEXT CHAPTER',happy:'Happy New Year 2027',preview:'New Year fireworks',paused:'The seasonal scene is static in Classic and when reduced motion is enabled.',previewBadge:'ARTSOUL 2027',menu:'Choose appearance'};
   const modes=['original','winter','newyear'];
@@ -61,7 +63,8 @@
   function resizeWeather(){if(!wctx)return;({w:ww,h:wh}=resizeCanvas(weather,wctx));const n=Math.min(ww<600?46:92,Math.max(24,Math.round(ww*wh/15000)));flakes=Array.from({length:n},()=>({x:rand(0,ww),y:rand(0,wh),r:rand(.7,2.2),speed:rand(15,38),depth:rand(.45,1),phase:rand(0,6.28)}))}
   function stopWeather(){if(weatherId)cancelAnimationFrame(weatherId);weatherId=0;wctx?.clearRect(0,0,ww,wh)}
   function weatherFrame(now){
-    weatherId=0;if(document.hidden||staticScene||!snow||mode==='original'||!wctx)return;
+    weatherId=0;if(document.hidden||staticScene||ambientIdle||!snow||mode==='original'||!wctx)return;
+    if(now-weatherLast<1000/24){weatherId=requestAnimationFrame(weatherFrame);return;}
     const dt=Math.min(.045,Math.max(0,(now-weatherLast)/1000));weatherLast=now;wctx.clearRect(0,0,ww,wh);
     const cold=mode==='winter';
     for(let i=0;i<flakes.length;i++){
@@ -79,8 +82,76 @@
   const tree=byId('as-tree-canvas');const tctx=tree?.getContext('2d',{alpha:true});let tw=0,th=0,treeId=0,treePoints=[];
   function stopTree(){if(treeId)cancelAnimationFrame(treeId);treeId=0;if(tctx)tctx.clearRect(0,0,tw,th)}
   function resizeTree(){if(!tctx)return;({w:tw,h:th}=resizeCanvas(tree,tctx,1.7));const n=tw<190?300:450;treePoints=Array.from({length:n},(_,i)=>({theta:i*2.39996*4.1,level:1-(i+.5)/n,spread:Math.pow((i+.5)/n,.75),size:rand(.65,1.8),pulse:rand(0,6.28),warm:i%6===0}))}
-  function drawTree(now){treeId=0;if(mode!=='newyear'||!tctx)return;const time=now*.001,spin=staticScene?.26:time*.17,center=tw*.5,foot=th*.88,h=th*.75,radius=tw*.39;tctx.clearRect(0,0,tw,th);const g=tctx.createRadialGradient(center,foot-9,2,center,foot-9,tw*.5);g.addColorStop(0,'rgba(241,184,103,.3)');g.addColorStop(1,'rgba(241,184,103,0)');tctx.fillStyle=g;tctx.beginPath();tctx.ellipse(center,foot,tw*.47,18,0,0,Math.PI*2);tctx.fill();for(let band=0;band<2;band++){tctx.beginPath();for(let i=0;i<115;i++){const v=i/114,a=v*16.5+spin+band*2.9,rr=radius*Math.pow(v,.9);const x=center+Math.cos(a)*rr,y=foot-v*h+Math.sin(a)*rr*.12;if(i===0)tctx.moveTo(x,y);else tctx.lineTo(x,y)}tctx.strokeStyle=band?'rgba(132,241,200,.27)':'rgba(255,207,139,.40)';tctx.lineWidth=1;tctx.stroke()}for(const p of treePoints){const a=p.theta+spin,depth=Math.sin(a),rr=radius*p.spread,x=center+Math.cos(a)*rr,y=foot-p.level*h+depth*rr*.13,alpha=(.32+.44*Math.max(0,depth))*(staticScene?1:.8+.2*Math.sin(time*2.1+p.pulse));tctx.fillStyle=p.warm?`rgba(255,214,140,${alpha+.14})`:`rgba(150,235,207,${alpha})`;tctx.shadowColor=p.warm?'#fad88c':'#9de8d3';tctx.shadowBlur=p.warm?8:3;tctx.beginPath();tctx.arc(x,y,p.size*(1+depth*.15),0,Math.PI*2);tctx.fill()}tctx.shadowBlur=0;tctx.fillStyle='#f9e9af';tctx.shadowBlur=14;tctx.shadowColor='#f9dba0';tctx.beginPath();tctx.arc(center,foot-h-3,4.3,0,Math.PI*2);tctx.fill();tctx.shadowBlur=0;if(!staticScene&&!document.hidden)treeId=requestAnimationFrame(drawTree)}
-  function updateMotion(){BODY.dataset.asMotion=staticScene?'static':'animated';if(staticScene||mode!=='newyear')stopFire();stopWeather();stopTree();if(mode==='newyear'&&tree&&hero){resizeTree();if(tctx)drawTree(performance.now())}if(!document.hidden&&!staticScene&&snow&&mode!=='original'&&wctx){weatherLast=performance.now();weatherId=requestAnimationFrame(weatherFrame)}}
+  // Reuse the two glowing lights instead of blurring every point on every frame.
+  function treeLightSprite(warm) {
+    const sprite = DOC.createElement('canvas');
+    sprite.width = sprite.height = 48;
+    const ctx = sprite.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = warm ? '#ffd68c' : '#96ebcf';
+    ctx.shadowColor = warm ? '#fad88c' : '#9de8d3';
+    ctx.shadowBlur = warm ? 16 : 6;
+    ctx.beginPath();
+    ctx.arc(24, 24, 3, 0, Math.PI * 2);
+    ctx.fill();
+    return sprite;
+  }
+  const treeLights = hero && tctx ? [treeLightSprite(false), treeLightSprite(true)] : [];
+  let treeVisible = !('IntersectionObserver' in window), treeLast = 0;
+  if(hero && tree && !treeVisible){
+    new IntersectionObserver(([entry]) => {
+      treeVisible = entry.isIntersecting;
+      if(treeVisible && mode==='newyear' && !ambientIdle && !document.hidden && !treeId)drawTree(performance.now());
+      else if(!treeVisible && treeId){cancelAnimationFrame(treeId);treeId=0;}
+    }).observe(tree);
+  }
+  function drawTree(now){
+    treeId=0;
+    if(mode!=='newyear'||!tctx||!treeVisible||document.hidden||ambientIdle)return;
+    if(!staticScene && now-treeLast<1000/20){treeId=requestAnimationFrame(drawTree);return;}
+    treeLast=now;
+    const time=now*.001,spin=staticScene?.26:time*.17,center=tw*.5,foot=th*.88,h=th*.75,radius=tw*.39;tctx.clearRect(0,0,tw,th);const g=tctx.createRadialGradient(center,foot-9,2,center,foot-9,tw*.5);g.addColorStop(0,'rgba(241,184,103,.3)');g.addColorStop(1,'rgba(241,184,103,0)');tctx.fillStyle=g;tctx.beginPath();tctx.ellipse(center,foot,tw*.47,18,0,0,Math.PI*2);tctx.fill();for(let band=0;band<2;band++){tctx.beginPath();for(let i=0;i<115;i++){const v=i/114,a=v*16.5+spin+band*2.9,rr=radius*Math.pow(v,.9);const x=center+Math.cos(a)*rr,y=foot-v*h+Math.sin(a)*rr*.12;if(i===0)tctx.moveTo(x,y);else tctx.lineTo(x,y)}tctx.strokeStyle=band?'rgba(132,241,200,.27)':'rgba(255,207,139,.40)';tctx.lineWidth=1;tctx.stroke()}
+    for (const point of treePoints) {
+      const angle = point.theta + spin, depth = Math.sin(angle), spread = radius * point.spread;
+      const x = center + Math.cos(angle) * spread, y = foot - point.level * h + depth * spread * .13;
+      const pulse = staticScene ? 1 : .8 + .2 * Math.sin(time * 2.1 + point.pulse);
+      const light = treeLights[point.warm ? 1 : 0];
+      if (!light) continue;
+      tctx.globalAlpha = (.32 + .44 * Math.max(0, depth)) * pulse + (point.warm ? .14 : 0);
+      const size = 16 * point.size * (1 + depth * .15);
+      tctx.drawImage(light, x - size / 2, y - size / 2, size, size);
+    }
+    tctx.globalAlpha = 1;
+    tctx.shadowBlur=0;tctx.fillStyle='#f9e9af';tctx.shadowBlur=14;tctx.shadowColor='#f9dba0';tctx.beginPath();tctx.arc(center,foot-h-3,4.3,0,Math.PI*2);tctx.fill();tctx.shadowBlur=0;if(!staticScene&&!document.hidden)treeId=requestAnimationFrame(drawTree)}
+  function updateMotion(){BODY.dataset.asMotion=staticScene?'static':'animated';if(staticScene||mode!=='newyear')stopFire();stopWeather();stopTree();if(mode==='newyear'&&tree&&hero){resizeTree();if(tctx)drawTree(performance.now())}if(!document.hidden&&!ambientIdle&&!staticScene&&snow&&mode!=='original'&&wctx){weatherLast=performance.now();weatherId=requestAnimationFrame(weatherFrame)}}
+  function pauseIdleAtmosphere() {
+    idleTimer = 0;
+    const remaining = ambientIdleDelay - (performance.now() - lastInteraction);
+    if (remaining > 0) {
+      idleTimer = setTimeout(pauseIdleAtmosphere, remaining);
+      return;
+    }
+    if (staticScene || document.hidden) return;
+    ambientIdle = true;
+    BODY.dataset.asAmbientIdle = 'true';
+    cancelAnimationFrame(weatherId);
+    cancelAnimationFrame(treeId);
+    weatherId = treeId = 0;
+  }
+  function noteInteraction() {
+    lastInteraction = performance.now();
+    if (ambientIdle) {
+      ambientIdle = false;
+      delete BODY.dataset.asAmbientIdle;
+      updateMotion();
+    }
+    if (!idleTimer) idleTimer = setTimeout(pauseIdleAtmosphere, ambientIdleDelay);
+  }
+  for (const event of ['pointermove','pointerdown','keydown','scroll']) {
+    window.addEventListener(event, noteInteraction, {passive:true,capture:true});
+  }
+  DOC.addEventListener('visibilitychange', () => { if (!DOC.hidden) noteInteraction(); });
+  idleTimer = setTimeout(pauseIdleAtmosphere, ambientIdleDelay);
   function applyMode(){BODY.dataset.asSeason=mode;ROOT.dataset.asSeason=mode;BODY.dataset.asSnow=snow?'on':'off';applyControlLabels();updateMotion();updateHeaderOffset();scheduleDecoration()}
   const fctx=fire.getContext('2d',{alpha:true});let fw=0,fh=0,particles=[],fireId=0,lastFrame=0,toastTimeout=0;
   const colors=['#f7deb0','#eac0a2','#9fe4df','#e75e85','#bcd2ff','#fff9e6'];
@@ -94,6 +165,9 @@
     const next=shouldReduceMotion();
     if(next===staticScene)return;
     staticScene=next;
+    ambientIdle=false;
+    delete BODY.dataset.asAmbientIdle;
+    noteInteraction();
     applyControlLabels();
     updateMotion();
   }
@@ -285,21 +359,27 @@
   }
   const sizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(()=>scheduleDecoration()):null;
   function cleanup(el,rec){rec?.node?.remove();el.classList.remove('as-living-surface','as-living-position','as-living-ink','as-living-round-control');sizeObserver?.unobserve(el);surfaceRecords.delete(el);}
-  function decorateNode(el){
+  function measureSurface(el){
     if(el.matches('.site-header .avatar-button'))return;
     const st=getComputedStyle(el),r=el.getBoundingClientRect(),kind=surfaceType(el,st,r),old=surfaceRecords.get(el);
-    if(!kind||kind==='account'||mode==='original'){if(old)cleanup(el,old);return;}
-    if(kind==='ink'){
-      if(old?.kind==='ink')return;if(old)cleanup(el,old);el.classList.add('as-living-ink');surfaceRecords.set(el,{kind});return;
-    }
+    if(!kind||kind==='account'||mode==='original')return old ? {el,old} : null;
+    if(kind==='ink')return old?.kind==='ink' ? null : {el,old,kind};
     const key=[kind,mode,Math.round(r.width*2)/2,Math.round(r.height*2)/2,st.borderTopLeftRadius,st.borderTopRightRadius,st.overflowX,st.overflowY].join('|');
     if(old?.key===key&&old.node?.parentNode===el)return;
-    if(old)cleanup(el,old);if(surfaceRecords.size>=180)return;
     const clipped=[st.overflowX,st.overflowY].some(s=>s==='hidden'||s==='clip'||s==='auto'||s==='scroll');
+    return {el,old,kind,r,key,clipped,geometry:kind==='round'?null:topGeometry(st,r,kind),
+      position:st.position==='static'||el.classList.contains('as-living-position'),
+      left:parseFloat(st.borderLeftWidth)||0,top:parseFloat(st.borderTopWidth)||0};
+  }
+  function applySurface({el,old,kind,r,key,clipped,geometry,position,left,top}){
+    if(old)cleanup(el,old);
+    if(!kind)return;
+    if(kind==='ink'){el.classList.add('as-living-ink');surfaceRecords.set(el,{kind});return;}
+    if(surfaceRecords.size>=180)return;
     const round=kind==='round',seed=signature(el,r.width,r.height);
-    const markup=round?roundMaterialMarkup(r.width,r.height,seed,mode==='newyear'):bankMarkup(topGeometry(st,r,kind),kind,seed,mode==='newyear',clipped);if(!markup)return;
-    el.classList.add('as-living-surface');if(round)el.classList.add('as-living-round-control');if(getComputedStyle(el).position==='static')el.classList.add('as-living-position');
-    const node=elt('span',{'class':'as-living-bank as-living-'+kind+(round?' as-living-ring':''),'data-as-living-decor':'true','aria-hidden':'true'});node.style.setProperty('--as-bank-x',(-(parseFloat(st.borderLeftWidth)||0))+'px');node.style.setProperty('--as-bank-y',((round?0:-18)-(parseFloat(st.borderTopWidth)||0))+'px');
+    const markup=round?roundMaterialMarkup(r.width,r.height,seed,mode==='newyear'):bankMarkup(geometry,kind,seed,mode==='newyear',clipped);if(!markup)return;
+    el.classList.add('as-living-surface');if(round)el.classList.add('as-living-round-control');if(position)el.classList.add('as-living-position');
+    const node=elt('span',{'class':'as-living-bank as-living-'+kind+(round?' as-living-ring':''),'data-as-living-decor':'true','aria-hidden':'true'});node.style.setProperty('--as-bank-x',-left+'px');node.style.setProperty('--as-bank-y',((round?0:-18)-top)+'px');
     if(round){
       node.style.setProperty('--as-ring-w',r.width+'px');node.style.setProperty('--as-ring-h',r.height+'px');
       node.dataset.asRingMaterial=mode==='newyear'?'brass':'ice';
@@ -307,12 +387,54 @@
     }else node.innerHTML=markup;
     el.appendChild(node);surfaceRecords.set(el,{kind,key,node});sizeObserver?.observe(el);
   }
+  function decorateSurfaces(targets){
+    // Inserting a decoration can invalidate styles for every card. Measure them together.
+    const changes=Array.from(targets,measureSurface);
+    for(const change of changes)if(change)applySurface(change);
+  }
+  const observedSurfaces = new Set();
+  const nearbySurfaces = new Set();
+  const surfaceVisibility = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!observedSurfaces.has(entry.target)) continue;
+      if (entry.isIntersecting) nearbySurfaces.add(entry.target);
+      else {
+        nearbySurfaces.delete(entry.target);
+        const old = surfaceRecords.get(entry.target);
+        if (old) cleanup(entry.target, old);
+      }
+    }
+    scheduleDecoration();
+  }, { rootMargin: '160px' }) : null;
+
   function decorateSite(){
     if(document.hidden)return;
     updateHeaderOffset();
     for(const [el,rec] of surfaceRecords){if(mode==='original'||!el.isConnected||!el.matches(targetSelector))cleanup(el,rec);}
-    syncAccount();if(mode==='original')return;
-    for(const el of DOC.querySelectorAll(targetSelector))decorateNode(el);
+    syncAccount();
+    if(mode==='original'){
+      surfaceVisibility?.disconnect();
+      observedSurfaces.clear();
+      nearbySurfaces.clear();
+      return;
+    }
+    const targets=DOC.querySelectorAll(targetSelector);
+    if(!surfaceVisibility){
+      decorateSurfaces(targets);
+      return;
+    }
+    for(const el of observedSurfaces){
+      if(el.isConnected&&el.matches(targetSelector))continue;
+      surfaceVisibility.unobserve(el);
+      observedSurfaces.delete(el);
+      nearbySurfaces.delete(el);
+    }
+    for(const el of targets){
+      if(observedSurfaces.has(el))continue;
+      observedSurfaces.add(el);
+      surfaceVisibility.observe(el);
+    }
+    decorateSurfaces(nearbySurfaces);
   }
   let decorTimer=0;
   function scheduleDecoration(){if(decorTimer)return;decorTimer=setTimeout(()=>{decorTimer=0;decorateSite();},100);}

@@ -15,6 +15,7 @@ function harness() {
   const values = [], refs = [], effects = [], listeners = new Map(), timers = new Map();
   let stateIndex, refIndex, effectIndex, timerId = 0, pendingEffects;
   const scope = {
+    repeatsStaffWalletUpdate: require('../src/features/admin/staff-entry.js').repeatsStaffWalletUpdate,
     window: {
       getCurrentWalletAddress: () => state.wallet,
       ensureAuthenticated: async () => true,
