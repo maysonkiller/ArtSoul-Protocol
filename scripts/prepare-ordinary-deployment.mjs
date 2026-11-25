@@ -4,8 +4,8 @@ import { pathToFileURL } from 'node:url';
 import { Interface, ZeroAddress, concat, dataLength, getAddress, getCreateAddress, isAddress, isHexString, keccak256, toQuantity } from 'ethers';
 
 const roleNames = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
-const sourceName = 'contracts/replacement/OrdinaryMarket.sol';
-const contractName = 'OrdinaryMarket';
+export const historicalCore = 'contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket';
+export const payoutCore = 'contracts/replacement/OrdinaryPayoutMarket.sol:OrdinaryPayoutMarket';
 const maxRuntimeBytes = 24_576; // EIP-170
 const maxInitCodeBytes = 49_152; // EIP-3860, including encoded constructor arguments
 class ReviewError extends Error {}
@@ -19,8 +19,8 @@ export function prepareOrdinaryDeployment(artifact, review, custody) {
     requireReview(Number.isSafeInteger(nonce) && nonce >= 0, 'Supply the exact nonnegative deployment nonce');
     requireReview(isAddress(review.payer) && getAddress(review.payer) !== ZeroAddress, 'Supply a deployment payer');
     const payer = getAddress(review.payer);
-    requireReview(artifact.sourceName === sourceName && artifact.contractName === contractName &&
-        review.contract === sourceName + ':' + contractName, 'Expected the reviewed qualified production Core artifact');
+    requireReview([historicalCore, payoutCore].includes(review.contract) &&
+        review.contract === artifact.sourceName + ':' + artifact.contractName, 'Expected the reviewed qualified production Core artifact');
     requireReview(isHexString(artifact.bytecode, true) && artifact.bytecode !== '0x', 'Expected nonempty linked creation bytecode');
     requireReview(isHexString(artifact.deployedBytecode, true) && artifact.deployedBytecode !== '0x', 'Expected nonempty linked runtime bytecode');
     const runtimeTemplateBytes = dataLength(artifact.deployedBytecode);

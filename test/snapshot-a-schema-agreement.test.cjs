@@ -1,8 +1,7 @@
 // B-06: the Snapshot A allowlist named columns that do not exist.
 //
-// Snapshot A is captured once, on an announced date, immediately before a
-// destructive reset. A defect found on that day is unrecoverable, which is why
-// the exporter was built months ahead. The first rehearsal against the real
+// Keep the optional historical exporter aligned to its source tables.
+// The first rehearsal against the real
 // database - 2026-09-14 - failed on the second table:
 //
 //     read v41_artworks: 33 rows

@@ -1,0 +1,88 @@
+// Compile the local contract artifacts first. All calls below go to an in-process EVM.
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const { ethers } = require('ethers');
+
+process.env.HARDHAT_CONFIG = path.join(__dirname, '../hardhat.local.config.cjs');
+process.env.HARDHAT_NETWORK = 'hardhat';
+const { artifacts, config } = require('hardhat');
+const { createProvider } = require('hardhat/internal/core/providers/construction');
+
+async function main() {
+    const { readOrdinarySettlement, readOrdinaryToken, readOrdinaryResaleQuote } =
+        await import('../src/indexer/nft-deployment-proof.js');
+    const chainId = 84532;
+    const hardhat = { ...config.networks.hardhat, chainId, forking: undefined };
+    const rpc = await createProvider({ ...config, networks: { hardhat } }, 'hardhat', artifacts);
+    const provider = new ethers.BrowserProvider(rpc, undefined, { cacheTimeout: -1 });
+    provider.pollingInterval = 10;
+    try {
+        const [payer, creator, first, second] = await provider.listAccounts();
+        async function deploy(name, ...args) {
+            const { abi, bytecode } = await artifacts.readArtifact(name);
+            return (await new ethers.ContractFactory(abi, bytecode, payer).deploy(...args)).waitForDeployment();
+        }
+        const mine = async transaction => (await transaction).wait();
+        const location = receipt => ({ blockHash: receipt.blockHash, blockNumber: receipt.blockNumber });
+        // Advance the isolated node's finality tag past the requested receipt.
+        const finalize = () => rpc.send('hardhat_mine', ['0x80']);
+        const roles = [];
+        for (let i = 0; i < 3; i++) roles.push((await deploy('TreasuryAccountStub', 2)).target);
+        const pairs = [];
+        for (const [index, winner] of [first, second].entries()) {
+            const market = await deploy('OrdinaryMarket', ...roles, 2, 30_000);
+            const nft = new ethers.Contract(await market.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, provider);
+            const review = { chainId, coreAddress: market.target.toLowerCase(), nftAddress: nft.target.toLowerCase(),
+                expectedCoreCodeHash: ethers.keccak256(await provider.getCode(market.target)),
+                expectedNftCodeHash: ethers.keccak256(await provider.getCode(nft.target)), isCurrent: () => true };
+            const listener = { chainId, contractAddress: market.target, nftAddress: nft.target, _readRpcCall: read => read(rpc) };
+            const price = ethers.parseEther(index ? '0.002' : '0.001');
+            await mine(market.connect(creator).registerArtwork('ipfs://local-pair-' + index));
+            await mine(market.connect(creator).createAuction(1, price, 86400));
+            await mine(market.connect(winner).placeBid(1, price, { value: await market.requiredDepositForBid(price) }));
+            pairs.push({ market, nft, winner, buyer: index ? first : second, price, review, listener });
+        }
+        assert.notEqual(pairs[0].review.coreAddress, pairs[1].review.coreAddress);
+        assert.notEqual(pairs[0].review.nftAddress, pairs[1].review.nftAddress);
+        await rpc.send('evm_setNextBlockTimestamp', [Number((await pairs[1].market.auctions(1)).end)]);
+
+        for (const pair of pairs) {
+            const { market, nft, winner, buyer, price, review, listener } = pair;
+            const primary = await mine(market.connect(winner).settleAuction(1));
+            await finalize();
+            const sale = await readOrdinarySettlement(listener, { ...review, ...location(primary),
+                transactionHash: primary.hash, auctionId: '1' });
+            assert.deepEqual([sale.auctionId, sale.artworkId, sale.tokenId, sale.creator, sale.firstCollector, sale.priceWei],
+                ['1', '1', '1', creator.address.toLowerCase(), winner.address.toLowerCase(), String(price)]);
+            assert.equal(sale.coreAddress, review.coreAddress);
+            pair.primary = primary;
+            const resalePrice = price * 3n;
+            await mine(nft.connect(winner).approve(market.target, 1));
+            const listing = await mine(market.connect(winner).listResale(1, 0, resalePrice));
+            const resale = await mine(market.connect(buyer).buyResale(1, 1, { value: resalePrice }));
+            await finalize();
+            const quote = await readOrdinaryResaleQuote(listener, { ...review, ...location(listing), tokenId: '1' });
+            assert.deepEqual([quote.active, quote.seller, quote.priceWei, quote.version],
+                [true, winner.address.toLowerCase(), String(resalePrice), '1']);
+            const purchased = resale.logs.find(log => log.fragment?.name === 'ResalePurchased');
+            assert.deepEqual([purchased.args.seller, purchased.args.buyer, purchased.args.price],
+                [winner.address, buyer.address, resalePrice]);
+            const token = await readOrdinaryToken(listener, { ...review, ...location(resale), tokenId: '1' });
+            assert.deepEqual([token.nftAddress, token.owner, token.creator, token.firstCollector, token.artworkId],
+                [review.nftAddress, buyer.address.toLowerCase(), creator.address.toLowerCase(), winner.address.toLowerCase(), '1']);
+            await assert.rejects(readOrdinarySettlement(listener, { ...review, ...location(resale),
+                transactionHash: resale.hash, auctionId: '1' }), /Expected one AuctionSettled/);
+        }
+        // Both pairs are deployed before either receipt, and both use auction/artwork/token ID 1.
+        for (const [i, pair] of pairs.entries()) {
+            const other = pairs[1 - i].primary;
+            await assert.rejects(readOrdinarySettlement(pair.listener, { ...pair.review,
+                ...location(other), transactionHash: other.hash, auctionId: '1' }), /Expected one AuctionSettled/);
+        }
+        console.log('PASS: two issuer pairs, two paid primary sales, two resales and four rejected receipt substitutions on an isolated EVM.');
+    } finally {
+        provider.destroy();
+    }
+}
+
+main().catch(error => { console.error(error); process.exitCode = 1; });

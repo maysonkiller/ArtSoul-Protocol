@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {OrdinaryArtAuctions} from "../replacement/OrdinaryArtAuctions.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {OrdinaryPayoutMarket} from "../replacement/OrdinaryPayoutMarket.sol";
 
 /// @dev Local EVM policy values only. This fixture has no deployment script.
 contract OrdinaryAuctionFixture is OrdinaryArtAuctions {
@@ -36,6 +37,7 @@ contract OrdinaryBidderFixture is IERC721Receiver {
         engine.acceptRunnerUpOffer{value: msg.value}(id);
     }
     function withdraw(OrdinaryArtAuctions engine) external { engine.withdraw(); }
+    function withdrawTo(OrdinaryPayoutMarket engine, address payable recipient) external { engine.withdrawTo(recipient); }
     receive() external payable { require(acceptsETH); }
     function onERC721Received(address, address, uint256, bytes calldata) external view returns (bytes4) {
         require(acceptsNFT);

@@ -24,7 +24,9 @@ After migration 018 is available in the intended database, the operator can inge
 node scripts/index-ordinary-settlement.mjs reviewed-pair.json receipt-location.json
 ```
 
-The reviewed pair file supplies `chainId`, `coreAddress`, `nftAddress`, `expectedCoreCodeHash` and `expectedNftCodeHash`. Pin the runtime hashes from the release review. The receipt location supplies numeric `blockNumber`, `blockHash`, `transactionHash` and a decimal string `auctionId`. The command reads the RPC finalized boundary, deployment bindings, runtime code and receipt before opening the database transaction. Replaying identical evidence returns `inserted: false`. A disagreement fails the intake and preserves earlier rows. Continuous scanning, public history and deployment activation remain separate release steps.
+The settlement, runner-up and token commands accept the private pair register emitted by `prepare-rehearsal-core.mjs --register`. Pass its file path directly after verifying the deployment receipt. The commands use the chain ID and the address and initialized runtime hash of each contract. They discard the custody fields. The compact file format with `chainId`, `coreAddress`, `nftAddress`, `expectedCoreCodeHash` and `expectedNftCodeHash` also works. Mixing both formats in one file fails validation.
+
+The receipt location supplies numeric `blockNumber`, `blockHash`, `transactionHash` and a decimal string `auctionId`. The command reads the RPC finalized boundary, deployment bindings, runtime code and receipt before opening the database transaction. Replaying identical evidence returns `inserted: false`. A disagreement fails the intake and preserves earlier rows. Continuous scanning, public history and deployment activation remain separate release steps.
 
 ### Read a runner-up offer
 
@@ -623,8 +625,8 @@ or deletion of complaints is part of this procedure.
 
 This procedure implements the mandatory reset in Canon Bible section 16. It does not amend canon. The preferred production topology is a fresh mainnet Supabase project/database so testnet product state cannot leak into mainnet through an incomplete delete.
 
-1. Freeze testnet writes at the announced cut-off and generate Snapshot A with a versioned schema, deterministic ordering, manifest, content hash, timestamp, and chain/deployment identifiers.
-2. Verify Snapshot A independently and store at least two durable copies outside the live testnet database. Snapshot A is an archive/community record and is never imported as mainnet entitlement or live protocol state.
+1. Preserve the running testnet and its data. Record a separately authorized migration scope and a rollback owner before changing either environment.
+2. Inventory the affected database and Storage objects. Restore the retained backup into an isolated environment and verify schema, representative records and media before any destructive action. Record restoration evidence privately.
 3. Create final full and schema-only testnet backups. Retain the testnet environment read-only for the approved evidence-retention period.
 4. Create a separate mainnet database/project. Apply the reviewed final schema from migration 001 so its checksum ledger is complete from the first migration; do not copy the testnet ledger or infer migration state from table names.
 5. Configure only audited Base mainnet contract addresses and deployment start blocks. Start the mainnet indexer from those blocks with an empty product projection.
@@ -632,7 +634,7 @@ This procedure implements the mandatory reset in Canon Bible section 16. It does
 7. Any proposal to preserve non-economic display-only profile fields requires a separate mapped, reviewed, consent-aware migration. It must not preserve testnet reputation, eligibility, balances, ownership, or protocol outcomes.
 8. Exercise the complete mainnet smoke lifecycle in the new environment before enabling public writes: wallet sign-in, publish, auction, deposit, settlement, lazy mint, resale, indexer projection, public reads, moderation, and Storage upload/read.
 9. Verify there are zero references to testnet contract addresses, RPC networks, object paths, or indexer cursors in the mainnet runtime. Only then switch production traffic.
-10. Archive or remove testnet Storage objects and database state only after Snapshot A, backups, retention, and rollback evidence are verified. Never treat deletion as the backup strategy.
+10. Archive or remove testnet Storage objects and database state only with separate approval after tested backups, retention and rollback evidence are verified. Never treat deletion as the backup strategy.
 
 The migration baseline audit for the current testnet database remains historical evidence. Missing superseded `indexed_auctions`/`indexed_bids` tables are not a reason to recreate them, and migration 014 is the forward compatibility fix for that live V4.1 schema.
 

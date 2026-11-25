@@ -1,5 +1,7 @@
 # Snapshot A timing amendment — October 28, 2026
 
+The November 25 founder decision supersedes the public archive and advance-notice requirement recorded here. The [current migration policy](ARTSOUL_CANON_BIBLE_FULL.md#16-pre-mainnet-migration-and-data-reset) retains operational backup and restore verification.
+
 Status: approved scheduling direction; no cut-off announced or final capture made.
 Source: the founder's instruction in the existing ArtSoul task to wait until the
 full testnet has run, rather than treating the current beta as the final testnet.

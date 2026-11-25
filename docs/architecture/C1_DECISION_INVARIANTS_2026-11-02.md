@@ -216,12 +216,9 @@ Excess-deposit vector: `P=5000000000000000`, `d=10000000000000000` gives require
 payment `0`, excess `5000000000000000`; price plus excess equals the original deposit.
 Its exact primary split is creator `4875000000000000`, protocol `125000000000000`.
 
-**RECOMMENDATION.** Specify one obligation state transition model before selecting
-push/batch/credit mechanics. Evaluate creditor-authorized alternate recipients for
-rejecting wallets; prohibit operator-chosen diversion. Use overflow-safe arithmetic
-equivalent to the equations and test upper representable bounds without inventing caps.
+**Ordinary payout decision, November 25.** A failed batch transfer creates one credit for the displaced bidder. In the [new Core candidate](../../contracts/replacement/OrdinaryPayoutMarket.sol), the creditor may withdraw its full accrued balance to itself or nominate a nonzero recipient other than the market. Only a call from the credited address authorizes delivery. A failed withdrawal preserves the balance. Both methods work during an entry pause. An account that cannot initiate either call must use a compatible wallet before bidding. Existing immutable deployments retain their original withdrawal methods.
 
-The November 19 decisions fix remainder assignment and bind the two treasuries at construction for the new ordinary pair. Selection of bounded executor limits, an operational gas payer and alternate refund-recipient authorization remains open. The [prototype](../../contracts/ArtSoulCore.sol#L574) allows a treasury change to affect a later settlement, default or resale. Existing credited balances retain their recipients.
+The November 19 decisions fix remainder assignment and bind the two treasuries at construction for the new ordinary pair. Production executor limits and the operational gas payer remain open. The [prototype](../../contracts/ArtSoulCore.sol#L574) allows a treasury change to affect a later settlement, default or resale. Existing credited balances retain their recipients.
 
 **Acceptance cases:** all vectors; zero/double obligations; over-deposit; multiple
 auctions sharing recipients; partial batch/retry; recipient revert/reentry; withdrawal

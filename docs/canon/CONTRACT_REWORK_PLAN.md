@@ -142,7 +142,7 @@ The selected ordinary-pair entry pause keeps fulfillment and exits available thr
 | Donations | Separate; any non-zero amount with/without message; 100% creator; no protocol revenue or Trust benefit |
 | Moderation / AI | Complaint-driven site visibility and human review; no reversal of chain ownership/seizure; AI does not set settlement/floor |
 | Treasury / growth | Protocol/1% ecosystem accounts separate; pool is not salaries/investor income; promoted-banner rules separately gated; no token/points/airdrop |
-| Migration | Announced Snapshot A, versioned hashed export and two independently verified durable copies before destructive reset; no testnet entitlement |
+| Migration | Preserve testnet data and verify operational backup restoration before any destructive change; no testnet entitlement |
 
 Generic phase prices, supply, fallback prices and draft Genesis ideas remain
 proposed where not approved. Do not turn a generic clearing price into a 1/1 floor
@@ -375,7 +375,7 @@ and undecided policy. It is not architecture sign-off or replacement Solidity.
 The November 16 [minimal replacement boundaries](../architecture/C1_REPLACEMENT_BOUNDARIES_2026-11-16.md)
 narrow this into a proposed immutable engine/NFT pair, deployment-scoped identity,
 settlement-bound mint capability and isolated liabilities with bounded refunds.
-The November 19 decisions select the ordinary-market entry pause, whole-wei payout rounding, three Safe addresses and delayed external operator admission. The concrete OrdinaryMarket candidate compiles with constructor-bound Safe roles. Contract sign-off still needs reviewed target-network refund settings, an independently reviewed release build and verification of the deployed pair. Each external operator requires its own compatibility evidence.
+The November 19 decisions established the ordinary-market entry pause, whole-wei payout rounding, three distinct Safe roles and delayed external operator admission. The concrete OrdinaryMarket candidate compiles with constructor-bound roles. Verify target-network refund settings, the exact build, network-specific custody and both deployed contracts. The [November 25 decision](CHANGELOG_2026-11-25_RELEASE_SEQUENCE.md) sets the audit schedule. Each external operator requires its own compatibility evidence.
 
 1. C1: state/rounding/deadline specification, identity/capability graph, upgrade
    selection, threats and invariants. Approve changed rules before Solidity.
@@ -388,8 +388,8 @@ The November 19 decisions select the ordinary-market entry pause, whole-wei payo
 4. Selected payment route after destination correctness and policy approval:
    funding first, bounded buy-now next, auction intents last.
 5. C7–C13: complete event projections, invariant/upgrade/migration suites,
-   independent review covering privileged integrations, fresh Base Sepolia rehearsal.
-6. B4/C14/D: approved cut-off, Snapshot A, operating/legal readiness, deployment
+   internal security review covering privileged integrations, fresh Base Sepolia rehearsal.
+6. B4/C14/D: verified operational recovery, operating/legal readiness, deployment
    approval and controlled mainnet release. Prefer an isolated new mainnet database;
    never destroy old history before required copies/verification.
 

@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Interface, ZeroAddress, getAddress, id, keccak256, toBeHex, zeroPadValue } from 'ethers';
 import { verifyTreasurySafes, verifyTreasurySafesWithTwoProviders } from '../scripts/verify-treasury-safes.mjs';
+import { verifyRehearsalCoreReceipt } from '../scripts/prepare-rehearsal-core.mjs';
 
 const addr = n => getAddress(toBeHex(n, 20));
 const roles = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
@@ -73,6 +74,87 @@ function fixture() {
     }
     return { register, chain, rpc };
 }
+
+function creationFixture() {
+    const { register, chain, rpc: underlying } = fixture();
+    const txHash = id('synthetic signed creation');
+    const review = { chainId: 84532, expectedCore: register.core.address, expectedNFT: register.nft.address,
+        payer: addr(80), nonce: 8, initCodeHash: keccak256('0x6001') };
+    const included = { blockNumber: block.number, blockHash: block.hash, transactionIndex: '0x1', from: review.payer, to: null };
+    const tx = { ...included, hash: txHash, nonce: '0x8', value: '0x0', input: '0x6001', chainId: '0x14a34' };
+    const receipt = { ...included, transactionHash: txHash, status: '0x1', contractAddress: register.core.address };
+    const canonical = { ...block, transactions: [id('other signed call'), txHash] };
+    const head = { number: '0x33', hash: id('later finalized head') };
+    async function rpc(method, params) {
+        if (method === 'eth_getTransactionByHash' || method === 'eth_getTransactionReceipt') {
+            assert.deepEqual(params, [txHash]);
+            return method === 'eth_getTransactionByHash' ? tx : receipt;
+        }
+        if (method === 'eth_getBlockByNumber') return params[0] === 'finalized' ? head : canonical;
+        return underlying(method, params);
+    }
+    return { txHash, review, register, chain, tx, receipt, canonical, head, rpc };
+}
+
+test('the rehearsal page re-verifies a deployed pair at a common finalized block, independent of the current payer nonce', async () => {
+    const { reviewedPairStatus } = await import('../scripts/serve-rehearsal-review.mjs');
+    const a = fixture(), b = fixture();
+    function provider(sample) {
+        return async (method, params) => {
+            if (method === 'eth_getTransactionCount') {
+                assert.ok([sample.register.core.address, sample.register.nft.address].includes(params[0]));
+                return '0x1';
+            }
+            if (method === 'eth_getCode' && params[1] === 'latest') {
+                return sample.rpc(method, [params[0], { blockHash: block.hash, requireCanonical: true }]);
+            }
+            return sample.rpc(method, params);
+        };
+    }
+    const providers = [provider(a), provider(b)];
+    const status = await reviewedPairStatus(providers, a.register, block);
+    assert.deepEqual(status.finalizedPair, { core: a.register.core.address, nft: a.register.nft.address });
+    assert.ok(status.complete && status.evidence.coreBindingsChecked && status.evidence.nftPairChecked);
+    assert.deepEqual(status.evidence.block, block);
+    assert.deepEqual(status.evidence.refundLimits, { refundBatchLimit: '3', refundTransferGas: '45000' });
+    assert.ok(!('data' in status));
+    b.chain.nft.mintingCore = addr(8);
+    await assert.rejects(reviewedPairStatus(providers, a.register, block), /NFT binding mismatch/);
+    b.chain.nft.mintingCore = b.register.core.address;
+    b.chain.core.refundTransferGas = '123';
+    await assert.rejects(reviewedPairStatus(providers, a.register, block), /refund setting mismatch/);
+});
+
+test('a finalized direct creation verifies payer, exact initcode, receipt and both contracts at the inclusion block', async () => {
+    const a = creationFixture(), b = creationFixture();
+    const proof = await verifyRehearsalCoreReceipt(a.txHash, a.review, a.register, [a.rpc, b.rpc]);
+    assert.deepEqual(proof.block, block);
+    assert.equal(proof.txHash, a.txHash);
+    assert.equal(proof.coreBindingsChecked, true);
+    assert.equal(proof.nftPairChecked, true);
+    assert.equal(proof.rpcReadings, 2);
+});
+
+test('a changed field on either provider invalidates the deployment receipt', async () => {
+    const a = creationFixture();
+    for (const [target, change, message] of [
+        ['tx', { from: addr(90) }, /payer/], ['receipt', { from: addr(90) }, /payer/],
+        ['tx', { nonce: '0x9' }, /nonce/], ['tx', { input: '0x6002' }, /bytecode/], ['tx', { chainId: '0x2105' }, /chain/],
+        ['tx', { to: addr(4) }, /direct/], ['receipt', { to: addr(4) }, /direct/], ['tx', { value: '0x1' }, /value/],
+        ['receipt', { status: '0x0' }, /failed/], ['receipt', { contractAddress: addr(5) }, /Core address/],
+        ['receipt', { transactionHash: id('other') }, /receipt hash/], ['tx', { hash: id('other') }, /transaction hash/],
+        ['tx', { transactionIndex: '0x0' }, /indices/], ['receipt', { blockHash: id('reorg') }, /blocks differ/],
+        ['canonical', { hash: id('reorg') }, /canonical/], ['canonical', { transactions: [a.txHash] }, /canonical/],
+        ['head', { number: '0x31' }, /has not finalized/]
+    ]) {
+        const b = creationFixture();
+        Object.assign(b[target], change);
+        await assert.rejects(verifyRehearsalCoreReceipt(a.txHash, a.review, a.register, [a.rpc, b.rpc]), message);
+    }
+    const b = creationFixture();
+    b.chain.nft.mintingCore = addr(8);
+    await assert.rejects(verifyRehearsalCoreReceipt(a.txHash, a.review, a.register, [a.rpc, b.rpc]), /NFT binding mismatch/);
+});
 
 test('matches all three Safes and Core bindings at one canonical block without printing identities', async () => {
     const { register, rpc } = fixture();

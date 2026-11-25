@@ -111,6 +111,12 @@ async function verifyCommand(pool) {
         assert.equal(report.inserted, false);
         assert.equal(report.sale.priceWei, '1000000000000000001');
         assert.ok(!stdout.includes(secret));
+        const privateOwner = address(70);
+        await writeFile(pair, JSON.stringify({ chainId, adminSecurity: { owners: [privateOwner] },
+            core: { address: coreAddress, codeHash: expectedCoreCodeHash }, nft: { address: nftAddress, codeHash: expectedNftCodeHash } }));
+        const replay = await command();
+        assert.deepEqual(JSON.parse(replay.stdout.trim().split(/\r?\n/).at(-1)), report);
+        assert.ok(!replay.stdout.includes(privateOwner));
         const args = ['scripts/read-ordinary-runner-up.mjs', pair, auctionId, String(blockNumber), blockHash];
         const observation = () => pool.query('SELECT 1 FROM artsoul_private.ordinary_runner_up_observations WHERE core_address=$1', [coreAddress]);
         const dry = await command(args);

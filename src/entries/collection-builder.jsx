@@ -4,7 +4,7 @@ import { MintReservationTerms } from './mint-reservation-terms.jsx';
 import { CollectionScheduleField } from './collection-schedule-field.jsx';
 import { COLLECTION_NETWORKS } from '../config/collection-networks.js';
 import {
-    createAuctionMintDraft, createDraft, createFirstArtworkDraft, createMintReservationDraft, createOriginDraft, createPhase, ELIGIBILITY, loadDraft,
+    changeDraftSupply, createAuctionMintDraft, createDraft, createFirstArtworkDraft, createMintReservationDraft, createOriginDraft, createPhase, ELIGIBILITY, hasFirstWorkMint, loadDraft,
     MAX_DRAFT_ITEMS, MECHANISMS, parseDraft, reservationPublicMint, reviewConfig, saveDraft, setsMintPrice, UNUSED_SUPPLY
 } from '../features/collections/launch-config.js';
 import '../features/collections/collections.css';
@@ -173,7 +173,9 @@ function Builder() {
                         </div>
                         <Field label="Description"><textarea value={draft.description} maxLength={20000} onChange={event => update('description', event.target.value)} /></Field>
                         <div className="launch-grid">
-                            <Field label="Maximum supply" inputMode="numeric" value={draft.maxSupply} onChange={event => update('maxSupply', event.target.value)} hint="Choose your own draft supply. This does not lock a contract." />
+                            <Field label="Maximum supply" inputMode="numeric" value={draft.maxSupply}
+                                onChange={event => { const value = event.target.value; setDraft(current => changeDraftSupply(current, value)); }}
+                                hint={hasFirstWorkMint(draft) ? 'Set a total of at least 2. One NFT goes to the opening auction and the rest to the public mint.' : 'Choose your own draft supply. This does not lock a contract.'} />
                             <Field label="Metadata base URI" placeholder="ipfs://CID/" value={draft.media.metadataBaseURI} onChange={event => updateGroup('media', 'metadataBaseURI', event.target.value)} hint={review.tokenOneMetadataURI ? <>Token #1 metadata URI / <bdi>{review.tokenOneMetadataURI}</bdi></> : 'Enter the prefix for numbered metadata files. For a directory, include the final slash.'} />
                         </div>
                         <Field label="Holder rights and licensing"><textarea value={draft.holderRights} maxLength={20000} onChange={event => update('holderRights', event.target.value)} /></Field>

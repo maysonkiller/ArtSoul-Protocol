@@ -4,14 +4,11 @@
 //
 //   node scripts/verify-snapshot-a.mjs ../snapshot-a
 //
-// This is the script Bible section 16 point 2 asks for. It reads no database, no
-// API and no table in this repository: give it a directory and it answers.
+// Read an optional historical archive offline. This utility does not verify a
+// full database or Storage backup and does not authorize a destructive change.
 //
-// That is deliberate, and it is the whole point of the format. Snapshot A has to
-// survive the destructive reset that removes the data it describes, so its proof
-// of integrity cannot depend on anything that reset takes away. Copy the
-// directory to two independent durable locations and run this there - a copy
-// nobody has verified in its own location is a copy nobody has verified.
+// For a previously saved archive, a trusted root lets each retrieved copy be
+// checked independently of the original application.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -20,12 +17,13 @@ import { captureCutOffMicros, verifySnapshot } from '../src/snapshot/snapshot-a.
 
 const hashText = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
-const usage = 'Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256> [--second-copy <directory>] [--announced-cut-off <ISO-8601> [--notice-published-at <ISO-8601>]]]';
+const usage = 'Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256> [--second-copy <directory>] [--expected-cut-off <ISO-8601>]]';
 let args;
 try {
     args = parseArgs({ allowPositionals: true, options: {
         'expected-root': { type: 'string', multiple: true }, 'second-copy': { type: 'string', multiple: true },
-        'announced-cut-off': { type: 'string', multiple: true },
+        'expected-cut-off': { type: 'string', multiple: true },
+        'announced-cut-off': { type: 'string', multiple: true }, // Historical command alias.
         'notice-published-at': { type: 'string', multiple: true }
     } });
 } catch {
@@ -34,7 +32,7 @@ try {
 }
 const roots = args.values['expected-root'] ?? [];
 const copies = args.values['second-copy'] ?? [];
-const cutOffs = args.values['announced-cut-off'] ?? [];
+const cutOffs = [...(args.values['expected-cut-off'] ?? []), ...(args.values['announced-cut-off'] ?? [])];
 const announcedMicros = captureCutOffMicros(cutOffs[0]);
 const notices = args.values['notice-published-at'] ?? [];
 const publicationMicros = captureCutOffMicros(notices[0]);
@@ -48,7 +46,7 @@ if (args.positionals.length > 1 || roots.length > 1 || copies.length > 1 || cutO
     process.exit(1);
 }
 if (announcedMicros !== null && announcedMicros > BigInt(Date.now()) * 1000n) {
-    console.error('The announced cut-off has not occurred yet.');
+    console.error('The expected archive cut-off has not occurred yet.');
     process.exit(1);
 }
 if (publicationMicros !== null && announcedMicros - publicationMicros < 14n * 86400n * 1000000n) {
@@ -89,7 +87,7 @@ function verifyDirectory(dir, second) {
     problems.push(...result.problems);
     if (result.ok && announcedMicros !== null &&
         (result.manifest.chain_id !== '84532' || captureCutOffMicros(result.manifest.source_cut_off) !== announcedMicros)) {
-        problems.push('Archive does not match the announced Base Sepolia cut-off.');
+        problems.push('Archive does not match the expected Base Sepolia cut-off.');
     }
     if (expectedRootHash && result.ok) {
         try {
@@ -126,8 +124,6 @@ if (process.exitCode) {
 } else if (copies.length) {
     console.log('Both restored copies match the trusted capture root. Record the two retrieval sources separately.');
 }
-if (!process.exitCode && announcedMicros !== null) {
-    console.log(publicationMicros === null
-        ? 'Notice period was not checked. Supply --notice-published-at for final cutover verification.'
-        : 'The supplied timestamps provide the required 14-day public notice. Retain the original announcement.');
+if (!process.exitCode && publicationMicros !== null) {
+    console.log('The supplied timestamps meet the historical 14-day public notice rule for this archive.');
 }

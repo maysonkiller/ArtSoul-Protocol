@@ -39,7 +39,7 @@ function addressSet(values, field) {
     return list;
 }
 
-async function finalizedBlock(chain, rpc) {
+export async function finalizedBlock(chain, rpc) {
     check(chain === 84532 || chain === 8453, 'Choose Base Sepolia or Base mainnet');
     check(BigInt(await rpc('eth_chainId', [])) === BigInt(chain), 'Wrong RPC chain');
     const finalized = await rpc('eth_getBlockByNumber', ['finalized', false]);
@@ -47,7 +47,7 @@ async function finalizedBlock(chain, rpc) {
     return { number: finalized.number, hash: finalized.hash };
 }
 
-async function confirmFinalizedBlock(rpc, head, block) {
+export async function confirmFinalizedBlock(rpc, head, block) {
     check(hash(block.hash) && /^0x[0-9a-f]+$/i.test(block.number), 'Invalid requested block');
     const height = BigInt(block.number);
     check(height <= BigInt(head.number), 'Provider has not finalized the requested block');
@@ -65,7 +65,7 @@ export async function verifyTreasurySafes(register, rpc, expectedBlock) {
     return verifyAtBlock(register, rpc, expectedBlock ?? head);
 }
 
-export async function verifyTreasurySafesWithTwoProviders(register, first, second, { requirePair = false } = {}) {
+export async function verifyTreasurySafesWithTwoProviders(register, first, second, { requirePair = false, expectedBlock } = {}) {
     let refundLimits;
     if (requirePair) {
         check(register.core && register.nft, 'The pair check requires reviewed Core and NFT entries');
@@ -83,16 +83,13 @@ export async function verifyTreasurySafesWithTwoProviders(register, first, secon
         }
     }
     const [firstHead, secondHead] = await Promise.all([finalizedBlock(register.chainId, first), finalizedBlock(register.chainId, second)]);
-    const block = BigInt(firstHead.number) <= BigInt(secondHead.number) ? firstHead : secondHead;
+    const block = expectedBlock ?? (BigInt(firstHead.number) <= BigInt(secondHead.number) ? firstHead : secondHead);
     await Promise.all([confirmFinalizedBlock(first, firstHead, block), confirmFinalizedBlock(second, secondHead, block)]);
     const [result] = await Promise.all([verifyAtBlock(register, first, block, refundLimits), verifyAtBlock(register, second, block, refundLimits)]);
     return result;
 }
 
-async function verifyAtBlock(register, rpc, block, refundLimits) {
-    const assigned = roles.map(role => address(register[role]?.address, role));
-    check(new Set(assigned).size === roles.length, 'Each custody role needs its own Safe address');
-    if (register.nft) check(register.core, 'An NFT register entry requires its paired Core');
+function blockReaders(rpc, block) {
     const at = { blockHash: block.hash, requireCanonical: true };
 
     async function view(to, name, args = []) {
@@ -107,28 +104,40 @@ async function verifyAtBlock(register, rpc, block, refundLimits) {
         check(keccak256(code) === expectedHash.toLowerCase(), 'Runtime code mismatch for ' + field);
     }
 
+    return { at, view, checkCode };
+}
+
+export async function verifySafeAtBlock(entry, role, rpc, block) {
+    const { at, view, checkCode } = blockReaders(rpc, block);
+    const owners = addressSet(entry.owners, role + ' owners');
+    const modules = addressSet(entry.modules, role + ' modules');
+    check(Number.isSafeInteger(entry.threshold) && entry.threshold >= 2 && entry.threshold <= owners.length,
+        'Invalid multisig threshold for ' + role);
+    await checkCode(entry.address, entry.proxyCodeHash, role + ' proxy');
+    for (const [field, slot] of Object.entries(slots)) {
+        const expected = address(entry[field], role + ' ' + field, field !== 'singleton');
+        const word = await rpc('eth_getStorageAt', [entry.address, slot, at]);
+        check(hash(word) && getAddress('0x' + word.slice(-40)) === expected, role + ' ' + field + ' mismatch');
+    }
+    await checkCode(entry.singleton, entry.singletonCodeHash, role + ' singleton');
+    const [actualOwners] = await view(entry.address, 'getOwners');
+    const [threshold] = await view(entry.address, 'getThreshold');
+    check(addressSet(actualOwners, 'on-chain owners').join() === owners.join(), role + ' owner set mismatch');
+    check(threshold === BigInt(entry.threshold), role + ' threshold mismatch');
+    const [actualModules, next] = await view(entry.address, 'getModulesPaginated', [sentinel, Math.max(1, modules.length)]);
+    check(next === sentinel && addressSet(actualModules, 'on-chain modules').join() === modules.join(),
+        role + ' enabled modules mismatch');
+    return { owners: owners.length, threshold: entry.threshold };
+}
+
+async function verifyAtBlock(register, rpc, block, refundLimits) {
+    const assigned = roles.map(role => address(register[role]?.address, role));
+    check(new Set(assigned).size === roles.length, 'Each custody role needs its own Safe address');
+    if (register.nft) check(register.core, 'An NFT register entry requires its paired Core');
+    const { view, checkCode } = blockReaders(rpc, block);
     const summary = {};
     for (const role of roles) {
-        const entry = register[role];
-        const owners = addressSet(entry.owners, role + ' owners');
-        const modules = addressSet(entry.modules, role + ' modules');
-        check(Number.isSafeInteger(entry.threshold) && entry.threshold >= 2 && entry.threshold <= owners.length,
-            'Invalid multisig threshold for ' + role);
-        await checkCode(entry.address, entry.proxyCodeHash, role + ' proxy');
-        for (const [field, slot] of Object.entries(slots)) {
-            const expected = address(entry[field], role + ' ' + field, field !== 'singleton');
-            const word = await rpc('eth_getStorageAt', [entry.address, slot, at]);
-            check(hash(word) && getAddress('0x' + word.slice(-40)) === expected, role + ' ' + field + ' mismatch');
-        }
-        await checkCode(entry.singleton, entry.singletonCodeHash, role + ' singleton');
-        const [actualOwners] = await view(entry.address, 'getOwners');
-        const [threshold] = await view(entry.address, 'getThreshold');
-        check(addressSet(actualOwners, 'on-chain owners').join() === owners.join(), role + ' owner set mismatch');
-        check(threshold === BigInt(entry.threshold), role + ' threshold mismatch');
-        const [actualModules, next] = await view(entry.address, 'getModulesPaginated', [sentinel, Math.max(1, modules.length)]);
-        check(next === sentinel && addressSet(actualModules, 'on-chain modules').join() === modules.join(),
-            role + ' enabled modules mismatch');
-        summary[role] = { owners: owners.length, threshold: entry.threshold };
+        summary[role] = await verifySafeAtBlock(register[role], role, rpc, block);
     }
     if (register.core) {
         const core = address(register.core.address, 'Core');

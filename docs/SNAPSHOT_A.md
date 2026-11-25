@@ -1,32 +1,8 @@
-# Snapshot A — export schema and capture runbook
+# Snapshot A historical export format
 
-Snapshot A is the community record of the public testnet. Bible section 16 point
-1 requires it to be versioned, reproducible, machine-readable and durable, to
-carry the source cut-off, participating addresses, qualifying public events with
-timestamps, aggregate counts and a cryptographic manifest, and to be verified
-from at least two independent durable locations. Point 2 requires proving it can
-be read and independently validated **after the application database is reset**.
+The founder retired the final public-testnet archive and its announcement on November 25. No final capture or publication is scheduled. Existing archives and their local verification tools remain readable. They carry no mainnet entitlements.
 
-**It creates no entitlement.** Not Genesis, not a token, not points, not an
-airdrop. That sentence is written into the manifest itself, because the file will
-outlive every document around it.
-
-## Why the format looks like this
-
-Timing was amended by the founder on October 28, 2026: the actual capture follows
-the full public testnet of the final contracts in late Phase C, before Phase D
-reset and mainnet launch. It is not an exit gate for the current Phase B beta.
-Announce the final cut-off at least two weeks ahead; no date is assigned now.
-Keep export tooling and rehearsals ready, without calling rehearsal files the
-final Snapshot A. See Bible §16 and canonical backlog C16.
-
-Snapshot A is captured once, on an announced date, immediately before a
-destructive reset, and it cannot be recaptured afterwards. Its proof of integrity
-therefore cannot depend on anything the reset removes. A reader holding only the
-directory — no database, no API, no access to this repository — must be able to
-decide whether the copy in front of them is intact.
-
-That single constraint produces every design decision below.
+The seven exported projections omit accounts, private records, media files and other data needed to restore the service. Before any separately approved destructive operation, preserve the affected database and Storage and test an isolated restore under the [migration runbook](security/MIGRATION_RUNBOOK.md). Keep the current testnet data.
 
 ## What is exported
 
@@ -91,13 +67,13 @@ for inspecting the listed files in older mixed directories.
 Output is deterministic for identical input rows: object keys and rows are
 sorted and every file ends with a newline. A timestamp cut-off alone does not
 freeze mutable auction/artwork projections. Two runs against a changing database
-can differ legitimately; this is not proof of tampering. Final capture must use
+can differ legitimately; this is not proof of tampering. A reproducible export uses
 a consistent, stabilized read view. The current timestamp filter does not
 reconstruct historical projection state at an earlier block.
 
 ## Capture runbook
 
-Run this on the announced cut-off date, before any destructive step.
+Use this optional procedure when reviewing an archive. A capture uses an explicit timestamp.
 
 **1. Export.**
 
@@ -138,33 +114,24 @@ providers, not two buckets in one account: the point is surviving the loss of an
 single one.
 
 **5. Verify both durable copies against the independently retained capture root.**
-Immediately before cutover, retrieve the complete export from each provider into
+For an independent copy check, retrieve the complete export from each provider into
 its own new directory. Use the offline verifier from the reviewed kit.
 
 ```bash
-node scripts/verify-snapshot-a.mjs /restore/provider-a --second-copy /restore/provider-b --expected-root TRUSTED_CAPTURE_ROOT --announced-cut-off ANNOUNCED_ISO_TIMESTAMP --notice-published-at PUBLICATION_ISO_TIMESTAMP
+node scripts/verify-snapshot-a.mjs /restore/provider-a --second-copy /restore/provider-b --expected-root TRUSTED_CAPTURE_ROOT --expected-cut-off RECORDED_ISO_TIMESTAMP
 ```
 
 The command reads both restores and succeeds only when each matches the trusted
 root. It reports the chain, cut-off, counts and root for each valid copy, and
 rejects reused files, including directory aliases and detectable hard links.
-Supply the cut-off and publication time from the original public announcement.
-Retain its public URL and a durable copy as evidence. The offline verifier
-checks that the notice was at least 14 full days before the cut-off,
-that the time has arrived and that both archives identify Base Sepolia and
-the same instant down to one microsecond. Equivalent time-zone offsets match.
+Supply the recorded cut-off from an independent source. The verifier checks that the timestamp has passed and that both archives identify Base Sepolia and the same instant down to one microsecond. Equivalent time-zone offsets match. The legacy announcement flags remain available when explicitly checking older evidence.
 This also catches an earlier rehearsal archived together with its own root. Save the
 command, exit status, output and the provider's object or version identifier
 for each retrieval. Two local directories alone cannot establish independent
 remote custody. On separate recovery machines, run the single-copy command
 from step 3 on each and retain both results against the same trusted root.
 
-**6. Record in the migration runbook:** the cut-off, the root hash, both
-locations, and the verification result from each. Bible section 16 point 2 asks
-for the verification result and the export schema, and this file is the schema.
-
-**7. Only then** does the destructive reset proceed. Snapshot A is never
-re-imported as live product state.
+**6. Record the result.** Retain the timestamp, trusted root, storage references and verification results privately. A verified export establishes integrity of the selected files. Operational restore verification and approval govern any later destructive changes.
 
 ## Verify the product database before the first mainnet publication
 
@@ -175,20 +142,29 @@ Use an existing operator role with unfiltered read access. Keep credentials
 out of command arguments and verification records.
 
 ```bash
-node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-address> <deployment-block> --database
+node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-address> <deployment-block> --database <reviewed-mainnet-pair.json>
 ```
 
 The command compares the database cursor with the reviewed Base mainnet Core
 and deployment block, then checks for residual product rows, including retired
 auction tables, bids, withdrawals, floor history, trust signals, eligibility,
-settlement evidence and the counters backing public metrics. A mainnet metrics
-row containing zero activity is permitted. Unrelated or pre-deployment chain
-events fail the check. The database reads use one read-only, repeatable-read
-transaction. Insufficient visibility, missing tables and unavailable services
+settlement evidence and the counters backing public metrics. Supply the reviewed
+mainnet custody register or compact pair file used by the settlement intake.
+Before the first publication the issuer table can be empty. Any issuer already present
+must match the reviewed chain, Core, NFT and both initialized runtime hashes.
+
+Keep the old workers stopped while checking. Pending or in-flight work in the persistent event queue
+or outbox, and retryable failed outbox effects, block acceptance even when the
+public catalog is empty. Completed queue history can remain. A mainnet metrics
+row containing zero activity is permitted. The event journal may contain deployment
+administration from the reviewed pair. A missing or unrelated emitter, a
+pre-deployment event, or a journal entry carrying an artwork, auction or token ID fails
+the check even when the gallery and its projections are empty.
+The database reads use one read-only, repeatable-read transaction.
+Insufficient visibility, missing tables and unavailable services
 cause the command to fail. It reports table names without printing row data.
 
-Retain the result with the public catalog check and verify both restored
-Snapshot A copies again after the cutover. Also verify browser configuration,
+Retain the result with the public catalog check and the isolated database and media restore evidence. Also verify browser configuration,
 legacy media storage and cache behavior against the release candidate. A quiet
 database sampled before writers are switched does not prove the launch state.
 
@@ -198,7 +174,7 @@ Prepare the offline verifier once from a reviewed Git commit. Run the builder
 in the development checkout with a full commit ID and a new directory alongside
 the archive. It reads the committed verifier and schema module from local Git,
 adds a minimal module declaration and writes their byte hashes to `SHA256SUMS`.
-This step can be rehearsed before the final capture or a database is available.
+This step can be rehearsed offline using a synthetic archive.
 
 ```bash
 node scripts/package-snapshot-a-verifier.mjs REVIEWED_COMMIT ../verification-tools
@@ -227,7 +203,7 @@ The November 18 rehearsal packaged verifier commit
 `c1d1687d99eb88b404d71e239a9c1013a9ece670`. Its `SHA256SUMS` digest was
 `331fc893346975ddf75ac1949150883bc1f639450f5bc78d003b811107b6c965`.
 The operator checked all three packaged files against that list on Windows.
-Retain a fresh reference to the reviewed kit alongside the final capture record.
+Retain the reference to the reviewed kit alongside its archive record.
 
 The verifier exits non-zero when either restored copy fails. It reports both
 results even if one restore is missing. Retrieve a fresh copy from the
@@ -257,9 +233,8 @@ pass the verifier. Only hashes/counts and transaction-mode evidence were saved
 privately; no archive data files or final Snapshot A were written. This confirms
 the current schema/read path, not a final cut-off or two durable copies.
 
-Final-contract schema alignment and a fresh stabilized-source rehearsal remain
-required before the late-C capture. Current schema version 1 is not automatically
-valid for future contract projections.
+Check schema alignment before using this optional exporter with a different contract.
+Version 1 describes the historical projections.
 
 On November 18 the three snapshot suites passed 29 local checks, including the
 PostgreSQL 17 integration test. Across all seven tables, the test included the row
@@ -267,8 +242,8 @@ at the cut-off and excluded the one a microsecond later under a different sessio
 time zone. The offline verifier also rejected a later row in an otherwise
 internally consistent fixture. For legacy unzoned cut-offs, verification retains
 the existing hash and structural checks. These results use synthetic test rows.
-The final cut-off and the verification of both durable locations remain open.
+The November 25 decision retired the proposed final capture.
 
 ## October 28 tooling release
 
-PR #386, `cc7db8dc`, released after CI40755921705 passed: Linux 2,892 passing checks (two unrelated skips), Windows 2,496 (33 environment-dependent skips), builds and contract suites. The new PostgreSQL concurrency check **executed and passed on Linux**. Production deployment7395560251 succeeded. B05/B4 current-schema tooling readiness is complete; the final capture and independent durable-copy gate remain C16.
+PR #386, `cc7db8dc`, released after CI40755921705 passed: Linux 2,892 passing checks (two unrelated skips), Windows 2,496 (33 environment-dependent skips), builds and contract suites. The new PostgreSQL concurrency check **executed and passed on Linux**. Production deployment7395560251 succeeded. B05/B4 current-schema tooling readiness is complete; C16 was subsequently retired.
