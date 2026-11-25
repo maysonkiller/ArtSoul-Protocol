@@ -1,3 +1,20 @@
+// The local test fixture is shared with the read-only planner. It accepts no caller-supplied metadata.
+export const rehearsalArtwork = Object.freeze({
+    core: '0xC4b756B6E3714E4BaB6E7dd4965400F390403CD2',
+    nft: '0x810DD5459c9cC5d82f13F8D52545a654Ec0bbe4c',
+    coreHash: '0x4d18f0243cff1ef906a07a3517949045c6fe3a9e8b584e60bcbe7ad021bef54e',
+    nftHash: '0xcbff8b3bb46c10d150d5812846d5d8c990c0156215d5978b44e238a86d141bac',
+    title: 'ArtSoul Base Sepolia Rehearsal',
+    dataSha256: '134d57c45b210427d7193990e3fd2a587692421b92904d7d83eb4331ea56bc3b'
+});
+
+export const rehearsalMetadataUri = 'data:application/json;base64,' + btoa(JSON.stringify({
+    name: rehearsalArtwork.title,
+    description: 'Technical test of artwork registration on Base Sepolia.',
+    image: 'https://artsoulprotocol.com/favicon.jpg',
+    media_type: 'image/jpeg'
+}));
+
 const testChain = '0x14a34';
 const factory = '0x4e1dcf7ad4e460cfd30791ccc4f9c8a4f820ec67';
 const roleName = { protocolTreasury: 'Protocol treasury', ecosystemTreasury: 'Ecosystem treasury', adminSecurity: 'Admin security' };
@@ -39,9 +56,17 @@ export async function walletRequest(provider, plan) {
     const rpc = (method, params) => provider.request({ method, params });
     await matchWallet(provider, plan);
     const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
-    check(create || ['protocolTreasury', 'ecosystemTreasury'].includes(plan.operation), 'Unknown rehearsal operation.');
-    check(create ? plan.target === 'Direct contract creation' :
-        sameAddress(plan.target, factory) && plan.data.startsWith('0x1688f0b9'), 'Unexpected transaction target or method.');
+    const artwork = plan.operation === 'registerArtwork';
+    if (artwork) {
+        check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === rehearsalArtwork.dataSha256 &&
+            plan.metadataUri === rehearsalMetadataUri && plan.deployments.length === 0 &&
+            plan.codeChecks.length === 2 && sameAddress(plan.codeChecks[0].address, rehearsalArtwork.core) &&
+            sameAddress(plan.codeChecks[1].address, rehearsalArtwork.nft), 'Unexpected artwork registration.');
+    } else {
+        check(create || ['protocolTreasury', 'ecosystemTreasury'].includes(plan.operation), 'Unknown rehearsal operation.');
+        check(create ? plan.target === 'Direct contract creation' :
+            sameAddress(plan.target, factory) && plan.data.startsWith('0x1688f0b9'), 'Unexpected transaction target or method.');
+    }
     check(await sha256(plan.data) === plan.dataSha256, 'Transaction data changed.');
     const [latest, pending, payerCode] = await Promise.all([
         rpc('eth_getTransactionCount', [plan.payer, 'latest']), rpc('eth_getTransactionCount', [plan.payer, 'pending']),
@@ -57,6 +82,10 @@ export async function walletRequest(provider, plan) {
         })
     ]);
     check(latest === plan.nonce && pending === plan.nonce && payerCode === '0x', 'Payer state changed. Refresh the chain evidence.');
+    if (artwork) {
+        const simulation = await rpc('eth_call', [{ from: plan.payer, to: rehearsalArtwork.core, data: plan.data, value: '0x0' }, 'pending']);
+        check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === 1n, 'Work registry changed. Refresh the chain evidence.');
+    }
     await matchWallet(provider, plan);
     const tx = { from: plan.payer, chainId: testChain, nonce: plan.nonce, value: '0x0', data: plan.data };
     if (!create) tx.to = plan.target;
@@ -155,7 +184,10 @@ export async function start() {
         if (!current.waitingForFinality && !current.complete) return false;
         ++stateRevision; plan = undefined; connected = undefined; wrongChain = false;
         byId('review').hidden = true;
-        if (current.finalizedPair) {
+        if (current.finalizedArtwork) {
+            status('Verified artwork ' + current.finalizedArtwork.id + ' · ' + rehearsalArtwork.title +
+                ' · creator ' + current.payer + ' at finalized Base Sepolia block ' + BigInt(current.block.number) + '.');
+        } else if (current.finalizedPair) {
             const { core, nft } = current.finalizedPair;
             status('Core ' + core + ' and NFT ' + nft + ' verified at finalized Base Sepolia block ' +
                 BigInt(current.evidence.block.number) + ' (' + current.evidence.block.hash + '). Both providers verified the pair, treasury and admin bindings, and refund limits.');
@@ -165,7 +197,8 @@ export async function start() {
                 : 'Both treasury Safes were verified at a finalized block.');
         } else {
             const waiting = current.waitingForFinality;
-            const found = waiting.role === 'OrdinaryMarket' ? 'Both providers see the expected Core ' + waiting.core + ' and NFT ' + waiting.nft :
+            const found = waiting.role === 'registerArtwork' ? 'Both providers see the expected artwork registration' :
+                waiting.role === 'OrdinaryMarket' ? 'Both providers see the expected Core ' + waiting.core + ' and NFT ' + waiting.nft :
                 roleName[waiting.role] + ' · ' + waiting.address + '. Both providers see the expected Safe proxy';
             status(found + '. Waiting for Base Sepolia finality. Refresh chain evidence later.');
         }
@@ -182,16 +215,25 @@ export async function start() {
             plan = current;
             if (previous !== plan.data) submitted = false;
             const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
-            byId('operation').textContent = create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
+            const artwork = plan.operation === 'registerArtwork';
+            byId('operation').textContent = artwork ? 'Register rehearsal artwork' :
+                create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
             byId('fields').replaceChildren();
             addField('Network', 'Base Sepolia · 84532');
             addField('Sender', plan.payer);
             addField('Value', '0 test ETH · wallet estimates gas');
             addField('Nonce', String(BigInt(plan.nonce)));
-            addField(create ? 'Method' : 'Safe factory', plan.target);
-            for (const [role, address] of Object.entries(plan.roles)) addField(roleName[role], address);
-            addField('Safe confirmations', 'Any 2 of 3');
-            plan.owners.forEach((owner, i) => addField('Signer ' + (i + 1), owner));
+            addField(artwork ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
+            if (artwork) {
+                addField('Title', rehearsalArtwork.title);
+                addField('Method', 'registerArtwork(string) · no mint or auction');
+                addField('Expected work', '1 if the registry is still empty at inclusion');
+                addField('Metadata URI', rehearsalMetadataUri);
+            } else {
+                for (const [role, address] of Object.entries(plan.roles)) addField(roleName[role], address);
+                addField('Safe confirmations', 'Any 2 of 3');
+                plan.owners.forEach((owner, i) => addField('Signer ' + (i + 1), owner));
+            }
             if (create) addField('Refund limits', '8 per batch · 30000 gas per transfer');
             plan.deployments.forEach((address, i) => addField(create ? ['Expected Core', 'Expected NFT'][i] : 'Expected Safe', address));
             addField('Calldata keccak256', plan.dataHash);

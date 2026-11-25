@@ -53,3 +53,17 @@ The [read-only rehearsal](../../scripts/simulate-rehearsal-auction.mjs) passed t
 ```sh
 node scripts/simulate-rehearsal-auction.mjs <payout-test-pair-register.json> 0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df --payout
 ```
+
+## First registration on the payout Core
+
+The local review page can prepare one call to `registerArtwork(string)` with zero ETH on network 84532. The creator is the test payer in the private payout deployment review. The fixture is titled **ArtSoul Base Sepolia Rehearsal**. Its 281-byte metadata URI embeds the entire JSON document on-chain and points to the existing public ArtSoul favicon for its image. The indexer's ordinary metadata reader decodes the title and image. The image remains hosted on the ArtSoul domain. Registering the work neither creates an auction nor mints a token.
+
+On November 25 both public providers confirmed an empty registry at finalized block 63,511,976 (`0x4eea0a59f0fb6e4fdae84d07335fd2b32613f7e8d434abdc911c336f31a26ae0`). Both simulated work ID 1 for the zero-value call with calldata hash `0x556480cecd493fa790352edfbb659bf12d96c82ed0148272301120df53ff902e`. This observation prepared an unsigned request. The contract assigns the ID at execution.
+
+```sh
+node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> --plan
+node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json>
+node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> --verify-receipt <registration-transaction-hash>
+```
+
+Open the loopback address printed by the second command. Review the payer, Base Sepolia, the payout Core and the zero-value registration in the wallet. A matching existing registration disables the request. If someone registered a different first work, the page stops and the public transaction hash can be checked independently. The verifier uses the actual ID from the finalized receipt, confirms the single event, its emitter and stored creator/URI, and rechecks the contract pair and its custody at the inclusion block through two providers. Auction, settlement, refunds, hosted indexing and UI acceptance have separate evidence.

@@ -207,6 +207,22 @@ test('newly included Safe suppresses all wallet actions on refresh and on the fi
     assert.equal(field('review').hidden, true);
     assert.ok(!provider.calls.includes('eth_sendTransaction'));
 });
+test('opening an unsigned registration shows the artwork; refreshing the finalized result never requests a wallet', async t => {
+    const provider = wallet();
+    let result = { ...plan, operation: 'registerArtwork', deployments: [], block: { number: '0x10' } };
+    const field = await renderReview(t, provider, () => result);
+    assert.equal(field('operation').textContent, 'Register rehearsal artwork');
+    assert.equal(field('review').hidden, false);
+    assert.equal(field('submit').disabled, true);
+    result = { waitingForFinality: { role: 'registerArtwork' } };
+    await field('refresh').onclick();
+    assert.match(field('status').textContent, /expected artwork registration.*Waiting for Base Sepolia finality/);
+    result = { complete: true, finalizedArtwork: { id: '1' }, payer, block: { number: '0x11' } };
+    await field('refresh').onclick();
+    assert.match(field('status').textContent, /Verified artwork 1.*finalized Base Sepolia block 17/);
+    assert.equal(field('review').hidden, true);
+    assert.deepEqual(provider.calls, []);
+});
 test('loopback server serves only token-bound read routes on the exact origin', async t => {
     let reads = 0;
     const { server, url } = await listenForReview(async () => { reads++; return { complete: true }; });
