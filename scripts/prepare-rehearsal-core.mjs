@@ -6,7 +6,7 @@ import { AbiCoder, concat, getAddress, getBytes, getCreateAddress, isHexString, 
 import { buildOrdinaryAuditManifest } from './ordinary-audit-manifest.cjs';
 import { historicalCore, payoutCore, prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
 import { prepareRehearsalSafes } from './prepare-rehearsal-safes.mjs';
-import { readRpc, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
+import { readRpc, requireIndependentProviders, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
 const roles = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
 const rehearsalLimits = [8, 30_000];
@@ -69,7 +69,7 @@ export function expectedRehearsalPairRegister(custody, review, manifest, layout,
 }
 
 export async function readUnusedCoreNonce(payer, providers) {
-    assert(providers.length === 2 && providers[0] !== providers[1], 'Use two independent providers');
+    requireIndependentProviders(providers);
     const nonces = await Promise.all(providers.map(async rpc => {
         const [pending, latest] = await Promise.all(['pending', 'latest'].map(tag => rpc('eth_getTransactionCount', [payer, tag])));
         assert.equal(BigInt(pending), BigInt(latest), 'The payer has a pending transaction');
@@ -95,7 +95,7 @@ export async function verifyRehearsalCoreReceipt(txHash, review, register, provi
     assert.equal(review.chainId, register.chainId, 'Review chain differs from register');
     assert.equal(getAddress(review.expectedCore), getAddress(register.core.address), 'Unexpected Core in register');
     assert.equal(getAddress(review.expectedNFT), getAddress(register.nft.address), 'Unexpected NFT in register');
-    assert(providers.length === 2 && providers[0] !== providers[1], 'Use two independent providers');
+    requireIndependentProviders(providers);
     txHash = txHash.toLowerCase();
     const readReceipt = async rpc => {
         const [tx, receipt] = await Promise.all([

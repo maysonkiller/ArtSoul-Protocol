@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url';
 import {
     Interface, ZeroAddress, concat, getAddress, getCreate2Address, id, keccak256, solidityPacked, zeroPadValue
 } from 'ethers';
-import { confirmFinalizedBlock, finalizedBlock, readRpc, verifySafeAtBlock } from './verify-treasury-safes.mjs';
+import { confirmFinalizedBlock, finalizedBlock, readRpc, requireIndependentProviders, verifySafeAtBlock } from './verify-treasury-safes.mjs';
 
 // Safe's v1.4.1 deployment registry for chain 84532 and the published v1.4.1 SafeProxy artifact.
 export const rehearsalSafeRelease = Object.freeze({
@@ -104,7 +104,7 @@ export async function prepareRehearsalSafes({ adminSafe, payer, providers = [
 ] }) {
     adminSafe = getAddress(adminSafe);
     payer = getAddress(payer);
-    check(providers.length === 2 && providers[0] !== providers[1], 'Two independent Base Sepolia providers are required');
+    requireIndependentProviders(providers);
     const heads = await Promise.all(providers.map(rpc => finalizedBlock(chainId, rpc)));
     const block = BigInt(heads[0].number) <= BigInt(heads[1].number) ? heads[0] : heads[1];
     await Promise.all(providers.map((rpc, index) => confirmFinalizedBlock(rpc, heads[index], block)));

@@ -1,6 +1,6 @@
 # C1 — Minimal replacement boundaries
 
-Status: **The immutable ordinary-work pair and its native auction pause/deadline policy were selected on November 19. A local Solidity candidate implements primary auctions, settlement-bound minting and bounded refunds. C1 remains open.**
+Status on November 25: **The immutable ordinary-work Core and its paired NFT are deployed on Base Sepolia.** The [finalized deployment](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md#core-with-creditor-directed-withdrawals) binds three separate two-of-three Safes and refund limits of eight entries and 30,000 gas per attempted delivery. The [internal review](../security/C12_ORDINARY_AUDIT_HANDOFF.md#payout-pair-review) covers the tested build, storage, roles and creditor-selected delivery. C1 still requires the production configuration decision, including the final refund limits. Production Safe selection and verification belong to C0 and D3. External payment routes and executor funding retain their separate decisions.
 Reviewed November 16, 2026 at `0f9d7fbb`, using the current source and the
 [D1–D6 decision annex](C1_DECISION_INVARIANTS_2026-11-02.md). This narrows the
 [rework plan](../canon/CONTRACT_REWORK_PLAN.md), rather than adding another

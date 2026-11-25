@@ -39,6 +39,14 @@ function addressSet(values, field) {
     return list;
 }
 
+export function requireIndependentProviders(providers) {
+    const [first, second] = providers;
+    check(providers.length === 2 && typeof first === 'function' && typeof second === 'function' && first !== second,
+        'Use two independent RPC providers');
+    check(!first.origin || !second.origin || first.origin !== second.origin,
+        'Use separate RPC provider origins for a second reading');
+}
+
 export async function finalizedBlock(chain, rpc) {
     check(chain === 84532 || chain === 8453, 'Choose Base Sepolia or Base mainnet');
     check(BigInt(await rpc('eth_chainId', [])) === BigInt(chain), 'Wrong RPC chain');
@@ -82,6 +90,7 @@ export async function verifyTreasurySafesWithTwoProviders(register, first, secon
             refundLimits[name] = String(value);
         }
     }
+    requireIndependentProviders([first, second]);
     const [firstHead, secondHead] = await Promise.all([finalizedBlock(register.chainId, first), finalizedBlock(register.chainId, second)]);
     const block = expectedBlock ?? (BigInt(firstHead.number) <= BigInt(secondHead.number) ? firstHead : secondHead);
     await Promise.all([confirmFinalizedBlock(first, firstHead, block), confirmFinalizedBlock(second, secondHead, block)]);
@@ -170,8 +179,9 @@ async function verifyAtBlock(register, rpc, block, refundLimits) {
 }
 
 export function readRpc(url) {
-    check(url && new URL(url).protocol === 'https:', 'Supply a private HTTPS RPC endpoint');
-    return async (method, params) => {
+    const endpoint = url && new URL(url);
+    check(endpoint?.protocol === 'https:', 'Supply a private HTTPS RPC endpoint');
+    const read = async (method, params) => {
         const res = await fetch(url, {
             method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: AbortSignal.timeout(10000)
@@ -181,6 +191,7 @@ export function readRpc(url) {
         check(body?.id === 1 && body.jsonrpc === '2.0' && body.result != null && !body.error, 'RPC read failed on ' + method);
         return body.result;
     };
+    return Object.assign(read, { origin: endpoint.origin });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
