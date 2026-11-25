@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Interface, ZeroAddress, getAddress, id, keccak256, toBeHex, zeroPadValue } from 'ethers';
-import { verifyTreasurySafes, verifyTreasurySafesWithTwoProviders } from '../scripts/verify-treasury-safes.mjs';
+import { readRpc, verifyTreasurySafes, verifyTreasurySafesWithTwoProviders } from '../scripts/verify-treasury-safes.mjs';
 import { verifyRehearsalCoreReceipt } from '../scripts/prepare-rehearsal-core.mjs';
 
 const addr = n => getAddress(toBeHex(n, 20));
@@ -205,7 +205,17 @@ test('strict release checks reject incomplete refund settings and non-release cu
     const { register, rpc } = fixture();
     delete register.core.refundBatchLimit;
     delete register.core.refundTransferGas;
-    assert.equal((await verifyTreasurySafesWithTwoProviders(register, rpc, rpc)).refundLimits, undefined);
+    assert.equal((await verifyTreasurySafesWithTwoProviders(register, rpc, fixture().rpc)).refundLimits, undefined);
+});
+
+test('a two-provider custody report cannot count one reader or one HTTPS origin twice', async t => {
+    const { register, rpc } = fixture();
+    await assert.rejects(verifyTreasurySafesWithTwoProviders(register, rpc, rpc), /independent RPC providers/);
+    const fetch = t.mock.method(globalThis, 'fetch', () => assert.fail('Provider validation must precede network reads'));
+    const first = readRpc('https://provider.invalid/base');
+    const second = readRpc('https://provider.invalid:443/second-route');
+    await assert.rejects(verifyTreasurySafesWithTwoProviders(register, first, second, { requirePair: true }), /separate RPC provider origins/);
+    assert.equal(fetch.mock.callCount(), 0);
 });
 
 test('both independent reads must match the reviewed refund settings exactly at the agreed block', async () => {

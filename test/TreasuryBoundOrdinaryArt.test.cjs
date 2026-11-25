@@ -5,8 +5,19 @@ const { ethers } = require('ethers');
 const mine = async tx => (await tx).wait();
 const day = 86400n;
 
-describe('Permanent ordinary-artwork treasury and security bindings', function () {
-    this.timeout(90000);
+const candidates = [
+    ['OrdinaryMarket', require('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json'), 2n],
+    ['OrdinaryPayoutMarket', require('../docs/architecture/C1_ORDINARY_PAYOUT_STORAGE.json'), 8n]
+];
+
+for (const [coreName, layout, batchLimit] of candidates) {
+    describe(`Treasury and security bindings for ${coreName}`, function () {
+        this.timeout(90000);
+        verifyMarket(coreName, layout, batchLimit);
+    });
+}
+
+function verifyMarket(coreName, layout, batchLimit) {
     let provider, deployer, artist, collector, buyer, protocol, ecosystem, security, engine;
 
     async function deploy(name, ...args) {
@@ -14,7 +25,7 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         return (await new ethers.ContractFactory(abi, bytecode, deployer).deploy(...args)).waitForDeployment();
     }
 
-    const deployMarket = (...roles) => deploy('OrdinaryMarket', ...roles, 2, 30_000);
+    const deployMarket = (...roles) => deploy(coreName, ...roles, batchLimit, 30_000);
 
     async function rejects(operation, name) {
         await assert.rejects(operation, error => {
@@ -35,12 +46,25 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         engine = await deployMarket(protocol.target, ecosystem.target, security.target);
     });
 
-    it('matches the reviewed payout Core and NFT runtime hashes after actual local deployment', async () => {
+    if (coreName === 'OrdinaryPayoutMarket') {
+        it('matches the reviewed payout Core and NFT runtime hashes after actual local deployment', verifyPayoutRuntime);
+        it('lets only the credited wallet route a rejected refund, including while entries are paused', verifyRoutedRefund);
+    }
+
+    async function verifyPayoutRuntime() {
         const { loadReviewedPair, buildRehearsalCoreReview, expectedRehearsalPairRegister } = await import('../scripts/prepare-rehearsal-core.mjs');
         const { payoutCore } = await import('../scripts/prepare-ordinary-deployment.mjs');
         const { buildOrdinaryAuditManifest } = require('../scripts/ordinary-audit-manifest.cjs');
         const { core, nft, layout, manifest } = await loadReviewedPair(payoutCore);
         assert.deepEqual(buildOrdinaryAuditManifest(undefined, 'OrdinaryPayoutMarket'), manifest);
+        const historical = new ethers.Interface((await artifacts.readArtifact('OrdinaryMarket')).abi).format();
+        const current = new ethers.Interface(core.abi).format();
+        assert.deepEqual(current.filter(entry => historical.includes(entry)), historical);
+        assert.deepEqual(current.filter(entry => !historical.includes(entry)).sort(), [
+            'error InvalidCreditRecipient()',
+            'event CreditRouted(address indexed creditor, address indexed recipient)',
+            'function withdrawTo(address recipient)'
+        ]);
         const roles = { protocolTreasury: protocol, ecosystemTreasury: ecosystem, adminSecurity: security };
         const custody = { chainId: 84532 };
         for (const [role, safe] of Object.entries(roles)) {
@@ -55,10 +79,9 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         for (const entry of [register.core, register.nft]) {
             assert.equal(ethers.keccak256(await provider.getCode(entry.address)), entry.codeHash);
         }
-    });
+    }
 
-    it('lets only the credited wallet route a rejected refund, including while entries are paused', async () => {
-        engine = await deploy('OrdinaryPayoutMarket', protocol.target, ecosystem.target, security.target, 2, 30_000);
+    async function verifyRoutedRefund() {
         const wallet = await deploy('OrdinaryBidderFixture');
         const startPrice = ethers.parseEther('0.1');
         const credit = await engine.requiredDepositForBid(startPrice);
@@ -90,7 +113,7 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         assert.equal(await provider.getBalance(engine.target), heldDeposit);
         assert.equal(await engine.credits(wallet.target), 0n);
         await rejects(wallet.withdrawTo.staticCall(engine.target, buyer.address), 'NoCredit');
-    });
+    }
 
     it('requires three distinct two-of-three accounts and explicit refund limits at creation', async () => {
         assert.deepEqual([await engine.protocolTreasury(), await engine.ecosystemTreasury(), await engine.adminSecurity()],
@@ -110,9 +133,9 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         }
         const safes = [protocol.target, ecosystem.target, security.target];
         for (const limits of [[0, 30_000], [2, 0]]) {
-            await rejects(deploy('OrdinaryMarket', ...safes, ...limits), 'InvalidRefundLimits');
+            await rejects(deploy(coreName, ...safes, ...limits), 'InvalidRefundLimits');
         }
-        assert.equal(await engine.refundBatchLimit(), 2n);
+        assert.equal(await engine.refundBatchLimit(), batchLimit);
         assert.equal(await engine.refundTransferGas(), 30_000n);
     });
 
@@ -238,7 +261,7 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
 
         const firstPayment = await openAndBid(engine, collector, firstPrice, 'ipfs://first-pair-work');
         const nextSecurity = await deploy('TreasuryAccountStub', 2);
-        const next = await deployMarket(protocol.target, ecosystem.target, nextSecurity.target);
+        const next = await deploy('OrdinaryPayoutMarket', protocol.target, ecosystem.target, nextSecurity.target, 8, 30_000);
         const secondPayment = await openAndBid(next, buyer, secondPrice, 'ipfs://second-pair-work');
         await mine(nextSecurity.setPause(next.target, true));
         assert.equal(await next.paused(), true);
@@ -340,8 +363,7 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         const price = ethers.parseEther('0.02');
         const deposit = ethers.parseEther('0.01');
         const nft = new ethers.Contract(await engine.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, provider);
-        const layout = require('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json');
-        const marketLayout = layout.contracts['contracts/replacement/OrdinaryMarket.sol:OrdinaryMarket'];
+        const marketLayout = layout.contracts[`contracts/replacement/${coreName}.sol:${coreName}`];
         const guardSlot = BigInt(marketLayout.storage.find(field => field.label === '_status').slot);
 
         // Observe ordinary successful transfers on the local EVM. Every outgoing call
@@ -397,7 +419,14 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
         assert.deepEqual(Array.from(await engine.refundProgress(1)), [1n, 1n]);
         await checkLiabilities(0n);
         for (const account of [artist, buyer]) {
-            await checkGuard(await mine(engine.connect(account).withdraw()));
+            if (coreName === 'OrdinaryPayoutMarket' && account === artist) {
+                const before = await provider.getBalance(deployer.address);
+                const credit = await engine.credits(artist.address);
+                await checkGuard(await mine(engine.connect(artist).withdrawTo(deployer.address)));
+                assert.equal(await provider.getBalance(deployer.address), before + credit);
+            } else {
+                await checkGuard(await mine(engine.connect(account).withdraw()));
+            }
             await rejects(engine.connect(account).withdraw.staticCall(), 'NoCredit');
             await checkLiabilities(0n);
         }
@@ -449,4 +478,4 @@ describe('Permanent ordinary-artwork treasury and security bindings', function (
             assert.equal(await engine.credits(account.target), 0n);
         }
     });
-});
+}
