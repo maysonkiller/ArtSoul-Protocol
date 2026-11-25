@@ -34,7 +34,7 @@ function fixture(pair, overrides = {}) {
     const price = overrides.price || '1000000000000000001';
     const stateOffer = overrides.offer === true;
     const log = (emitter, event, values, position) => ({
-        address: emitter, logIndex: toQuantity(position), blockNumber, blockHash, transactionHash,
+        address: emitter, logIndex: toQuantity(position), transactionIndex: '0x0', blockNumber, blockHash, transactionHash,
         ...abi.encodeEventLog(event, values)
     });
     const firstIndex = stateOffer ? 1 : 0;
@@ -51,7 +51,8 @@ function fixture(pair, overrides = {}) {
             if (method === 'eth_chainId') return toQuantity(options.chainId);
             if (method === 'eth_getBlockByNumber') return {
                 number: args[0] === 'finalized' && overrides.unfinalized ? '0x0' : blockNumber,
-                hash: offerRead && overrides.reorg ? hash(999) : blockHash, timestamp: toQuantity(overrides.timestamp ?? 16)
+                hash: offerRead && overrides.reorg ? hash(999) : blockHash, timestamp: toQuantity(overrides.timestamp ?? 16),
+                transactions: [transactionHash]
             };
             if (method === 'eth_getCode') return args[0] === coreAddress ? '0x6001' : '0x6002';
             if (method === 'eth_call') {
@@ -70,7 +71,7 @@ function fixture(pair, overrides = {}) {
             }
             assert.equal(method, 'eth_getTransactionReceipt');
             assert.equal(args[0], transactionHash);
-            return { status: '0x1', blockNumber, blockHash, transactionHash, logs };
+            return { status: '0x1', blockNumber, blockHash, transactionHash, transactionIndex: '0x0', logs };
         } })
     });
     return { listener, options };
