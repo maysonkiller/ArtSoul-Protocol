@@ -2,11 +2,12 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { Interface, ZeroAddress, isHexString, keccak256, toQuantity } from 'ethers';
+import { Interface, ZeroAddress, getAddress, isHexString, keccak256, toQuantity } from 'ethers';
+import { checkReceipt, decodeReceiptLog, verifyTransactionPosition } from '../src/indexer/settlement-receipt.js';
 import { inspectOpeningReceipt } from './review-rehearsal-artwork.mjs';
 import { rehearsalArtwork as pair, rehearsalLateBid as bid, rehearsalOpening, lateBidWindow } from './rehearsal-review/client.mjs';
 import { listenForReview, sequencedRead } from './serve-rehearsal-review.mjs';
-import { requireIndependentProviders } from './verify-treasury-safes.mjs';
+import { confirmFinalizedBlock, finalizedBlock, requireIndependentProviders } from './verify-treasury-safes.mjs';
 
 const creator = '0xE6d6658DD5013B30Ab8cA9CBD667D0b5a5A1b215';
 const openingHash = '0x9c13f650612551c6a13d0be018ce0cdc44036ba43de0e36e7a8b74f29e45d42d';
@@ -14,7 +15,9 @@ const market = new Interface([
     'function auctions(uint256) view returns(uint256 artworkId,uint256 startPrice,uint256 originalEnd,uint256 end,uint256 deadline,address highestBidder,uint256 price,uint256 deposit,uint8 state,address firstCollector)',
     'function minimumBid(uint256) view returns(uint256)',
     'function requiredDepositForBid(uint256) view returns(uint256)',
-    'function placeBid(uint256,uint256) payable'
+    'function placeBid(uint256,uint256) payable',
+    'event BidAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price,uint256 deposit)',
+    'event AuctionExtended(uint256 indexed auctionId,uint256 oldEnd,uint256 newEnd)'
 ]);
 const price = BigInt(rehearsalOpening.reserveWei);
 const call = { from: bid.bidder, to: pair.core, data: market.encodeFunctionData('placeBid', [1n, price]), value: bid.deposit };
@@ -78,13 +81,69 @@ export async function firstLateBidReview(providers) {
     return { chainId: '0x14a34', payer: bid.bidder, block: opening.block, ...plans[0] };
 }
 
+// Validate exactly what the first transaction did, even if another bidder took the lead in the same block.
+export function readBidExtension(tx, receipt, header, hash, {core, bidder, deadline}) {
+    assert.equal(tx?.hash?.toLowerCase(), hash, 'Unexpected bid transaction');
+    assert.equal(tx.chainId, '0x14a34', 'Wrong bid network');
+    assert.equal(tx.blockHash, header.hash);
+    assert.equal(tx.blockNumber, header.number);
+    assert.equal(tx.transactionIndex, receipt.transactionIndex);
+    checkReceipt(receipt, {blockHash:header.hash, blockNumber:header.number}, hash, 'first late bid');
+    verifyTransactionPosition(receipt, header, hash);
+    for (const envelope of [tx,receipt]) {
+        assert.equal(getAddress(envelope.from), bidder, 'Unexpected bidder');
+        assert.equal(getAddress(envelope.to), core, 'Unexpected bid destination');
+    }
+    assert.equal(tx.input?.toLowerCase(), call.data, 'Unexpected bid calldata');
+    assert.equal(BigInt(tx.value), BigInt(call.value), 'Unexpected bid deposit');
+    const timestamp = Number(BigInt(header.timestamp));
+    assert(timestamp >= deadline-bid.window && timestamp < deadline, 'Bid was outside the original late window');
+    assert.equal(receipt.logs.length, 2, 'Expected only BidAccepted and AuctionExtended');
+    for (const log of receipt.logs) assert.equal(getAddress(log.address), core, 'Unexpected bid event emitter');
+    const accepted = decodeReceiptLog(market, 'BidAccepted', receipt.logs[0], receipt);
+    const extended = decodeReceiptLog(market, 'AuctionExtended', receipt.logs[1], receipt);
+    assert.equal(extended.index, accepted.index+1, 'Bid extension must immediately follow the accepted bid');
+    assert.deepEqual([...accepted.args], [1n, bidder, price, BigInt(bid.deposit)], 'Unexpected accepted bid');
+    assert.deepEqual([...extended.args], [1n, BigInt(deadline), BigInt(deadline+bid.window)], 'Unexpected deadline extension');
+    const time = seconds => new Date(seconds*1000).toISOString();
+    return { transactionHash:hash, blockNumber:String(BigInt(header.number)), blockHash:header.hash, bidder, core,
+        auctionId:'1', artworkId:'1', bidWei:String(price), depositWei:String(BigInt(bid.deposit)),
+        acceptedLogIndex:accepted.index, extendedLogIndex:extended.index, includedAt:time(timestamp),
+        previousDeadline:time(deadline), deadlineAfterThisBid:time(deadline+bid.window), gasUsed:String(BigInt(receipt.gasUsed)) };
+}
+
+export async function verifyFirstBidReceipt(hash, providers) {
+    assert(isHexString(hash,32), 'Supply a public transaction hash');
+    requireIndependentProviders(providers);
+    hash = hash.toLowerCase();
+    const results = await Promise.all(providers.map(async rpc => {
+        const [head,tx,receipt] = await Promise.all([finalizedBlock(84532,rpc),
+            rpc('eth_getTransactionByHash',[hash]),rpc('eth_getTransactionReceipt',[hash])]);
+        assert(receipt && tx, 'Bid is not yet included');
+        const block = await confirmFinalizedBlock(rpc,head,{number:receipt.blockNumber,hash:receipt.blockHash});
+        const proof = readBidExtension(tx,receipt,block,hash,{core:pair.core,bidder:bid.bidder,deadline:bid.deadline});
+        const at = {blockHash:block.hash,requireCanonical:true};
+        const [auction] = await Promise.all([view(rpc,'auctions',[1n],at), ...['core','nft'].map(async role => {
+            assert.equal(keccak256(await rpc('eth_getCode',[pair[role],at])),pair[role+'Hash'],'Unexpected runtime at bid inclusion');
+        })]);
+        assert(auction.artworkId === 1n && auction.startPrice === price && auction.originalEnd === BigInt(bid.deadline) &&
+            auction.state === 1n && auction.end === BigInt(bid.deadline+bid.window) && auction.price >= price,
+            'Stored auction differs from the bid receipt');
+        return {...proof, highestBidderAtBlock:auction.highestBidder, highestBidWeiAtBlock:String(auction.price)};
+    }));
+    assert.deepEqual(results[0],results[1],'RPC providers disagree on the finalized first bid');
+    return {...results[0],rpcReadings:2};
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     try {
-        const [mode, ...extra] = process.argv.slice(2);
-        assert(!extra.length && ['--plan', '--serve'].includes(mode), 'Usage: node scripts/review-rehearsal-late-bid.mjs --plan|--serve');
+        const [mode, hash, ...extra] = process.argv.slice(2);
+        assert(!extra.length && ((mode === '--verify-receipt' && isHexString(hash,32)) ||
+            (!hash && ['--plan','--serve'].includes(mode))), 'Usage: node scripts/review-rehearsal-late-bid.mjs --plan | --serve | --verify-receipt HASH');
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
         const load = () => firstLateBidReview(providers);
-        if (mode === '--plan') console.log(JSON.stringify(await load(), null, 2));
+        if (mode === '--verify-receipt') console.log(JSON.stringify(await verifyFirstBidReceipt(hash,providers),null,2));
+        else if (mode === '--plan') console.log(JSON.stringify(await load(), null, 2));
         else console.log('Open the private Base Sepolia bid review on this computer:\n' + (await listenForReview(load)).url);
     } catch (error) { console.error(error.shortMessage ?? error.message); process.exitCode = 1; }
 }

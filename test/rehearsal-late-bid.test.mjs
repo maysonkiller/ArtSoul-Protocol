@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { Interface, ZeroAddress, toQuantity } from 'ethers';
 import { lateBidWindow, rehearsalArtwork, rehearsalLateBid as bid, sameReview, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { firstLateBidReview, inspectFirstBid, prepareFirstBid } from '../scripts/review-rehearsal-late-bid.mjs';
+import { firstLateBidReview, inspectFirstBid, prepareFirstBid, readBidExtension, verifyFirstBidReceipt } from '../scripts/review-rehearsal-late-bid.mjs';
 
 const start = bid.deadline - bid.window;
 const block = { blockHash: '0x' + '2'.repeat(64), requireCanonical: true };
@@ -104,4 +104,32 @@ test('the wallet constructs one exact payable call after checking chain, sender,
     assert.equal(sameReview(prepared,{...prepared,value:'0x1'}),false);
     t.mock.timers.setTime(bid.deadline*1000);
     await assert.rejects(walletRequest(wallet({eth_getBlockByNumber: () => ({timestamp:toQuantity(bid.deadline)})}),prepared), /first late bid is unavailable/);
+});
+
+test('the receipt establishes the exact new deadline from the included bid and its immediately following canonical event', async () => {
+    const hash = '0x' + '3'.repeat(64);
+    const terms = {core:rehearsalArtwork.core,bidder:bid.bidder,deadline:bid.deadline};
+    const events = new Interface(['event BidAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price,uint256 deposit)',
+        'event AuctionExtended(uint256 indexed auctionId,uint256 oldEnd,uint256 newEnd)']);
+    const details = { transactionHash:hash,blockHash:block.blockHash,blockNumber:'0x42',transactionIndex:'0x0' };
+    const header = { number:details.blockNumber,hash:details.blockHash,timestamp:toQuantity(start),transactions:[hash] };
+    const logs = [['BidAccepted',[1n,bid.bidder,reserve,BigInt(bid.deposit)]],
+        ['AuctionExtended',[1n,BigInt(bid.deadline),BigInt(bid.deadline+600)]]].map(([name,args],index) => ({
+        ...details,address:terms.core,logIndex:toQuantity(index+5),...events.encodeEventLog(name,args)
+    }));
+    const tx = { ...details,hash,chainId:'0x14a34',from:bid.bidder,to:terms.core,value:bid.deposit,
+        input:market.encodeFunctionData('placeBid',[1n,reserve]) };
+    const receipt = { ...details,status:'0x1',from:tx.from,to:tx.to,logs,gasUsed:'0x20000' };
+    assert.equal(readBidExtension(tx,receipt,header,hash,terms).deadlineAfterThisBid,'2026-11-26T21:38:44.000Z');
+    for (const changed of [[logs[1],logs[0]],[logs[0]], [logs[0],{...logs[1],removed:true}],
+        [logs[0],{...logs[1],address:bid.bidder}], [logs[0],{...logs[1],logIndex:'0x9'}],
+        [logs[0],{...logs[1],...events.encodeEventLog('AuctionExtended',[1,bid.deadline,bid.deadline+1200])}]]) {
+        assert.throws(() => readBidExtension(tx,{...receipt,logs:changed},header,hash,terms));
+    }
+    assert.throws(() => readBidExtension(tx,receipt,{...header,transactions:[]},hash,terms));
+    assert.throws(() => readBidExtension(tx,receipt,{...header,timestamp:toQuantity(start-1)},hash,terms));
+    assert.throws(() => readBidExtension({...tx,chainId:'0x2105'},receipt,header,hash,terms));
+    await assert.rejects(verifyFirstBidReceipt('0x1234',[]),/public transaction hash/);
+    const read = nodeRead();
+    await assert.rejects(verifyFirstBidReceipt(hash,[read,read]),/independent/);
 });
