@@ -45,6 +45,12 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged, readOnly =
         setRoster(null); setRosterBusy(true); setRosterError('');
         try {
             const result = await api(`authority?view=staff&expectedWallet=${encodeURIComponent(wallet)}${after ? `&after=${encodeURIComponent(after)}` : ''}`);
+            if (!Array.isArray(result?.policy?.authorities) || result.policy.authorities.length !== 2 ||
+                !result.policy.authorities.every(address => typeof address === 'string' && ADDRESS.test(address)) ||
+                !Array.isArray(result.staff) || !result.staff.every(member => member && ADDRESS.test(member.wallet) &&
+                    Object.hasOwn(ROLE_NAMES, member.role) && typeof member.active === 'boolean')) {
+                throw new Error('Invalid staff directory response.');
+            }
             if (current()) setRoster({...result, after});
         } catch (error) {
             if (current()) {

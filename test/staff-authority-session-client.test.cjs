@@ -84,6 +84,17 @@ test('wallet, authentication and lifecycle changes immediately clear the visible
   }
 });
 
+test('an incomplete directory response leaves the other admin sections usable',async()=>{
+  const h=harness();await tick();h.render();
+  for(const invalid of [{},{policy:{authorities:[WALLET,OTHER]},staff:[null]}]){
+    h.state.api=async()=>invalid;await h.actions.loadRoster();
+    const view=h.render();assert.equal(view.roster,null);assert.match(view.rosterError,/team list could not be loaded/);
+    assert.equal(view.rosterBusy,false);
+  }
+  h.state.api=async()=>roster();await h.actions.loadRoster();
+  assert.equal(h.render().roster.staff[0].wallet,WALLET);h.unmount();
+});
+
 test('late roster and proposal responses cannot return after an identity or lifetime boundary',async()=>{
   for(const boundary of ['wallet','authentication','unsettled','auth-event','pagehide','unmount']) {
     const h=harness();await tick();h.render();const pendingRoster=deferred(),pendingProposal=deferred();
