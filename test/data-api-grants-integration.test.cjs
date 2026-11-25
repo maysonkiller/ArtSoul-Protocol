@@ -62,7 +62,7 @@ test('new table migrations must join the no-default-grant rehearsal', async () =
     'sql/migrations/phase11_ai_core.sql', 'sql/migrations/phase12_correctness.sql',
     'sql/migrations/stabilization_layer.sql'
   ]);
-  const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services',
+  const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services', '20261125210000_banner_schedule_revisions',
     '20261119150000_collection_origin_reviews', ...features]
     .map(name => `sql/migrations/${name}.sql`));
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
@@ -256,6 +256,13 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     query(noImplicitGrants);
     query(fs.readFileSync('sql/migrations/20261119150000_collection_origin_reviews.sql', 'utf8'));
     query(fs.readFileSync('test/fixtures/collection-origin-reviews.sql', 'utf8'));
+  });
+  await t.test('the staged banner schedule grants no access to Data API roles', () => {
+    query(fs.readFileSync('sql/migrations/20261125210000_banner_schedule_revisions.sql', 'utf8'));
+    for (const role of ['anon', 'authenticated', 'service_role']) {
+      assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.banner_schedule_revisions',
+        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')`), 'f');
+    }
   });
   await t.test('read-only verification accepts explicit grants and detects drift in review column permissions', () => {
     const report = fs.readFileSync('sql/verification/phase_a_security_verification.sql', 'utf8');

@@ -76,6 +76,16 @@ node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair
 
 Open the loopback address printed by the second command. Review the payer, Base Sepolia, the payout Core and the zero-value registration in the wallet. A matching existing registration disables the request. If someone registered a different first work, the page stops and the public transaction hash can be checked independently. The verifier uses the actual ID from the finalized receipt, confirms the single event, its emitter and stored creator/URI, and rechecks the contract pair and its custody at the inclusion block through two providers. Auction, settlement, refunds, hosted indexing and UI acceptance have separate evidence.
 
+## Opening the registered work in a read-only simulation
+
+At finalized block 63,558,247 (`0x48c1082c1d07d686d6916ea98a1e2daf2c789d289e84ffb4df62175e6ad98425`), Base and PublicNode agreed on the payout pair, custody, and the creator and metadata of work 1. The work had zero floor, zero token ID and no active auction. Both nodes simulated a 24-hour opening at 0.001 test ETH from the registered creator and returned auction ID 1. The calldata hash was `0x08130d8ab39d1264a70fbf21cfb22dd88f926ba91952124a6e0a782db8ee8a14`. This specific price and duration were simulation inputs. The call produced no auction, deadline or receipt.
+
+```sh
+node scripts/review-rehearsal-artwork.mjs review.json register.json --check-opening 1000000000000000 24
+```
+
+The command uses ordinary read RPCs at a common finalized block. It checks the reviewed test deployment, rejects a mismatched creator or URI, an active auction or a minted work, and compares the returned ID to the next auction counter. The hosted public indexer still reported the earlier test Core during the same evening's operator check. Use the issuing Core as well as the artwork ID when verifying later hosted journeys.
+
 ## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.

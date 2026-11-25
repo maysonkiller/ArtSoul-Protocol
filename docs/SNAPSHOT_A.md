@@ -156,8 +156,11 @@ and deployment block, then checks for residual product rows, including retired
 auction tables, bids, withdrawals, floor history, trust signals, eligibility,
 settlement evidence and the counters backing public metrics. Supply the reviewed
 mainnet custody register or compact pair file used by the settlement intake.
-Before the first publication the issuer table can be empty. Any issuer already present
+Before the first publication the ordinary issuer table can be empty. Any ordinary issuer already present
 must match the reviewed chain, Core, NFT and both initialized runtime hashes.
+An entry in the dedicated Genesis issuer registry can precede its pilot.
+Any finalized Genesis batch or individual grant recorded by migration 021
+blocks this prepublication check. D5 grants follow Core stabilization.
 
 With `--worker-health`, the command also reads the live worker after reading the
 public catalog. Both must identify the reviewed Core, Base chain ID and confirmation

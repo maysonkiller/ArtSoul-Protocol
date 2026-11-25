@@ -4,12 +4,13 @@ import { test } from 'node:test';
 import { Interface, keccak256 } from 'ethers';
 import { readArtworkMetadata } from '../src/api/safe-artwork-fetch.js';
 import { rehearsalArtwork as work, rehearsalMetadataUri as uri, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { checkRegistrationPublication, inspectRegistrationReceipt, registrationAtHead, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
+import { checkRegistrationPublication, inspectRegistrationReceipt, registrationAtHead, simulateRegisteredOpening, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
 
 const market = new Interface([
     'function registerArtwork(string) returns (uint256)', 'function workCount() view returns (uint256)',
     'function works(uint256) view returns (address,string,uint256,uint256)',
     'function artworkToToken(uint256) view returns(uint256)',
+    'function createAuction(uint256,uint256,uint256) returns (uint256)', 'function auctionCount() view returns (uint256)',
     'event ArtworkRegistered(uint256 indexed artworkId,address indexed creator,string metadataURI)'
 ]);
 const payer = '0x' + '1'.repeat(40), outsider = '0x' + '2'.repeat(40);
@@ -17,6 +18,35 @@ const hash = '0x' + 'a'.repeat(64), block = { number: '0x10', hash: '0x' + 'b'.r
 const data = market.encodeFunctionData('registerArtwork', [uri]), value = '0x0', chainId = '0x14a34';
 const digest = hex => createHash('sha256').update(Buffer.from(hex.slice(2), 'hex')).digest('hex');
 const returned = (method, values) => market.encodeFunctionResult(method, values);
+
+test('first auction rehearsal uses only hash-pinned calls for the registered, unsold work', async () => {
+    let creator = payer, active = 0n, floor = 0n, token = 0n, next = 4n, simulations = 0;
+    const rpc = async (method, [call, at]) => {
+        assert.equal(method, 'eth_call');
+        assert.deepEqual(at, { blockHash: block.hash, requireCanonical: true });
+        const { name, args } = market.parseTransaction({data: call.data});
+        assert.equal(call.to, name === 'artworkToToken' ? work.nft : work.core);
+        if (name === 'works') return returned(name, [creator, uri, active, floor]);
+        if (name === 'artworkToToken') return returned(name, [token]);
+        if (name === 'auctionCount') return returned(name, [3n]);
+        assert.equal(name, 'createAuction');
+        assert.equal(call.from, payer);
+        assert.equal(call.value, '0x0');
+        assert.deepEqual([...args], [1n, 1234567890123456789n, 36n * 3600n]);
+        simulations++;
+        return returned(name, [next]);
+    };
+    const check = (reserve = '1234567890123456789', hours = '36') => simulateRegisteredOpening(rpc, payer, block, reserve, hours);
+    assert.equal((await check()).simulatedAuctionId, '4');
+    creator = outsider; await assert.rejects(check(), /Another account/); creator = payer;
+    active = 4n; await assert.rejects(check(), /already has an auction/); active = 0n;
+    token = 1n; await assert.rejects(check(), /settled or minted/); token = 0n;
+    floor = 1n; await assert.rejects(check(), /settled or minted/); floor = 0n;
+    for (const reserve of ['0', '-1', '1e18', (1n << 256n).toString()]) await assert.rejects(check(reserve), /reserve/);
+    await assert.rejects(check('1', '12'), /hours/);
+    assert.equal(simulations, 1);
+    next = 5n; await assert.rejects(check(), /Unexpected simulated auction ID/);
+});
 const event = market.encodeEventLog('ArtworkRegistered', [7, payer, uri]);
 const tx = { hash, chainId, input: data, value, from: payer, to: work.core,
     blockHash: block.hash, blockNumber: block.number, transactionIndex: '0x0' };

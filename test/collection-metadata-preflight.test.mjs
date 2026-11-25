@@ -63,6 +63,9 @@ test('an unreadable, oversized or malformed response never produces a metadata c
 test('issued first-work evidence binds the draft, paying collector and current holder to one finalized contract', async t => {
     const draft = createFirstArtworkDraft();
     draft.media.metadataBaseURI = prefix;
+    draft.maxSupply = 5;
+    draft.phases[1].allocation = 4;
+    draft.phases[0].pricing.priceEth = '0.000000000000000031';
     const json = JSON.stringify(draft);
     const address = '0x' + '1'.repeat(40), buyer = '0x' + '2'.repeat(40), holder = '0x' + '3'.repeat(40);
     const block = { number: '0x12', hash: '0x' + 'a'.repeat(64) };
@@ -72,10 +75,13 @@ test('issued first-work evidence binds the draft, paying collector and current h
     const abi = new Interface([
         'function creator() returns (address)', 'function firstCollector(uint256) returns (address)',
         'function collectionFirstCollector() returns (address)', 'function ownerOf(uint256) returns (address)',
-        'function tokenURI(uint256) returns (string)', 'function mintPrice(uint256) returns (uint256)'
+        'function tokenURI(uint256) returns (string)', 'function mintPrice(uint256) returns (uint256)',
+        'function maxSupply() returns (uint32)', 'function configurationLocked() returns (bool)',
+        'function allocatedSupply() returns (uint256)', 'function royaltyInfo(uint256,uint256) returns (address,uint256)'
     ]);
     const values = { creator: address, firstCollector: buyer, collectionFirstCollector: buyer,
-        ownerOf: holder, tokenURI: prefix + '1', mintPrice: 42n };
+        ownerOf: holder, tokenURI: prefix + '1', mintPrice: 42n, openingReserve: 31n, maxSupply: 5n,
+        allocatedSupply: 5n, configurationLocked: true, royaltyInfo: [address, 550n] };
     let chain = '0x14a34', canonical = block;
     async function rpc(method, params) {
         if (method === 'eth_chainId') return chain;
@@ -85,19 +91,43 @@ test('issued first-work evidence binds the draft, paying collector and current h
         assert.equal(method, 'eth_call');
         assert.equal(params[0].to, address);
         const call = abi.parseTransaction({ data: params[0].data });
+        if (call.name === 'royaltyInfo') {
+            assert.deepEqual([...call.args], [1n, 10000n]);
+            return abi.encodeFunctionResult(call.fragment, values.royaltyInfo);
+        }
+        if (call.name === 'mintPrice' && call.args[0] === 0n) return abi.encodeFunctionResult(call.fragment, [values.openingReserve]);
         if (call.args.length) assert.equal(call.args[0], 1n);
         return abi.encodeFunctionResult(call.fragment, [values[call.name]]);
     }
-    const check = () => checkIssuedFirstWork(json, address, runtime, digest, rpc);
+    const other = (...args) => rpc(...args);
+    const check = (second = other) => checkIssuedFirstWork(json, address, runtime, digest, [rpc, second]);
     const report = await check();
     assert.equal(report.firstCollector, buyer);
     assert.equal(report.owner, holder);
     assert.equal(report.publicMintPriceWei, '42');
+    assert.equal(report.openingReserveWei, '31');
+    assert.equal(report.supply, 5);
+    assert.equal(report.rpcReadings, 2);
     assert.deepEqual(report.block, block);
     assert.equal(report.metadata.sha256, digest);
-    await assert.rejects(checkIssuedFirstWork(json, address, keccak256('0x01'), digest, rpc), /runtime differs/);
+    for (const change of [d => { d.phases[1].pricing.sourcePhaseId = ''; }, d => { d.creatorEarnings.bps = 0; },
+        d => { d.phases[1].pricing.fallback = 'fixed'; }, d => { d.maxSupply = 100; }]) {
+        const different = JSON.parse(json);
+        change(different);
+        await assert.rejects(checkIssuedFirstWork(JSON.stringify(different), address, runtime, digest, [rpc, other]), /draft/);
+    }
+    await assert.rejects(check(rpc), /independent RPC/);
+    await assert.rejects(check(async (method, params) => {
+        const result = await rpc(method, params);
+        return method === 'eth_call' && abi.parseTransaction({ data: params[0].data }).name === 'ownerOf'
+            ? abi.encodeFunctionResult('ownerOf', [buyer]) : result;
+    }), /providers disagree/);
+    await assert.rejects(checkIssuedFirstWork(json, address, keccak256('0x01'), digest, [rpc, other]), /runtime differs/);
     for (const [field, bad, expected] of [['collectionFirstCollector', holder, /do not agree/],
-        ['ownerOf', ZeroAddress, /do not agree/], ['mintPrice', 0n, /do not agree/], ['tokenURI', prefix + '2', /URI differs/]]) {
+        ['ownerOf', ZeroAddress, /do not agree/], ['mintPrice', 30n, /opening price/], ['tokenURI', prefix + '2', /URI differs/],
+        ['maxSupply', 4n, /supply/], ['allocatedSupply', 3n, /allocation/], ['openingReserve', 32n, /opening price/],
+        ['configurationLocked', false, /Locked/], ['royaltyInfo', [holder, 550n], /creator royalty/],
+        ['royaltyInfo', [address, 549n], /creator royalty/]]) {
         const previous = values[field];
         values[field] = bad;
         await assert.rejects(check(), expected);

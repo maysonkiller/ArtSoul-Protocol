@@ -131,12 +131,12 @@ test('the credentialed standalone API uses an exact CORS allowlist', () => {
   assert.match(standaloneServer, /apiOrigins\.has\(origin\)/);
 });
 
-test('the indexer migration runner covers the complete 001 through 020 sequence', async () => {
+test('the indexer migration runner covers the complete 001 through 021 sequence', async () => {
   const { listIndexerMigrations } = await modules;
   const migrations = listIndexerMigrations();
   assert.deepEqual(
     migrations.map(migration => migration.number),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
   );
 
   const setupSql = fs.readFileSync(path.join(REPO_ROOT, 'src/indexer/setup-database.sql'), 'utf8');
@@ -223,7 +223,8 @@ test('Phase 18.7b classifies tracked public tables while private tables have the
   assert.deepEqual(missing, []);
   // New private tables require an explicit independent hardening test; they
   // must never acquire the historical public-table service grants by accident.
-  assert.deepEqual([...privateTables].sort(), ['artsoul_private.aura_border_history', 'artsoul_private.notification_reorg_identities',
+  assert.deepEqual([...privateTables].sort(), ['artsoul_private.aura_border_history', 'artsoul_private.banner_schedule_revisions',
+    'artsoul_private.genesis_grant_batches', 'artsoul_private.genesis_grants', 'artsoul_private.genesis_issuers', 'artsoul_private.notification_reorg_identities',
     'artsoul_private.ordinary_issuers', 'artsoul_private.ordinary_resale_purchases',
     'artsoul_private.ordinary_runner_up_observations', 'artsoul_private.ordinary_settlements']);
 });
