@@ -596,3 +596,12 @@ body:has(#artsoul-search-dialog[open]) .site-search-button>.as-living-ring,
 @media(forced-colors:active){
   .as-living-ring{display:none!important}
 }
+
+/* Keep CSS decoration in step with the canvas motion preference. */
+body[data-as-season][data-as-motion="static"] :is(#as-ambient,#as-scroll-mist,#as-header-ornament .as-bulb,.as-snow-crown,.as-page-halo),
+body[data-as-season][data-as-motion="static"] :is(#as-ambient,#as-scroll-mist)::before,
+body[data-as-season][data-as-motion="static"] :is(#as-ambient,#as-scroll-mist)::after {
+  animation:none!important;
+  transition:none!important;
+  will-change:auto!important;
+}
