@@ -35,10 +35,10 @@ test('Add New is Created-only and tab loading draws no transient card grid', () 
 });
 
 test('trust is computed once from the complete creator corpus, independent of tabs', () => {
-  assert.match(profile, /function buildDiscoveryProfile\(profileData, fullArtworkCorpus, genesisState\)/);
+  assert.match(profile, /function buildDiscoveryProfile\(profileData, fullArtworkCorpus\)/);
   assert.match(profile, /computeTrustProfile\(profileData, fullArtworkCorpus/);
   assert.match(profile, /Promise\.allSettled\(\[/);
-  assert.match(profile, /buildDiscoveryProfile\(profileData, artworkData\.corpus, genesisState\)/);
+  assert.match(profile, /buildDiscoveryProfile\(profileData, artworkData\.corpus\)/);
   assert.doesNotMatch(profile, /computeTrustProfile\(profileData, artworkData\.items/);
 });
 

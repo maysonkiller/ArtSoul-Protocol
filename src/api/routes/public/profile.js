@@ -5,6 +5,7 @@ import {
   supabaseRest
 } from '../../backend.js';
 import { PUBLIC_PROFILE_SOURCE, PUBLIC_PROFILE_SELECT, publicProfile } from '../../profile-fields.js';
+import { publicGenesisSerial } from '../../profile-genesis.js';
 
 // The exact set the public profile page consumes, and nothing else. This list
 // is a behavioural contract rather than a detail of this route: it is the whole
@@ -27,6 +28,10 @@ export default async function publicProfileHandler(req, res) {
       error.statusCode = 400;
       error.code = 'INVALID_WALLET_ADDRESS';
       throw error;
+    }
+    if (req.query?.view === 'genesis') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.status(200).json({ wallet, serial: await publicGenesisSerial(wallet) });
     }
 
     const rows = await supabaseRest(

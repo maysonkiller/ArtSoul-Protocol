@@ -82,6 +82,50 @@ test('public profile rejects an invalid address before querying the database', a
   }
 });
 
+test('optional Genesis lookup accepts only the configured issuer and returns a public serial without a profile row', async t => {
+  const fetch = globalThis.fetch;
+  const names = ['ARTSOUL_PROFILE_GENESIS_ENABLED', 'ARTSOUL_PROFILE_GENESIS_DEPLOYMENT', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+  const before = names.map(name => process.env[name]);
+  t.after(() => {
+    globalThis.fetch = fetch;
+    names.forEach((name, i) => { if (before[i] === undefined) delete process.env[name]; else process.env[name] = before[i]; });
+  });
+  const deployment = { chainId: 8453, genesis: '0x' + '1'.repeat(40), genesisCodeHash: '0x' + '2'.repeat(64),
+    safe: '0x' + '3'.repeat(40), founder: '0x' + '4'.repeat(40) };
+  process.env.SUPABASE_URL = 'https://database.example';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role';
+  let count = 0, returned = 0;
+  globalThis.fetch = async (url, options) => {
+    count++;
+    assert.equal(new URL(url).pathname, '/rest/v1/rpc/read_profile_genesis_serial');
+    assert.deepEqual(JSON.parse(options.body), { p_genesis: deployment.genesis, p_code_hash: deployment.genesisCodeHash,
+      p_authority: deployment.safe, p_founder: deployment.founder, p_wallet: WALLET });
+    return Response.json(returned);
+  };
+  const call = async () => {
+    const res = createResponse();
+    await publicProfileHandler({ method: 'GET', query: { view: 'genesis', address: WALLET,
+      chainId: 84532, serial: '500', genesis: WALLET } }, res);
+    assert.equal(res.statusCode, 200); assert.equal(res.headers['Cache-Control'], 'private, no-store');
+    return res.body;
+  };
+  process.env.ARTSOUL_PROFILE_GENESIS_ENABLED = 'false';
+  process.env.ARTSOUL_PROFILE_GENESIS_DEPLOYMENT = JSON.stringify(deployment);
+  assert.deepEqual(await call(), { wallet: WALLET, serial: null });
+  process.env.ARTSOUL_PROFILE_GENESIS_ENABLED = 'true';
+  for (const invalid of ['{}', 'not-json', JSON.stringify({...deployment, chainId:84532}), JSON.stringify({...deployment, safe: deployment.genesis})]) {
+    process.env.ARTSOUL_PROFILE_GENESIS_DEPLOYMENT = invalid;
+    assert.deepEqual(await call(), { wallet: WALLET, serial: null });
+  }
+  assert.equal(count, 0);
+  process.env.ARTSOUL_PROFILE_GENESIS_DEPLOYMENT = JSON.stringify(deployment);
+  assert.deepEqual(await call(), { wallet: WALLET, serial: 0 });
+  for (returned of [null, { serial: 0, private: 'fixture' }, '0', -1, 10000]) {
+    assert.deepEqual(await call(), { wallet: WALLET, serial: null });
+  }
+  assert.equal(count, 6);
+});
+
 test('public profile returns null for a wallet without a profile row', async (t) => {
   const originalFetch = globalThis.fetch;
   const originalUrl = process.env.SUPABASE_URL;

@@ -35,17 +35,35 @@ test('contract readiness is observable without throwing', () => {
   assert.match(contracts, /ensureCore\(\) \{/);
 });
 
-test('genesis display neither initializes a wallet nor reads the unrelated testnet prototype', async () => {
-  const genesisBlock = profileEntry.match(/async function getGenesisState\(walletAddress\) \{[\s\S]*?\n            \}/)?.[0];
-  assert.ok(genesisBlock);
-  let providerReads = 0;
-  const window = {
-    web3Modal: { getWalletProvider() { providerReads++; throw new Error('Unexpected wallet request'); } },
-    ArtSoulContracts: { getProjectNFTState() { providerReads++; return { minted: true, balance: 100 }; } }
-  };
-  const readState = new Function('window', `${genesisBlock}; return getGenesisState;`)(window);
-  for (const address of ['', '0x' + '1'.repeat(40)]) {
-    assert.deepEqual(await readState(address), { owned: false, tokenId: null, eligibilityHash: null, source: 'mainnet-not-deployed' });
-  }
-  assert.equal(providerReads, 0);
+test('Genesis status stays keyed to the profile, with no wallet provider or testnet prototype lookup', async () => {
+  const { transformWithOxc } = await import('vite');
+  const vm = require('node:vm');
+  const source = fs.readFileSync('src/features/profile/genesis-status.jsx', 'utf8');
+  const {code} = await transformWithOxc(source.replace(/^import .*;\r?$/gm, '').replace(/^export /gm, ''), 'genesis-status.jsx', { jsx: { runtime: 'classic' } });
+  assert.match(profileEntry, /<GenesisStatus key=\{profile.wallet_address\} wallet=\{profile.wallet_address\} enabled=\{genesisProfileEnabled\}/);
+  const A = '0x' + 'a'.repeat(40), B = '0x' + 'b'.repeat(40);
+  const requests = [];
+  let enabled = false, state, effect;
+  const tick = () => new Promise(resolve => setImmediate(resolve));
+  const window = { get ethereum() { assert.fail('Unexpected wallet request'); }, get ArtSoulContracts() { assert.fail('Unexpected contract read'); } };
+  const Component = vm.runInNewContext(code + '\nGenesisStatus;', {
+    window, AbortController,
+    fetch: (url, options) => new Promise(resolve => requests.push({ url, options, resolve })),
+    React: { createElement: (_type, _props, ...children) => children.flat(), useEffect: fn => { effect = fn; }, useState: initial => { state = initial; return [state, next => { state = next; }]; } }
+  });
+  const mount = wallet => { const view = Component({wallet, enabled}); return {view, cleanup: effect()}; };
+  const off = mount(A); await tick();
+  assert.ok(off.view.includes('Testnet does not qualify.')); assert.equal(requests.length, 0);
+  enabled = true;
+  const first = mount(A); await tick(); first.cleanup();
+  const second = mount(B); await tick();
+  assert.equal(requests[0].options.signal.aborted, true);
+  assert.equal(requests[1].url, '/api/public/profile?address=' + B + '&view=genesis');
+  requests[1].resolve(Response.json({wallet: B, serial: 0})); await tick();
+  assert.equal(state.label, 'Genesis #0');
+  requests[0].resolve(Response.json({wallet: A, serial: 201})); await tick();
+  assert.equal(state.label, 'Genesis #0'); second.cleanup();
+  const last = mount(A); await tick();
+  requests[2].resolve(Response.json({wallet: B, serial: 201})); await tick();
+  assert.equal(state.label, 'Unconfirmed'); last.cleanup();
 });
