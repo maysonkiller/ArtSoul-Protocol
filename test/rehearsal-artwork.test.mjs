@@ -4,11 +4,12 @@ import { test } from 'node:test';
 import { Interface, keccak256 } from 'ethers';
 import { readArtworkMetadata } from '../src/api/safe-artwork-fetch.js';
 import { rehearsalArtwork as work, rehearsalMetadataUri as uri, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { inspectRegistrationReceipt, registrationAtHead, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
+import { checkRegistrationPublication, inspectRegistrationReceipt, registrationAtHead, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
 
 const market = new Interface([
     'function registerArtwork(string) returns (uint256)', 'function workCount() view returns (uint256)',
     'function works(uint256) view returns (address,string,uint256,uint256)',
+    'function artworkToToken(uint256) view returns(uint256)',
     'event ArtworkRegistered(uint256 indexed artworkId,address indexed creator,string metadataURI)'
 ]);
 const payer = '0x' + '1'.repeat(40), outsider = '0x' + '2'.repeat(40);
@@ -20,7 +21,8 @@ const event = market.encodeEventLog('ArtworkRegistered', [7, payer, uri]);
 const tx = { hash, chainId, input: data, value, from: payer, to: work.core,
     blockHash: block.hash, blockNumber: block.number, transactionIndex: '0x0' };
 const receipt = { transactionHash: hash, from: payer, to: work.core, status: '0x1', blockHash: block.hash,
-    blockNumber: block.number, transactionIndex: '0x0', logs: [{ ...event, address: work.core, transactionHash: hash, blockHash: block.hash }] };
+    blockNumber: block.number, transactionIndex: '0x0', logs: [{ ...event, address: work.core, transactionHash: hash, blockHash: block.hash,
+        blockNumber: block.number, transactionIndex:'0x0', logIndex:'0x2', removed:false }] };
 
 test('pinned registration carries one supported self-contained metadata string, within the contract limit', async () => {
     assert.equal(digest(data), work.dataSha256);
@@ -75,9 +77,14 @@ test('wallet re-simulates the exact pinned call with zero ETH and fails on a cha
 function receiptRpc(change = {}) {
     const answers = {
         eth_chainId: () => chainId, eth_getTransactionByHash: () => tx, eth_getTransactionReceipt: () => receipt,
+        eth_getCode: () => '0x6001',
         eth_getBlockByNumber: tag => tag === 'finalized' ? block : { ...block, transactions: [hash] },
         eth_call: (call, at) => {
             assert.deepEqual(at, { blockHash: block.hash, requireCanonical: true });
+            if (call.to === work.nft) {
+                assert.equal(call.data, market.encodeFunctionData('artworkToToken', [7]));
+                return returned('artworkToToken', [0]);
+            }
             assert.equal(call.to, work.core);
             assert.equal(call.data, market.encodeFunctionData('works', [7]));
             return returned('works', [payer, uri, 0, 0]);
@@ -88,7 +95,31 @@ function receiptRpc(change = {}) {
 
 test('receipt inclusion verifies the real work ID from the event even when another actor took the first ID', async () => {
     const result = await inspectRegistrationReceipt(receiptRpc(), hash, payer);
-    assert.deepEqual(result, { block, txHash: hash, transactionIndex: '0x0', workId: '7', creator: payer, core: work.core, metadataUri: uri, logCount: 1 });
+    assert.deepEqual(result, { block, txHash: hash, transactionIndex: '0x0', workId: '7', creator: payer, core: work.core, metadataUri: uri,
+        logCount: 1, logIndex:'2', atRegistrationBlock:{activeAuctionId:null,canonicalFloorWei:'0',tokenId:null} });
+});
+
+test('registration evidence follows the same publication recovery path and exact log as the signed rehearsal', async () => {
+    const checked = await inspectRegistrationReceipt(receiptRpc(), hash, payer);
+    const register = {chainId:84532,core:{address:work.core,codeHash:keccak256('0x6001')}};
+    const result = await checkRegistrationPublication(checked, register, [receiptRpc(),receiptRpc()]);
+    assert.equal(result.core_address,work.core.toLowerCase());
+    assert.equal(result.can_submit,false);
+    assert.equal(result.registrations[0].log_index,'2');
+    assert.deepEqual(result.finalized_anchor,{number:'16',hash:block.hash});
+    await assert.rejects(checkRegistrationPublication({...checked,logIndex:'3'},register,[receiptRpc(),receiptRpc()]),/differs/);
+    await assert.rejects(checkRegistrationPublication(checked,register,[receiptRpc(),receiptRpc({eth_getCode:()=>'0x6002'})]),/RECOVERY_CODE_MISMATCH/);
+});
+
+test('the receipt state is block scoped and reports an auction opened later in the registration block', async () => {
+    const stage = (floor,token) => receiptRpc({eth_call:(call,at) => {
+        assert.deepEqual(at,{blockHash:block.hash,requireCanonical:true});
+        return call.to === work.nft ? returned('artworkToToken',[token]) : returned('works',[payer,uri,24,floor]);
+    }});
+    const observed = await inspectRegistrationReceipt(stage(0,0), hash, payer);
+    assert.deepEqual(observed.atRegistrationBlock,{activeAuctionId:'24',canonicalFloorWei:'0',tokenId:null});
+    await assert.rejects(inspectRegistrationReceipt(stage(1,0),hash,payer),/Unexpected floor/);
+    await assert.rejects(inspectRegistrationReceipt(stage(0,5),hash,payer),/Unexpected token/);
 });
 
 test('a failed or substituted request, event, chain, block or stored work cannot count as a registration', async () => {
@@ -97,7 +128,9 @@ test('a failed or substituted request, event, chain, block or stored work cannot
         ...[{ value: '0x1' }, { input: '0x' }, { from: outsider }, { to: work.nft }, { transactionIndex: '0x1' }, { chainId: '0x2105' }].map(change => ({
             eth_getTransactionByHash: () => ({ ...tx, ...change }) })),
         ...[{ status: '0x0' }, { logs: [] }, { logs: [...receipt.logs, ...receipt.logs] },
-            ...[{ address: work.nft }, { removed: true }, { transactionHash: block.hash }, { topics: [] }].map(change => ({ logs: [{ ...receipt.logs[0], ...change }] }))
+            ...[{ address: work.nft }, { removed: true }, { transactionHash: block.hash }, { topics: [] },
+                {blockNumber:'0x20'},{transactionIndex:'0x3'},{logIndex:'0x02'},{data:event.data+'00'},{topics:[...event.topics,hash]}]
+                .map(change => ({ logs: [{ ...receipt.logs[0], ...change }] }))
         ].map(change => ({ eth_getTransactionReceipt: () => ({ ...receipt, ...change }) })),
         { eth_getBlockByNumber: tag => tag === 'finalized' ? { ...block, number: '0xf' } : block },
         { eth_getBlockByNumber: tag => tag === 'finalized' ? block : { ...block, transactions: [] } },

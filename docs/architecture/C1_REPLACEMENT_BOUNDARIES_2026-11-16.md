@@ -231,14 +231,7 @@ Permissionless default requires an on-chain call. Funding an automatic executor 
    issuance and the absence of a penalty caused solely by an administrative block.
    Keep the existing 55 characterization tests as historical behavior evidence;
    model tests cannot prove replacement bytecode or close C1.
-2. **Complete the candidate:** finish the exact capability
-   graph, action/deadline table, replacement state inventory and event/interface
-   specification for just native-ETH publish → auction → settle → resale →
-   withdraw. Review it against the current storage export without proposing an
-   in-place conversion. Review the local primary-auction, NFT, refund and resale code
-   alongside its [compiler record](C1_REPLACEMENT_STORAGE_2026-11-19.json). Its regression suite must reject the
-   reproduced hazards, preserve old liabilities and prove initialization and
-   atomicity before independent review or any fresh testnet rehearsal.
+2. **Ordinary payout candidate.** The [authority and deadline inventory](#reviewed-ordinary-pair-authority-and-deadlines) now covers the deployed testnet pair from registration to withdrawal. The [compiler storage record](C1_ORDINARY_PAYOUT_STORAGE.json) identifies its state and immutable bindings. The [payout review](../security/C12_ORDINARY_AUDIT_HANDOFF.md#payout-pair-review) records the regression evidence. The production refund budget still needs public-chain measurements and a release decision.
 
 This proposal is linked under canonical backlog C1 and the rework plan's delivery
 section. Source/hash/reference review validates the proposal; the linked model
@@ -258,3 +251,49 @@ Run `node scripts/measure-ordinary-refunds.cjs` after compiling the [concrete ca
 Use a cap of 8 and a receiver allowance of 30,000 as the starting configuration for the Base Sepolia rehearsal. A caller can request a smaller batch. These numbers are measured execution gas for the stated receivers, not a worst case or a fee quote. Include a Safe recipient, Base data fees and actual gas estimates in the public rehearsal. Mainnet constructor inputs require explicit review against that concrete build. A failed delivery keeps the recipient's full claim withdrawable.
 
 On November 21, eight distinct two-of-three Safe L2 1.4.1 proxies placed bids with different deposits in the [local rehearsal](../../scripts/rehearse-safe-marketplace-admission.cjs). The three custody Safes were separate from the bidders. After a ninth wallet outbid them and the auction closed, batches of 1, 4 and 8 Safe recipients used **70,810**, **131,064** and **217,065** execution gas, respectively, from the same starting state. Each paid Safe received its full deposit and had zero outstanding credit. Processing the exhausted queue again produced no payment. The run used the rehearsal batch cap of 8 and a per-transfer gas allowance of 30,000. Public Base Sepolia fee and receipt verification remains open.
+
+## Reviewed ordinary pair authority and deadlines
+
+This inventory applies to the native-ETH payout pair deployed on Base Sepolia. The artifact manifest pins both ABIs. The deployment record verifies the bytecode, reciprocal Core/NFT addresses and all three custody roles. The deployer has no ongoing capability. Each treasury controls its own accrued credit. Only the Admin Security Safe governs entry and external marketplace admission. The constructor requires three distinct Safe addresses, each reporting a threshold of two and three owners. [Build manifest](../security/C12_ORDINARY_PAYOUT_MANIFEST.json) · [Deployment evidence](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md#core-with-creditor-directed-withdrawals)
+
+### OrdinaryPayoutMarket
+
+The table lists every state-changing ABI entry. The pause blocks the five operations marked **Entry**. Times are block timestamps. Events in the last column belong to the emitting Core and appear when their conditions apply. [Auction implementation](../../contracts/replacement/OrdinaryArtAuctions.sol) · [Resales](../../contracts/replacement/OrdinaryArtResales.sol) · [Refunds](../../contracts/replacement/OutbidRefunds.sol) · [Directed withdrawals](../../contracts/replacement/OrdinaryPayoutMarket.sol) · [Safe authority](../../contracts/replacement/TreasuryBoundOrdinaryArt.sol)
+
+| Entry point | Authorized caller and effect | Core events |
+| --- | --- | --- |
+| `registerArtwork(string)` | **Entry.** Any caller registers as creator with a bounded, nonempty metadata URI. Mint and floor await payment. | `ArtworkRegistered` |
+| `createAuction(uint256,uint256,uint256)` | **Entry.** Creator opens an unsold work at a positive price for 24, 36 or 48 hours. Can close a previous expired bidless round or expire a previous runner-up offer in the same call. | `AuctionOpened`, `AuctionClosed`, `RunnerUpOfferExpired` |
+| `placeBid(uint256,uint256)` | **Entry.** Before the current end, any eligible bidder except the creator and current leader can bid the required minimum or higher with the exact deposit. A bid in the last ten minutes extends the end by ten minutes, capped at one hour beyond the original end. | `BidAccepted`, `OutbidRefundQueued`, `AuctionExtended` |
+| `closeAuction(uint256)` | Anyone from the end timestamp. A bidless work becomes available again. With a winner, the confirmation block starts a full 24-hour payment window. | `AuctionClosed` |
+| `settleAuction(uint256)` | Highest bidder pays the price less the applicable deposit through the deadline inclusive. They can close and pay in one call from the auction end. Excess deposit becomes their own credit. Settlement, proceeds, floor and mint are atomic. | `AuctionClosed`, `WinnerSurplusCredited`, `ProceedsCredited`, `AuctionSettled` |
+| `finalizeDefault(uint256)` | Anyone strictly after an unpaid winner's deadline. The deposit splits 80/20 between creator and protocol. If a runner-up exists, this confirmation starts their own 24-hour window. | `AuctionDefaulted`, `ProceedsCredited`, `RunnerUpOfferOpened` |
+| `acceptRunnerUpOffer(uint256)` | Recorded runner-up pays their own full bid through the offer deadline inclusive. Their earlier refund stays independent. The paid price sets the floor. | `RunnerUpOfferAccepted`, `ProceedsCredited`, `AuctionSettled` |
+| `declineRunnerUpOffer(uint256)` | Recorded runner-up releases the work through the offer deadline inclusive. | `RunnerUpOfferDeclined` |
+| `expireRunnerUpOffer(uint256)` | Anyone releases the work strictly after the offer deadline. | `RunnerUpOfferExpired` |
+| `processRefunds(uint256,uint256)` | Anyone after close. A batch advances the auction's refund cursor. Each obligation is either delivered or credited in full to the same creditor. | `OutbidRefundProcessed` |
+| `withdraw()` | Creditor withdraws their entire balance to themselves. A failed delivery restores the claim. | `CreditWithdrawn` |
+| `withdrawTo(address)` | Creditor directs their entire balance to a recipient other than zero or the Core. A failed delivery restores the claim. Both events describe one successful payment. | `CreditRouted`, `CreditWithdrawn` |
+| `listResale(uint256,uint256,uint256)` | **Entry.** Current owner supplies the expected version, an effective approval for the Core and a price at or above the canonical floor. | `ResaleListed` |
+| `cancelResale(uint256,uint256)` | Listed seller who still owns the token cancels the expected version, including during a pause. | `ResaleCancelled` |
+| `buyResale(uint256,uint256)` | **Entry.** Buyer other than the seller pays the exact quote. The Core rechecks version, uninterrupted approval and floor before recording the four credits and transferring the NFT atomically. | `ResaleCredited`, `ResalePurchased` |
+| `setEntryPaused(bool)` | Admin Security Safe reporting a threshold of at least two pauses or resumes entry. Existing settlement, default, refunds and withdrawal remain callable. | `Paused`, `Unpaused` |
+| `scheduleMarketplaceAdmission(address)` | Admin Security Safe with exactly two-of-three announces an eligible external contract. The 48-hour delay starts in this block. | `MarketplaceAdmissionScheduled` |
+| `executeMarketplaceAdmission(address)` | Anyone at or after the announced time can activate that operator. The Safe must still report exactly two-of-three. Owners grant their own NFT approvals separately. | `MarketplaceAdmissionChanged` |
+| `cancelMarketplaceAdmission(address)` | Admin Security Safe reporting a threshold of at least two cancels a pending admission immediately. | `MarketplaceAdmissionCancelled` |
+| `disableMarketplace(address)` | Same Safe and minimum threshold immediately disable an active external operator. A later admission requires fresh holder approvals. | `MarketplaceAdmissionChanged` |
+
+### SettledArtworkNFT
+
+The paired Core supplies the settlement record. The NFT holds the immutable issuer address, the recorded URI, token/work/auction identities, creator, First Collector and transfer/approval state. The Core's entry pause does not govern ERC-721 owner operations. Neither contract declares a payable receive or fallback entry. [NFT implementation](../../contracts/replacement/SettledArtworkNFT.sol) · [Compiler storage inventory](C1_ORDINARY_PAYOUT_STORAGE.json)
+
+| Entry point | Authorized caller and effect | NFT events |
+| --- | --- | --- |
+| `mintSettled(uint256)` | Only the paired Core can issue once for a settled auction and work. The recorded First Collector receives the mint. | `SettledArtworkIssued`, `Transfer` |
+| `approve(address,uint256)` | Token owner or an authorized operator for all can grant token-specific approval to an admitted operator, or clear it. | `Approval` |
+| `setApprovalForAll(address,bool)` | A holder grants an admitted operator or revokes an operator for their own tokens. | `ApprovalForAll` |
+| `transferFrom(address,address,uint256)` | Owner or currently authorized operator transfers an existing NFT. A transfer alone carries no sale price or proceeds. | `Transfer` |
+| `safeTransferFrom(address,address,uint256)` | Same authority, with an ERC-721 receiver check when the recipient is a contract. | `Transfer` |
+| `safeTransferFrom(address,address,uint256,bytes)` | Same safe transfer, passing the caller's data to the receiver. | `Transfer` |
+
+The [upgrade comparison](../canon/CONTRACT_REWORK_PLAN.md#upgrade-comparison), [threat review](../canon/CONTRACT_REWORK_PLAN.md#5-threat-model-and-acceptance-gates), [decision invariants](C1_DECISION_INVARIANTS_2026-11-02.md) and [accounting model](../audits/C1_EXECUTABLE_ACCOUNTING_MODEL_2026-11-16.md) provide the other C1 review inputs. Production sign-off still requires choosing the immutable refund batch and delivery-gas limits from the public rehearsal. The signed sale and refund receipts belong to C13. Independent release review belongs to C12.
