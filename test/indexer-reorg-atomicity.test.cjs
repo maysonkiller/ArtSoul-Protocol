@@ -128,7 +128,12 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     const { checkOrdinaryDemand } = await import('./helpers/ordinary-demand-postgres.mjs');
     await checkOrdinaryDemand(pool);
   });
-  await t.test('pre-smoke database check detects residual projections and refuses row-filtered evidence', async () => {
+  await t.test('staged banner revisions serialize competing schedules and retain the original terms', async () => {
+    await pool.query(read('sql/migrations/20261125210000_banner_schedule_revisions.sql'));
+    const { checkBannerRevisions } = await import('./helpers/banner-schedule-postgres.mjs');
+    await checkBannerRevisions(pool);
+  });
+  await t.test('pre-smoke database check detects residual projections and refuses row-filtered evidence', async cutover => {
     const {verifyMainnetProjectionRows} = await import('../scripts/verify-mainnet-catalog.mjs');
     const reader = await pool.connect();
     const pair = {chainId: 8453, coreAddress: CORE, nftAddress: CREATOR,
@@ -215,8 +220,22 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       await assert.rejects(verify(), error => error.code === '42501');
       await reader.query('RESET ROLE');
       assert.ok(await verify() > 20, 'a failed check ends its read-only transaction');
-      // This is the final prepublication check in the disposable database. A
-      // finalized resale cannot be removed to make a contaminated launch pass.
+      // Registration of the dedicated issuer is separate from issuing a grant.
+      const { review } = await import('./helpers/genesis-grant-rpc.mjs');
+      await pool.query(`INSERT INTO artsoul_private.genesis_issuers
+        (chain_id,genesis_address,code_hash,grant_authority,founder_recipient) VALUES (8453,$1,$2,$3,$4)`,
+        [review.genesis, review.genesisCodeHash, review.safe, review.founder]);
+      assert.ok(await verify() > 20);
+      await reader.query('ALTER ROLE cutover_fixture BYPASSRLS; REVOKE SELECT ON artsoul_private.genesis_grants FROM cutover_fixture; SET ROLE cutover_fixture');
+      await assert.rejects(verify(), error => error.code === '42501' && error.message.includes('genesis_grants'));
+      await reader.query('RESET ROLE');
+      await cutover.test('private Genesis intake preserves finalized grants and returns only designated wallet evidence', async () => {
+        const { checkGenesisGrantIntake } = await import('./helpers/genesis-grant-postgres.mjs');
+        await checkGenesisGrantIntake(pool);
+      });
+      await assert.rejects(verify(), error => error.message.includes('artsoul_private.genesis_grant_batches') &&
+        error.message.includes('artsoul_private.genesis_grants'));
+      // Finalized evidence stays in this disposable database after a failed preflight.
       await pool.query(`INSERT INTO artsoul_private.ordinary_resale_purchases
         (chain_id,core_address,token_id,listing_version,artwork_id,price_wei,seller,buyer,creator,first_collector,
          protocol_treasury,ecosystem_treasury,seller_wei,creator_wei,protocol_wei,ecosystem_wei,transaction_hash,block_number,block_hash,log_index)

@@ -64,11 +64,13 @@ async function inspectBatch(rpc, prepared, founder, codeHash, hash) {
 export async function verifyGenesisGrants(review, transactionHash, providers) {
     const prepared = prepareGenesisGrants(review);
     assert(nonzeroHash(review.genesisCodeHash) && nonzeroHash(transactionHash), 'Supply the reviewed initialized runtime hash and mined transaction hash');
+    const binding = { genesisCodeHash: review.genesisCodeHash.toLowerCase(), founder: review.founder.toLowerCase(),
+        policyHash: review.policyHash.toLowerCase(), calldataHash: keccak256(prepared.transaction.data) };
     requireIndependentProviders(providers);
-    const [first, second] = await Promise.all(providers.map(rpc => inspectBatch(rpc, prepared, review.founder,
-        review.genesisCodeHash.toLowerCase(), transactionHash.toLowerCase())));
+    const [first, second] = await Promise.all(providers.map(rpc => inspectBatch(rpc, prepared, binding.founder,
+        binding.genesisCodeHash, transactionHash.toLowerCase())));
     assert.deepEqual(first, second, 'Providers disagree on finalized Genesis grants');
-    return first;
+    return { ...first, ...binding };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

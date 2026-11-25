@@ -10,6 +10,8 @@ import { confirmFinalizedBlock, finalizedBlock, requireIndependentProviders, ver
 
 const market = new Interface([
     'function registerArtwork(string uri) returns (uint256)',
+    'function createAuction(uint256 artworkId,uint256 startPrice,uint256 duration) returns (uint256)',
+    'function auctionCount() view returns (uint256)',
     'function workCount() view returns (uint256)',
     'function works(uint256) view returns (address creator, string metadataURI, uint256 activeAuction, uint256 floor)',
     'function artworkToToken(uint256 artworkId) view returns (uint256 tokenId)',
@@ -79,6 +81,23 @@ export async function buildArtworkReview(review, register, providers) {
     const [first, second] = await Promise.all(providers.map(rpc => registrationAtHead(rpc, payer, block)));
     assert.deepEqual(first, second, 'Providers disagree on the registration state. Refresh later.');
     return { chainId: chain, payer, block, ...first };
+}
+
+// This read exercises the actual registered work and never requests a wallet or opens the review server.
+export async function simulateRegisteredOpening(rpc, payer, block, reserveWei, hours) {
+    assert(/^[1-9]\d{0,77}$/.test(reserveWei) && BigInt(reserveWei) < (1n << 256n), 'Use a positive uint256 reserve in wei');
+    assert(['24', '36', '48'].includes(hours), 'Choose 24, 36 or 48 hours');
+    const at = { blockHash: block.hash, requireCanonical: true };
+    const [work, [token], [count]] = await Promise.all([checkWork(rpc, 1n, payer, at),
+        view(rpc, 'artworkToToken', [1], at, fixture.nft), view(rpc, 'auctionCount', [], at)]);
+    assert.equal(work.activeAuction, 0n, 'This work already has an auction');
+    assert(work.floor === 0n && token === 0n, 'This work already settled or minted');
+    const call = { from: payer, to: fixture.core, value: '0x0',
+        data: market.encodeFunctionData('createAuction', [1n, reserveWei, Number(hours) * 3600]) };
+    const raw = await rpc('eth_call', [call, at]);
+    assert.equal(raw.toLowerCase(), market.encodeFunctionResult('createAuction', [count + 1n]), 'Unexpected simulated auction ID');
+    return { chainId: 84532, block, artworkId: '1', core: fixture.core, creator: payer,
+        reserveWei, durationHours: Number(hours), simulatedAuctionId: (count + 1n).toString(), calldataHash: keccak256(call.data) };
 }
 
 export async function inspectRegistrationReceipt(rpc, hash, payer) {
@@ -161,12 +180,20 @@ export async function verifyArtworkRegistration(review, register, txHash, provid
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     try {
         const [reviewFile, registerFile, option, hash, ...extra] = process.argv.slice(2);
-        assert(reviewFile && registerFile && !extra.length && ((!option && !hash) || (option === '--plan' && !hash) ||
-            (option === '--verify-receipt' && hash)), 'Usage: node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> [--plan | --verify-receipt <hash>]');
+        const opening = option === '--check-opening' && hash && extra.length === 1;
+        assert(reviewFile && registerFile && (opening || (!extra.length && ((!option && !hash) || (option === '--plan' && !hash) ||
+            (option === '--verify-receipt' && hash)))), 'Usage: review-rehearsal-artwork.mjs review.json register.json [--plan | --verify-receipt HASH | --check-opening RESERVE_WEI HOURS]');
         const [review, register] = await Promise.all([reviewFile, registerFile].map(async path => JSON.parse(await readFile(path, 'utf8'))));
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
         const getPlan = () => buildArtworkReview(review, register, providers);
-        if (option) console.log(JSON.stringify(option === '--plan' ? await getPlan() : await verifyArtworkRegistration(review, register, hash, providers), null, 2));
+        if (opening) {
+            const payer = checkedPayer(review, register);
+            const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });
+            const [first, second] = await Promise.all(providers.map(rpc => simulateRegisteredOpening(rpc, payer, block, hash, extra[0])));
+            assert.deepEqual(first, second, 'Providers disagree on the simulated auction');
+            await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
+            console.log(JSON.stringify({ ...first, rpcReadings: 2 }, null, 2));
+        } else if (option) console.log(JSON.stringify(option === '--plan' ? await getPlan() : await verifyArtworkRegistration(review, register, hash, providers), null, 2));
         else {
             checkedPayer(review, register);
             const { url } = await listenForReview(getPlan);

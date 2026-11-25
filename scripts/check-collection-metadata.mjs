@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { getAddress, Interface, isHexString, keccak256, ZeroAddress } from 'ethers';
 import { allowedArtworkUrl, fetchArtworkResource } from '../src/api/safe-artwork-fetch.js';
 import { MAX_METADATA_BYTES } from '../src/config/upload-policy.js';
-import { hasFirstWorkMint, parseDraft, reviewConfig, safeUrl } from '../src/features/collections/launch-config.js';
-import { confirmFinalizedBlock, finalizedBlock, readRpc } from './verify-treasury-safes.mjs';
+import { hasFirstWorkMint, parseDraft, parseEth, reviewConfig, safeUrl } from '../src/features/collections/launch-config.js';
+import { confirmFinalizedBlock, finalizedBlock, readRpc, requireIndependentProviders } from './verify-treasury-safes.mjs';
 
 // Read only the URI that the collection builder previews for its first ERC-721 token.
 export async function checkCollectionMetadata(draftJson, expectedSha256) {
@@ -17,7 +18,8 @@ export async function checkCollectionMetadata(draftJson, expectedSha256) {
 
 // A reviewed runtime identifies the template. An auction winner may mint to a
 // different recipient, and the resulting NFT may have changed hands since.
-export async function checkIssuedFirstWork(draftJson, collection, runtimeHash, expectedSha256, rpc) {
+export async function checkIssuedFirstWork(draftJson, collection, runtimeHash, expectedSha256, providers) {
+    requireIndependentProviders(providers);
     const draft = parseDraft(draftJson);
     if (Number(draft.chainId) !== 84532 || !hasFirstWorkMint(draft)) throw new Error('Choose a Base Sepolia first-work draft.');
     const { tokenOneMetadataURI } = reviewConfig(draft);
@@ -25,31 +27,61 @@ export async function checkIssuedFirstWork(draftJson, collection, runtimeHash, e
     if (!tokenOneMetadataURI || address === ZeroAddress || !isHexString(runtimeHash, 32) ||
         !/^[a-f0-9]{64}$/i.test(expectedSha256)) throw new Error('Supply a reviewed contract, runtime hash, metadata URI and SHA-256.');
 
-    const block = await finalizedBlock(84532, rpc);
+    const reserve = parseEth(draft.phases[0].pricing.priceEth);
+    const supply = Number(draft.maxSupply);
+    if (draft.phases[1].pricing.sourcePhaseId !== draft.phases[0].id || draft.phases[1].pricing.fallback !== 'pause' ||
+        Number(draft.creatorEarnings.bps) !== 550 || draft.creatorEarnings.recipients.length) {
+        throw new Error('The draft must use its settled opening price and the 5.5% creator royalty.');
+    }
+    if (!Number.isSafeInteger(supply) || supply < 2 || supply > 0xffffffff ||
+        Number(draft.phases[0].allocation) !== 1 || Number(draft.phases[1].allocation) !== supply - 1 || !reserve) {
+        throw new Error('The reviewed draft must specify its supply, complete allocations and positive opening reserve.');
+    }
+    const heads = await Promise.all(providers.map(rpc => finalizedBlock(84532, rpc)));
+    const block = BigInt(heads[0].number) <= BigInt(heads[1].number) ? heads[0] : heads[1];
+    await Promise.all(providers.map((rpc, i) => confirmFinalizedBlock(rpc, heads[i], block)));
+    const [first, second] = await Promise.all(providers.map(rpc => readFirstWork(rpc, address, runtimeHash, block)));
+    if (!isDeepStrictEqual(first, second)) throw new Error('Independent providers disagree on the issued first work.');
+    if (first.uri !== tokenOneMetadataURI) throw new Error('Issued token URI differs from the collection draft.');
+    if (!first.locked || first.supply !== BigInt(supply) || first.allocated !== first.supply ||
+        first.openingReserve !== reserve || first.price < reserve) {
+        throw new Error('Locked collection supply, allocation or opening price differs from the reviewed draft.');
+    }
+    if (first.creator === ZeroAddress || first.owner === ZeroAddress || first.firstCollector === ZeroAddress ||
+        first.firstCollector !== first.openingBuyer) throw new Error('The issued first token and its paid opening auction do not agree.');
+    if (first.royaltyReceiver !== first.creator || first.royaltyAmount !== 550n) {
+        throw new Error('The issued NFT does not report the reviewed 5.5% creator royalty.');
+    }
+    const metadata = await checkPublishedTokenMetadata(first.uri, '1', expectedSha256);
+    await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
+    return { chainId: 84532, collection: address, runtimeHash: runtimeHash.toLowerCase(), block, rpcReadings: 2,
+        creator: first.creator, firstCollector: first.firstCollector, owner: first.owner, supply,
+        openingReserveWei: reserve.toString(), publicMintPriceWei: first.price.toString(), metadata };
+}
+
+async function readFirstWork(rpc, address, runtimeHash, block) {
     const at = { blockHash: block.hash, requireCanonical: true };
     const code = await rpc('eth_getCode', [address, at]);
     if (code === '0x' || keccak256(code) !== runtimeHash.toLowerCase()) throw new Error('Collection runtime differs from the reviewed deployment.');
     const abi = new Interface([
         'function creator() view returns (address)', 'function firstCollector(uint256) view returns (address)',
         'function collectionFirstCollector() view returns (address)', 'function ownerOf(uint256) view returns (address)',
-        'function tokenURI(uint256) view returns (string)', 'function mintPrice(uint256) view returns (uint256)'
+        'function tokenURI(uint256) view returns (string)', 'function mintPrice(uint256) view returns (uint256)',
+        'function configurationLocked() view returns (bool)', 'function maxSupply() view returns (uint32)',
+        'function allocatedSupply() view returns (uint256)', 'function royaltyInfo(uint256,uint256) view returns (address,uint256)'
     ]);
     async function read(name, args = []) {
         const result = await rpc('eth_call', [{ to: address, data: abi.encodeFunctionData(name, args) }, at]);
-        return abi.decodeFunctionResult(name, result)[0];
+        const decoded = abi.decodeFunctionResult(name, result);
+        return decoded.length === 1 ? decoded[0] : decoded;
     }
-    const [creator, firstCollector, openingBuyer, owner, uri, price] = await Promise.all([
+    const [creator, firstCollector, openingBuyer, owner, uri, price, locked, supply, allocated, openingReserve,
+        [royaltyReceiver, royaltyAmount]] = await Promise.all([
         read('creator'), read('firstCollector', [1]), read('collectionFirstCollector'),
-        read('ownerOf', [1]), read('tokenURI', [1]), read('mintPrice', [1])
+        read('ownerOf', [1]), read('tokenURI', [1]), read('mintPrice', [1]), read('configurationLocked'),
+        read('maxSupply'), read('allocatedSupply'), read('mintPrice', [0]), read('royaltyInfo', [1, 10000])
     ]);
-    if ([creator, firstCollector, owner].includes(ZeroAddress) || firstCollector !== openingBuyer || price === 0n) {
-        throw new Error('The issued first token and its paid opening auction do not agree.');
-    }
-    if (uri !== tokenOneMetadataURI) throw new Error('Issued token URI differs from the collection draft.');
-    const metadata = await checkPublishedTokenMetadata(uri, '1', expectedSha256);
-    await confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block);
-    return { chainId: 84532, collection: address, runtimeHash: keccak256(code), block, creator, firstCollector,
-        owner, publicMintPriceWei: price.toString(), metadata };
+    return { creator, firstCollector, openingBuyer, owner, uri, price, locked, supply, allocated, openingReserve, royaltyReceiver, royaltyAmount };
 }
 
 export async function checkPublishedTokenMetadata(metadataURI, tokenId, expectedSha256) {
@@ -102,7 +134,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             'Usage: check-collection-metadata.mjs draft.json [sha256] | --issued draft.json sha256 address runtime-keccak256');
         const draft = await readFile(file, 'utf8');
         const report = issued
-            ? await checkIssuedFirstWork(draft, address, runtimeHash, digest, readRpc(process.env.ARTSOUL_COLLECTION_RPC_URL))
+            ? await checkIssuedFirstWork(draft, address, runtimeHash, digest,
+                [readRpc(process.env.ARTSOUL_COLLECTION_RPC_URL), readRpc(process.env.ARTSOUL_COLLECTION_RPC_CHECK_URL)])
             : await checkCollectionMetadata(draft, digest);
         console.log(JSON.stringify(report, null, 2));
     } catch (error) {

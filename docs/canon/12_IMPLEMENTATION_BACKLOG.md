@@ -311,6 +311,21 @@ Public-beta acceptance requires a stable real cohort, processed feedback, modera
 
 Local engineering is active as of November 18. Deployment, custody changes and mainnet activation retain their own decisions.
 
+### November 25 remaining acceptance evidence
+
+Twelve active C items remain. C2, C3, C6 and C11 have implementation acceptance. C16 is retired. The following checks identify what is still needed for the open items.
+
+| Items | Evidence still needed |
+| --- | --- |
+| C0, C1 | Select and verify production custody and recovery. Review the immutable refund limits against the public Safe refund rehearsal before signing off the final topology. |
+| C4, C8, C9 | Real approved recipients and reviewed Genesis media, pilot grants, staff operating evidence, and the verified link from indexed grants and Partner collections to public frames. Profile badges require their own eligibility evidence. |
+| C5 | A published collection, paid opening and issued token with indexed provenance and verified marketplace policy. The [token reader](../../scripts/check-collection-metadata.mjs) now compares two nodes at one finalized block, the draft supply and reserve, royalty recipient, original buyer and current holder. |
+| C7, C13 | Finalized sales, refunds and keeper receipts on the replacement pair, hosted intake, recovery and observed participant journeys. The [auction simulation](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md#opening-the-registered-work-in-a-read-only-simulation) exercised work 1 on the actual pair. The public indexer still served the earlier Core. |
+| C10 | Authenticated publication and sponsor review, real treasury payment and refund evidence, and labeled delivery with independent organic ranking. The [private schedule ledger](../runbooks/PROMOTED_BANNER_SCHEDULE.md#retain-a-reviewed-schedule-in-a-private-rehearsal) serializes competing revisions and protects previously recorded terms. |
+| C12 | Disposition of browser wallet and privileged integration findings on the selected release, including the physical mobile-wallet check. The full independent audit is scheduled for the end of D. |
+| C14 | Operator, applicable disclosures, incident ownership and custody recovery. At 19:29 UTC the [public indexer](https://artsoulprotocol.com/api/public/indexer-status) reported the running Base Sepolia Core healthy. The public artwork list returned a result and zero warnings. |
+| C15 | Final on-device playback and visual checks after the remaining product flows stabilize. The [guest browser evidence](../audits/C15_PUBLIC_SURFACES_2026-11-25.md) records the desktop and mobile viewport coverage. |
+
 Goal: audited, product-grade contracts and production operations.
 
 The October 3 founder amendment moves the previously deferred passkey/recovery

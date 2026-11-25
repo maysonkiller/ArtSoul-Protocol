@@ -39,6 +39,16 @@ The preflight verifies record shape, amounts, timing, lane capacity, recorded gr
 
 Before enabling real placements, the delivery service must verify permissions and group affiliations, preserve a timestamped public version of each approved set of terms, and serialize schedule changes against the last committed version so concurrent approvals cannot overbook. It must use the settlement outcome and verified treasury destination, define cancellation/refunds and the auction award rules, and check eligibility before an irreversible payment. The homepage must label every delivered promotion, revert unavailable positions to organic discovery and prove organic ranking stays independent. These remain C10 acceptance work.
 
+## Retain a reviewed schedule in a private rehearsal
+
+After applying `sql/migrations/20261125210000_banner_schedule_revisions.sql` to the intended isolated database, set `ARTSOUL_BANNER_DATABASE_URL` for the operator and run:
+
+```sh
+node scripts/record-banner-schedule.mjs 0 proposed.json --persist
+```
+
+Supply the entire schedule and the revision reviewed by the operator (zero for the first intake). The command locks the schedule, reads its committed terms and time from PostgreSQL, validates all placements and awards, and appends only new entries. An identical retry returns the existing revision. Conflicting terms or a new entry based on a stale revision require a fresh review. The ledger retains the recorder's database login and the recording time. It has no Data API grants. This is a private recording step. Public disclosure, verification of proposer and reviewer affiliations, collection of payment, refunds and homepage delivery still require their own integrations.
+
 ## Industry references
 
 Google Ad Manager uses publisher pricing rules to filter bids below a configured floor and describes separate treatment for direct sponsorships. This is the relevant precedent for keeping a public auction reserve distinct from an agreed direct placement. [Google Ad Manager pricing rules](https://support.google.com/admanager/answer/9298008?hl=en)

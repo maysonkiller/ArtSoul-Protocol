@@ -98,6 +98,15 @@
             background: var(--c-bg);
             color: var(--accent-future);
         }
+        @media (max-width: 420px) {
+            .gallery-page-heading .home-section-kicker { display: none; }
+            body:is(.classic, .future) .gallery-page-main .gallery-page-heading h1 { font-size: 26px; }
+            body:is(.classic, .future) .gallery-page-main.site-page-container .gallery-filter-panel { padding: 0; margin-block: 8px 12px; }
+            body:is(.classic, .future) .gallery-page-main .gallery-tab-row { margin-bottom: 8px; }
+            .gallery-search-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+            .gallery-search-controls .gallery-search-input { grid-column: auto; min-width: 0; }
+            .gallery-search-controls .gallery-search-all { margin: 0; }
+        }
 
     </style>
     <link rel="stylesheet" href="/mobile-no-motion.css?v=3">
