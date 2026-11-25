@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
 
-const source = fs.readFileSync('src/features/discovery/gallery-contract-runtime.js', 'utf8');
+const source = fs.readFileSync('src/features/discovery/public-contract-runtime.js', 'utf8');
 const connected = { address: '0x1111111111111111111111111111111111111111', isConnected: true };
 
 function start(state, loadContracts, loadServices) {
@@ -11,10 +11,10 @@ function start(state, loadContracts, loadServices) {
         artsoulSettledWalletState: state,
         addEventListener: (name, callback) => listeners.set(name, callback)
     };
-    const script = source.replace("import '../../ui/components/index.js';", '')
-        .replace("import('/contracts-integration.js?v=22')", 'loadContracts()')
-        .replace("import('../../index.js')", 'loadServices()');
-    new Function('window', 'loadContracts', 'loadServices', script)(window, loadContracts, loadServices);
+    const script = source.replace('export function installPublicContractRuntime', 'function installPublicContractRuntime')
+        .replace('import(/* @vite-ignore */ contractModule)', 'loadContracts()');
+    new Function('window', 'loadContracts', 'loadServices',
+        script + '\ninstallPublicContractRuntime(loadServices);')(window, loadContracts, loadServices);
     return { load: window.loadArtSoulGalleryContracts, change: detail => listeners.get('artsoul:wallet-state-changed')({ detail }) };
 }
 
@@ -43,4 +43,16 @@ test('an already-restored wallet can retry after the first load fails', async ()
     await runtime.load();
     assert.equal(attempts, 2);
     assert.equal(services, 1);
+});
+
+test('the homepage starts its first wallet read on demand without initializing gallery services', async () => {
+    const home = fs.readFileSync('src/entries/index.js', 'utf8');
+    const gallery = fs.readFileSync('src/features/discovery/gallery-contract-runtime.js', 'utf8');
+    assert.match(home, /^installPublicContractRuntime\(\);$/m);
+    assert.match(gallery, /installPublicContractRuntime\(\(\) => import\('\.\.\/\.\.\/index\.js'\)\)/);
+    let attempts = 0;
+    const runtime = start(null, async () => { attempts++; });
+    assert.equal(attempts, 0);
+    await Promise.all([runtime.load(), runtime.load()]);
+    assert.equal(attempts, 1);
 });
