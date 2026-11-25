@@ -18,6 +18,14 @@ remain separate gates. No purge is acknowledged while caching is disabled.
 
 ## Ordinary settlement intake
 
+For a completed native resale, identify the block-wide log index of `ResalePurchased` in its receipt. Set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to independent HTTPS endpoints. The following command reads the finalized purchase, the adjacent credit and NFT delivery, the immutable treasury recipients, and the original artwork provenance.
+
+```sh
+node scripts/read-ordinary-resale.mjs reviewed-pair.json BLOCK_NUMBER BLOCK_HASH TX_HASH PURCHASE_LOG_INDEX
+```
+
+Amounts in the report are credited wei. The buyer in this receipt may have transferred the token again. Use the transfer history for subsequent ownership. A listing or an ordinary wallet transfer does not produce a paid resale.
+
 After migration 018 is available in the intended database, the operator can ingest one finalized sale from a reviewed ordinary Core/NFT pair. Configure `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_DATABASE_URL` for that target. The database identity must be able to insert and read both private tables.
 
 ```sh

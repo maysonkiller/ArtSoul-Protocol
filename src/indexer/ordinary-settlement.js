@@ -4,19 +4,38 @@ const events = new Interface([
     'event AuctionSettled(uint256 indexed auctionId, uint256 indexed artworkId, uint256 tokenId, uint256 price)',
     'event RunnerUpOfferAccepted(uint256 indexed auctionId, address indexed bidder, uint256 price)',
     'event SettledArtworkIssued(uint256 indexed auctionId, uint256 indexed artworkId, uint256 indexed tokenId, address creator, address firstCollector)',
-    'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'
+    'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+    'event ResalePurchased(uint256 indexed tokenId, uint256 version, address indexed seller, address indexed buyer, uint256 price)',
+    'event ResaleCredited(uint256 indexed tokenId, uint256 indexed version, address protocol, address ecosystem, uint256 sellerAmount, uint256 creatorAmount, uint256 protocolAmount, uint256 ecosystemAmount)'
 ]);
 const quantity = value => typeof value === 'string' && /^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(value);
 
 // The reader supplies a verified pair and canonical block. Do not infer the buyer
 // from the highest bid, the transaction sender, or a transfer after the mint.
-export function parseOrdinarySettlement(receipt, proof, transactionHash, auctionId) {
+function checkReceipt(receipt, proof, transactionHash) {
     if (receipt?.status !== '0x1' || receipt.transactionHash?.toLowerCase() !== transactionHash ||
         receipt.blockHash?.toLowerCase() !== proof.blockHash || !quantity(receipt.blockNumber) ||
         BigInt(receipt.blockNumber) !== BigInt(proof.blockNumber) || !quantity(receipt.transactionIndex) || !Array.isArray(receipt.logs)) {
         throw new Error('Missing successful ordinary settlement receipt in the expected block');
     }
+}
 
+function decodeReceiptLog(name, log, receipt) {
+    const index = quantity(log.logIndex) ? Number(BigInt(log.logIndex)) : NaN;
+    if ((log.removed !== undefined && log.removed !== false) || log.blockHash?.toLowerCase() !== receipt.blockHash.toLowerCase() ||
+        log.transactionHash?.toLowerCase() !== receipt.transactionHash.toLowerCase() || log.blockNumber !== receipt.blockNumber ||
+        log.transactionIndex !== receipt.transactionIndex || !Number.isSafeInteger(index)) throw new Error('Invalid ordinary settlement log position');
+    const args = events.decodeEventLog(name, log.data, log.topics);
+    const canonical = events.encodeEventLog(name, args);
+    if (canonical.data !== log.data.toLowerCase() || canonical.topics.length !== log.topics.length ||
+        canonical.topics.some((word, i) => word !== log.topics[i].toLowerCase())) {
+        throw new Error('Invalid ordinary settlement event encoding');
+    }
+    return { args, index };
+}
+
+export function parseOrdinarySettlement(receipt, proof, transactionHash, auctionId) {
+    checkReceipt(receipt, proof, transactionHash);
     function findLog(name, address, indexedFields, optional = false) {
         const topic = events.getEvent(name).topicHash;
         const logs = receipt.logs.filter(log => log.address?.toLowerCase() === address &&
@@ -24,18 +43,7 @@ export function parseOrdinarySettlement(receipt, proof, transactionHash, auction
                 log.topics[index]?.toLowerCase() === value));
         if (!logs.length && optional) return null;
         if (logs.length !== 1) throw new Error('Expected one ' + name + ' in ordinary settlement receipt');
-        const [log] = logs;
-        const index = quantity(log.logIndex) ? Number(BigInt(log.logIndex)) : NaN;
-        if (log.removed === true || log.blockHash?.toLowerCase() !== proof.blockHash ||
-            log.transactionHash?.toLowerCase() !== transactionHash || log.blockNumber !== receipt.blockNumber ||
-            log.transactionIndex !== receipt.transactionIndex || !Number.isSafeInteger(index)) throw new Error('Invalid ordinary settlement log position');
-        const args = events.decodeEventLog(name, log.data, log.topics);
-        const canonical = events.encodeEventLog(name, args);
-        if (canonical.data !== log.data.toLowerCase() || canonical.topics.length !== log.topics.length ||
-            canonical.topics.some((word, i) => word !== log.topics[i].toLowerCase())) {
-            throw new Error('Invalid ordinary settlement event encoding');
-        }
-        return { args, index };
+        return decodeReceiptLog(name, logs[0], receipt);
     }
 
     const auction = [[1, toBeHex(BigInt(auctionId), 32)]];
@@ -58,4 +66,42 @@ export function parseOrdinarySettlement(receipt, proof, transactionHash, auction
         tokenId: tokenId.toString(), priceWei: price.toString(), creator: creator.toLowerCase(),
         firstCollector: firstCollector.toLowerCase(), runnerUpAccepted: Boolean(offer)
     };
+}
+
+export function parseOrdinaryResale(receipt, proof, transactionHash, logIndex) {
+    checkReceipt(receipt, proof, transactionHash);
+    // buyResale emits the credit and purchase immediately before the ERC-721
+    // transfer. The receiver can transfer it again in its callback.
+    function at(index, address, name) {
+        const position = '0x' + index.toString(16);
+        const logs = receipt.logs.filter(log => log.logIndex?.toLowerCase() === position);
+        if (logs.length !== 1 || logs[0].address?.toLowerCase() !== address ||
+            logs[0].topics?.[0]?.toLowerCase() !== events.getEvent(name).topicHash) {
+            throw new Error('Missing or ambiguous ordinary resale ' + name);
+        }
+        return decodeReceiptLog(name, logs[0], receipt).args;
+    }
+    const purchase = at(logIndex, proof.coreAddress, 'ResalePurchased');
+    const credit = at(logIndex - 1, proof.coreAddress, 'ResaleCredited');
+    const delivery = at(logIndex + 1, proof.nftAddress, 'Transfer');
+    const { tokenId, version, seller, buyer, price } = purchase;
+    if (!tokenId || !version || !price || seller === buyer || seller === ZeroAddress || buyer === ZeroAddress ||
+        delivery.tokenId !== tokenId || delivery.from !== seller || delivery.to !== buyer ||
+        credit.tokenId !== tokenId || credit.version !== version) throw new Error('Ordinary resale events disagree');
+
+    const weights = [185n, 11n, 2n, 2n];
+    const shares = weights.map(weight => price * weight / 200n);
+    const extras = Number(price - shares.reduce((total, share) => total + share, 0n));
+    const priority = weights.map((w, role) => ({ role, remainder: price * w % 200n }))
+        .sort((a, b) => Number(b.remainder - a.remainder) || a.role - b.role);
+    for (const { role } of priority.slice(0, extras)) shares[role]++;
+    const amounts = [credit.sellerAmount, credit.creatorAmount, credit.protocolAmount, credit.ecosystemAmount];
+    if (amounts.some((amount, i) => amount !== shares[i]) || credit.protocol === ZeroAddress ||
+        credit.ecosystem === ZeroAddress || credit.protocol === credit.ecosystem) throw new Error('Invalid ordinary resale credits');
+
+    return { ...proof, transactionHash, logIndex, tokenId: tokenId.toString(), version: version.toString(),
+        seller: seller.toLowerCase(), buyer: buyer.toLowerCase(), priceWei: price.toString(),
+        protocol: credit.protocol.toLowerCase(), ecosystem: credit.ecosystem.toLowerCase(),
+        sellerWei: credit.sellerAmount.toString(), creatorWei: credit.creatorAmount.toString(),
+        protocolWei: credit.protocolAmount.toString(), ecosystemWei: credit.ecosystemAmount.toString() };
 }

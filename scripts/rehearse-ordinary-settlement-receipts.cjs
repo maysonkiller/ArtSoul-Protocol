@@ -9,7 +9,7 @@ const { artifacts, config } = require('hardhat');
 const { createProvider } = require('hardhat/internal/core/providers/construction');
 
 async function main() {
-    const { readOrdinarySettlement, readOrdinaryToken, readOrdinaryResaleQuote } =
+    const { readOrdinarySettlement, readOrdinaryToken, readOrdinaryResaleQuote, readOrdinaryResalePurchase } =
         await import('../src/indexer/nft-deployment-proof.js');
     const chainId = 84532;
     const hardhat = { ...config.networks.hardhat, chainId, forking: undefined };
@@ -65,8 +65,10 @@ async function main() {
             assert.deepEqual([quote.active, quote.seller, quote.priceWei, quote.version],
                 [true, winner.address.toLowerCase(), String(resalePrice), '1']);
             const purchased = resale.logs.find(log => log.fragment?.name === 'ResalePurchased');
-            assert.deepEqual([purchased.args.seller, purchased.args.buyer, purchased.args.price],
-                [winner.address, buyer.address, resalePrice]);
+            const paid = await readOrdinaryResalePurchase(listener, { ...review, ...location(resale),
+                transactionHash: resale.hash, logIndex: purchased.index });
+            assert.deepEqual([paid.seller, paid.buyer, paid.creator, paid.priceWei, paid.protocol, paid.ecosystem],
+                [winner.address, buyer.address, creator.address, String(resalePrice), roles[0], roles[1]].map(s => s.toLowerCase()));
             const token = await readOrdinaryToken(listener, { ...review, ...location(resale), tokenId: '1' });
             assert.deepEqual([token.nftAddress, token.owner, token.creator, token.firstCollector, token.artworkId],
                 [review.nftAddress, buyer.address.toLowerCase(), creator.address.toLowerCase(), winner.address.toLowerCase(), '1']);

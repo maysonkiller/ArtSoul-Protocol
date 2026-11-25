@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Interface, keccak256 } from 'ethers';
 import EventListener from '../src/indexer/event-listener.js';
-import { readNftDeploymentProof } from '../src/indexer/nft-deployment-proof.js';
+import { readNftDeploymentProof, readOrdinaryResalePurchase } from '../src/indexer/nft-deployment-proof.js';
 
 const CORE = `0x${'a'.repeat(40)}`, NFT = `0x${'b'.repeat(40)}`, OTHER = `0x${'c'.repeat(40)}`;
 const HASH = `0x${'d'.repeat(64)}`, OTHER_HASH = `0x${'e'.repeat(64)}`;
@@ -140,6 +140,63 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
 
 const resaleGetter = new Interface(['function getActiveResale(uint256) view returns (bool, address, uint256, uint256)']);
 const maxUint = 2n ** 256n - 1n;
+
+test('finalized ordinary resales distinguish paid delivery, later transfers and separate sales in one receipt', async () => {
+    const seller = '0x' + '1'.repeat(40), buyer = '0x' + '2'.repeat(40);
+    const protocol = '0x' + '3'.repeat(40), ecosystem = '0x' + '4'.repeat(40);
+    const tx = OTHER_HASH;
+    const events = new Interface([
+        'event ResalePurchased(uint256 indexed tokenId,uint256 version,address indexed seller,address indexed buyer,uint256 price)',
+        'event ResaleCredited(uint256 indexed tokenId,uint256 indexed version,address protocol,address ecosystem,uint256,uint256,uint256,uint256)',
+        'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)'
+    ]);
+    const log = (address, name, args, index) => ({ address, ...events.encodeEventLog(name, args),
+        removed: false, transactionHash: tx, blockHash: HASH, blockNumber: '0x64', transactionIndex: '0x0',
+        logIndex: '0x' + index.toString(16) });
+    const credit = (version, index, last = [46,3,1,0]) =>
+        log(CORE,'ResaleCredited',[7,version,protocol,ecosystem,...last],index);
+    const logs = [credit(1,0), log(CORE,'ResalePurchased',[7,1,seller,buyer,50],1),
+        log(NFT,'Transfer',[seller,buyer,7],2), log(NFT,'Transfer',[buyer,OTHER,7],3),
+        credit(3,4), log(CORE,'ResalePurchased',[7,3,OTHER,buyer,50],5), log(NFT,'Transfer',[OTHER,buyer,7],6)];
+    async function read(logIndex, change = () => {}) {
+        const f = fixture({ coreGetter:'nft' });
+        f.listener.nftAddress = NFT;
+        const block = { number:'0x64',hash:HASH,transactions:[tx] };
+        const receipt = { status:'0x1',transactionHash:tx,blockHash:HASH,blockNumber:'0x64',transactionIndex:'0x0',logs:structuredClone(logs) };
+        f.replacements.set(2,block); f.replacements.set(7,block); f.replacements.set(8,receipt);
+        const state = new Interface(['function tokenToArtwork(uint256) view returns (uint256)',
+            'function tokenCreator(uint256) view returns (address)','function firstCollector(uint256) view returns (address)',
+            'function protocolTreasury() view returns (address)','function ecosystemTreasury() view returns (address)']);
+        for (const [i, [name, result]] of [['tokenToArtwork',8],['tokenCreator',seller],['firstCollector',OTHER],
+            ['protocolTreasury',protocol],['ecosystemTreasury',ecosystem]].entries()) {
+            f.replacements.set(9+i,state.encodeFunctionResult(name,[result]));
+        }
+        f.hook = (_, method, params) => {
+            if (method === 'eth_call') assert.deepEqual(params[1],{blockHash:HASH,requireCanonical:true});
+        };
+        change(receipt, f);
+        return readOrdinaryResalePurchase(f.listener,{...f.options,transactionHash:tx,logIndex});
+    }
+    const first = await read(1), second = await read(5);
+    assert.deepEqual([first.artworkId,first.tokenId,first.version,first.seller,first.buyer,first.creator,first.firstCollector],
+        ['8','7','1',seller,buyer,seller,OTHER]);
+    assert.deepEqual([first.priceWei,first.sellerWei,first.creatorWei,first.protocolWei,first.ecosystemWei],['50','46','3','1','0']);
+    assert.deepEqual([first.protocol,first.ecosystem,second.version,second.seller], [protocol,ecosystem,'3',OTHER]);
+    await assert.rejects(read(3), /ResalePurchased/);
+    await assert.rejects(read(1, r => { r.logs.splice(2,1); }), /Transfer/);
+    await assert.rejects(read(1, r => { r.logs[0] = credit(2,0); }), /events disagree/);
+    await assert.rejects(read(1, r => { r.logs[0] = credit(1,0,[46,3,0,1]); }), /resale credits/);
+    await assert.rejects(read(1, r => { r.logs[2] = log(NFT,'Transfer',[seller,OTHER,7],2); }), /events disagree/);
+    await assert.rejects(read(1, r => { r.logs[0].address = OTHER; }), /ResaleCredited/);
+    await assert.rejects(read(1, r => { r.logs.push(r.logs[1]); }), /ambiguous/);
+    await assert.rejects(read(1, r => { r.logs[1].removed = true; }), /log position/);
+    await assert.rejects(read(1, r => { r.logs[1].data += '00'; }), /encoding/);
+    await assert.rejects(read(1, r => { r.transactionIndex='0x1'; for (const l of r.logs) l.transactionIndex='0x1'; }), /finalized block position/);
+    await assert.rejects(read(1, (_,f) => { f.replacements.set(7,{number:'0x63',hash:HASH}); }), /not finalized/);
+    await assert.rejects(read(1, (_,f) => { f.replacements.set(12,abi.encodeFunctionResult('core',[OTHER])); }), /credits and deployment/);
+    await assert.rejects(read(1, (_,f) => { f.replacements.set(14,{number:'0x64',hash:OTHER_HASH}); }), /canonical block/);
+    await assert.rejects(read(0), /location/);
+});
 const zeroAddress = '0x' + '0'.repeat(40);
 
 test('runner-up terms require a canonical timestamp, finalized pair and matching auction state', async () => {

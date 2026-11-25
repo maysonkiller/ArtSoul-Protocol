@@ -1,11 +1,13 @@
 import { Interface, keccak256 } from 'ethers';
-import { parseOrdinarySettlement } from './ordinary-settlement.js';
+import { parseOrdinaryResale, parseOrdinarySettlement } from './ordinary-settlement.js';
 
 const getters = new Interface([
     'function nftContract() view returns (address)',
     'function nft() view returns (address)',
     'function core() view returns (address)',
     'function totalSupply() view returns (uint256)',
+    'function protocolTreasury() view returns (address)',
+    'function ecosystemTreasury() view returns (address)',
     'function getActiveResale(uint256 tokenId) view returns (bool active, address seller, uint256 price, uint256 version)',
     'function auctions(uint256 id) view returns (uint256 artworkId, uint256 startPrice, uint256 originalEnd, uint256 end, uint256 paymentDeadline, address highestBidder, uint256 price, uint256 deposit, uint8 state, address firstCollector)',
     'function runnerUpOffers(uint256 id) view returns (address bidder, uint256 price, uint256 deadline)'
@@ -142,6 +144,14 @@ async function readOrdinaryAuctionField(send, proof, block, auctionId, method) {
     return result;
 }
 
+function verifyTransactionPosition(receipt, header, transactionHash) {
+    const position = Number(BigInt(receipt.transactionIndex));
+    if (!Number.isSafeInteger(position) || !Array.isArray(header.transactions) ||
+        header.transactions[position]?.toLowerCase?.() !== transactionHash) {
+        throw new Error('Ordinary settlement transaction is absent at its finalized block position');
+    }
+}
+
 // Read one sale on the reviewed replacement pair without modifying the prototype cursor.
 export async function readOrdinarySettlement(listener, options) {
     const tx = options?.transactionHash;
@@ -152,11 +162,7 @@ export async function readOrdinarySettlement(listener, options) {
     return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
         const receipt = await send('eth_getTransactionReceipt', [transactionHash]);
         const sale = parseOrdinarySettlement(receipt, proof, transactionHash, auctionId);
-        const position = Number(BigInt(receipt.transactionIndex));
-        if (!Number.isSafeInteger(position) || !Array.isArray(header.transactions) ||
-            header.transactions[position]?.toLowerCase?.() !== transactionHash) {
-            throw new Error('Ordinary settlement transaction is absent at its finalized block position');
-        }
+        verifyTransactionPosition(receipt, header, transactionHash);
         const auction = await readOrdinaryAuctionField(send, proof, block, auctionId, 'auctions');
         const offer = await readOrdinaryAuctionField(send, proof, block, auctionId, 'runnerUpOffers');
         // A prior losing bid can leave a price in this mapping even when no offer ever opened.
@@ -173,18 +179,44 @@ export async function readOrdinarySettlement(listener, options) {
     }, 'nft');
 }
 
+async function readField(send, address, block, abi, name, args) {
+    const data = abi.encodeFunctionData(name, args);
+    const raw = await send('eth_call', [{ to: address, data }, block]);
+    const result = abi.decodeFunctionResult(name, raw);
+    if (abi.encodeFunctionResult(name, result) !== raw.toLowerCase()) throw new Error('Invalid ordinary token encoding');
+    return result;
+}
+
+export async function readOrdinaryResalePurchase(listener, options) {
+    const tx = options?.transactionHash, logIndex = options?.logIndex;
+    if (!matches(hashPattern, tx) || !nonzero(tx) || !Number.isSafeInteger(logIndex) ||
+        logIndex < 1 || logIndex >= Number.MAX_SAFE_INTEGER) throw new Error('Invalid ordinary resale receipt location');
+    const transactionHash = tx.toLowerCase();
+    return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
+        const receipt = await send('eth_getTransactionReceipt', [transactionHash]);
+        const sale = parseOrdinaryResale(receipt, proof, transactionHash, logIndex);
+        verifyTransactionPosition(receipt, header, transactionHash);
+        const nftField = name => readField(send, proof.nftAddress, block, token, name, [sale.tokenId]);
+        const treasury = name => readField(send, proof.coreAddress, block, getters, name, []);
+        const [[artworkId], [creator], [firstCollector], [protocol], [ecosystem]] = await Promise.all([
+            nftField('tokenToArtwork'), nftField('tokenCreator'), nftField('firstCollector'),
+            treasury('protocolTreasury'), treasury('ecosystemTreasury')
+        ]);
+        if (!artworkId || !nonzero(creator) || !nonzero(firstCollector) ||
+            protocol.toLowerCase() !== sale.protocol || ecosystem.toLowerCase() !== sale.ecosystem) {
+            throw new Error('Ordinary resale credits and deployment disagree');
+        }
+        return { ...sale, artworkId: artworkId.toString(), creator: creator.toLowerCase(),
+            firstCollector: firstCollector.toLowerCase() };
+    }, 'nft');
+}
+
 // Read the same interface a wallet can use, pinned to one reviewed issuer and finalized block.
 export async function readOrdinaryToken(listener, options) {
     const tokenId = options?.tokenId;
     if (!positiveUint256(tokenId)) throw new Error('Invalid ordinary token ID');
     return readAtNftDeployment(listener, options, async (send, proof, block) => {
-        const field = async (name, args) => {
-            const data = token.encodeFunctionData(name, args);
-            const raw = await send('eth_call', [{ to: proof.nftAddress, data }, block]);
-            const result = token.decodeFunctionResult(name, raw);
-            if (token.encodeFunctionResult(name, result) !== raw.toLowerCase()) throw new Error('Invalid ordinary token encoding');
-            return result;
-        };
+        const field = (name, args) => readField(send, proof.nftAddress, block, token, name, args);
         const interfaces = [['0x01ffc9a7', true], ['0xffffffff', false],
             ['0x80ac58cd', true], ['0x5b5e139f', true], ['0x2a55205a', true]];
         await Promise.all(interfaces.map(async ([id, expected]) => {
