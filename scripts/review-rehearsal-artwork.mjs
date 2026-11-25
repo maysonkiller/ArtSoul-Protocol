@@ -20,6 +20,7 @@ const market = new Interface([
 const data = market.encodeFunctionData('registerArtwork', [uri]);
 const openingData = market.encodeFunctionData('createAuction', [1n, rehearsalOpening.reserveWei, Number(rehearsalOpening.hours) * 3600]);
 const chain = '0x14a34';
+const signedRegistration = '0xe6e6f19235b714814c40bb1ab20aebd4ff2408f17c9e8bc4f15e1e7ee391eacf';
 const sha = bytes => createHash('sha256').update(Buffer.from(bytes.slice(2), 'hex')).digest('hex');
 assert.equal(sha(data), fixture.dataSha256, 'Unsigned fixture differs from the browser review');
 assert.equal(sha(openingData), rehearsalOpening.dataSha256, 'Unsigned auction differs from the browser review');
@@ -217,7 +218,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         else if (option === '--plan' || option === '--opening-plan') console.log(JSON.stringify(await getPlan(), null, 2));
         else {
             checkedPayer(review, register);
-            const { url } = await listenForReview(getPlan);
+            const { url } = await listenForReview(getPlan, {
+                loadRegistration: option === '--serve-opening'
+                    ? () => verifyArtworkRegistration(review, register, signedRegistration, providers)
+                    : undefined
+            });
             console.log('Open the private Base Sepolia rehearsal page on this computer:\n' + url);
         }
     } catch (error) {

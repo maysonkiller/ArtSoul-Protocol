@@ -1,4 +1,5 @@
 import { React } from '../../entries/react-runtime.js';
+import { WalletNftMedia } from './wallet-nft-media.jsx';
 
 // B36: Wallet presentation only. No background reads, transfers or listings.
 const OPTIONS = [
@@ -43,11 +44,11 @@ function NetworkBadge({ network }) {
 }
 function NftCard({ item }) {
   return <article className="wallet-asset-card">
-    <div className="wallet-asset-art">
+    <WalletNftMedia item={item} className="wallet-asset-art">
       <span className="wallet-asset-placeholder" aria-hidden="true">NFT</span>
       {item.imageUrl && <img src={item.imageUrl} alt="" loading="lazy" decoding="async"
         referrerPolicy="no-referrer" onError={e => { e.currentTarget.hidden = true; }}/>}
-    </div>
+    </WalletNftMedia>
     <div className="wallet-asset-copy">
       <div className="wallet-nft-title-row">
         <h4 title={item.name || item.tokenId}>{item.name || ('NFT #' + item.tokenId)}</h4>

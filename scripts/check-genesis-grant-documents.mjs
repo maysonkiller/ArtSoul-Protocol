@@ -27,12 +27,19 @@ async function privateFile(path, limit) {
     }
 }
 
+export async function readLocalGrantJson(file) {
+    const bytes = await privateFile(localPath(file), reviewLimit);
+    try {
+        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    } catch {
+        throw new Error('The reviewed Genesis batch is invalid.');
+    }
+}
+
 export async function checkGenesisGrantDocuments(algorithm, reviewFile, directory) {
     if (algorithm !== 'keccak256' && algorithm !== 'sha256') throw new Error('Select keccak256 or sha256.');
-    const reviewBytes = await privateFile(localPath(reviewFile), reviewLimit);
-    let review;
+    const review = await readLocalGrantJson(reviewFile);
     try {
-        review = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(reviewBytes));
         prepareGenesisGrants(review);
     } catch {
         // Validation exceptions can quote the submitted addresses or document content.

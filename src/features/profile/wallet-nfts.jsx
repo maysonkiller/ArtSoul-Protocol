@@ -1,6 +1,7 @@
 import { React } from '../../entries/react-runtime.js';
 import { createPortal } from 'react-dom';
 import { MultiChainWalletAssets } from './multichain-wallet-assets.jsx';
+import { WalletNftMedia } from './wallet-nft-media.jsx';
 
 const currentWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
 const empty = () => ({ status: 'idle', page: null, index: 0, message: '' });
@@ -26,10 +27,10 @@ function NftPreview({ item }) {
   const [loaded, setLoaded] = React.useState(null);
   const [failed, setFailed] = React.useState(null);
   const available = item.imageUrl && failed !== item.imageUrl;
-  return <div className="wallet-nft-image">
+  return <WalletNftMedia item={item} className="wallet-nft-image">
     {(!available || loaded !== item.imageUrl) && <span>{available ? 'Loading preview…' : 'Preview unavailable'}</span>}
     {available && <img key={item.imageUrl} src={item.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onLoad={() => setLoaded(item.imageUrl)} onError={() => setFailed(item.imageUrl)} />}
-  </div>;
+  </WalletNftMedia>;
 }
 
 function NftDetails({ item, quote, onClose }) {

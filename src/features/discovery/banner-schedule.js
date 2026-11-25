@@ -19,6 +19,15 @@ function exactFields(record, expected, context) {
     requireRule(Object.keys(record).length === expected.length && expected.every(key => Object.hasOwn(record, key)), context + ' has missing or unknown fields');
 }
 
+// Historic records carry only the private conflict group. New records can also
+// retain the independently reviewed name and relationship intended for visitors.
+function publicSponsorFields(record) {
+    if (!Object.hasOwn(record, 'sponsorName') && !Object.hasOwn(record, 'relationship')) return [];
+    nonempty(record.sponsorName, 'public sponsor name');
+    nonempty(record.relationship, 'public sponsor relationship');
+    return ['sponsorName', 'relationship'];
+}
+
 function id(value, field) {
     requireRule(typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,79}$/.test(value), 'Invalid ' + field);
 }
@@ -47,7 +56,7 @@ function publicLink(value, field) {
 
 function validatePlacement(row, asOf) {
     requireRule(kinds.includes(row?.kind), 'Unknown placement kind');
-    exactFields(row, [...common, ...fields[row.kind]], row.kind + ' terms');
+    exactFields(row, [...common, ...fields[row.kind], ...(row.kind === 'auction' ? [] : publicSponsorFields(row))], row.kind + ' terms');
     id(row.id, 'placement ID');
     id(row.proposedBy, 'proposer group');
     id(row.approvedBy, 'reviewer group');
@@ -107,7 +116,8 @@ export function readBannerSchedule(schedule, asOfUtc) {
     const placements = recordBy(schedule.placements, 'id');
     const sponsors = schedule.placements.filter(row => row.kind !== 'auction');
     for (const award of schedule.awards) {
-        exactFields(award, awardFields, 'award');
+        requireRule(award && typeof award === 'object', 'award must be an object');
+        exactFields(award, [...awardFields, ...publicSponsorFields(award)], 'award');
         const placement = placements.get(award.placementId);
         requireRule(placement?.kind === 'auction', 'Award must identify a published auction');
         id(award.sponsorGroup, 'awarded sponsor group');

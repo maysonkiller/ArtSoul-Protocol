@@ -123,6 +123,8 @@ node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair
 
 The first command prints the unsigned plan. The second prints a random URL usable only on the same computer. The page checks the exact origin and refreshes both provider readings when the creator selects **Review in wallet**. The wallet checks its account, chain, current nonce, both runtimes and the pending result of `createAuction(1, 1000000000000000, 86400)`. The request closes once the Core has any auction history, including an expired or completed first auction. A second operation cannot be prepared as a retry. Retain the signed transaction hash to verify the actual auction ID, work, reserve and deadline after inclusion. The unsigned preflight starts no countdown.
 
+**View verified work registration** opens a wallet-free page on this private server. Each visit reads the already signed registration from the two fixed RPC providers, verifies the reviewed pair and the public catalog recovery reader's result, and displays the registered metadata, creator, block, transaction and event index. The auction, mint and floor fields describe the registration block. The URL accepts no alternate deployment, receipt or RPC endpoint.
+
 ## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.

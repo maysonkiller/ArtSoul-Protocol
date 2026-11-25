@@ -21,3 +21,29 @@ export async function publicGenesisSerial(wallet) {
   });
   return Number.isInteger(serial) && serial >= 0 && serial < 10000 ? serial : null;
 }
+
+export async function walletGenesisFrames(page, wallet) {
+  const deployment = profileGenesisDeployment();
+  if (!deployment || page?.wallet !== wallet || !Array.isArray(page.items) || page.items.length > 12) return page;
+  const basePage = page.chainId === 8453 && page.network === 'Base' && page.view === undefined;
+  function serialFor(item) {
+    const onBase = basePage ? item.chainId === undefined && item.network === undefined :
+      page.view === 'nfts' && item.network === 'base-mainnet' && item.chainId === 8453;
+    if (!onBase || item.contractAddress !== deployment.p_genesis || item.tokenType !== 'ERC721' || item.quantity !== '1') return null;
+    return typeof item.tokenId === 'string' && /^(0|[1-9]\d{0,3})$/.test(item.tokenId) ? Number(item.tokenId) : null;
+  }
+  const serials = [...new Set(page.items.map(serialFor).filter(id => id !== null))];
+  if (!serials.length) return page;
+  try {
+    const rows = await supabaseRest('rpc/read_wallet_genesis_frames', { method: 'POST',
+      body: { ...deployment, p_wallet: wallet, p_serials: serials }, signal: AbortSignal.timeout(2000) });
+    if (!Array.isArray(rows) || rows.length > serials.length ||
+        rows.some(row => !serials.includes(row?.token_id) || typeof row.border_text !== 'boolean')) return page;
+    const verified = new Map(rows.map(row => [row.token_id, row.border_text]));
+    if (!verified.size || verified.size !== rows.length) return page;
+    return { ...page, items: page.items.map(item => {
+      const id = serialFor(item);
+      return verified.has(id) ? { ...item, aura_kind: 'genesis', aura_border_text: verified.get(id) } : item;
+    }) };
+  } catch { return page; }
+}

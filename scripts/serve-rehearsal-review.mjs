@@ -7,6 +7,7 @@ import { getAddress, keccak256, toQuantity } from 'ethers';
 import { prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
 import { expectedRehearsalPairRegister, loadReviewedPair } from './prepare-rehearsal-core.mjs';
 import { prepareRehearsalSafes, rehearsalSafeRelease as release } from './prepare-rehearsal-safes.mjs';
+import { registrationPage } from './rehearsal-review/registration.mjs';
 import { readRpc, requireIndependentProviders, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
 const asset = name => new URL('./rehearsal-review/' + name, import.meta.url);
@@ -144,12 +145,12 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, tre
     return { ...base, operation, target, deployments, codeChecks, nonce, dataHash, data: tx.data, dataSha256: sha256Hex(tx.data) };
 }
 
-export async function listenForReview(loadPlan) {
+export async function listenForReview(loadPlan, { loadRegistration } = {}) {
     const token = randomBytes(24).toString('hex');
     const prefix = '/' + token + '/';
     const files = new Map([['', ['index.html', 'text/html']], ['client.mjs', ['client.mjs', 'text/javascript']],
         ['review.css', ['review.css', 'text/css']]]);
-    let inflight;
+    let inflight, registrationInFlight;
     const server = createServer(async (req, res) => {
         const host = '127.0.0.1:' + server.address().port;
         res.setHeader('Cache-Control', 'no-store');
@@ -169,9 +170,18 @@ export async function listenForReview(loadPlan) {
                 inflight ??= Promise.resolve().then(loadPlan).finally(() => { inflight = undefined; });
                 const result = await inflight;
                 res.writeHead(200, { 'Content-Type': 'application/json' }).end(req.method === 'HEAD' ? undefined : JSON.stringify(result));
+            } else if (name === 'registration' && loadRegistration) {
+                registrationInFlight ??= Promise.resolve().then(loadRegistration).finally(() => { registrationInFlight = undefined; });
+                const html = registrationPage(await registrationInFlight);
+                res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(req.method === 'HEAD' ? undefined : html);
             } else if (files.has(name)) {
                 const [file, mime] = files.get(name);
-                const content = await readFile(asset(file));
+                let content = await readFile(asset(file));
+                if (name === '' && loadRegistration) {
+                    content = content.toString('utf8').replace('<!-- verified-registration -->',
+                        '<p><a href="./registration">View verified work registration</a></p>');
+                }
                 res.writeHead(200, { 'Content-Type': mime + '; charset=utf-8' }).end(req.method === 'HEAD' ? undefined : content);
             } else {
                 res.writeHead(404).end();

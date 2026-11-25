@@ -8719,6 +8719,8 @@ body:is(.classic, .future) .site-theme-toggle-glyph {
 }
 body:is(.classic, .future) .site-theme-toggle-classic { background: var(--c-surface); }
 body:is(.classic, .future) .site-theme-toggle-future { background: var(--c-accent); }
+body:is(.classic, .future)[data-as-season="winter"] { --seasonal-control-ink: #d6f2ff; }
+body:is(.classic, .future)[data-as-season="newyear"] { --seasonal-control-ink: #f5ddb5; }
 body.classic .site-theme-toggle[data-current-theme="classic"] { border-color: var(--c-accent); }
 body.future .site-theme-toggle[data-current-theme="future"] { border-color: var(--c-accent-2); }
 body:is(.classic, .future) .site-theme-toggle:focus-visible {
@@ -10444,6 +10446,92 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
 /* Owner follow-up: shrink the actual desktop account plaque, not only the
    copy icon spacing. The dropdown follows the same variable plaque width.
    Mobile intentionally retains its 44px avatar and separate touch popover. */
+/* Both artwork renderers share this mobile layout. Reserve the complete first
+   row for the cover and keep all playback actions in document flow below it. */
+@media (max-width: 768px), (pointer: coarse) and (max-width: 1000px) {
+    body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        background: var(--c-surface);
+        --preview-touch-size: 44px;
+        --preview-ratio: 4 / 3;
+    }
+    .artsoul-card-preview:has(.artsoul-card-media-controls)::before {
+        content: '';
+        grid-area: 1 / 1 / 2 / -1;
+        width: 100%;
+        aspect-ratio: var(--preview-ratio);
+        background: var(--c-bg);
+    }
+    body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) :is(.artsoul-card-media, .artsoul-card-audio) {
+        display: contents;
+    }
+    .artsoul-card-preview:has(.artsoul-card-media-controls) :is(.artsoul-card-media-object, .artsoul-video-poster, .artsoul-media-loading) {
+        position: absolute;
+        grid-area: 1 / 1 / 2 / -1;
+        inset: 0;
+    }
+    body:is(.classic, .future) .artsoul-card-preview .artsoul-card-media-video :is(video, .artsoul-video-poster) {
+        object-fit: contain;
+    }
+    .artsoul-card-preview .artsoul-card-audio-avatar {
+        grid-area: 1 / 1 / 2 / -1;
+        place-self: center;
+    }
+    body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) :is(.artsoul-card-media-badge, .artsoul-card-audio-label, .artsoul-card-media-controls, .saved-button-overlay) {
+        position: relative;
+        inset: auto !important;
+        grid-row: 2;
+        margin: 0;
+    }
+    body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+        grid-column: 1;
+        padding: 3px 4px !important;
+        margin-inline-start: 2px;
+    }
+    body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) .artsoul-card-media-controls {
+        grid-column: 2;
+        justify-self: center;
+        padding: 0;
+        margin-block: 2px;
+        gap: 2px;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        opacity: 1;
+        pointer-events: auto;
+    }
+    body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) .saved-button-overlay {
+        grid-column: 3;
+        margin-inline-end: 2px;
+    }
+    body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) :is(.artsoul-media-toggle, .artsoul-media-mute, .saved-button-overlay) {
+        width: var(--preview-touch-size);
+        height: var(--preview-touch-size);
+        min-width: var(--preview-touch-size);
+        min-height: var(--preview-touch-size);
+        flex-basis: var(--preview-touch-size);
+    }
+    @container (max-width: 250px) {
+        body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) { --preview-ratio: 1; }
+    }
+    @container (max-width: 185px) {
+        body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+            padding-inline: 0 !important;
+            letter-spacing: normal;
+        }
+    }
+    @container (max-width: 169px) {
+        body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) { --preview-touch-size: 36px; }
+    }
+    @container (max-width: 145px) {
+        body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) .artsoul-card-media-controls {
+            grid-area: 3 / 1 / 4 / -1;
+        }
+    }
+}
+
 @media (min-width: 769px) {
     body:is(.classic, .future) .site-header .site-header-actions #navButtons,
     body:is(.classic, .future) .site-header #navButtons .avatar-dropdown-container {
