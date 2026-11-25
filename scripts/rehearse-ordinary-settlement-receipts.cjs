@@ -11,6 +11,7 @@ const { createProvider } = require('hardhat/internal/core/providers/construction
 async function main() {
     const { readOrdinarySettlement, readOrdinaryToken, readOrdinaryResaleQuote, readOrdinaryResalePurchase } =
         await import('../src/indexer/nft-deployment-proof.js');
+    const { readBidExtension } = await import('./review-rehearsal-late-bid.mjs');
     const chainId = 84532;
     const hardhat = { ...config.networks.hardhat, chainId, forking: undefined };
     const rpc = await createProvider({ ...config, networks: { hardhat } }, 'hardhat', artifacts);
@@ -39,7 +40,19 @@ async function main() {
             const price = ethers.parseEther(index ? '0.002' : '0.001');
             await mine(market.connect(creator).registerArtwork('ipfs://local-pair-' + index));
             await mine(market.connect(creator).createAuction(1, price, 86400));
-            await mine(market.connect(winner).placeBid(1, price, { value: await market.requiredDepositForBid(price) }));
+            const deadline = Number((await market.auctions(1)).end);
+            if (index === 0) await rpc.send('evm_setNextBlockTimestamp', [deadline-600]);
+            const bid = await mine(market.connect(winner).placeBid(1, price, { value: await market.requiredDepositForBid(price) }));
+            if (index === 0) {
+                const [tx, receipt, header] = await Promise.all([rpc.send('eth_getTransactionByHash',[bid.hash]),
+                    rpc.send('eth_getTransactionReceipt',[bid.hash]), rpc.send('eth_getBlockByHash',[bid.blockHash,false])]);
+                const terms = {core:market.target, bidder:winner.address, deadline};
+                const extension = readBidExtension(tx,receipt,header,bid.hash,terms);
+                assert.equal(extension.deadlineAfterThisBid, new Date((deadline+600)*1000).toISOString());
+                assert.throws(() => readBidExtension(tx,{...receipt,logs:receipt.logs.slice(0,1)},header,bid.hash,terms));
+                assert.throws(() => readBidExtension({...tx,value:'0x0'},receipt,header,bid.hash,terms));
+                console.log('PASS: real local first-bid and ten-minute extension receipt.');
+            }
             pairs.push({ market, nft, winner, buyer: index ? first : second, price, review, listener });
         }
         assert.notEqual(pairs[0].review.coreAddress, pairs[1].review.coreAddress);

@@ -25,7 +25,7 @@ async function serverForCards() {
         const galleryUrl = 'https://artsoulprotocol.com/gallery';
         const response = await fetch(galleryUrl, {signal:AbortSignal.timeout(15000)});
         assert(response.ok, 'Live gallery returned ' + response.status);
-        const [, sheet] = (await response.text()).match(/href="(\/unified-styles\.css(?:\?[^"]*)?)"/) || [];
+        const [, sheet] = (await response.text()).match(/href="(\/(?:assets\/unified-styles-[\w-]+\.css|unified-styles\.css(?:\?v=\d+)?))"/) || [];
         assert(sheet, 'Public gallery should link its shared stylesheet');
         const url = new URL(sheet, galleryUrl);
         const css = await fetch(url, {signal:AbortSignal.timeout(15000)});
