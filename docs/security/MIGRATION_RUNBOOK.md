@@ -168,6 +168,12 @@ Verify against the database before applying or re-applying it.
 
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.
 
+### November 25 notification counter baseline
+
+From 19:21:54 to 19:51:54 UTC, Supabase logged 487 API requests with zero HTTP 4xx or 5xx responses. All 60 calls to `read_notification_summary` exceeded one second of upstream service time. The median was 1,246 ms and p95 was 1,286 ms. The hosted function still matched the November 16 definition. The service role's cumulative PostgreSQL statement statistics showed 4,543 calls averaging 740 ms, with zero JIT functions and zero temporary blocks. The cumulative figures cover a different window from the gateway sample.
+
+On isolated PostgreSQL 17.10 the candidate and its function-only rollback passed all 12 behavioral checks. Nine interleaved measurements for a recipient with one historical notice and 49 reminders gave medians of 37.46 ms with the candidate and 37.35 ms with an additional short-page exit. The evidence did not justify adding that exit. The public baseline and these local measurements do not establish a hosted speedup. After an authorized rollout, compare the same workload groups and verify unread counts and payment reminder deadlines.
+
 ### Fresh indexer bootstrap repair (2026-10-24)
 
 Running the ordered 001–015 sequence on disposable PostgreSQL reproduced an
