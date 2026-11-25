@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Base Sepolia rehearsal · ArtSoul</title>
+  <link rel="stylesheet" href="./review.css">
+  <script type="module" src="./client.mjs"></script>
+</head>
+<body><main>
+  <p>ArtSoul Protocol · Local review</p>
+  <h1>Base Sepolia rehearsal</h1>
+  <p id="status" role="status" aria-live="polite">Verifying the rehearsal with two read-only RPC providers…</p>
+  <section id="review" hidden>
+    <h2 id="operation"></h2>
+    <dl id="fields"></dl>
+    <details><summary>Transaction data</summary><pre id="data"></pre></details>
+    <div class="actions">
+      <label>Extension wallet <select id="wallet"></select></label>
+      <button id="connect" type="button" disabled>Connect selected wallet</button>
+      <button id="submit" type="button" disabled>Review in wallet</button>
+    </div>
+    <p>Check the network, sender, transaction and test gas estimate in your wallet before confirming.</p>
+  </section>
+  <button id="refresh" type="button">Refresh chain evidence</button>
+</main></body>
+</html>
