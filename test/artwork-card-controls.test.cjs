@@ -45,13 +45,14 @@ class FakeElement {
 
 function loadDomCardRuntime() {
     const mediaElements = [];
+    const events = new EventTarget();
     const document = {
         createElement: tag => new FakeElement(tag, mediaElements),
         querySelectorAll: () => mediaElements
     };
     const window = {
         ArtSoulSecurity: { isValidStorageUrl: () => true },
-        addEventListener: () => {}
+        addEventListener: events.addEventListener.bind(events)
     };
     // The page loads the artwork URL owner before the card script; the harness
   // must do the same or the card falls back to a different URL shape.
@@ -60,7 +61,7 @@ function loadDomCardRuntime() {
     { window, document }
   );
   vm.runInNewContext(source, { window, document });
-    return { api: window.ArtSoulArtworkCard, mediaElements, window };
+    return { api: window.ArtSoulArtworkCard, mediaElements, window, document, events };
 }
 
 test('both card renderers disclose the confirmed transaction while projection synchronization is pending', () => {
@@ -385,9 +386,34 @@ test('DOM cards render two isolated overlay buttons and keep only one media play
 
     audioControls.children[1].dispatch('click');
     assert.equal(mediaElements[1].muted, true);
+    audioControls.children[0].dispatch('click');
+    assert.equal(mediaElements[1].paused, true, 'a second Play/Pause click pauses the preview');
+    audioControls.children[1].dispatch('click');
+    assert.equal(mediaElements[1].muted, false);
+    assert.equal(mediaElements[1].paused, true, 'unmuting alone never starts a preview');
     const dragEvent = audioControls.dispatch('dragstart');
     assert.equal(dragEvent.defaultPrevented, true);
     assert.equal(dragEvent.propagationStopped, true);
+});
+
+test('hidden and departing pages pause only card previews and never resume them on return', () => {
+    const { document, events } = loadDomCardRuntime();
+    const makeMedia = paused => ({ paused, calls: 0, pause() { this.paused = true; this.calls++; } });
+    const video = makeMedia(false), audio = makeMedia(false), idle = makeMedia(true), fullPlayer = makeMedia(false);
+    document.querySelectorAll = selector => {
+        assert.equal(selector, '.artsoul-card-media video, .artsoul-card-audio-element');
+        return [video, audio, idle];
+    };
+    document.hidden = true;
+    events.dispatchEvent(new Event('visibilitychange'));
+    assert.deepEqual([video.calls, audio.calls, idle.calls, fullPlayer.calls], [1, 1, 0, 0]);
+    document.hidden = false;
+    events.dispatchEvent(new Event('visibilitychange'));
+    events.dispatchEvent(new Event('scroll'));
+    assert.deepEqual([video.paused, audio.paused, fullPlayer.paused], [true, true, false]);
+    audio.paused = false;
+    events.dispatchEvent(new Event('pagehide'));
+    assert.deepEqual([video.calls, audio.calls, idle.calls], [1, 2, 0]);
 });
 
 test('cards omit unsafe media and remove themselves when media loading fails', () => {
