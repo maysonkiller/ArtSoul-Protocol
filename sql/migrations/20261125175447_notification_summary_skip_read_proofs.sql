@@ -21,23 +21,40 @@ BEGIN
     SELECT revision::TEXT INTO chain_revision FROM public.artwork_media_chain_revisions WHERE chain_id=84532 FOR SHARE;
     IF chain_revision IS NULL THEN RAISE EXCEPTION 'Notification revision unavailable' USING ERRCODE='55000'; END IF;
     SELECT * INTO prefs FROM public.auction_notification_preferences WHERE wallet_address=p_wallet AND core_address=p_core;
-    -- Apply unread/preferences before any bound. Singleton proof calls preserve
-    -- the canonical source/recipient rules without the history page's 21-row cap.
-    SELECT count(*)::INTEGER INTO auction_count FROM (
-      SELECT o.id FROM public.outbox_events o
-      WHERE o.event_type='notification' AND lower(o.payload->>'recipient')=p_wallet
-        AND ((o.payload->>'type'='auction_created' AND coalesce(prefs.auction_created,true))
-          OR (o.payload->>'type'='outbid' AND coalesce(prefs.outbid,true))
-          OR (p_lifecycle AND coalesce(prefs.lifecycle,true) AND o.payload->>'type' IN
-            ('bid_received','auction_won','auction_ended','purchase_completed','sale_completed','payment_missed','sale_unpaid','resale_purchased','resale_sold')))
-        -- A read or dismissed row contributes zero even when its chain proof is valid.
-        -- CASE prevents the planner from evaluating that expensive proof before the read check.
-        AND CASE WHEN EXISTS (SELECT 1 FROM public.auction_notification_reads r
-          WHERE r.wallet_address=p_wallet AND r.core_address=p_core AND r.outbox_id=o.id AND (r.read OR r.dismissed_at IS NOT NULL))
-        THEN false ELSE EXISTS (SELECT 1 FROM public.canonical_auction_notifications_v2(p_wallet,p_core,NULL,ARRAY[o.id],
-          coalesce(prefs.auction_created,true),coalesce(prefs.outbid,true),p_lifecycle AND coalesce(prefs.lifecycle,true)) n WHERE n.id=o.id) END
-      LIMIT 100
-    ) unread;
+    -- Each proof helper returns at most 21 rows. A page of 20 gives it room
+    -- for every candidate; unproven or already-seen events cannot fill the badge.
+    WITH RECURSIVE pages(before_id, proven) AS (
+      VALUES (NULL::BIGINT, 0)
+      UNION ALL
+      SELECT batch.last_id, page.proven + (
+        SELECT count(DISTINCT n.id)::INTEGER
+        FROM public.canonical_auction_notifications_v2(
+          p_wallet,p_core,NULL,coalesce(batch.ids,'{}'::BIGINT[]),
+          coalesce(prefs.auction_created,true),coalesce(prefs.outbid,true),
+          p_lifecycle AND coalesce(prefs.lifecycle,true)) n
+        WHERE n.id=ANY(batch.ids)
+      )
+      FROM pages page
+      CROSS JOIN LATERAL (
+        SELECT min(candidate.id) AS last_id,array_agg(candidate.id) AS ids
+        FROM (
+          SELECT o.id FROM public.outbox_events o
+          WHERE o.event_type='notification' AND lower(o.payload->>'recipient')=p_wallet
+            AND o.id<=coalesce(page.before_id,9223372036854775807::BIGINT)
+            AND o.id IS DISTINCT FROM page.before_id
+            AND ((o.payload->>'type'='auction_created' AND coalesce(prefs.auction_created,true))
+              OR (o.payload->>'type'='outbid' AND coalesce(prefs.outbid,true))
+              OR (p_lifecycle AND coalesce(prefs.lifecycle,true) AND o.payload->>'type' IN
+                ('bid_received','auction_won','auction_ended','purchase_completed','sale_completed','payment_missed','sale_unpaid','resale_purchased','resale_sold')))
+            AND NOT EXISTS (SELECT 1 FROM public.auction_notification_reads r
+              WHERE r.wallet_address=p_wallet AND r.core_address=p_core AND r.outbox_id=o.id
+                AND (r.read OR r.dismissed_at IS NOT NULL))
+          ORDER BY o.id DESC LIMIT 20
+        ) candidate
+      ) batch
+      WHERE page.proven<100 AND batch.last_id IS NOT NULL
+    )
+    SELECT least(100,max(proven)) INTO auction_count FROM pages;
     IF p_reminders AND coalesce(prefs.reminders,true) THEN
       reminders_available:=public.auction_reminders_available(p_core,task_now);
       IF reminders_available THEN

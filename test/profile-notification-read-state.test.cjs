@@ -192,5 +192,6 @@ test('profile notices support existing private inbox operations (PostgreSQL 17)'
         const result = service(`SELECT public.read_notification_summary('${A}','${core}',true,true,false);`);
         assert.equal(result.auctionCount, 1);
         assert.deepEqual(json('SELECT jsonb_agg(id ORDER BY id) FROM public.fixture_proof_calls;'), [3, 4]);
+        sql(fs.readFileSync(path.join(ROOT,'test/fixtures/notification-summary-proof-pages.sql'),'utf8'));
     });
 });
