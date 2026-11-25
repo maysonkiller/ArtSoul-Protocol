@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Before the first mainnet smoke registration, check what an anonymous site visitor can see.
-// node scripts/verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block>
+// node scripts/verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block> [--database <reviewed-pair.json>]
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
+import { readReviewedOrdinaryPair } from './read-reviewed-ordinary-pair.mjs';
 
 const mainnet = 8453;
 const catalogTables = ['v41_artworks', 'v41_auctions', 'v41_bids', 'v41_settlements',
@@ -21,7 +22,8 @@ const emptyIndexerTables = [
     'artsoul_private.ordinary_settlements', 'artsoul_private.ordinary_runner_up_observations'
 ];
 
-export async function verifyMainnetProjectionRows(client, expectedCore, deploymentBlock) {
+export async function verifyMainnetProjectionRows(client, pair, deploymentBlock) {
+    assert.equal(pair.chainId, mainnet, 'Supply a reviewed Base mainnet pair for the database check');
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     try {
         // A role subject to a row policy must fail rather than certify an apparently empty table.
@@ -30,19 +32,24 @@ export async function verifyMainnetProjectionRows(client, expectedCore, deployme
         const {rows: [state]} = await client.query(`
             SELECT count(*) = 1 AND count(*) FILTER (WHERE chain_id = 8453 AND lower(contract_address) = lower($1)
                 AND last_confirmed_block >= $2 AND last_indexed_block >= last_confirmed_block) = 1 AS valid
-            FROM public.indexer_state`, [expectedCore, deploymentBlock]);
+            FROM public.indexer_state`, [pair.coreAddress, deploymentBlock]);
         assert.equal(state.valid, true, 'The database cursor must identify the same reviewed Base mainnet deployment');
         const conditions = emptyIndexerTables.map(table => [table, 'true']);
-        conditions.push(['public.contract_events', 'chain_id IS DISTINCT FROM 8453 OR block_number < $1'],
+        conditions.push(['public.contract_events', `chain_id IS DISTINCT FROM 8453 OR block_number < $1
+                OR contract_address IS NULL OR contract_address NOT IN (lower($2), lower($3))
+                OR artwork_id IS NOT NULL OR event_data ?| ARRAY['artworkId', 'auctionId', 'tokenId']`],
             // These workers claim by status across all chains. A retry must not replay earlier product work.
             ['public.outbox_events', "processing_status IN ('pending', 'processing', 'failed')"],
             ['public.event_queue_spillover', "status IN ('pending', 'processing')"],
             ['public.v41_public_metrics', 'chain_id IS DISTINCT FROM 8453 OR artists_onboarded <> 0 OR auctions_completed <> 0 OR unique_collectors <> 0 OR settled_volume_wei <> 0'],
-            ['artsoul_private.ordinary_issuers', 'chain_id IS DISTINCT FROM 8453 OR core_address IS DISTINCT FROM lower($2)']);
+            ['artsoul_private.ordinary_issuers', `chain_id IS DISTINCT FROM 8453 OR core_address IS DISTINCT FROM lower($2)
+                OR nft_address IS DISTINCT FROM lower($3) OR core_code_hash IS DISTINCT FROM lower($4)
+                OR nft_code_hash IS DISTINCT FROM lower($5)`]);
         // Identifiers and predicates above are fixed here. Addresses and blocks are bound values.
         const sql = conditions.map(([table, where]) =>
             `SELECT '${table}' AS relation WHERE EXISTS (SELECT 1 FROM ${table} WHERE ${where})`).join(' UNION ALL ');
-        const {rows} = await client.query(sql, [deploymentBlock, expectedCore]);
+        const {rows} = await client.query(sql, [deploymentBlock, pair.coreAddress, pair.nftAddress,
+            pair.expectedCoreCodeHash, pair.expectedNftCodeHash]);
         assert.equal(rows.length, 0, 'Residual indexer data in ' + rows.map(row => row.relation).join(', '));
         return conditions.length;
     } finally {
@@ -107,17 +114,27 @@ export async function verifyMainnetCatalog(site, expectedCore, deploymentBlock) 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     try {
         const [site, core, block, ...extra] = process.argv.slice(2);
-        const withDatabase = extra.length === 1 && extra[0] === '--database';
+        const withDatabase = extra.length === 2 && extra[0] === '--database' && Boolean(extra[1]);
         assert.ok(site && core && /^[1-9]\d*$/.test(block) && (!extra.length || withDatabase),
-            'Usage: verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block> [--database]');
-        if (withDatabase) assert.ok(process.env.ARTSOUL_CUTOVER_DATABASE_URL, 'Supply ARTSOUL_CUTOVER_DATABASE_URL for --database');
+            'Usage: verify-mainnet-catalog.mjs <site-origin> <reviewed-core-address> <deployment-block> [--database <reviewed-pair.json>]');
+        let pair;
+        if (withDatabase) {
+            try {
+                pair = await readReviewedOrdinaryPair(extra[1]);
+            } catch {
+                throw new Error('Could not read the reviewed pair. Check its path, addresses and runtime hashes.');
+            }
+            assert.ok(pair.chainId === mainnet && pair.coreAddress.toLowerCase() === core.toLowerCase(),
+                'The reviewed pair must identify the supplied Base mainnet Core');
+            assert.ok(process.env.ARTSOUL_CUTOVER_DATABASE_URL, 'Supply ARTSOUL_CUTOVER_DATABASE_URL for --database');
+        }
         const checked = await verifyMainnetCatalog(site, core, Number(block));
         if (withDatabase) {
             const {Client} = (await import('pg')).default;
             const client = new Client({connectionString: process.env.ARTSOUL_CUTOVER_DATABASE_URL, connectionTimeoutMillis: 10000});
             try {
                 await client.connect();
-                checked.databaseRelationsChecked = await verifyMainnetProjectionRows(client, core, Number(block));
+                checked.databaseRelationsChecked = await verifyMainnetProjectionRows(client, pair, Number(block));
             } catch (error) {
                 if (error instanceof assert.AssertionError) throw error;
                 throw new Error('Could not verify the cutover database. Check access, schema, and unfiltered read permissions.');

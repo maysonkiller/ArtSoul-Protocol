@@ -41,4 +41,18 @@ test('the custody register and compact intake file identify the same reviewed pa
             env: { ...process.env, ARTSOUL_ORDINARY_RPC_URL: 'http://127.0.0.1:1', ARTSOUL_ORDINARY_DATABASE_URL: 'unused' } }),
         error => error.code === 1 && error.stderr.includes('Ambiguous ordinary pair') && !error.stderr.includes('private-fixture'));
     }
+
+    // Validate the launch register before contacting the candidate site or its database.
+    const cutover = (core, ...args) => promisify(execFile)(process.execPath, [
+        'scripts/verify-mainnet-catalog.mjs', 'http://127.0.0.1:1', core, '160', '--database', ...args
+    ], { windowsHide: true, timeout: 10_000, env: { ...process.env, ARTSOUL_CUTOVER_DATABASE_URL: '' } });
+    await assert.rejects(cutover(compact.coreAddress), error => error.stderr.includes('Usage:'));
+    await read(register);
+    await assert.rejects(cutover(compact.coreAddress, file), error => error.stderr.includes('supplied Base mainnet Core'));
+    await read({ ...register, chainId: 8453 });
+    await assert.rejects(cutover(compact.nftAddress, file), error => error.stderr.includes('supplied Base mainnet Core'));
+    await assert.rejects(cutover(compact.coreAddress, file), error => error.stderr.includes('Supply ARTSOUL_CUTOVER_DATABASE_URL'));
+    await writeFile(file, 'private-fixture');
+    await assert.rejects(cutover(compact.coreAddress, file), error =>
+        error.stderr.includes('Could not read the reviewed pair') && !error.stderr.includes('private-fixture'));
 });
