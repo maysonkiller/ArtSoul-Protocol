@@ -67,7 +67,7 @@ for (const key of [...pages, 'supabase-client.js']) visitStaticEntry(key);
 if (sdkKeys.some(key => staticEntries.has(key))) {
     throw new Error('A browser SDK was moved onto the initial page load path.');
 }
-const browserLicenses = await readFile(path.join(dist, 'assets/third-party-licenses.txt'), 'utf8');
+const browserLicenses = await readFile(path.join(dist, 'third-party-licenses.txt'), 'utf8');
 const browserNotice = await readFile(path.join(dist, 'third-party-notices.txt'), 'utf8');
 if (!browserLicenses.includes('## @walletconnect/ethereum-provider -') ||
     !browserLicenses.includes('## @supabase/supabase-js -') ||

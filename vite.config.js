@@ -278,7 +278,7 @@ export default defineConfig({
         outDir,
         emptyOutDir: true,
         manifest: true,
-        license: { fileName: 'assets/third-party-licenses.txt' },
+        license: { fileName: 'third-party-licenses.txt' },
         sourcemap: false,
         target: 'es2020',
         rollupOptions: {
