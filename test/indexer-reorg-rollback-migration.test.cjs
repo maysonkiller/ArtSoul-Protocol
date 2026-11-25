@@ -54,7 +54,7 @@ test('migration 014 deletes outbox references before their contract events', () 
   assert.ok(contractEventsIndex > outboxIndex, 'contract events are deleted after outbox correlation lookups');
 });
 
-test('the tracked migration sequence and setup entry include migrations 014 through 022', async () => {
+test('the tracked migration sequence and setup entry include migrations 014 through 023', async () => {
   const { listIndexerMigrations } = await import('../scripts/apply-migrations.js');
   const migrations = listIndexerMigrations();
   const setupSql = fs.readFileSync(
@@ -64,7 +64,7 @@ test('the tracked migration sequence and setup entry include migrations 014 thro
 
   assert.deepEqual(
     migrations.map(migration => migration.number),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
   );
   assert.match(setupSql, /014_schema_aware_reorg_rollback\.sql/);
   assert.match(setupSql, /015_public_metrics_projection\.sql/);
@@ -75,4 +75,5 @@ test('the tracked migration sequence and setup entry include migrations 014 thro
   assert.match(setupSql, /020_ordinary_resale_purchases\.sql/);
   assert.match(setupSql, /021_genesis_grant_evidence\.sql/);
   assert.match(setupSql, /022_ordinary_registrations\.sql/);
+  assert.match(setupSql, /023_ordinary_primary_credits\.sql/);
 });

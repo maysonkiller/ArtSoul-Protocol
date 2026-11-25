@@ -112,6 +112,17 @@ node scripts/review-rehearsal-artwork.mjs review.json register.json --check-open
 
 The command uses ordinary read RPCs at a common finalized block. It checks the reviewed test deployment, rejects a mismatched creator or URI, an active auction or a minted work, and compares the returned ID to the next auction counter. The hosted public indexer still reported the earlier test Core during the same evening's operator check. Use the issuing Core as well as the artwork ID when verifying later hosted journeys.
 
+### Creator's unsigned opening request
+
+The private rehearsal page can now prepare that fixed opening for work 1. The two-provider preflight passed at finalized block 63,588,254 (`0xfa309695fc998af3a48b4630ae474ebfaec6671fd1b0c333757863ab6372394d`). Both providers verified the payout pair and its custody, matched the registered creator and work, and simulated auction ID 1 with a settled creator nonce of 19. The reserve is 0.001 test ETH and the duration is 24 hours. The creator sends **0 ETH** to the Core and pays test gas upon submission.
+
+```sh
+node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> --opening-plan
+node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> --serve-opening
+```
+
+The first command prints the unsigned plan. The second prints a random URL usable only on the same computer. The page checks the exact origin and refreshes both provider readings when the creator selects **Review in wallet**. The wallet checks its account, chain, current nonce, both runtimes and the pending result of `createAuction(1, 1000000000000000, 86400)`. The request closes once the Core has any auction history, including an expired or completed first auction. A second operation cannot be prepared as a retry. Retain the signed transaction hash to verify the actual auction ID, work, reserve and deadline after inclusion. The unsigned preflight starts no countdown.
+
 ## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.

@@ -68,6 +68,7 @@ test('a reciprocal deployment proof is immutable, block-scoped and exactly eight
 test('the ordinary listener reads the specific auction from its pinned pair and canonical receipt', async () => {
     const tx = OTHER_HASH, zero = '0x' + '0'.repeat(40), bidder = '0x' + '1'.repeat(40);
     const events = new Interface([
+        'event ProceedsCredited(uint256 indexed auctionId,address indexed creator,address indexed treasury,uint256 creatorAmount,uint256 protocolAmount)',
         'event AuctionSettled(uint256 indexed auctionId,uint256 indexed artworkId,uint256 tokenId,uint256 price)',
         'event SettledArtworkIssued(uint256 indexed auctionId,uint256 indexed artworkId,uint256 indexed tokenId,address creator,address firstCollector)',
         'event RunnerUpOfferAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price)',
@@ -79,10 +80,11 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
         log(OTHER, 'AuctionSettled', [2, 17, 19, 99], 3),
         log(CORE, 'AuctionSettled', [1, 13, 20, 11], 4),
         log(CORE, 'RunnerUpOfferAccepted', [2, bidder, 31], 5),
-        log(NFT, 'SettledArtworkIssued', [2, 17, 19, OTHER, bidder], 6),
-        log(NFT, 'Transfer', [zero, bidder, 19], 7),
-        log(NFT, 'Transfer', [bidder, OTHER, 19], 8),
-        log(CORE, 'AuctionSettled', [2, 17, 19, 31], 9)
+        log(CORE, 'ProceedsCredited', [2, OTHER, bidder, 30, 1], 6),
+        log(NFT, 'SettledArtworkIssued', [2, 17, 19, OTHER, bidder], 7),
+        log(NFT, 'Transfer', [zero, bidder, 19], 8),
+        log(NFT, 'Transfer', [bidder, OTHER, 19], 9),
+        log(CORE, 'AuctionSettled', [2, 17, 19, 31], 10)
     ];
     const check = (modifyReceipt = () => {}, configure = () => {}, chainId = 84532) => {
         const f = fixture({ coreGetter: 'nft', chainId });
@@ -112,11 +114,12 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
     assert.equal(result.tokenId, '19');
     assert.equal(result.firstCollector, bidder);
     assert.equal(result.priceWei, '31');
-    assert.equal(result.logIndex, 9);
+    assert.equal(result.logIndex, 10);
+    assert.deepEqual([result.protocol, result.creatorWei, result.protocolWei, result.creditLogIndex], [bidder, '30', '1', 6]);
     assert.equal(result.runnerUpAccepted, true);
     await assert.rejects(check(undefined, f => { f.replacements.get(2).transactions.reverse(); }), /finalized block position/);
     await assert.rejects(check(r => { delete r.transactionIndex; }), /successful ordinary settlement receipt/);
-    await assert.rejects(check(r => { r.logs[6].transactionIndex = '0x0'; }), /log position/);
+    await assert.rejects(check(r => { r.logs[7].transactionIndex = '0x0'; }), /log position/);
     await assert.rejects(check(r => { r.logs.splice(2, 1); }), /finalized auction state disagree/);
     await assert.rejects(check(undefined, f => { f.replacements.set(10, auctionAbi.encodeFunctionResult('runnerUpOffers', [bidder,31,30])); }), /finalized auction state disagree/);
     await assert.rejects(check(undefined, f => { f.replacements.set(11, {number:'0x64',hash:OTHER_HASH}); }), /canonical block mismatch/);
@@ -126,12 +129,20 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
     await assert.rejects(check(undefined, f => { f.replacements.set(1, '0x14a34'); }, 8453), /RPC chain mismatch/);
     await assert.rejects(check(undefined, f => { f.replacements.set(6, abi.encodeFunctionResult('core', [OTHER])); }, 8453), /reciprocal binding mismatch/);
     await assert.rejects(check(undefined, undefined, 1), /Invalid NFT deployment proof inputs/);
-    await assert.rejects(check(r => { r.logs[3].address = OTHER; }), /Expected one SettledArtworkIssued/);
+    await assert.rejects(check(r => { r.logs[4].address = OTHER; }), /Expected one SettledArtworkIssued/);
     await assert.rejects(check(r => { r.logs[2] = log(CORE, 'RunnerUpOfferAccepted', [2, OTHER, 31], 5); }), /acceptance and settlement disagree/);
     await assert.rejects(check(r => { r.logs[2] = log(CORE, 'RunnerUpOfferAccepted', [2, bidder, 32], 5); }), /acceptance and settlement disagree/);
-    await assert.rejects(check(r => { r.logs[4] = log(NFT, 'Transfer', [zero, OTHER, 19], 7); }), /settlement and mint disagree/);
-    await assert.rejects(check(r => { r.logs[4].blockHash = OTHER_HASH; }), /log position/);
-    await assert.rejects(check(r => { r.logs.push(r.logs[6]); }), /Expected one AuctionSettled/);
+    await assert.rejects(check(r => { r.logs[5] = log(NFT, 'Transfer', [zero, OTHER, 19], 8); }), /settlement and mint disagree/);
+    await assert.rejects(check(r => { r.logs[5].blockHash = OTHER_HASH; }), /log position/);
+    await assert.rejects(check(r => { r.logs.push(r.logs[7]); }), /Expected one AuctionSettled/);
+    await assert.rejects(check(r => { r.logs.splice(3, 1); }), /Missing or ambiguous ordinary primary sale credit/);
+    await assert.rejects(check(r => { r.logs.push(r.logs[3]); }), /Missing or ambiguous ordinary primary sale credit/);
+    const wrongCredits = [[2, OTHER, bidder, 25, 6], [2, OTHER, zero, 30, 1], [1, OTHER, bidder, 30, 1], [2, bidder, bidder, 30, 1]];
+    for (const args of wrongCredits) {
+        await assert.rejects(check(r => { r.logs[3] = log(CORE, 'ProceedsCredited', args, 6); }), /credit disagrees/);
+    }
+    const withEarlierDefault = await check(r => { r.logs.unshift(log(CORE, 'ProceedsCredited', [2, OTHER, bidder, 80, 20], 1)); });
+    assert.equal(withEarlierDefault.protocolWei, '1');
     await assert.rejects(check(r => { r.status = '0x0'; }), /successful ordinary settlement receipt/);
     await assert.rejects(check(undefined, f => { f.listener.nftAddress = ''; }), /authority changed/);
     await assert.rejects(check(undefined, f => { f.replacements.set(7, { number: '0x63', hash: HASH }); }), /not finalized/);

@@ -55,6 +55,9 @@ async function main() {
             assert.deepEqual([sale.auctionId, sale.artworkId, sale.tokenId, sale.creator, sale.firstCollector, sale.priceWei],
                 ['1', '1', '1', creator.address.toLowerCase(), winner.address.toLowerCase(), String(price)]);
             assert.equal(sale.coreAddress, review.coreAddress);
+            assert.deepEqual([sale.protocol, sale.protocolWei, sale.creatorWei], [
+                roles[0].toLowerCase(), String(price / 40n), String(price - price / 40n)
+            ]);
             pair.primary = primary;
             const resalePrice = price * 3n;
             await mine(nft.connect(winner).approve(market.target, 1));

@@ -21,7 +21,7 @@ try {
     console.log(JSON.stringify(result));
 } catch (error) {
     // SDKs can include a full request, response or credential in an error.
-    const safeDetail = /^(?:Ordinary deployment block is not finalized|Conflicting finalized evidence in ordinary_(?:issuers|settlements))$/.test(error.message);
+    const safeDetail = /^(?:Ordinary deployment block is not finalized|Conflicting finalized evidence in ordinary_(?:issuers|settlements|primary_credits))$/.test(error.message);
     console.error(error instanceof InputError || safeDetail ? error.message : 'Could not verify or persist this settlement. Check the reviewed pair, receipt location, RPC and database configuration.');
     process.exitCode = 1;
 } finally {

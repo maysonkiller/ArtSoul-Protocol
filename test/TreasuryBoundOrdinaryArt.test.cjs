@@ -52,7 +52,7 @@ function verifyMarket(coreName, layout, batchLimit) {
     }
 
     async function verifyPayoutRuntime() {
-        const { loadReviewedPair, buildRehearsalCoreReview, expectedRehearsalPairRegister } = await import('../scripts/prepare-rehearsal-core.mjs');
+        const { loadReviewedPair, buildRehearsalCoreReview, expectedRehearsalPairRegister, expectedOrdinaryPairRegister } = await import('../scripts/prepare-rehearsal-core.mjs');
         const { payoutCore } = await import('../scripts/prepare-ordinary-deployment.mjs');
         const { buildOrdinaryAuditManifest } = require('../scripts/ordinary-audit-manifest.cjs');
         const { core, nft, layout, manifest } = await loadReviewedPair(payoutCore);
@@ -77,6 +77,23 @@ function verifyMarket(coreName, layout, batchLimit) {
         assert.equal(deployed.target, register.core.address);
         assert.equal(await deployed.nft(), register.nft.address);
         for (const entry of [register.core, register.nft]) {
+            assert.equal(ethers.keccak256(await provider.getCode(entry.address)), entry.codeHash);
+        }
+
+        // The release takes its limits from its own review, including decimal-string inputs.
+        // This second deployment still runs only on the disposable Hardhat network.
+        const releaseNonce = await provider.getTransactionCount(deployer.address);
+        const expectedCore = ethers.getCreateAddress({ from: deployer.address, nonce: releaseNonce });
+        const args = [protocol.target, ecosystem.target, security.target, 3, 45000];
+        const release = { ...review, chainId: 8453, nonce: releaseNonce, expectedCore,
+            expectedNFT: ethers.getCreateAddress({ from: expectedCore, nonce: 1 }),
+            initCodeHash: ethers.keccak256(ethers.concat([core.bytecode, new ethers.Interface(core.abi).encodeDeploy(args)])),
+            constructorArgs: [...review.constructorArgs.slice(0, 3), '3', '45000'] };
+        const linked = expectedOrdinaryPairRegister({ ...custody, chainId: 8453 }, release, manifest, layout, core, nft);
+        const second = await deploy(core.contractName, ...args);
+        assert.equal(second.target, linked.core.address);
+        assert.equal(await second.nft(), linked.nft.address);
+        for (const entry of [linked.core, linked.nft]) {
             assert.equal(ethers.keccak256(await provider.getCode(entry.address)), entry.codeHash);
         }
     }

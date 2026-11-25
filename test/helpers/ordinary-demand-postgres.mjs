@@ -44,10 +44,21 @@ export async function checkOrdinaryDemand(pool) {
             await primary(chain, issuer, 1, alice, 100, large);
             await resale(chain, issuer, 1, alice, bob, 102, [93, 6, 1, 1]);
         }
+        const largeShare = large / 40n + (large % 40n > 20n ? 1n : 0n);
+        const credit = (auction, price, share) => client.query(`INSERT INTO artsoul_private.ordinary_primary_credits
+            (chain_id,core_address,auction_id,protocol_treasury,protocol_wei,creator_wei,log_index)
+            VALUES (8453,$1,$2,$3,$4,$5,0)`, [core,auction,address(416),share.toString(),(price - share).toString()]);
+        await credit(1, large, largeShare);
+        const partial = (await report('100', '105')).totals;
+        assert.equal(partial.primary_sales_missing_credit, '1');
+        assert.equal(partial.primary_protocol_credit_wei, null);
+        assert.equal(partial.resale_protocol_credit_wei, '4');
+        await credit(2, 7n, 0n);
         assert.deepEqual(await report('100', '105'), {
             chainId: 8453, coreAddress: core, fromBlock: '100', toBlock: '105', issuerRegistered: true,
             coverage: 'indexed_receipts_only', totals: { paying_wallets: '3', repeat_paying_wallets: '2', primary_sales: '2', resales: '3',
                 primary_volume_wei: (large + 7n).toString(), resale_volume_wei: '300', total_volume_wei: (large + 307n).toString(),
+                primary_sales_missing_credit: '0', primary_protocol_credit_wei: largeShare.toString(),
                 resale_protocol_credit_wei: '4', resale_ecosystem_credit_wei: '2' }
         });
         const single = (await report('105', '105')).totals;

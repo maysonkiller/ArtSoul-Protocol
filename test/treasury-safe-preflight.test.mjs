@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { Interface, ZeroAddress, getAddress, id, keccak256, toBeHex, zeroPadValue } from 'ethers';
+import { Interface, ZeroAddress, getAddress, id, keccak256, toBeHex, toQuantity, zeroPadValue } from 'ethers';
 import { readRpc, verifyTreasurySafes, verifyTreasurySafesWithTwoProviders } from '../scripts/verify-treasury-safes.mjs';
-import { verifyRehearsalCoreReceipt } from '../scripts/prepare-rehearsal-core.mjs';
+import { verifyOrdinaryCoreReceipt, verifyRehearsalCoreReceipt } from '../scripts/prepare-rehearsal-core.mjs';
 
 const addr = n => getAddress(toBeHex(n, 20));
 const roles = ['protocolTreasury', 'ecosystemTreasury', 'adminSecurity'];
@@ -22,9 +22,9 @@ const slots = new Map([
     [id('module_manager.module_guard.address'), 'moduleGuard']
 ]);
 
-function fixture() {
+function fixture(chainId = 84532) {
     const register = {
-        chainId: 84532,
+        chainId,
         core: { address: addr(20), codeHash: keccak256('0x6003'), refundBatchLimit: 3, refundTransferGas: '45000' },
         nft: { address: addr(23), codeHash: keccak256('0x6004') }
     };
@@ -39,7 +39,7 @@ function fixture() {
     chain.core.pairedNFT = register.nft.address;
     chain.nft.mintingCore = register.core.address;
     async function rpc(method, params) {
-        if (method === 'eth_chainId') return '0x14a34';
+        if (method === 'eth_chainId') return toQuantity(chainId);
         if (method === 'eth_getBlockByNumber') return block;
         assert.deepEqual(params.at(-1), { blockHash: block.hash, requireCanonical: true });
         if (method === 'eth_getCode') {
@@ -75,13 +75,13 @@ function fixture() {
     return { register, chain, rpc };
 }
 
-function creationFixture() {
-    const { register, chain, rpc: underlying } = fixture();
+function creationFixture(chainId = 84532) {
+    const { register, chain, rpc: underlying } = fixture(chainId);
     const txHash = id('synthetic signed creation');
-    const review = { chainId: 84532, expectedCore: register.core.address, expectedNFT: register.nft.address,
+    const review = { chainId, expectedCore: register.core.address, expectedNFT: register.nft.address,
         payer: addr(80), nonce: 8, initCodeHash: keccak256('0x6001') };
     const included = { blockNumber: block.number, blockHash: block.hash, transactionIndex: '0x1', from: review.payer, to: null };
-    const tx = { ...included, hash: txHash, nonce: '0x8', value: '0x0', input: '0x6001', chainId: '0x14a34' };
+    const tx = { ...included, hash: txHash, nonce: '0x8', value: '0x0', input: '0x6001', chainId: toQuantity(chainId) };
     const receipt = { ...included, transactionHash: txHash, status: '0x1', contractAddress: register.core.address };
     const canonical = { ...block, transactions: [id('other signed call'), txHash] };
     const head = { number: '0x33', hash: id('later finalized head') };
@@ -154,6 +154,15 @@ test('a changed field on either provider invalidates the deployment receipt', as
     const b = creationFixture();
     b.chain.nft.mintingCore = addr(8);
     await assert.rejects(verifyRehearsalCoreReceipt(a.txHash, a.review, a.register, [a.rpc, b.rpc]), /NFT binding mismatch/);
+});
+
+test('release verification uses the reviewed chain and refund limits while the rehearsal stays on Base Sepolia', async () => {
+    const a = creationFixture(8453), b = creationFixture(8453);
+    const proof = await verifyOrdinaryCoreReceipt(a.txHash, a.review, a.register, [a.rpc, b.rpc]);
+    assert.equal(proof.chainId, 8453);
+    assert.deepEqual(proof.refundLimits, { refundBatchLimit: '3', refundTransferGas: '45000' });
+    await assert.rejects(verifyRehearsalCoreReceipt(a.txHash, a.review, a.register, [a.rpc, b.rpc]), /Base Sepolia/);
+    await assert.rejects(verifyOrdinaryCoreReceipt(a.txHash, a.review, a.register, [a.rpc, creationFixture().rpc]), /wrong chain/);
 });
 
 test('matches all three Safes and Core bindings at one canonical block without printing identities', async () => {

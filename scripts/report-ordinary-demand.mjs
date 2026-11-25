@@ -6,8 +6,9 @@ class ReportError extends Error {}
 
 const sql = `
 WITH sales AS (
-    SELECT first_collector AS buyer, true AS is_primary, price_wei, 0::numeric AS protocol_wei, 0::numeric AS ecosystem_wei
+    SELECT first_collector AS buyer, true AS is_primary, price_wei, credit.protocol_wei, 0::numeric AS ecosystem_wei
     FROM artsoul_private.ordinary_settlements
+    LEFT JOIN artsoul_private.ordinary_primary_credits AS credit USING (chain_id, core_address, auction_id)
     WHERE chain_id = $1 AND core_address = $2 AND block_number BETWEEN $3 AND $4
     UNION ALL
     SELECT buyer, false, price_wei, protocol_wei, ecosystem_wei
@@ -17,16 +18,20 @@ WITH sales AS (
     SELECT buyer, count(*) AS purchases,
         count(*) FILTER (WHERE is_primary) AS primary_sales, count(*) FILTER (WHERE NOT is_primary) AS resales,
         sum(price_wei) FILTER (WHERE is_primary) AS primary_volume, sum(price_wei) FILTER (WHERE NOT is_primary) AS resale_volume,
-        sum(protocol_wei) AS resale_protocol_credit, sum(ecosystem_wei) AS resale_ecosystem_credit
+        count(*) FILTER (WHERE is_primary AND protocol_wei IS NULL) AS missing_primary_credits,
+        sum(protocol_wei) FILTER (WHERE is_primary) AS primary_protocol_credit,
+        sum(protocol_wei) FILTER (WHERE NOT is_primary) AS resale_protocol_credit, sum(ecosystem_wei) AS resale_ecosystem_credit
     FROM sales GROUP BY buyer
 )
 SELECT EXISTS (SELECT 1 FROM artsoul_private.ordinary_issuers WHERE chain_id = $1 AND core_address = $2) AS registered,
     row_security_active('artsoul_private.ordinary_issuers') OR row_security_active('artsoul_private.ordinary_settlements')
-        OR row_security_active('artsoul_private.ordinary_resale_purchases') AS filtered,
+        OR row_security_active('artsoul_private.ordinary_resale_purchases') OR row_security_active('artsoul_private.ordinary_primary_credits') AS filtered,
     count(*)::text AS paying_wallets, (count(*) FILTER (WHERE purchases > 1))::text AS repeat_paying_wallets,
     coalesce(sum(primary_sales), 0)::text AS primary_sales, coalesce(sum(resales), 0)::text AS resales,
     coalesce(sum(primary_volume), 0)::text AS primary_volume_wei, coalesce(sum(resale_volume), 0)::text AS resale_volume_wei,
     (coalesce(sum(primary_volume), 0) + coalesce(sum(resale_volume), 0))::text AS total_volume_wei,
+    coalesce(sum(missing_primary_credits), 0)::text AS primary_sales_missing_credit,
+    CASE WHEN coalesce(sum(missing_primary_credits), 0) = 0 THEN coalesce(sum(primary_protocol_credit), 0)::text END AS primary_protocol_credit_wei,
     coalesce(sum(resale_protocol_credit), 0)::text AS resale_protocol_credit_wei,
     coalesce(sum(resale_ecosystem_credit), 0)::text AS resale_ecosystem_credit_wei
 FROM wallets`;
@@ -57,7 +62,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         pool = new pg.Pool({ connectionString, max: 1, connectionTimeoutMillis: 10000, statement_timeout: 30000 });
         console.log(JSON.stringify(await reportOrdinaryDemand(pool, ...args), null, 2));
     } catch (error) {
-        console.error(error instanceof ReportError ? error.message : 'Could not read the ordinary sales evidence. Check database access and migrations 018 and 020.');
+        console.error(error instanceof ReportError ? error.message : 'Could not read the ordinary sales evidence. Check database access and migrations 018, 020 and 023.');
         process.exitCode = 1;
     } finally {
         await pool?.end();

@@ -59,7 +59,8 @@ test('private custody review binds all owners, role addresses, payer and pending
 async function renderReview(t, provider, current = () => ({ ...plan, roles: {}, owners: [], block: { number: '0x1' } })) {
     const fields = new Map();
     function field(id) {
-        if (!fields.has(id)) fields.set(id, { textContent: '', value: '', append() {}, replaceChildren() {},
+        if (!fields.has(id)) fields.set(id, { textContent: '', value: '', items: [],
+            append(...items) { this.items.push(...items.map(item => item.textContent)); }, replaceChildren() { this.items = []; },
             add(option) { if (!this.value) this.value = option.value; } });
         return fields.get(id);
     }
@@ -71,6 +72,24 @@ async function renderReview(t, provider, current = () => ({ ...plan, roles: {}, 
     await start();
     return field;
 }
+test('opening review displays the work, reserve and duration without contacting a wallet and hides the request after history appears', async t => {
+    let current = { ...plan, operation: 'createAuction', deployments: [], block: { number: '0x10' } };
+    const provider = wallet();
+    const field = await renderReview(t, provider, () => current);
+    assert.equal(field('operation').textContent, 'Open the first rehearsal auction');
+    for (const text of ['1 · ArtSoul Base Sepolia Rehearsal', '0.001 test ETH', '24 hours from inclusion', 'createAuction(uint256,uint256,uint256)']) {
+        assert.ok(field('fields').items.includes(text));
+    }
+    assert.deepEqual(provider.calls, []);
+    current = { waitingForFinality: { role: 'createAuction' } };
+    await field('refresh').onclick();
+    assert.equal(field('review').hidden, true);
+    current = { complete: true, existingAuctionHistory: true };
+    await field('refresh').onclick();
+    assert.match(field('status').textContent, /already has finalized auction history/);
+    assert.equal(field('submit').disabled, true);
+    assert.deepEqual(provider.calls, []);
+});
 test('rendering never connects the wallet; explicit connect then a double click produces one mock submission', async t => {
     const sentHash = '0x' + 'a'.repeat(64);
     const provider = wallet({ eth_requestAccounts: () => [payer], eth_sendTransaction: () => sentHash });
