@@ -146,6 +146,30 @@ const sections = [
         ]
     },
     {
+        id: "support",
+        title: "Help and contact",
+        blocks: [{
+            type: "faq",
+            items: [
+                {
+                    question: "Where can I find answers about wallets, bids or refunds?",
+                    answer: "Start with the guide or search for the action you were trying to take.",
+                    link: { text: "Read the frequently asked questions", href: "/docs-protocol#faq" }
+                },
+                {
+                    question: "How can I reach a person?",
+                    answer: "The founder handles support at the project mailbox. Describe what happened and which page you used. This link opens a draft in your mail app. You choose what to send. Keep recovery phrases, private keys and sign-in codes to yourself.",
+                    link: { text: "artsoulprotocol@gmail.com", href: "mailto:artsoulprotocol@gmail.com" }
+                },
+                {
+                    question: "How do I report an artwork or a security issue?",
+                    answer: "For copyright or abusive content, open the artwork and choose Report. If reporting is unavailable, email the founder with the artwork link. For a security issue, contact the founder privately with a short description.",
+                    link: { text: "Security reporting contact", href: "/.well-known/security.txt" }
+                }
+            ]
+        }]
+    },
+    {
         id: "roadmap",
         title: "ArtSoul roadmap",
         blocks: [{

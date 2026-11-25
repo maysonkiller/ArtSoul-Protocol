@@ -858,7 +858,8 @@
             collected: { url: '/profile#collected', title: 'Collected ArtSoul NFTs' },
             walletNfts: { url: '/profile#wallet-nfts', title: 'Wallet NFTs' },
             create: { url: '/upload', title: 'Create' },
-            guide: { url: '/docs-protocol', title: 'How it works' }
+            guide: { url: '/docs-protocol', title: 'How it works' },
+            support: { url: '/docs-protocol#support', title: 'Help and contact' }
         });
         const openPage = {
             name: 'open_page',
@@ -1810,7 +1811,7 @@
                 // Docs and the collection builder have no card renderer at
                 // startup. Load the same policy only when a form is requested.
                 if (!window.ArtSoulArtworkUrl) await import('/src/ui/artwork-url.js?v=1');
-                if (!window.ArtSoulArtworkCard) await import('/src/ui/components/artwork-card.js?v=45');
+                if (!window.ArtSoulArtworkCard) await import('/src/ui/components/artwork-card.js?v=46');
                 return window.ArtSoulArtworkCard?.cardActionItems?.(card, config || {}) || [];
             },
             readContracts: () => window.ArtSoulContracts || null,

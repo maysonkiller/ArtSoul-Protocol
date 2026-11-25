@@ -105,6 +105,8 @@ For external NFT display, the release check starts after the first successful mi
 
 On November 19, a Base Sepolia read of [Music 2, token 5](https://sepolia.basescan.org/token/0xf061f70503c37cf2196a28f4785e524d0fb32538?a=5) confirmed that its existing JSON supplies an audio URL but omits a still image. New audio and video publications carry a static ArtSoul cover for image-only clients. The original media remains in `animation_url`. ArtSoul still prefers the work's own poster or video frame on its site. Registration stops before requesting the wallet if the metadata upload fails. [Metadata builder](../../ipfs-client.js) · [Publication checks](../../test/upload-publication.test.mjs)
 
+The founder currently covers product, support, operations and release decisions. The roles below describe the work. The [solo operator plan](../runbooks/B3_INCIDENT_RESPONSE.md#solo-founder-support-and-incident-ownership) sets the human handoff. Independent review requires a separate person; custody actions use their configured quorum.
+
 | Step | Accountable role | Evidence needed to advance |
 | --- | --- | --- |
 | 1. Prepare and demonstrate the testnet product | Product and support | Assemble the walkthrough above, give visitors a testnet entry point, record feedback by journey, and distinguish testnet volume from revenue. Keep the currently available voice helper. Broader voice and WebMCP parity stays on its separate track. |

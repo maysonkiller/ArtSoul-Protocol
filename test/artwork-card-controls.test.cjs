@@ -32,6 +32,7 @@ class FakeElement {
     addEventListener(name, listener) { (this.listeners[name] ||= []).push(listener); }
     dispatch(name) {
         const event = {
+            type: name,
             currentTarget: this,
             preventDefault() { this.defaultPrevented = true; },
             stopPropagation() { this.propagationStopped = true; }
@@ -414,6 +415,42 @@ test('hidden and departing pages pause only card previews and never resume them 
     audio.paused = false;
     events.dispatchEvent(new Event('pagehide'));
     assert.deepEqual([video.calls, audio.calls, idle.calls], [1, 2, 0]);
+});
+
+test('muted audio shows loading, progress, interruption and retry without changing mute or starting itself', async () => {
+    const { api, mediaElements } = loadDomCardRuntime();
+    const wrap = api.createMediaElement({ file_type: 'audio', file_url: 'music.mp3' }).children[0];
+    const label = wrap.children[0];
+    const [play, mute] = wrap.children.find(el => el.className === 'artsoul-card-media-controls').children;
+    const [audio] = mediaElements;
+    mute.dispatch('click');
+    assert.equal(audio.muted, true);
+    assert.equal(audio.paused, true);
+    audio.readyState = 0;
+    play.dispatch('click');
+    assert.equal(label.textContent, 'Wait');
+    audio.pause();
+    audio.dispatch('timeupdate');
+    assert.equal(label.textContent, 'Paused');
+    const originalPlay = audio.play;
+    audio.play = () => Promise.reject(Object.assign(new Error(), { name: 'NotAllowedError' }));
+    play.dispatch('click');
+    await Promise.resolve();
+    assert.equal(label.textContent, 'Retry');
+    assert.equal(play['aria-label'], 'Retry audio preview');
+    assert.equal(audio.paused, true);
+    audio.play = originalPlay;
+    audio.readyState = 4;
+    play.dispatch('click');
+    audio.currentTime = 66.8;
+    audio.dispatch('timeupdate');
+    assert.equal(label.textContent, '1:06');
+    assert.equal(play['aria-label'], 'Pause audio preview');
+    assert.equal(audio.muted, true);
+    assert.equal(audio.paused, false);
+    audio.ended = true;
+    audio.dispatch('ended');
+    assert.equal(label.textContent, 'AUDIO');
 });
 
 test('cards omit unsafe media and remove themselves when media loading fails', () => {

@@ -146,6 +146,7 @@
         ['home', /^(?:главн(?:ая|ую)(?: страниц[ау])?|домой|home(?: ?page)?)$/u],
         ['profile', /^(?:(?:(?:мой|моему) )?профил[ьюе]|(?:my )?profile)$/u],
         ['create', /^(?:создание(?: работы| искусства)?|публикаци[юя](?: работы)?|загрузк[ау](?: работы)?|(?:create|publish|upload)(?: (?:an? )?artwork| page)?)$/u],
+        ['support', /^(?:support|поддержк[ау])$/u],
         ['guide', /^(?:руководств[оу]|документаци[юия]|инструкци[июя]|справк[ау]|guide|docs|documentation|how it works)$/u]
     ];
 
@@ -157,6 +158,9 @@
             .replace(/(?:н[ -]?ф[ -]?т|эн[ -]?эф[ -]?ти|н[ -]?эф[ -]?ти|n[ .-]+f[ .-]+t)(?![\p{L}\p{N}_])/gu, 'nft')
             .replace(/^(?:пожалуйста|please)[ ,]+|[, ]+(?:пожалуйста|please)$/gu, '').trim();
         const words = pendingNft ? text.replace(/^(?:нет|точнее|лучше|no|actually|rather)[, ]+/u, '') : text;
+        if (/^(?:contact support|talk to a person|связаться с поддержкой)$/u.test(words)) {
+            return { tool: 'open_page', input: { page: 'support' } };
+        }
         const request = ru
             ? /^(?:(?:давай(?:те)?|можешь|можете) )?(?:откроем|открой(?:те)?|открыть|покажи(?:те)?|показать|перейди(?:те)?|перейдем|переключись|перейти|(?:я )?хочу (?:открыть|посмотреть|перейти)|(?:я )?хочу(?= (?:в|на) )|можно (?:открыть|посмотреть))[, ]+(?:мне[, ]+)?(?:пожалуйста[, ]+)?/u
             : /^(?:(?:(?:can|could|would) you|let['’]?s|i (?:want|would like) to) )?(?:open|show(?: me)?|go to|take me to|switch to|browse|view) (?:please )?/u;
@@ -300,13 +304,13 @@
         notHeard: 'Nothing was heard. Press the microphone and try again.',
         options: 'You can open the gallery, find artwork, or ask about your activity.',
         askSearch: 'What would you like to find?', askTitle: 'What is the title?',
-        otherRequest: 'Try “open NFTs”, “search moon”, or “my activity”.',
+        otherRequest: 'I didn’t recognize that command. Try “open NFTs” or “search moon”.',
         unsure: heard => `I am not sure I heard "${heard}" correctly. Please repeat the action.`,
         heard: heard => `Heard: "${heard}"`,
         unavailable: 'Commands are not available on this page.',
         notice: 'Your browser may send microphone audio to its speech service for transcription. ArtSoul receives no microphone audio.\n\nTurn on the microphone?',
         micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
-        help: 'Try: "open gallery", "open NFTs", "open home", "open my profile", "open create", "open guide", "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
+        help: 'Try: "open gallery", "open NFTs", "open home", "open my profile", "open create", "open guide", "contact support", "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
             '"prepare artwork titled Moonlight", "donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
             '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
             '"change price of artwork 19 to 0.003", "remove artwork 19 from sale", ' +
@@ -904,7 +908,7 @@
                 command = { tool: DRAFT_TOOL, input: { title: transcript.trim() } };
             }
             if (!command) {
-                reply(transcript, t.otherRequest, t.options);
+                reply(transcript, t.otherRequest, t.options, [{label: 'Help and contact', url: '/docs-protocol#support'}]);
                 return;
             }
             if (command.message) {

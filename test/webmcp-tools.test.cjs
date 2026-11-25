@@ -752,7 +752,7 @@ test('open_page navigates only to declared pages without provider or wallet work
     ['auctions', '/gallery#live_auctions', 'Auctions'], ['collections', '/gallery#collections', 'Collections'],
     ['profile', '/profile', 'Profile'], ['collected', '/profile#collected', 'Collected ArtSoul NFTs'],
     ['create', '/upload', 'Create'],
-    ['guide', '/docs-protocol', 'How it works']
+    ['guide', '/docs-protocol', 'How it works'], ['support', '/docs-protocol#support', 'Help and contact']
   ];
   assert.deepEqual(tool.inputSchema.properties.page.enum.toSorted(), [...expected.map(([page]) => page), 'walletNfts'].sort());
   assert.equal(tool.inputSchema.additionalProperties, false);
