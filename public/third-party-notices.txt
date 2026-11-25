@@ -1,0 +1,4 @@
+Portions © 2025 Reown, Inc. All Rights Reserved
+
+The third-party software notices and licenses for this build are available
+at /third-party-licenses.txt.

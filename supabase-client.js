@@ -135,7 +135,7 @@ async function initSupabase() {
 
             // Import Supabase once for the whole page. Auth and data APIs share
             // this exact GoTrueClient instance through ArtSoulSupabaseSingleton.
-            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const { createClient } = await import('./scripts/browser-sdks/supabase.mjs');
             const client = createClient(config.supabaseUrl, config.supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,

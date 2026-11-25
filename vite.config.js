@@ -72,7 +72,6 @@ const legacyRootAssets = [
     'webmcp-tools.js',
     // Voice commands. The same shape as the agent tools, which it drives.
     'voice-commands.js',
-    'supabase-client.js',
     'theme-sync.js',
     'ui-core.css',
     'unified-styles.css'
@@ -279,13 +278,18 @@ export default defineConfig({
         outDir,
         emptyOutDir: true,
         manifest: true,
+        license: { fileName: 'third-party-licenses.txt' },
         sourcemap: false,
         target: 'es2020',
         rollupOptions: {
-            input: Object.fromEntries(
-                Object.entries(pageInputs).map(([name, page]) => [name, path.join(root, page)])
-            ),
+            input: {
+                ...Object.fromEntries(Object.entries(pageInputs).map(([name, page]) => [name, path.join(root, page)])),
+                'supabase-client': path.join(root, 'supabase-client.js')
+            },
             output: {
+                // Preserve the staff, collection and help pages' existing
+                // module URL while Vite resolves its deferred authentication SDK.
+                entryFileNames: chunk => chunk.name === 'supabase-client' ? 'supabase-client.js' : 'assets/[name]-[hash].js',
                 manualChunks(id) {
                     if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
                         return 'vendor-react';

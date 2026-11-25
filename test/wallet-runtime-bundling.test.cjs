@@ -16,6 +16,10 @@ test('wallet runtime dependencies are pinned and bundled by Vite', () => {
     assert.equal(packageJson.dependencies['@reown/appkit'], '1.8.21');
     assert.equal(packageJson.dependencies['@reown/appkit-adapter-wagmi'], '1.8.21');
     assert.equal(packageJson.dependencies['@walletconnect/modal'], '2.7.0');
+    const sdkLock = JSON.parse(read('scripts/browser-sdks/package-lock.json')).packages;
+    assert.equal(sdkLock['node_modules/@walletconnect/ethereum-provider'].version, '2.23.10');
+    assert.equal(sdkLock['node_modules/@reown/appkit'].link, true);
+    assert.equal(sdkLock['../../node_modules/@reown/appkit'].version, packageJson.dependencies['@reown/appkit']);
     assert.equal(packageJson.dependencies['@wagmi/core'], '3.6.4');
     assert.equal(packageJson.dependencies.wagmi, '3.6.4');
     assert.equal(packageJson.dependencies.viem, '2.55.19');
@@ -36,8 +40,11 @@ test('wallet runtime dependencies are pinned and bundled by Vite', () => {
 
     // The external mobile provider stays demand-loaded on Connect; A-54 must
     // not make that heavy path part of every visitor's cold start.
-    assert.match(core, /WC_ETHEREUM_PROVIDER_URL/);
-    assert.match(core, /import\(WC_ETHEREUM_PROVIDER_URL\)/);
+    assert.match(core, /await import\('\.\/scripts\/browser-sdks\/wallet\.mjs'\)/);
+    assert.doesNotMatch(core, /https:\/\/esm\.sh\//);
+    const auth = read('supabase-client.js');
+    assert.match(auth, /await import\('\.\/scripts\/browser-sdks\/supabase\.mjs'\)/);
+    assert.doesNotMatch(auth, /https:\/\/esm\.sh\//);
 });
 
 test('shared pages load AppKit through a deferred runtime boundary', () => {

@@ -1,0 +1,16 @@
+{
+  "name": "artsoul-browser-sdks",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "npm@11.6.2",
+  "dependencies": {
+    "@reown/appkit": "file:../../node_modules/@reown/appkit",
+    "@supabase/supabase-js": "2.119.2",
+    "@walletconnect/ethereum-provider": "2.23.10"
+  },
+  "overrides": {
+    "@walletconnect/ethereum-provider": {
+      "@reown/appkit": "$@reown/appkit"
+    }
+  }
+}

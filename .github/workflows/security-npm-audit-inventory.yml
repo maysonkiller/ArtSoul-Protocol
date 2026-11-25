@@ -41,16 +41,18 @@ jobs:
           set -euo pipefail
           full_status=0
           prod_status=0
+          browser_status=0
           npm audit --json --package-lock-only > npm-audit-full.json || full_status=$?
           npm audit --json --package-lock-only --omit=dev > npm-audit-prod.json || prod_status=$?
+          npm audit --prefix scripts/browser-sdks --json --package-lock-only --omit=dev > npm-audit-browser.json || browser_status=$?
           {
             git rev-parse HEAD
-            sha256sum package-lock.json npm-audit-full.json npm-audit-prod.json
+            sha256sum package-lock.json scripts/browser-sdks/package-lock.json npm-audit-full.json npm-audit-prod.json npm-audit-browser.json
             node --version
             npm --version
-            printf 'full_exit=%s\nomit_dev_exit=%s\n' "$full_status" "$prod_status"
+            printf 'full_exit=%s\nomit_dev_exit=%s\nbrowser_exit=%s\n' "$full_status" "$prod_status" "$browser_status"
           } > npm-audit-provenance.txt
-          test "$full_status" -le 1 && test "$prod_status" -le 1
+          test "$full_status" -le 1 && test "$prod_status" -le 1 && test "$browser_status" -le 1
 
       - name: Print exact list and render summary
         shell: bash
@@ -59,6 +61,7 @@ jobs:
           node scripts/security/npm-audit-inventory.mjs npm-audit-full.json npm-audit-prod.json
           cat npm-audit-inventory.md >> "$GITHUB_STEP_SUMMARY"
           node -e 'const {metadata} = require("./npm-audit-prod.json"); if (metadata.vulnerabilities.total !== 0) process.exit(1)'
+          node -e 'const {metadata} = require("./npm-audit-browser.json"); console.log("Browser SDK advisories:", metadata.vulnerabilities); if (metadata.vulnerabilities.total !== 0) process.exit(1)'
 
       - name: Preserve exact raw evidence
         if: always()
@@ -68,6 +71,7 @@ jobs:
           path: |
             npm-audit-full.json
             npm-audit-prod.json
+            npm-audit-browser.json
             npm-audit-inventory.md
             npm-audit-provenance.txt
           if-no-files-found: error
