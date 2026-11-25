@@ -152,6 +152,11 @@ export async function readOrdinarySettlement(listener, options) {
     return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
         const receipt = await send('eth_getTransactionReceipt', [transactionHash]);
         const sale = parseOrdinarySettlement(receipt, proof, transactionHash, auctionId);
+        const position = Number(BigInt(receipt.transactionIndex));
+        if (!Number.isSafeInteger(position) || !Array.isArray(header.transactions) ||
+            header.transactions[position]?.toLowerCase?.() !== transactionHash) {
+            throw new Error('Ordinary settlement transaction is absent at its finalized block position');
+        }
         const auction = await readOrdinaryAuctionField(send, proof, block, auctionId, 'auctions');
         const offer = await readOrdinaryAuctionField(send, proof, block, auctionId, 'runnerUpOffers');
         // A prior losing bid can leave a price in this mapping even when no offer ever opened.

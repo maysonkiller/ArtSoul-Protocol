@@ -74,7 +74,7 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
         'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)'
     ]);
     const log = (address, name, args, index) => ({ address, ...events.encodeEventLog(name, args),
-        blockHash: HASH, blockNumber: '0x64', transactionHash: tx, logIndex: '0x' + index.toString(16) });
+        blockHash: HASH, blockNumber: '0x64', transactionHash: tx, transactionIndex: '0x1', logIndex: '0x' + index.toString(16) });
     const logs = [
         log(OTHER, 'AuctionSettled', [2, 17, 19, 99], 3),
         log(CORE, 'AuctionSettled', [1, 13, 20, 11], 4),
@@ -87,9 +87,9 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
     const check = (modifyReceipt = () => {}, configure = () => {}, chainId = 84532) => {
         const f = fixture({ coreGetter: 'nft', chainId });
         f.listener.nftAddress = NFT;
-        const receipt = { status: '0x1', blockHash: HASH, transactionHash: tx, blockNumber: '0x64', logs: structuredClone(logs) };
+        const receipt = { status: '0x1', blockHash: HASH, transactionHash: tx, transactionIndex: '0x1', blockNumber: '0x64', logs: structuredClone(logs) };
         modifyReceipt(receipt);
-        f.replacements.set(2, { number: '0x64', hash: HASH, timestamp:'0x20' });
+        f.replacements.set(2, { number: '0x64', hash: HASH, timestamp:'0x20', transactions: [HASH, tx] });
         f.replacements.set(7, { number: '0x64', hash: HASH });
         f.replacements.set(8, receipt);
         f.replacements.set(9, auctionAbi.encodeFunctionResult('auctions', [17,1,2,2,3,OTHER,50,0,4,bidder]));
@@ -114,6 +114,9 @@ test('the ordinary listener reads the specific auction from its pinned pair and 
     assert.equal(result.priceWei, '31');
     assert.equal(result.logIndex, 9);
     assert.equal(result.runnerUpAccepted, true);
+    await assert.rejects(check(undefined, f => { f.replacements.get(2).transactions.reverse(); }), /finalized block position/);
+    await assert.rejects(check(r => { delete r.transactionIndex; }), /successful ordinary settlement receipt/);
+    await assert.rejects(check(r => { r.logs[6].transactionIndex = '0x0'; }), /log position/);
     await assert.rejects(check(r => { r.logs.splice(2, 1); }), /finalized auction state disagree/);
     await assert.rejects(check(undefined, f => { f.replacements.set(10, auctionAbi.encodeFunctionResult('runnerUpOffers', [bidder,31,30])); }), /finalized auction state disagree/);
     await assert.rejects(check(undefined, f => { f.replacements.set(11, {number:'0x64',hash:OTHER_HASH}); }), /canonical block mismatch/);

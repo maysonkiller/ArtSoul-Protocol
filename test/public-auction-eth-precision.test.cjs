@@ -27,7 +27,7 @@ function postgrestProjection(path, rows) {
   })));
 }
 
-function endpoint(name, amount, bidAmounts = [amount], configure) {
+function endpoint(name, amount, bidAmounts = [amount], configure, requests = []) {
   const rows = {
     v41_artworks: [{ chain_id: CHAIN, artwork_id: '28', creator: CREATOR,
       metadata_uri: 'https://metadata.example/28.json', minted: true, token_id: '400',
@@ -64,7 +64,10 @@ function endpoint(name, amount, bidAmounts = [amount], configure) {
     recheckNftOwnership: async () => null,
     readWithNftOwnershipRetry: operation => operation(),
     sendError: (res, error) => res.status(500).json({ error: error.message }),
-    supabaseRest: async path => postgrestProjection(path, rows[path.split('?')[0]] || []),
+    supabaseRest: async path => {
+      requests.push(path);
+      return postgrestProjection(path, rows[path.split('?')[0]] || []);
+    },
     validateArtworkId: value => String(value || '').trim() || null,
     getModerationAccess: async () => ({ canModerate: false }),
     readArtworkMetadata: async () => ({ name: 'Exact amount fixture', image: 'https://images.example/28.png' })
@@ -90,6 +93,31 @@ const amounts = [
   ['1000000000000000001', '1.000000000000000001'],
   ['123456789012345678901234567890', '123456789012.34567890123456789']
 ];
+
+test('catalog and detail choose the last floor log in a block and preserve newer artwork prices', async () => {
+  const latest = '1000000000000000001';
+  for (const [artworkBlock, artworkFloor] of [[99, '1'], [101, latest]]) {
+    const requests = [];
+    const artworks = endpoint('artworks', '1', [], rows => {
+      Object.assign(rows.v41_artworks[0], {last_updated_block: artworkBlock, canonical_floor: artworkFloor});
+      const floor = rows.v41_floor_history[0];
+      Object.assign(floor, {log_index: 1, floor_price: '5'});
+      rows.v41_floor_history.push({...floor, log_index: 3, floor_price: artworkBlock === 99 ? latest : '7'});
+    }, requests);
+    for (const query of [{chain_id: CHAIN}, {chain_id: CHAIN, artwork_id: '28'}]) {
+      const result = await artworks(query);
+      assert.equal(result.data[0].canonical_floor, '1.000000000000000001');
+      assert.equal(result.data[0].floor_price, result.data[0].canonical_floor);
+    }
+    const history = requests.filter(path => path.startsWith('v41_floor_history?'));
+    assert.equal(history.length, 2);
+    for (const path of history) {
+      const params = new URLSearchParams(path.split('?')[1]);
+      assert.equal(params.get('order'), 'block_number.desc,log_index.desc');
+      assert.ok(params.get('select').split(',').includes('log_index'));
+    }
+  }
+});
 
 for (const [wei, eth] of amounts) {
   test(`public auction amounts preserve ${wei} wei through exact decimal serialization`, async () => {
