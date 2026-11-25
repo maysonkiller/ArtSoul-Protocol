@@ -24,7 +24,9 @@ After migration 018 is available in the intended database, the operator can inge
 node scripts/index-ordinary-settlement.mjs reviewed-pair.json receipt-location.json
 ```
 
-The reviewed pair file supplies `chainId`, `coreAddress`, `nftAddress`, `expectedCoreCodeHash` and `expectedNftCodeHash`. Pin the runtime hashes from the release review. The receipt location supplies numeric `blockNumber`, `blockHash`, `transactionHash` and a decimal string `auctionId`. The command reads the RPC finalized boundary, deployment bindings, runtime code and receipt before opening the database transaction. Replaying identical evidence returns `inserted: false`. A disagreement fails the intake and preserves earlier rows. Continuous scanning, public history and deployment activation remain separate release steps.
+The settlement, runner-up and token commands accept the private pair register emitted by `prepare-rehearsal-core.mjs --register`. Pass its file path directly after verifying the deployment receipt. The commands use the chain ID and the address and initialized runtime hash of each contract. They discard the custody fields. The compact file format with `chainId`, `coreAddress`, `nftAddress`, `expectedCoreCodeHash` and `expectedNftCodeHash` also works. Mixing both formats in one file fails validation.
+
+The receipt location supplies numeric `blockNumber`, `blockHash`, `transactionHash` and a decimal string `auctionId`. The command reads the RPC finalized boundary, deployment bindings, runtime code and receipt before opening the database transaction. Replaying identical evidence returns `inserted: false`. A disagreement fails the intake and preserves earlier rows. Continuous scanning, public history and deployment activation remain separate release steps.
 
 ### Read a runner-up offer
 
