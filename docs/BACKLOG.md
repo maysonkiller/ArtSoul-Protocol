@@ -25,6 +25,8 @@ C13 has a [public test deployment and read-only auction rehearsal](testnet/ORDIN
 
 The [numbered checklist](canon/12_IMPLEMENTATION_BACKLOG.md) has 17 of 38 active items accepted; the two retired archive gates receive no completion credit. B engineering is closed. Its named public-beta journeys are tracked in C13. The ordinary-market candidate passed C2 auction Core implementation, C3 artwork NFT implementation, C6 pool accounting and C11 contract and invariant testing. The independent review, fresh hosted rehearsal, production custody and mainnet go/no-go are still open.
 
+The [C5 collection metadata check](canon/CONTRACT_REWORK_PLAN.md#first-work-attempts-for-partner-launches) verifies a minted opening token against its draft at one finalized block. The [regressions](../test/collection-metadata-preflight.test.mjs) cover distinct original buyer and owner, a wrong chain or runtime, a changed URI, an inconsistent collector and a replaced block. Public collection acceptance still needs a reviewed Base Sepolia deployment and settlement.
+
 ### November 20 review of older proposals
 
 - [PR #278](https://github.com/maysonkiller/ArtSoul-Protocol/pull/278) is superseded by the shipped wrapping auction heading and its responsive regressions in [PR #500](https://github.com/maysonkiller/ArtSoul-Protocol/pull/500).
