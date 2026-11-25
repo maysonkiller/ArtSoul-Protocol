@@ -41,8 +41,7 @@
     const NAVIGATION_KEY = 'artsoul.voice.next-page';
     const NAVIGATION_TTL = 30000;
     // SpeechRecognition reports 0..1. Below this a wallet command is not run.
-    // Some engines report 0 when they do not measure it at all; that is treated
-    // as unknown, and the tool gate still applies.
+    // Engines reporting unknown confidence require an explicit typed submission.
     const WRITE_CONFIDENCE = 0.6;
 
     const WRITE_TOOLS = Object.freeze([
@@ -63,7 +62,7 @@
     // A new tool requires a deliberate Send until its voice-chat effects are reviewed.
     const CHAT_TOOLS = new Set(['search_catalog', 'find_active_auctions', 'get_auction_state',
         'get_artwork_provenance', 'get_artwork', 'get_my_activity', 'open_artwork', 'open_page',
-        DRAFT_TOOL, 'revise_publication_draft']);
+        'explain_settlement', 'prepare_bid', DRAFT_TOOL, 'revise_publication_draft']);
 
     // Recognisers write numbers as digits: "31", "0.05", and in Russian "0,05".
     const AMOUNT = '(\\d+(?:[.,]\\d{1,18})?)';
@@ -268,14 +267,15 @@
 
     /** Whether a heard command may run, given the recogniser's own confidence. */
     function mayRun(command, confidence) {
-        if (!isWrite(command) && !SAVED_TOOLS.includes(command?.tool) && !REVIEW_TOOLS.includes(command?.tool) && command?.tool !== DRAFT_TOOL) return true;
-        const value = Number(confidence);
-        return !(Number.isFinite(value) && value > 0 && value < WRITE_CONFIDENCE);
+        const tool = command?.tool;
+        const draftEdit = tool === 'revise_publication_draft' && command.input?.value !== undefined;
+        if (!isWrite(command) && !SAVED_TOOLS.includes(tool) && !REVIEW_TOOLS.includes(tool) && tool !== DRAFT_TOOL && !draftEdit) return true;
+        return Number.isFinite(confidence) && confidence >= WRITE_CONFIDENCE && confidence <= 1;
     }
 
     const TEXT = {
         title: 'ArtSoul commands',
-        hint: 'Choose the language you speak. Replies are in English. Wallet actions need your review and signature.',
+        hint: 'Choose the language you speak. Replies are in English. Recorded replies can play aloud. Wallet actions need your review and signature.',
         input: 'Your command', placeholder: 'Open gallery, search moon…',
         send: 'Send', microphone: 'Use microphone', stop: 'Stop listening',
         conversation: 'Start voice chat', endConversation: 'End voice chat',
@@ -283,9 +283,10 @@
         resumeMic: 'Page opened. Tap Start voice chat to continue, or type your next request.',
         arrival: 'Page opened. Listening for your next request.',
         navigationWait: 'Navigation is taking longer than expected. Voice chat is paused.',
-        reviewCommand: 'Voice chat paused. Check the command and press Send to review this action.',
+        reviewCommand: 'Check the command and press Send to review this action.',
         listenReply: 'Listen to answer', stopReply: 'Stop audio',
         audioUnavailable: 'Audio could not play in this browser. The answer is available as text.',
+        audioMissing: 'This reply is available as text.',
         audioBlocked: 'Tap Listen to answer to play the audio.',
         audioNotice: 'AI-generated voice.',
         helpSpeech: 'You can open the gallery, find artwork, or ask about your activity. The examples below show the available commands. Wallet actions always need your review and signature.',
@@ -301,7 +302,7 @@
         options: 'You can open the gallery, find artwork, or ask about your activity.',
         askSearch: 'What would you like to find?', askTitle: 'What is the title?',
         otherRequest: 'Try “open NFTs”, “search moon”, or “my activity”.',
-        unsure: heard => `I am not sure I heard "${heard}" correctly. Please repeat the action.`,
+        unsure: 'I am not sure I heard that correctly. Check the text and press Send, or repeat your request.',
         heard: heard => `Heard: "${heard}"`,
         unavailable: 'Commands are not available on this page.',
         notice: 'Your browser may send microphone audio to its speech service for transcription. ArtSoul receives no microphone audio.\n\nTurn on the microphone?',
@@ -319,17 +320,86 @@
         error: message => `That did not work: ${message}`
     };
 
+    // Previously recorded with the same API voice as the English responses.
+    const RU_FIXED = Object.freeze({
+      "helpSpeech": "Можно открыть галерею, найти работу или узнать о своей активности. Доступные команды показаны в примерах ниже. Действия с кошельком всегда требуют вашей проверки и подписи.",
+      "searchPrompt": "Что найти? Например: «найди луна», «найди автора Vera» или «найди в документации fees».",
+      "publicationPrompt": "Как назвать работу? Например: «подготовь работу с названием Лунный свет». На Publish вы проверите черновик; файл не загружается, подпись не запрашивается.",
+      "tooLong": "Введите одну команду длиной до 300 символов.",
+      "empty": "Сначала введите команду.",
+      "unavailable": "Команды недоступны на этой странице.",
+      "noWallet": "Кошелёк не подключён. Сначала подключите его.",
+      "submitted": "Готово. Кошелёк подтвердил, транзакция отправлена.",
+      "settled": "Расчёт подтверждён. NFT теперь ваша. Данные работы обновляются."
+    });
+    // Pre-recorded generic cues never include private, changing or unverified data.
+    const SPOKEN_CUES = Object.freeze({
+    "r2AuctionResults": "The current auction results are shown on screen.",
+    "r2ArtworkResults": "The verified artwork details are shown on screen.",
+    "r2ProvenanceResults": "Creator, First Collector, and Owner are shown on screen.",
+    "r2SearchResults": "The ArtSoul search results are shown on screen.",
+    "r2ActivityResults": "Your ArtSoul activity is shown on screen.",
+    "r2BidPreparedResult": "Your bid preview is ready for review. Nothing has been signed.",
+    "r2ReviewResult": "You must review this action and approve it in your own wallet.",
+    "r2InfoResults": "Verified ArtSoul details are shown on screen.",
+    "r2ActionNotCompleted": "The action was not completed. Check the reason on screen.",
+    "r2ToolError": "ArtSoul could not complete this request. Check the details on screen.",
+    "r2NoMatches": "No matching items were returned. Try another title or number.",
+    "r2NoAuctions": "No open auctions were returned by ArtSoul.",
+    "r2LifecycleResults": "The ArtSoul auction and settlement stages are explained on screen.",
+    "r2PageNavigation": "Opening the requested ArtSoul page."
+});
+    function safeToolCue(tool,data) {
+        const choose = id => SPOKEN_CUES[id] || '';
+        if (!data || typeof data !== 'object' || Array.isArray(data) || data.error) return choose('r2ToolError');
+        if (data.submitted === true && !WRITE_TOOLS.includes(tool)) return choose('r2ToolError');
+        if (data.submitted === false || data.prepared === false || data.opened === false || data.updated === false)
+            return choose('r2ActionNotCompleted');
+        if (tool === 'find_active_auctions') {
+            if (!Array.isArray(data.auctions) || !Number.isSafeInteger(data.count) || data.count < data.auctions.length)
+                return choose('r2ToolError');
+            return choose(data.count === 0 ? 'r2NoAuctions' : 'r2AuctionResults');
+        }
+        if (tool === 'search_catalog') {
+            const groups = data.groups;
+            if (!groups || typeof groups !== 'object') return choose('r2ToolError');
+            const lengths = ['artworks','auctions','artists','pages','docs']
+                .map(key => groups[key]?.items)
+                .filter(value => Array.isArray(value)).map(value => value.length);
+            if (!lengths.length) return choose('r2ToolError');
+            return choose(lengths.some(Boolean) ? 'r2SearchResults' : 'r2NoMatches');
+        }
+        if (['get_artwork','get_auction_state','get_artwork_provenance','prepare_bid'].includes(tool) &&
+            !/^[1-9]\d{0,77}$/.test(String(data.artwork_id || ''))) return choose('r2ToolError');
+        if (tool === 'get_artwork') return choose('r2ArtworkResults');
+        if (tool === 'get_auction_state') return choose('r2AuctionResults');
+        if (tool === 'get_artwork_provenance') return choose('r2ProvenanceResults');
+        if (tool === 'get_my_activity') return choose('r2ActivityResults');
+        if (tool === 'explain_settlement') return choose('r2LifecycleResults');
+        if (tool === 'prepare_bid' && data.prepared === true) return choose('r2BidPreparedResult');
+        if ((tool === 'open_page' || tool === 'open_artwork') && data.opened === true)
+            return choose('r2PageNavigation');
+        return '';
+    }
+
     // Only reviewed, fixed public copy has a prerecorded voice. Exact matching
     // keeps dynamic amounts and refused/submitted/confirmed states distinct.
     const replyClips = Object.freeze(
         ['helpSpeech', 'searchPrompt', 'publicationPrompt', 'tooLong', 'empty', 'unavailable', 'noWallet', 'submitted', 'settled']
             .map(id => Object.freeze({lang: 'en', id, text: TEXT[id], url: `/audio/assistant/v1/en-${id}.wav`}))
+            .concat(['helpSpeech','searchPrompt','publicationPrompt','tooLong','empty','unavailable','noWallet','submitted','settled']
+                .map(id=>Object.freeze({lang:'ru',id,text:RU_FIXED[id],url:`/audio/assistant/v1/ru-${id}.wav`})))
     );
 
     function getReplyAudio(text) {
         const phrase = ['options', 'askSearch', 'askTitle'].find(id => TEXT[id] === text);
         if (phrase) return `/audio/assistant/v1/phrases/en-${phrase}.wav`;
-        return replyClips.find(clip => clip.text === text)?.url || '';
+        const fixed = replyClips.find(clip => clip.lang === 'en' && clip.text === text)?.url;
+        if (fixed) return fixed;
+        // Generated offline, never a runtime call to any API or browser voice.
+        const extra = window.ArtSoulVoiceAudioBank?.lookup?.(text);
+        return typeof extra === 'string' &&
+            /^\/audio\/assistant\/v1\/phrases\/en-r2[A-Za-z0-9]+\.wav$/.test(extra) ? extra : '';
     }
 
     function hoursText(value) {
@@ -344,6 +414,11 @@
      * the panel carries the detail, so a person who cannot hear the reply still
      * gets all of it.
      */
+    function walletSubmitted(tool, data) {
+        return WRITE_TOOLS.includes(tool) && data?.submitted === true &&
+            typeof data.transaction_hash === 'string' && /^0x[0-9a-f]{64}$/i.test(data.transaction_hash);
+    }
+
     function describeResult(tool, result) {
         const t = TEXT;
         const data = result || {};
@@ -355,11 +430,13 @@
         }
         if (data.connected === false) return { say: t.noWallet, show: data.reason || t.noWallet };
         if (data.submitted === true) {
+            if (!walletSubmitted(tool, data)) {
+                const message = 'A transaction receipt is unavailable. Check your wallet activity.';
+                return {say: '', show: message};
+            }
             const message = tool === 'complete_settlement' && data.confirmed === true ? t.settled : t.submitted;
             const links = [{url: data.url || '/profile', label: data.url ? 'View artwork' : 'View profile'}];
-            if (/^0x[0-9a-f]{64}$/i.test(data.transaction_hash || '')) {
-                links.push({url: `https://sepolia.basescan.org/tx/${data.transaction_hash}`, label: 'View transaction'});
-            }
+            links.push({url: `https://sepolia.basescan.org/tx/${data.transaction_hash}`, label: 'View transaction'});
             return { say: message, show: `${message}\n${t.next}`, links };
         }
         if ((data.submitted === false && !(tool === DRAFT_TOOL && data.prepared === true)) || data.prepared === false || data.opened === false || data.updated === false) {
@@ -464,6 +541,15 @@
             const text = `Opening ${data.title}.`;
             return { say: text, show: text };
         }
+        case 'explain_settlement': {
+            const steps = Array.isArray(data.lifecycle) ? data.lifecycle.filter(x => typeof x === 'string').slice(0,7) : [];
+            const explanation = steps.length ? steps.join(' ') : t.unavailable;
+            return {say:explanation,show:[explanation,data.floor_rule,data.exact_figures].filter(Boolean).join('\n')};
+        }
+        case 'prepare_bid': {
+            const message = typeof data.instruction === 'string' ? data.instruction : t.unavailable;
+            return {say:message,show:message};
+        }
         case 'revoke_wallet_access': {
             const text = data.revoked
                 ? 'The agent can no longer open your wallet.'
@@ -521,16 +607,65 @@
         } catch { return null; }
     }
 
+
+    // UI-only voice intents. No wallet connection, signatures or transfers:
+    // these helpers may display an existing menu or set a presentation theme.
+    function safeVoiceUiAction(intent, { win = window, doc = typeof document === 'undefined' ? null : document } = {}) {
+        const result = text => ({show:text, say:text});
+        const unavailable=()=>result('This control is unavailable here. Please use the corresponding header button.');
+        if (!intent || intent.kind !== 'ui' || !doc || doc.visibilityState === 'hidden') return unavailable();
+        if (intent.action === 'walletMenu') {
+            const button = doc.querySelector('.avatar-button[aria-label="ArtSoul account menu"]');
+            if (!button || button.disabled || typeof button.click !== 'function') return unavailable();
+            try {
+                if (button.getAttribute('aria-expanded') !== 'true') button.click();
+            } catch { return unavailable(); }
+            return result('Account menu opened. Select a wallet and approve the connection yourself. Nothing was signed.');
+        }
+        if (intent.action === 'notifications') {
+            const button = doc.querySelector('[data-notification-preview]');
+            if (!button || button.disabled || typeof button.click !== 'function') return unavailable();
+            try { button.click(); } catch { return unavailable(); }
+            return result('Opening notifications. If no wallet is connected, the panel will show a connection prompt.');
+        }
+        if (intent.action === 'theme') {
+            if (!['classic','future'].includes(intent.theme) ||
+                typeof win.ThemeManager?.setTheme !== 'function') return unavailable();
+            try { win.ThemeManager.setTheme(intent.theme); } catch { return unavailable(); }
+            return intent.theme === 'classic'
+                ? result('ArtSoul Classic appearance is enabled.')
+                : result('ArtSoul Future appearance is enabled.');
+        }
+        if (intent.action === 'networkStatus') {
+            if (win.artsoulWalletStateSettled !== true)
+                return result('Wallet state is still loading. Check the network in your wallet menu.');
+            const state=win.artsoulSettledWalletState;
+            if (!state?.isConnected || !/^0x[0-9a-f]{40}$/i.test(String(state.address||'')))
+                return result('No wallet is connected. Its selected network is unknown.');
+            const raw = state.chainId ?? state.network?.chainId;
+            const chain = typeof raw === 'string' && /^0x[0-9a-f]+$/i.test(raw)
+                ? Number.parseInt(raw.slice(2),16) : Number(raw);
+            if (Number.isSafeInteger(chain) && chain > 0) {
+                const label=({84532:'Base Sepolia',8453:'Base Mainnet',1:'Ethereum Mainnet',11155111:'Ethereum Sepolia'})[chain];
+                return result('Wallet connected. Selected network: '+(label||'ID '+chain)+'.');
+            }
+            return result('Wallet connected, but the network is not verified by available state. Check it in your wallet.');
+        }
+        return unavailable();
+    }
+
     window.ArtSoulVoice = Object.freeze({
         parseCommand,
         parseNavigationTurn,
         describeResult,
         replyClips,
         getReplyAudio,
+        safeToolCue,
         mayRun,
         isWrite,
         WRITE_TOOLS,
-        WRITE_CONFIDENCE
+        WRITE_CONFIDENCE,
+        safeVoiceUiAction
     });
 
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -541,12 +676,21 @@
         if (launcher?.dataset.commandsInitialized) return;
         const agent = window.ArtSoulWebMCP;
         const tools = new Map(agent.createTools(agent.browserDependencies()).map(tool => [tool.name, tool]));
+        const dialogue = window.ArtSoulVoiceConversation?.createDialogue?.();
+        const DIALOGUE_KEY = 'artsoul.voice.dialogue.r2';
 
         let inputLanguage = readStored(LANG_KEY) === 'ru' ? 'ru' : 'en';
         let recognition = null;
         let handsFree = false;
         let leavingFor = null;
         let arrivingFrom = takeNavigation();
+        if (arrivingFrom && dialogue) {
+            try {
+                const saved = window.sessionStorage.getItem(DIALOGUE_KEY);
+                if (saved && saved.length < 1500) dialogue.restore(JSON.parse(saved));
+                window.sessionStorage.removeItem(DIALOGUE_KEY);
+            } catch { dialogue.clear(); }
+        }
         let pendingDraftField = null;
         let pendingPrompt = null;
         let voiceConsent = readStored(NOTICE_KEY) === 'accepted';
@@ -687,7 +831,7 @@
             chat.setAttribute('aria-pressed', String(handsFree));
             chat.dataset.listening = String(handsFree && Boolean(recognition));
             const hasClip = Boolean(getReplyAudio(answerToRead)) && typeof window.Audio === 'function';
-            const supportsAudio = hasClip || (typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function');
+            const supportsAudio = hasClip;
             audioNotice.textContent = TEXT.audioNotice;
             audioNotice.hidden = !hasClip;
             replay.hidden = !answerToRead;
@@ -695,7 +839,7 @@
             replay.textContent = speaking ? TEXT.stopReply : TEXT.listenReply;
             replay.setAttribute('aria-pressed', String(speaking));
             if (answerToRead && !supportsAudio) {
-                audioStatus.textContent = TEXT.audioUnavailable;
+                audioStatus.textContent = getReplyAudio(answerToRead) ? TEXT.audioUnavailable : TEXT.audioMissing;
                 audioStatus.hidden = false;
             }
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => { el.disabled = busy || noticePending; });
@@ -729,6 +873,7 @@
             if (!keepDraft) {
                 pendingDraftField = null;
                 pendingPrompt = null;
+                dialogue?.clear();
             }
             handsFree = false;
             stopListening();
@@ -737,6 +882,7 @@
 
         function closePanel() {
             stopVoice();
+            dialogue?.clear();
             panel.hidden = true;
             button.setAttribute('aria-expanded', 'false');
             button.focus({ preventScroll: true });
@@ -800,42 +946,13 @@
                     playback?.catch(error => finish(error || {name: 'MediaError'}));
                     return;
                 }
-                if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') {
-                    afterPlayback(true);
-                    return;
-                }
-                const current = new SpeechSynthesisUtterance(textToSay);
-                let started = false;
-                utterance = current;
-                current.lang = 'en-US';
-                current.onstart = () => {
-                    if (utterance !== current) return;
-                    started = true;
-                    speaking = true;
-                    controls();
-                };
-                const finish = failed => {
-                    if (utterance !== current) return;
-                    window.clearTimeout?.(clipTimer);
-                    clipTimer = null;
-                    utterance = null;
-                    speaking = false;
-                    if (failed) {
-                        audioStatus.textContent = TEXT.audioUnavailable;
-                        audioStatus.hidden = false;
-                    }
-                    afterPlayback(failed);
-                };
-                current.onend = () => finish(!started);
-                current.onerror = () => finish(true);
-                // Some mobile engines accept speak() and never deliver an event.
-                // Stop the chat if playback cannot complete; never guess when to listen.
-                if (handsFree) clipTimer = window.setTimeout(() => {
-                    if (utterance !== current) return;
-                    finish(true);
-                    window.speechSynthesis.cancel();
-                }, 60000);
-                window.speechSynthesis.speak(current);
+                // A missing matching clip must never switch to an arbitrary browser/male voice.
+                // Unrecorded responses remain available as text until a verified unified TTS is available.
+                speaking = false;
+                audioStatus.textContent = TEXT.audioMissing;
+                audioStatus.hidden = false;
+                afterPlayback(true);
+                return;
             } catch {
                 stopVoice();
                 audioStatus.textContent = TEXT.audioUnavailable;
@@ -869,6 +986,10 @@
         async function handle(transcript, confidence, spoken = false) {
             if (busy || noticePending) return;
             silence();
+            const acronymOnly = /^(?:nfts?|n[ .-]?f[ .-]?t)$/iu.test(transcript.trim());
+            const hasCyrillic = /[а-яё]/iu.test(transcript);
+            const parseLang = hasCyrillic ? 'ru' : acronymOnly ? inputLanguage
+                : /[a-z]/iu.test(transcript) ? 'en' : inputLanguage;
             const t = TEXT;
             const audio = audioGeneration;
             const reply = (heard, answer, say = answer, links = []) => {
@@ -889,13 +1010,28 @@
                 reply(transcript, t.next);
                 return;
             }
-            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, inputLanguage, pendingDraftField);
-            pendingDraftField = draftTurn?.nextField || null;
+            const draftTurn = !isValue && window.ArtSoulPublicationDraft?.parseTurn?.(transcript, parseLang, pendingDraftField);
             if (draftTurn?.message) {
+                pendingDraftField = draftTurn.nextField || null;
                 reply(transcript, draftTurn.message, pendingDraftField === 'title' ? t.askTitle : draftTurn.message);
                 return;
             }
-            let command = draftTurn || parseCommand(transcript, inputLanguage, previousPrompt === 'nft');
+            const contextual = !draftTurn && !isValue && dialogue?.route(transcript, {
+                spoken, confidence
+            });
+            let command = draftTurn || (contextual?.kind === 'tool'
+                ? {tool:contextual.tool,input:contextual.input}
+                : parseCommand(transcript, parseLang, previousPrompt === 'nft'));
+            if (contextual?.kind === 'stop') { stopVoice(); show(transcript,'',[], ''); return; }
+            if (contextual?.kind === 'reply') {
+                if (contextual.pendingNft === true) pendingPrompt = 'nft';
+                reply(transcript,contextual.text); return;
+            }
+            if (contextual?.kind === 'ui') {
+                const outcome = safeVoiceUiAction(contextual,{win:window,doc:document});
+                reply(transcript,outcome.show,outcome.say);
+                return;
+            }
             // The answer to a search/title question is data, even when it sounds like a wallet command.
             if (previousPrompt === 'search' && command?.tool !== 'search_catalog' && !command?.searchPrompt && !command?.help) {
                 command = { tool: 'search_catalog', input: { query: transcript.trim() } };
@@ -921,12 +1057,15 @@
                 reply(transcript, hint, handsFree ? (command.searchPrompt ? t.askSearch : t.askTitle) : hint);
                 return;
             }
-            if (!mayRun(command, confidence)) {
-                const text = t.unsure(transcript);
-                reply(transcript, text);
+            if (spoken && !mayRun(command, confidence)) {
+                // Preserve the field so manual Send keeps a dictated title as data.
+                pendingPrompt = previousPrompt;
+                handsFree = false;
+                reply(transcript, t.unsure);
                 return;
             }
-            if (handsFree && !CHAT_TOOLS.has(command.tool)) {
+            pendingDraftField = null;
+            if (spoken && (isWrite(command) || (handsFree && !CHAT_TOOLS.has(command.tool)))) {
                 handsFree = false;
                 reply(transcript, t.reviewCommand);
                 return;
@@ -945,13 +1084,26 @@
             try {
                 const result = JSON.parse(await tool.execute(command.input));
                 if (current !== generation || currentWallet !== walletIdentity()) return;
-                if (!result.error && (result.submitted === true || result.updated === true || result.revoked === true)) {
-                    // A finished action must not remain armed in the composer.
-                    // Declines/errors retain the draft for a deliberate retry.
+                dialogue?.observe(command.tool,result);
+                if (!result.error && ((isWrite(command) && result.submitted === true) ||
+                    (SAVED_TOOLS.includes(command.tool) && result.updated === true) ||
+                    (command.tool === 'revoke_wallet_access' && result.revoked === true))) {
+                    // Disarm a possibly sent wallet action even when its hash is missing.
                     input.value = '';
                     input.placeholder = t.next;
                 }
-                const resultText = describeResult(command.tool, result);
+                let resultText = describeResult(command.tool, result);
+                // Only speak a generic cue when the corresponding verified WAV exists.
+                // Changing names, balances, prices, owner addresses stay on screen.
+                const cue = safeToolCue(command.tool,result);
+                if (cue && getReplyAudio(cue)) resultText = {...resultText,say:cue};
+                else if (getReplyAudio(resultText.say)) {
+                    // Text returned by a read tool is never evidence of a wallet action.
+                    const walletRecorded = walletSubmitted(command.tool, result);
+                    const walletMissing = resultText.say === TEXT.noWallet && (result.connected === false ||
+                        (result.opened === false && result.code === 'wallet_required'));
+                    if (!walletRecorded && !walletMissing) resultText = {...resultText,say:''};
+                }
                 if (spoken && handsFree && audio === audioGeneration && result.opened === true && sourcePage &&
                     (command.tool === 'open_page' || command.tool === 'open_artwork')) {
                     const from = new URL(sourcePage);
@@ -1118,9 +1270,10 @@
         });
         // Never listen in a tab nobody is looking at.
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') stopVoice();
+            if (document.visibilityState === 'hidden') {stopVoice();dialogue?.clear();}
         });
         function clearAccount() {
+            dialogue?.clear();
             generation++;
             stopVoice();
             input.value = '';
@@ -1132,7 +1285,12 @@
             if (!window.artsoulSettledWalletState && (arrivingFrom.wallet || readStored('artsoul_wallet'))) return;
             const nav = arrivingFrom;
             arrivingFrom = null;
-            if (nav.wallet !== walletIdentity() || Date.now() - nav.at >= NAVIGATION_TTL ||
+            if (nav.wallet !== walletIdentity()) {
+                // Do not resurrect prior-account conversational references.
+                dialogue?.clear();
+                return;
+            }
+            if (Date.now() - nav.at >= NAVIGATION_TTL ||
                 !voiceConsent || typeof Recognition !== 'function' || document.visibilityState !== 'visible' || panel.hidden) return;
             handsFree = true;
             show('', TEXT.arrival, [], '');
@@ -1146,7 +1304,10 @@
         window.addEventListener('artsoul:auth-state-changed', () => { clearAccount(); show('', ''); });
         window.addEventListener('pagehide', () => {
             if (leavingFor && Date.now() - leavingFor.at < NAVIGATION_TTL) {
-                try { window.sessionStorage.setItem(NAVIGATION_KEY, JSON.stringify(leavingFor)); }
+                try {
+                    if (dialogue) window.sessionStorage.setItem(DIALOGUE_KEY,JSON.stringify(dialogue.snapshot()));
+                    window.sessionStorage.setItem(NAVIGATION_KEY, JSON.stringify(leavingFor));
+                }
                 catch { /* Browsing still works when tab storage is unavailable. */ }
             }
             clearAccount();
