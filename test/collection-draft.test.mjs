@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assetIdentity, createAuctionMintDraft, createDraft, createFirstArtworkDraft, createOriginDraft, createPhase, DRAFT_KEY, feePreview, loadDraft, MAX_DRAFT_ITEMS, parseDraft, parseEth, reviewConfig, saveDraft, scheduleTimestamp } from '../src/features/collections/launch-config.js';
+import { assetIdentity, changeDraftSupply, createAuctionMintDraft, createDraft, createFirstArtworkDraft, createOriginDraft, createPhase, DRAFT_KEY, feePreview, loadDraft, MAX_DRAFT_ITEMS, parseDraft, parseEth, reviewConfig, saveDraft, scheduleTimestamp } from '../src/features/collections/launch-config.js';
 import { COLLECTION_NETWORKS } from '../src/config/collection-networks.js';
 
 function configured() {
@@ -163,6 +163,31 @@ test('only an explicitly selected first-work template uses the restricted local 
     assert.equal(reviewConfig(parseDraft(JSON.stringify(legacy))).contractCompatibility.compatible, true);
     for (const other of [legacy, createAuctionMintDraft(), createOriginDraft()]) {
         assert.equal(reviewConfig(other).contractCompatibility.firstWorkArtifact, null);
+    }
+});
+
+test('editing first-work supply reserves one opening NFT and resizes only the public allocation', () => {
+    const draft = createFirstArtworkDraft();
+    const [opening, mint] = draft.phases;
+    mint.walletLimit = 2;
+    for (const [supply, remainder] of [['100', 99], ['2', 1], ['4294967295', 4294967294],
+        ['', ''], ['1', ''], ['1.5', ''], ['4294967296', '']]) {
+        const sized = changeDraftSupply(draft, supply);
+        assert.equal(sized.maxSupply, supply);
+        assert.deepEqual(sized.phases, [{ ...opening, allocation: 1 }, { ...mint, allocation: remainder }]);
+    }
+    const resized = changeDraftSupply(changeDraftSupply(draft, '100'), '12');
+    const store = memoryStorage();
+    saveDraft(store, resized);
+    assert.deepEqual(loadDraft(store), resized);
+    assert.equal(resized.phases[1].allocation, 11);
+    assert.equal(draft.phases[1].allocation, '');
+
+    const legacy = structuredClone(resized);
+    delete legacy.launchTemplate;
+    const reordered = { ...resized, phases: [...resized.phases].reverse() };
+    for (const custom of [legacy, reordered, createAuctionMintDraft(), createOriginDraft()]) {
+        assert.deepEqual(changeDraftSupply(custom, '50').phases, custom.phases);
     }
 });
 

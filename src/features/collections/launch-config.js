@@ -33,6 +33,7 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const ZERO_ADDRESS = /^0x0{40}$/i;
 const integer = value => (typeof value === 'number' || (typeof value === 'string' && /^[+-]?\d+$/.test(value.trim()))) && Number.isSafeInteger(Number(value));
 const positive = value => integer(value) && Number(value) > 0;
+const uint32 = value => positive(value) && BigInt(value) <= 0xffffffffn;
 const address = value => ADDRESS.test(String(value || '')) && !ZERO_ADDRESS.test(value);
 const hasText = value => typeof value === 'string' && value.trim().length > 0;
 
@@ -169,6 +170,21 @@ export function createFirstArtworkDraft() {
     return draft;
 }
 
+export function hasFirstWorkMint(draft) {
+    const [opening, mint] = draft.phases;
+    return draft.launchTemplate === 'first-work' && draft.phases.length === 2 &&
+        opening.mechanism === 'first-artwork-auction' && ['fixed', 'fcfs'].includes(mint.mechanism) &&
+        mint.eligibility.kind === 'public';
+}
+
+// Only a deliberate supply edit resizes allocations. Loading an older draft preserves its original terms.
+export function changeDraftSupply(draft, maxSupply) {
+    if (!hasFirstWorkMint(draft)) return { ...draft, maxSupply };
+    const [opening, mint] = draft.phases;
+    const remainder = uint32(maxSupply) && Number(maxSupply) >= 2 ? Number(maxSupply) - 1 : '';
+    return { ...draft, maxSupply, phases: [{ ...opening, allocation: 1 }, { ...mint, allocation: remainder }] };
+}
+
 export function setsMintPrice(phase) {
     return phase.mechanism === 'uniform-auction' || phase.mechanism === 'first-artwork-auction';
 }
@@ -239,12 +255,10 @@ export function loadDraft(storage) {
 export function reviewLocalContractCapabilities(config) {
     const findings = [];
     const add = (code, message) => findings.push({ code, message });
-    const uint32 = value => positive(value) && BigInt(value) <= 0xffffffffn;
     const allowlists = ['merkle', 'wallet-allowlist'];
     if (config.launchTemplate === 'first-work') {
-        const [opening, mint] = config.phases;
-        if (config.phases.length !== 2 || opening?.mechanism !== 'first-artwork-auction' ||
-            !['fixed', 'fcfs'].includes(mint?.mechanism) || mint?.eligibility.kind !== 'public') {
+        const mint = config.phases[1];
+        if (!hasFirstWorkMint(config)) {
             add('FIRST_WORK_PHASES', 'Use one opening artwork auction followed by one public fixed-price mint.');
         }
         if (!uint32(config.maxSupply) || Number(config.maxSupply) < 2 || !uint32(mint?.allocation) ||
