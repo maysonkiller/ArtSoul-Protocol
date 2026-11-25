@@ -13,13 +13,21 @@ const resources = {
     '/artwork-url.js': ['src/ui/artwork-url.js', 'text/javascript'],
     '/motion.mp4': ['docs/design/study-assets/motion-demo.mp4', 'video/mp4'],
     '/poster.svg': ['docs/design/study-assets/motion-poster.svg', 'image/svg+xml'],
-    '/tone.wav': ['docs/design/study-assets/tone-demo.wav', 'audio/wav'],
+    '/silence.wav': ['docs/design/study-assets/tone-demo.wav', 'audio/wav'],
     '/brand/artsoul-audio-cover-384.webp': ['public/brand/artsoul-audio-cover-384.webp', 'image/webp'],
     '/brand/base.svg': ['public/brand/base.svg', 'image/svg+xml']
 };
 
 async function serverForCards() {
     const gallery = await fs.readFile(path.join(root, 'gallery.html'), 'utf8');
+    // Exercise real playback and mute controls without sending any sound to the host.
+    const silentAudio = await fs.readFile(path.join(root, resources['/silence.wav'][0]));
+    const samples = silentAudio.indexOf('data', 36);
+    assert(samples >= 36 && silentAudio.readUInt16LE(20) === 1 && silentAudio.readUInt16LE(34) === 16);
+    silentAudio.fill(0, samples + 8);
+    const silentVideo = await fs.readFile(path.join(root, resources['/motion.mp4'][0]));
+    assert(!silentVideo.includes(Buffer.from('soun')), 'The video fixture needs a video-only MP4');
+    const silentMedia = new Map([['/silence.wav', silentAudio], ['/motion.mp4', silentVideo]]);
     let deployedCss;
     if (process.env.ARTSOUL_CARD_CSS === 'production') {
         const galleryUrl = 'https://artsoulprotocol.com/gallery';
@@ -47,7 +55,7 @@ async function serverForCards() {
             }
             if (!Object.hasOwn(resources, pathname)) { res.writeHead(404); return res.end(); }
             const [file, type] = resources[pathname];
-            const bytes = pathname === '/unified-styles.css' && deployedCss ? deployedCss : await fs.readFile(path.join(root, file));
+            const bytes = silentMedia.get(pathname) ?? (pathname === '/unified-styles.css' && deployedCss ? deployedCss : await fs.readFile(path.join(root, file)));
             const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || '');
             const start = range ? Number(range[1]) : 0;
             const end = range ? Math.min(Number(range[2] || bytes.length - 1), bytes.length - 1) : bytes.length - 1;
@@ -64,7 +72,7 @@ async function serverForCards() {
 
 async function run(engine, name, screenshots, origin) {
     const channel = name === 'chromium' && process.env.CHROMIUM_CHANNEL;
-    const browser = await engine.launch(channel ? {channel} : {});
+    const browser = await engine.launch(name === 'chromium' ? {channel: channel || undefined, args:['--mute-audio']} : {});
     try {
         for (const [width, height, mobile] of [[320, 700, true], [360, 800, true], [390, 844, true], [430, 932, true], [932, 430, true], [1280, 800, false]]) {
             const context = await browser.newContext({ viewport: { width, height }, hasTouch: mobile, isMobile: mobile });
@@ -81,7 +89,7 @@ async function run(engine, name, screenshots, origin) {
                             ['DOM', 'video'], ['React', 'audio'], ['DOM', 'audio'], ['React', 'video']
                         ].entries()) {
                             const artwork = { artwork_id: i + 1, chain_id: 84532, title: (media === 'audio' ? 'Sound study' : 'Motion study'),
-                                creator_name: 'ArtSoul', file_type: media, file_url: media === 'audio' ? '/tone.wav' : '/motion.mp4',
+                                creator_name: 'ArtSoul', file_type: media, file_url: media === 'audio' ? '/silence.wav' : '/motion.mp4',
                                 poster_url: media === 'video' ? '/poster.svg' : null };
                             const host = document.createElement('div');
                             host.dataset.renderer = renderer;
@@ -127,8 +135,10 @@ async function run(engine, name, screenshots, origin) {
                                 const media = card.locator('audio,video');
                                 const before = await media.evaluate(m => m.muted);
                                 const press = el => mobile ? el.tap() : el.click();
+                                assert(await media.evaluate(m => m.paused), 'Scrolling to a preview must leave it paused');
                                 await press(mute);
                                 assert.notEqual(await media.evaluate(m => m.muted), before, where);
+                                assert(await media.evaluate(m => m.paused), 'Changing mute must not start playback');
                                 await press(play);
                                 await page.waitForFunction(m => !m.paused && m.currentTime > .1, await media.elementHandle());
                                 await press(play);

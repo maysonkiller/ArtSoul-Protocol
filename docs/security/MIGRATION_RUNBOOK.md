@@ -183,6 +183,10 @@ The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-mi
 
 From 19:21:54 to 19:51:54 UTC, Supabase logged 487 API requests with zero HTTP 4xx or 5xx responses. All 60 calls to `read_notification_summary` exceeded one second of upstream service time. The median was 1,246 ms and p95 was 1,286 ms. The hosted function still matched the November 16 definition. The service role's cumulative PostgreSQL statement statistics showed 4,543 calls averaging 740 ms, with zero JIT functions and zero temporary blocks. The cumulative figures cover a different window from the gateway sample.
 
+From 21:08 to 21:38 UTC, the gateway recorded another 53 calls averaging 1,250 ms with p95 of 1,437 ms. A catalog check at 21:46 UTC still found the November 16 body and no ledger entry for the November 25 migration. The recipient index and the read-state primary key were valid and ready. The main service-role SQL statement had accumulated 4,746 calls averaging 760.4 ms with zero temporary blocks read or written.
+
+Run the [read-only catalog inspection](../../sql/runbooks/inspect_notification_summary_rollout.sql) before and after a separately authorized release or rollback. The preserved November 16 body reports `november_16`, and the batched version reports `november_25_batched`. An unexpected version needs a source comparison. Check both index flags, `SECURITY DEFINER`, the fixed `pg_catalog, public` search path and service-role execution with neither Data API client role allowed. The inspection does not call the counter or access inbox rows.
+
 On isolated PostgreSQL 17.10 the candidate and its function-only rollback passed all 12 behavioral checks. Nine interleaved measurements for a recipient with one historical notice and 49 reminders gave medians of 37.46 ms with the candidate and 37.35 ms with an additional short-page exit. The evidence did not justify adding that exit. The public baseline and these local measurements do not establish a hosted speedup. After an authorized rollout, compare the same workload groups and verify unread counts and payment reminder deadlines.
 
 ### Fresh indexer bootstrap repair (2026-10-24)

@@ -194,4 +194,31 @@ test('profile notices support existing private inbox operations (PostgreSQL 17)'
         assert.deepEqual(json('SELECT jsonb_agg(id ORDER BY id) FROM public.fixture_proof_calls;'), [3, 4]);
         sql(fs.readFileSync(path.join(ROOT,'test/fixtures/notification-summary-proof-pages.sql'),'utf8'));
     });
+
+    await t.test('read-only rollout inspection identifies the deployed body and rollback without accessing inboxes', () => {
+        const runbook = name => fs.readFileSync(path.join(ROOT, 'sql/runbooks', name), 'utf8');
+        const inspection = runbook('inspect_notification_summary_rollout.sql').trim().replace(/;$/, '');
+        const inspect = () => json(`BEGIN READ ONLY; SELECT to_jsonb(result) FROM (${inspection}) result; COMMIT;`);
+        assert.deepEqual(inspect(), {
+            body_version: 'november_25_batched', security_definer: true,
+            function_settings: ['search_path=pg_catalog, public'],
+            anon_can_execute: false, authenticated_can_execute: false, service_can_execute: true,
+            recipient_index_ready: false, read_state_primary_key_ready: false
+        });
+        sql(`CREATE INDEX outbox_notification_recipient ON public.outbox_events
+              (lower(payload->>'recipient'),id DESC) WHERE event_type='notification';
+            ALTER TABLE public.auction_notification_reads ADD PRIMARY KEY(wallet_address,core_address,outbox_id);`);
+        const indexed = inspect();
+        assert.equal(indexed.recipient_index_ready, true);
+        assert.equal(indexed.read_state_primary_key_ready, true);
+        sql(runbook('restore_notification_summary_pre_batching.sql'));
+        assert.deepEqual(inspect(), { ...indexed, body_version: 'november_16' });
+        const target = 'public.read_notification_summary(text,text,boolean,boolean,boolean)';
+        sql(`GRANT EXECUTE ON FUNCTION ${target} TO anon;`);
+        assert.equal(inspect().anon_can_execute, true);
+        sql(`DROP FUNCTION ${target};`);
+        assert.equal(inspect().body_version, 'missing');
+        sql(`CREATE FUNCTION ${target} RETURNS jsonb LANGUAGE sql AS 'SELECT NULL::jsonb';`);
+        assert.equal(inspect().body_version, 'unrecognized');
+    });
 });

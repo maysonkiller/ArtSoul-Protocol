@@ -35,6 +35,26 @@ test('only a failed generated preview retries the original video once', () => {
     }
 });
 
+test('a rejected generated preview carries one active Play request to the original source', () => {
+    const { retryVideoPreview } = window.ArtSoulArtworkCard;
+    const url = 'https://cdn.example.test/work.mp4';
+    for (const [paused, ended, isConnected, hidden] of [
+        [false, false, true, false], [true, false, true, false], [false, true, true, false],
+        [false, false, false, false], [false, false, true, true]
+    ]) {
+        const actions = [];
+        const video = {
+            src: url + '#t=0.1', paused, ended, isConnected, ownerDocument: { hidden },
+            getAttribute() { return this.src; },
+            load() { actions.push(['load', this.src]); },
+            play() { actions.push(['play', this.src]); return Promise.resolve(); }
+        };
+        assert.equal(retryVideoPreview(video, url), true);
+        assert.equal(retryVideoPreview(video, url), false);
+        assert.deepEqual(actions, !paused && !ended && isConnected && !hidden ? [['load', url], ['play', url]] : []);
+    }
+});
+
 test('a posterless preview requests one frame and first playback includes the opening soundtrack', () => {
     const { videoPreviewSource, startVideoFromPreview } = window.ArtSoulArtworkCard;
     const url = 'https://cdn.example.test/work.mp4?quality=source';

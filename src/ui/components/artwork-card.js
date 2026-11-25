@@ -698,7 +698,13 @@
         const preview = videoPreviewSource(url, poster);
         if (preview === url || video.getAttribute('src') !== preview) return false;
         // Some WebKit builds can decode the original but reject the generated time fragment.
+        const resume = video.isConnected && !video.ownerDocument.hidden && !video.paused && !video.ended;
         video.src = url;
+        if (resume) {
+            // Clear the failed resource before carrying this Play request to the original.
+            video.load();
+            video.play().catch(() => {});
+        }
         return true;
     }
 
@@ -1258,6 +1264,15 @@
 
     if (!window.__artsoulMediaRestoreBound) {
         window.__artsoulMediaRestoreBound = true;
+        function pauseCardPreviews() {
+            document.querySelectorAll('.artsoul-card-media video, .artsoul-card-audio-element').forEach(media => {
+                if (!media.paused) media.pause();
+            });
+        }
+        window.addEventListener('visibilitychange', () => {
+            if (document.hidden) pauseCardPreviews();
+        }, true);
+        window.addEventListener('pagehide', pauseCardPreviews);
         window.addEventListener('pageshow', (event) => {
             const navigationType = performance.getEntriesByType?.('navigation')?.[0]?.type;
             if (event.persisted || navigationType === 'back_forward') {
