@@ -164,20 +164,21 @@ test('profile email gate remains disabled without a true public flag and ignores
   const effectStart = profileSource.lastIndexOf('useEffect(() => {', marker);
   const effectEnd = profileSource.indexOf('}, []);', marker) + '}, []);'.length;
   const effect = profileSource.slice(effectStart, effectEnd);
-  for (const config of [undefined, {}, {emailVerificationEnabled: false}, {emailVerificationEnabled: 'true'}, {emailVerificationEnabled: true}]) {
-    const changes = [];
+  for (const config of [undefined, {}, {emailVerificationEnabled: false}, {emailVerificationEnabled: 'true', genesisProfileEnabled: 'true'}, {emailVerificationEnabled: true, genesisProfileEnabled: true}]) {
+    const changes = [], genesis = [];
     vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: async () => config}},
-      useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}});
+      useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}, setGenesisProfileEnabled: value => genesis.push(value)});
     await tick();
     assert.deepEqual(changes, [config?.emailVerificationEnabled === true]);
+    assert.deepEqual(genesis, [config?.genesisProfileEnabled === true]);
   }
   let release, retire;
   const changes = [];
   vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: () => new Promise(resolve => {release = resolve;})}},
-    useEffect: fn => {retire = fn();}, setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}});
+    useEffect: fn => {retire = fn();}, setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}, setGenesisProfileEnabled: value => changes.push(value)});
   retire(); release({emailVerificationEnabled: true}); await tick();
   assert.deepEqual(changes, []);
   vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: async () => {throw new Error('config unavailable');}}},
-    useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}});
+    useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}, setGenesisProfileEnabled() {}});
   await tick(); assert.deepEqual(changes, [false]);
 });

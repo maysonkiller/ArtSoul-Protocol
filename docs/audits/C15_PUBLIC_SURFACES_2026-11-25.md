@@ -40,6 +40,8 @@ At 320 pixels the text field measured 158×50 and the Search ArtSoul button meas
 - Real iPhone Safari media playback, route changes and foreground/background recovery require device evidence. Muting in desktop Chrome does not measure audible output or playback recovery.
 - Staff-only content and signed wallet operations were outside this guest run. Recheck the affected screens when those workflows reach their final build.
 
+At 19:40 UTC the production domain served the gallery fix from commit `1ea57c60`. Chrome found 27 Discovery cards. In both Classic and Future, the first card started at 607 px on a 320×700 viewport and 588 px on a 390×844 viewport. All four views opened search for the entered query and returned on Escape. The search field and button had an 8 px gap, with no horizontal overflow or uncaught JavaScript errors. These are browser viewport measurements.
+
 ## Public contact and operating checks
 
 The apex served the homepage. The www gallery URL issued a 308 redirect to the same path on the apex. Both /docs and /auction-system issued 308 redirects to /docs-protocol. The homepage footer supplied a working-format mailto link to the published ArtSoul contact address, plus links to the project on X and GitHub. The Guide explained how copyright complaints are handled. No message was sent.

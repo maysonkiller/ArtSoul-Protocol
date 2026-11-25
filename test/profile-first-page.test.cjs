@@ -80,7 +80,7 @@ test('identity is still committed before the gallery, not after it', () => {
   // Bounding the read makes a coherent frame affordable; it does not reinstate
   // the gate A-54 removed. Identity must still land on the narrow profile read.
   const commit = source.indexOf('setProfile(profileData);');
-  const settle = source.indexOf('const [artworksResult, genesisResult] = await secondaryResults');
+  const settle = source.indexOf('const [artworksResult] = await secondaryResults');
 
   assert.notEqual(commit, -1);
   assert.notEqual(settle, -1);
@@ -96,7 +96,7 @@ test('the discovery profile is rebuilt from the full corpus, not the first page'
 
   assert.match(
     block,
-    /setDiscoveryProfile\(buildDiscoveryProfile\(profileData, full\.corpus, genesisState\)\)/,
+    /setDiscoveryProfile\(buildDiscoveryProfile\(profileData, full\.corpus\)\)/,
     'the discovery profile must be rebuilt from the unbounded corpus'
   );
 });
