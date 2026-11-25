@@ -43,6 +43,13 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-overview strong { fo
     gap: clamp(1rem, 2.5vw, 2.5rem);
 }
 .admin-workspace-content { min-width: 0; }
+/* Keep the seasonal switch reachable after the workspace, clear of the catalog players. */
+.protocol-admin-page > #as-scene-button {
+    position: static;
+    width: fit-content;
+    min-height: 44px;
+    margin: 1rem max(.75rem, var(--site-shell-pad, 30px), calc((100% - 1440px) / 2)) max(1rem, env(safe-area-inset-bottom)) auto;
+}
 /* Float in the outer gutter when there is room. Otherwise reserve space in the heading. */
 @media (max-width: 1599px) {
     .admin-workspace-frame { position: relative; }
