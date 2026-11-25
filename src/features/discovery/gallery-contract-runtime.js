@@ -5,7 +5,7 @@ import '../../ui/components/index.js';
 let loading;
 function loadGalleryContracts() {
     if (!loading) {
-        loading = import('/contracts-integration.js?v=21')
+        loading = import('/contracts-integration.js?v=22')
             .then(() => import('../../index.js'))
             .then(() => window.ArtSoulContracts)
             .catch(error => {

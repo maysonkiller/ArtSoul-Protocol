@@ -2,7 +2,7 @@
 // Provides: Primary/Backup fallback + Request deduplication
 // Does NOT: Retry storms, health scoring, parallel execution
 
-import { ethers } from 'https://esm.sh/ethers@6.7.0';
+import { ethers } from '/assets/ethers-6.17.0.min.js';
 
 class RPCClient {
     constructor(config) {
