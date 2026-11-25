@@ -105,12 +105,12 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   for (const migration of listIndexerMigrations()) query(migration.sql);
   await t.test('ordinary issuer and sale evidence has no effective Data API table privileges', () => {
     for (const role of ['anon', 'authenticated', 'service_role']) {
-      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations', 'ordinary_resale_purchases', 'ordinary_registrations']) {
+      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations', 'ordinary_resale_purchases', 'ordinary_registrations', 'ordinary_primary_credits']) {
         assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.${table}',
           'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN');`), 'f', `${role}: ${table}`);
       }
     }
-    for (const migration of ['019_ordinary_runner_up_observations', '020_ordinary_resale_purchases', '022_ordinary_registrations']) {
+    for (const migration of ['019_ordinary_runner_up_observations', '020_ordinary_resale_purchases', '022_ordinary_registrations', '023_ordinary_primary_credits']) {
       const table = 'artsoul_private.' + migration.slice(4);
       assert.equal(query(`SELECT relrowsecurity FROM pg_class WHERE oid='${table}'::regclass;`), 't');
       query(`GRANT SELECT ON ${table} TO PUBLIC; GRANT UPDATE ON ${table} TO anon, authenticated, service_role;`);
