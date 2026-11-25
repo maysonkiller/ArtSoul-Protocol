@@ -1,13 +1,14 @@
 // Read-only rehearsal against the state immediately after a fresh Base Sepolia deployment.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { Interface, getAddress, isHexString, keccak256, parseEther, toQuantity } from 'ethers';
-import { readRpc } from './verify-treasury-safes.mjs';
+import { Interface, ZeroHash, getAddress, isHexString, keccak256, parseEther, toQuantity, zeroPadValue } from 'ethers';
+import { confirmFinalizedBlock, finalizedBlock, readRpc } from './verify-treasury-safes.mjs';
 
 const [registerFile, blockHash, option, ...extra] = process.argv.slice(2);
-const payout = option === '--payout';
+const safeRefunds = option === '--safe-refunds';
+const payout = option === '--payout' || safeRefunds;
 assert(registerFile && isHexString(blockHash, 32) && (!option || payout) && !extra.length,
-    'Usage: node scripts/simulate-rehearsal-auction.mjs <pair-register.json> <creation-block-hash> [--payout]');
+    'Usage: node scripts/simulate-rehearsal-auction.mjs <pair-register.json> <creation-block-hash> [--payout | --safe-refunds]');
 const register = JSON.parse(await readFile(registerFile, 'utf8'));
 assert.equal(register.chainId, 84532);
 const [market, nft] = await Promise.all([payout ? 'OrdinaryPayoutMarket' : 'OrdinaryMarket', 'SettledArtworkNFT'].map(async name => {
@@ -18,6 +19,68 @@ const [market, nft] = await Promise.all([payout ? 'OrdinaryPayoutMarket' : 'Ordi
 const [artist, collector, buyer] = [1001, 1002, 1003].map(id => getAddress('0x' + id.toString(16).padStart(40, '0')));
 const price = parseEther('0.10'), deposit = parseEther('0.01'), resale = parseEther('0.20');
 const uri = 'ipfs://artwork-rehearsal';
+
+async function simulateSafeRefunds(rpc, block, start) {
+    const core = register.core.address;
+    const treasury = register.protocolTreasury;
+    const at = { blockHash: block.hash, requireCanonical: true };
+    const [proxy, singleton, slot] = await Promise.all([
+        rpc('eth_getCode', [treasury.address, at]), rpc('eth_getCode', [treasury.singleton, at]),
+        rpc('eth_getStorageAt', [treasury.address, '0x0', at])
+    ]);
+    assert.equal(keccak256(proxy), treasury.proxyCodeHash);
+    assert.equal(keccak256(singleton), treasury.singletonCodeHash);
+    assert.equal(slot.toLowerCase(), zeroPadValue(treasury.singleton, 32).toLowerCase());
+    const recipients = Array.from({ length: 8 }, (_, i) => getAddress('0x' + (2000 + i).toString(16).padStart(40, '0')));
+    const safe = new Interface(['event SafeReceived(address indexed sender,uint256 value)']);
+    const call = (method, args, from = artist, value = 0n) => ({
+        from, to: core, data: market.encodeFunctionData(method, args), value: toQuantity(value), gas: '0x100000'
+    });
+    const sizes = [1, 4, 8];
+    const open = [], close = [];
+    for (const [index, size] of sizes.entries()) {
+        const id = index + 1;
+        open.push(call('registerArtwork', [uri]), call('createAuction', [id, price, 86400]));
+        for (let i = 0; i <= size; i++) {
+            const bid = price + BigInt(i) * parseEther('0.01');
+            open.push(call('placeBid', [id, bid], i === size ? buyer : recipients[i], bid / 10n));
+        }
+        close.push(call('closeAuction', [id]), call('processRefunds', [id, size]),
+            call('processRefunds', [id, size]), call('refundProgress', [id]));
+    }
+    // Only virtual bidder addresses and balances change. At payout each recipient
+    // executes the reviewed proxy's receive path through the deployed singleton.
+    const blocks = [
+        { blockOverrides: { time: toQuantity(start) }, calls: open, stateOverrides: Object.fromEntries(
+            [artist, buyer, ...recipients].map(address => [address, { balance: toQuantity(parseEther('1')) }])) },
+        { blockOverrides: { time: toQuantity(start + 86400) }, calls: close, stateOverrides: Object.fromEntries(
+            recipients.map(address => [address, { code: proxy, state: { [ZeroHash]: slot } }])) }
+    ];
+    const result = await rpc('eth_simulateV1', [{ blockStateCalls: blocks, validation: false }, block.number]);
+    assert.deepEqual(result.map(b => b.calls.map(c => c.status)), blocks.map(b => b.calls.map(() => '0x1')));
+    const measurements = sizes.map((size, index) => {
+        const id = BigInt(index + 1);
+        const [, paid, replay, progress] = result[1].calls.slice(4 * index, 4 * index + 4);
+        assert.deepEqual([...market.decodeFunctionResult('refundProgress', progress.returnData)], [BigInt(size), BigInt(size)]);
+        assert.equal(replay.logs.length, 0);
+        const logs = paid.logs.filter(log => log.address.toLowerCase() === core.toLowerCase());
+        assert.equal(logs.length, size);
+        for (const [i, log] of logs.entries()) {
+            const amount = (price + BigInt(i) * parseEther('0.01')) / 10n;
+            const processed = market.parseLog(log);
+            assert.equal(processed.name, 'OutbidRefundProcessed');
+            assert.deepEqual([...processed.args], [id, BigInt(i), recipients[i], amount, true]);
+            const received = paid.logs.filter(entry => entry.address.toLowerCase() === recipients[i].toLowerCase());
+            assert.equal(received.length, 1);
+            const event = safe.parseLog(received[0]);
+            assert.equal(event.name, 'SafeReceived');
+            assert.deepEqual([...event.args], [getAddress(core), amount]);
+        }
+        return { recipients: size, executionGas: BigInt(paid.gasUsed).toString() };
+    });
+    await confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block);
+    return { block: Number(BigInt(block.number)), blockHash: block.hash, safeRefunds: measurements };
+}
 
 async function simulateCreditRoute(rpc, block, start) {
     const fixture = JSON.parse(await readFile(new URL('../artifacts/contracts/test/OrdinaryAuctionFixture.sol/OrdinaryBidderFixture.json', import.meta.url), 'utf8'));
@@ -72,6 +135,7 @@ async function simulate(url) {
         assert.equal(keccak256(await rpc('eth_getCode', [item.address, at])), item.codeHash);
     }
     const start = Number(BigInt(block.timestamp)) + 1;
+    if (safeRefunds) return simulateSafeRefunds(rpc, block, start);
     const end = start + 86400;
     const secondStart = end + 1;
     const secondEnd = secondStart + 86400;

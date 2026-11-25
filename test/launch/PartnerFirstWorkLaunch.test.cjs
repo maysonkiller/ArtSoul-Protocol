@@ -65,7 +65,7 @@ describe('Partner collection first-work lifecycle', function () {
         await at(sale.end + day);
         await reject(launch.connect(bidder).retryFirstAuction.staticCall(), 'OwnableUnauthorizedAccount');
         await reject(launch.closePhase.staticCall(1), 'PriceUnavailable');
-        await mine(launch.connect(bidder).closePhase(0));
+        const emptyClose = await mine(launch.connect(bidder).closePhase(0));
         await mine(launch.pause());
         await reject(launch.retryFirstAuction.staticCall(), 'EnforcedPause');
         await mine(launch.unpause());
@@ -84,7 +84,7 @@ describe('Partner collection first-work lifecycle', function () {
         await at(opening.end);
         await reject(launch.retryFirstAuction.staticCall(), 'PhaseUnavailable');
         await reject(launch.mintPrice(1), 'PriceUnavailable');
-        await mine(launch.connect(publicBuyer).finalizeAuction(0));
+        const closed = await mine(launch.connect(publicBuyer).finalizeAuction(0));
         assert.equal(await launch.mintPrice(1), 400n);
         assert.equal(await launch.collectionFirstCollector(), bidder.address);
         assert.equal(await launch.totalSupply(), 0n);
@@ -92,8 +92,8 @@ describe('Partner collection first-work lifecycle', function () {
         assert.equal(await launch.credits(creator.address), 390n);
         await at(sale.start + shift);
         await reject(launch.connect(publicBuyer).mintPhase.staticCall(1, 1, 0, [], publicBuyer.address, {value: 100n}), 'IncorrectPayment');
-        await mine(launch.connect(publicBuyer).mintPhase(1, 3, 0, [], publicBuyer.address, {value: 1200n}));
-        await mine(launch.connect(bidder).claimAuction(0, collector.address));
+        const publicMint = await mine(launch.connect(publicBuyer).mintPhase(1, 3, 0, [], publicBuyer.address, {value: 1200n}));
+        const claimed = await mine(launch.connect(bidder).claimAuction(0, collector.address));
         assert.equal(await launch.ownerOf(1), collector.address);
         assert.equal(await launch.firstCollector(1), bidder.address);
         assert.equal(await launch.collectionFirstCollector(), bidder.address);
@@ -101,6 +101,28 @@ describe('Partner collection first-work lifecycle', function () {
         assert.equal(await launch.totalSupply(), 4n);
         assert.equal(await launch.credits(protocol.address), 40n);
         assert.equal(await launch.credits(creator.address), 1560n);
+
+        const transfer = await mine(launch.connect(collector).transferFrom(collector.address, publicBuyer.address, 1));
+        const rpc = (method, params) => network.provider.send(method, params);
+        const head = await rpc('eth_getBlockByNumber', ['latest', false]);
+        const address = await launch.getAddress();
+        const runtimeHash = ethers.keccak256(await rpc('eth_getCode', [address, 'latest']));
+        const work = { price: await launch.mintPrice(1), firstCollector: await launch.firstCollector(1) };
+        const { readCollectionOpeningReceipts } = await import('../../scripts/read-collection-opening-receipts.mjs');
+        const verify = (settlement, issuance, read = rpc) =>
+            readCollectionOpeningReceipts(read, head, address, runtimeHash, work, { settlement, issuance });
+        const proof = await verify(closed.hash, claimed.hash);
+        assert.equal(proof.settlement.transactionHash, closed.hash);
+        assert.equal(proof.issuance.transactionHash, claimed.hash);
+        assert.ok(proof.mintLogIndex < proof.issuance.logIndex);
+        assert.equal(proof.mintRecipient, collector.address);
+        assert.equal(await launch.ownerOf(1), publicBuyer.address);
+        for (const other of [publicMint, transfer]) await assert.rejects(verify(closed.hash, other.hash), /CollectionMinted/);
+        await assert.rejects(verify(emptyClose.hash, claimed.hash), /funded opening/);
+        await assert.rejects(verify(closed.hash, claimed.hash, async (method, params) => {
+            const result = await rpc(method, params);
+            return method === 'eth_getBlockByNumber' ? { ...result, transactions: [] } : result;
+        }), /finalized block position/);
     });
 
     it('cancels at the third bidless deadline and measures 30 days independently of the closing caller', async () => {

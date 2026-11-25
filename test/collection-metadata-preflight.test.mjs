@@ -139,4 +139,37 @@ test('issued first-work evidence binds the draft, paying collector and current h
     chain = '0x14a34';
     canonical = { ...block, hash: '0x' + 'b'.repeat(64) };
     await assert.rejects(check(), /disagree on the finalized block/);
+
+    canonical = block;
+    const settlement = '0x' + '5'.repeat(64), issuance = '0x' + '6'.repeat(64);
+    const receiver = '0x' + '4'.repeat(40);
+    const events = new Interface([
+        'event AuctionFinalized(uint256 indexed phaseId,uint256 clearingPrice,uint256 winners,bool subscribed)',
+        'event CollectionMinted(uint256 indexed phaseId,address indexed payer,address indexed recipient,uint256 firstTokenId,uint256 quantity,uint256 unitPrice)',
+        'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)'
+    ]);
+    function receiptRpc(recipient) {
+        return async (method, params) => {
+            if (method === 'eth_getBlockByNumber') return { ...await rpc(method, params), transactions: [settlement, issuance] };
+            if (method !== 'eth_getTransactionReceipt') return rpc(method, params);
+            const [hash] = params;
+            const receipt = { status: '0x1', blockHash: block.hash, blockNumber: block.number,
+                transactionHash: hash, transactionIndex: hash === settlement ? '0x0' : '0x1' };
+            function log(name, args, logIndex) {
+                return { ...receipt, ...events.encodeEventLog(name, args), address, logIndex };
+            }
+            return { ...receipt, logs: hash === settlement ? [log('AuctionFinalized', [0, 42, 1, true], '0x0')] :
+                [log('Transfer', [ZeroAddress, recipient, 1], '0x2'),
+                    log('CollectionMinted', [0, buyer, recipient, 1, 1, 42], '0x3')] };
+        };
+    }
+    const withProvenance = second => checkIssuedFirstWork(json, address, runtime, digest,
+        [receiptRpc(receiver), second], { settlement, issuance });
+    const issued = await withProvenance(receiptRpc(receiver));
+    assert.equal(issued.provenance.mintRecipient, receiver);
+    assert.equal(issued.firstCollector, buyer);
+    assert.equal(issued.owner, holder);
+    assert.equal(issued.provenance.settlement.logIndex, 0);
+    assert.equal(issued.provenance.issuance.logIndex, 3);
+    await assert.rejects(withProvenance(receiptRpc(holder)), /providers disagree on collection provenance/);
 });

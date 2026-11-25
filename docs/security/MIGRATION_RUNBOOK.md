@@ -18,6 +18,14 @@ remain separate gates. No purge is acknowledged while caching is disabled.
 
 ## Ordinary settlement intake
 
+To retain a registration before an auction or mint, select its block-wide `ArtworkRegistered` log index from the receipt. Set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to independent HTTPS endpoints for the reviewed pair.
+
+```sh
+node scripts/read-ordinary-receipt.mjs registration reviewed-pair.json BLOCK_NUMBER BLOCK_HASH TX_HASH LOG_INDEX
+```
+
+The command compares both providers' finalized receipts, transaction position, issuing contracts and stored work. It reports the creator and the exact metadata URI bytes as hex. After indexer migration 022 is applied to the intended database, supply `ARTSOUL_ORDINARY_DATABASE_URL` and append `--persist` to record that evidence privately. Replaying the same registration returns `inserted: false`. The key includes the chain, Core and artwork ID. The intake does not update the public catalog or its cursor. Registration alone carries no ownership, floor, or mint evidence.
+
 For a completed native resale, identify the block-wide log index of `ResalePurchased` in its receipt. Set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to independent HTTPS endpoints. The following command reads the finalized purchase, the adjacent credit and NFT delivery, the immutable treasury recipients, and the original artwork provenance.
 
 ```sh
@@ -69,7 +77,7 @@ The report also includes the owner at that block, creator, First Collector, toke
 | Location | Purpose | Treatment |
 | --- | --- | --- |
 | `sql/migrations/001_core_indexer_schema.sql` through `003_resilience_schema.sql` | Base indexer schema | First three migrations in the indexer sequence. Managed by `scripts/apply-migrations.js` for fresh or already-ledgered environments. |
-| `src/indexer/migrations/004_*.sql` through `021_*.sql` | Active indexer and deployment-scoped projections | Remaining eighteen migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
+| `src/indexer/migrations/004_*.sql` through `022_*.sql` | Active indexer and deployment-scoped projections | Remaining nineteen migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
 | Other files in `sql/migrations/` | Feature, auth, AI, moderation, observability, and security changes | Manually reviewed migrations. Their production status must be recorded explicitly; filename order is not an execution plan. |
 | `migrations/001_ai_integration.sql` | Early AI integration migration | Historical/manual. Verify schema before use; do not assume it belongs to the indexer 001-014 sequence. |
 
@@ -109,6 +117,7 @@ Verify against the database before applying or re-applying it.
 | `src/indexer/migrations/019_ordinary_runner_up_observations.sql` | Indexer sequence 19. Keeps one private finalized observation per ordinary auction. The explicit operator intake shares the issuer registry from migration 018. Hosted application and notification delivery remain pending. |
 | `src/indexer/migrations/020_ordinary_resale_purchases.sql` | Indexer sequence 20. Records verified native resale deliveries and credited amounts per issuer, token and listing version. The explicit intake verifies the receipt through two independent RPC providers before persistence. Hosted application is pending. |
 | `src/indexer/migrations/021_genesis_grant_evidence.sql` | Indexer sequence 21. Private, append-only issuer, receipt and grant evidence for the dedicated Base mainnet Genesis deployment. The [pilot procedure](../canon/CONTRACT_REWORK_PLAN.md#separate-genesis-grant-pilot) describes verified intake and wallet lookup. Hosted rollout and the pilot are pending. |
+| `src/indexer/migrations/022_ordinary_registrations.sql` | Indexer sequence 22. Retains a finalized registration per issuing Core and artwork ID, including its URI bytes and event position. Data API roles have no grants. Hosted rollout is pending. |
 | `sql/migrations/auction_notifications.sql` | **Applied, verified and activated 2026-10-25.** B17 private confirmed auction-created/outbid history, read state and category preferences. Requires migration 017 and `artwork_media_reorg.sql`; explicit grants and forced RLS restrict browser access. Protected backup, actual source proof and 43 real-account HTTP interactions on each staged/apex deployment passed before/after the one-flag promotion. On a fresh deployment keep `ARTSOUL_AUCTION_NOTIFICATIONS_ENABLED` off until the same gates pass. See `audits/B17_AUCTION_INBOX_2026-10-25.md`. |
 | `sql/migrations/auction_notification_lifecycle.sql` | **Applied, verified and activated 2026-10-25.** Additive B17 v2 lifecycle history and one preference column; v1 functions/keys remain compatible. Protected backup, rollback rehearsal, receipt-backed recovery of five old auction-66 notices, worker rollout and 64 real-account interactions on each final staged/apex release passed. Service-only RPCs validate actual Core/recipient/confirmed source history. Fresh deployments keep `ARTSOUL_AUCTION_LIFECYCLE_ENABLED` off until these gates pass. No automatic event/history replay; do not rerun completed private journals. See `audits/B17_LIFECYCLE_PROFILE_2026-10-25.md` and the indexer session-lock correction. |
 | `sql/migrations/auction_notification_reminders.sql` | **Applied, verified and activated 2026-10-25 through PR #353.** Additive B17 v3 private deadline reminders and bounded personal times. Requires v2 lifecycle and its source-proof prerequisites. V1/v2 remain unchanged; first-page materialization is idempotent and adds no service. Protected backup/read validation, rollback rehearsal, actual PostgreSQL/CI, boundary-header worker correction and 105 real-account steps on each staged/apex release passed. On fresh deployments keep `ARTSOUL_AUCTION_REMINDERS_ENABLED` off until these gates pass. Do not replay completed journals. Live due-time delivery and new phone acceptance are not claimed. See `audits/B17_REMINDERS_2026-10-25.md`. |

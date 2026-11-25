@@ -242,6 +242,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
         VALUES (8453,$1,1,1,1,200,$2,$3,$2,$2,$2,$3,185,11,2,2,$4,170,$5,1)`,
       [CORE, CREATOR, WINNER, hash(170), hash(1170)]);
       await assert.rejects(verify(), /artsoul_private\.ordinary_resale_purchases/);
+      await pool.query(`INSERT INTO artsoul_private.ordinary_registrations
+        (chain_id,core_address,artwork_id,creator,metadata_uri,transaction_hash,block_number,block_hash,log_index)
+        VALUES (8453,$1,1,$2,'x',$3,171,$4,0)`, [CORE,CREATOR,hash(171),hash(1171)]);
+      await assert.rejects(verify(), /artsoul_private\.ordinary_registrations/);
     } finally {
       await reader.query('RESET ROLE');
       reader.release();
@@ -261,6 +265,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   await t.test('runner-up observations advance by finalized block and retain independent deployment states', async () => {
     const { checkRunnerUpIntake } = await import('./helpers/ordinary-settlement-postgres.mjs');
     await checkRunnerUpIntake(pool);
+  });
+  await t.test('registrations keep distinct issuers, exact URI bytes and the existing catalog cursor', async () => {
+    const { checkOrdinaryRegistrationIntake } = await import('./helpers/ordinary-registration-postgres.mjs');
+    await checkOrdinaryRegistrationIntake(pool);
   });
   for (const name of ['identity', 'preparation', 'submission', 'registration', 'reorg']) {
     await pool.query(read(`sql/migrations/artwork_media_${name}.sql`));

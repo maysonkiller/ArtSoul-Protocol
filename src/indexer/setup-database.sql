@@ -26,6 +26,7 @@ BEGIN;
 \i src/indexer/migrations/019_ordinary_runner_up_observations.sql
 \i src/indexer/migrations/020_ordinary_resale_purchases.sql
 \i src/indexer/migrations/021_genesis_grant_evidence.sql
+\i src/indexer/migrations/022_ordinary_registrations.sql
 COMMIT;
 
 -- Verify setup

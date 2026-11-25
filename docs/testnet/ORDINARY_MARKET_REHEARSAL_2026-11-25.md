@@ -54,6 +54,22 @@ The [read-only rehearsal](../../scripts/simulate-rehearsal-auction.mjs) passed t
 node scripts/simulate-rehearsal-auction.mjs <payout-test-pair-register.json> 0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df --payout
 ```
 
+## Refunds to Safe receivers on two public RPC simulators
+
+At payout deployment block 63,494,032, Base and PublicNode ran the same read-only `eth_simulateV1` rehearsal against the deployed Core. Each virtual losing bidder received the reviewed test treasury's Safe proxy runtime and singleton slot for the payout phase. Both nodes checked the original proxy code hash, singleton address and singleton code hash against the register. This exercises the Safe's ETH receive path. It does not exercise an owner's signature or model L1 data fees.
+
+| Displaced deposits in the batch | Simulated execution gas |
+| --- | ---: |
+| 1 | 70,820 |
+| 4 | 131,072 |
+| 8 | 217,065 |
+
+Both nodes recorded each expected recipient and exact amount in the simulated Core and Safe events, the completed queue cursor, and zero events on a second payout attempt. To repeat, run `node scripts/simulate-rehearsal-auction.mjs <payout-register.json> 0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df --safe-refunds`. A mined Safe refund and its actual network fee remain open.
+
+## Public routing observation
+
+At 20:13 UTC the public upload page loaded the published [contract configuration](https://artsoulprotocol.com/contracts-config.js), which selected Core `0x43368f7E2d5f11f4B7E11928D66d3f4A5a4E4ceF` and NFT `0xf061f70503c37Cf2196A28F4785E524D0Fb32538` on Base Sepolia. The [public indexer](https://artsoulprotocol.com/api/public/indexer-status) reported the same Core. Base and PublicNode confirmed the new payout Core and NFT runtime hashes and both directions of their binding at finalized block 63,573,369. The replacement had one registered work, zero auctions and zero minted tokens at that block.
+
 ## First registration on the payout Core
 
 The local review page can prepare one call to `registerArtwork(string)` with zero ETH on network 84532. The creator is the test payer in the private payout deployment review. The fixture is titled **ArtSoul Base Sepolia Rehearsal**. Its 281-byte metadata URI embeds the entire JSON document on-chain and points to the existing public ArtSoul favicon for its image. The indexer's ordinary metadata reader decodes the title and image. The image remains hosted on the ArtSoul domain. Registering the work neither creates an auction nor mints a token.
@@ -75,6 +91,16 @@ node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair
 ```
 
 Open the loopback address printed by the second command. Review the payer, Base Sepolia, the payout Core and the zero-value registration in the wallet. A matching existing registration disables the request. If someone registered a different first work, the page stops and the public transaction hash can be checked independently. The verifier uses the actual ID from the finalized receipt, confirms the single event, its emitter and stored creator/URI, and rechecks the contract pair and its custody at the inclusion block through two providers. Auction, settlement, refunds, hosted indexing and UI acceptance have separate evidence.
+
+## Private indexer replay of the signed registration
+
+The [registration intake](../../scripts/read-ordinary-receipt.mjs) read the signed work 1 receipt at block 63,521,080, log index 2, from Base and PublicNode. Each provider confirmed inclusion at its transaction position, the two bound runtimes, the registration event and its creator and metadata in the Core at that block.
+
+Using a disposable PostgreSQL 18.4 database on loopback, the ordinary read call left the registration table empty. Running the same command with `--persist` inserted one row. A second independent read and replay returned `inserted: false` and left exactly one row. Its 281 metadata URI bytes matched the original registration fixture. The database was stopped and its data directory removed. In a separate fixture, two issuers with the same numeric artwork ID retained separate rows and the prototype catalog cursor stayed unchanged. Hosted intake and public rendering remain open.
+
+```sh
+node scripts/read-ordinary-receipt.mjs registration reviewed-pair.json 63521080 0xaa095aa18eed6d600b5aaf47754a098cb2d4c953bcad27d1d81e43186b1c1e34 0xe6e6f19235b714814c40bb1ab20aebd4ff2408f17c9e8bc4f15e1e7ee391eacf 2
+```
 
 ## Opening the registered work in a read-only simulation
 
