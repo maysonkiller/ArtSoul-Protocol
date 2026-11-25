@@ -43,6 +43,22 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-overview strong { fo
     gap: clamp(1rem, 2.5vw, 2.5rem);
 }
 .admin-workspace-content { min-width: 0; }
+.admin-aura-setting > label { display: flex; align-items: center; gap: .65rem; min-height: 44px; }
+.admin-aura-setting > label input { flex: none; inline-size: 1.125rem; block-size: 1.125rem; margin: 0; }
+.admin-aura-preview { margin: 1rem 0; }
+.admin-aura-preview figcaption { margin-bottom: .5rem; font-weight: 600; }
+.admin-aura-preview .artsoul-aura-frame {
+    display: grid;
+    place-items: center;
+    max-width: 21rem;
+    min-height: 8.5rem;
+    overflow: hidden;
+    border-radius: .85rem;
+    background: var(--c-surface);
+}
+.admin-aura-preview img { display: block; width: 4.5rem; height: 4.5rem; border-radius: 50%; object-fit: cover; }
+.admin-aura-preview .admin-aura-classic-note { margin-top: .5rem; color: var(--c-text-muted); }
+.future .admin-aura-classic-note { display: none; }
 /* Keep the seasonal switch reachable after the workspace, clear of the catalog players. */
 .protocol-admin-page > #as-scene-button {
     position: static;

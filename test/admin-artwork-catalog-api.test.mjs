@@ -31,12 +31,10 @@ function fixture(t,custom=()=>undefined){const calls=[]; t.mock.method(globalThi
 });return calls;}
 
 test('frame settings require verified admin or a team wallet still in the current authority pair', async t => {
-  const old = process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
-  process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = 'true';
-  t.after(() => {
-    if (old === undefined) delete process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
-    else process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = old;
-  });
+  const previous = process.env;
+  process.env = {...previous, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true', ARTSOUL_NFT_OWNERSHIP_ENABLED:'false'};
+  t.after(() => { process.env = previous; });
+  const awaitingOwnership = {publicFrameSource:'awaiting_ownership'};
   let role = 'admin', member = false, rotatedDuringRequest = false, saved = { enabled: false, revision: 0 };
   const calls = fixture(t, (path, options) => {
     if (path.startsWith('artsoul_staff_roles?')) return json([{role,authorization_version:2}]);
@@ -68,18 +66,28 @@ test('frame settings require verified admin or a team wallet still in the curren
   assert.equal((await call(null,{cookie:cookie(true,1)})).statusCode,403);
   assert.equal((await call(null,{query:{wallet:'0x'+'2'.repeat(40)}})).statusCode,403);
   assert.equal(calls.some(c=>c.path.includes('rpc/')),false);
-  assert.deepEqual((await call()).body,saved);
+  assert.deepEqual((await call()).body,{...saved,...awaitingOwnership});
   assert.equal((await call({enabled:true,revision:0},{headers:{origin:'https://unrelated.example'}})).statusCode,403);
   assert.equal((await call({enabled:1,revision:0})).statusCode,400);
-  assert.deepEqual((await call({enabled:true,revision:0})).body,{enabled:true,revision:1});
+  assert.deepEqual((await call({enabled:true,revision:0})).body,{enabled:true,revision:1,...awaitingOwnership});
   assert.equal((await call({enabled:false,revision:0})).statusCode,409);
-  assert.deepEqual((await call()).body,{enabled:true,revision:1});
+  assert.deepEqual((await call()).body,{enabled:true,revision:1,...awaitingOwnership});
   role='team';member=true;
-  assert.deepEqual((await call()).body,{enabled:true,revision:1});
+  assert.deepEqual((await call()).body,{enabled:true,revision:1,...awaitingOwnership});
   assert.equal((await call(null,{cookie:cookie(false)})).statusCode,403);
   assert.equal((await call(null,{cookie:cookie(true,1)})).statusCode,403);
   assert.equal((await call({enabled:false,revision:1},{headers:{origin:'https://unrelated.example'}})).statusCode,403);
-  assert.deepEqual((await call({enabled:false,revision:1})).body,{enabled:false,revision:2});
+  assert.deepEqual((await call({enabled:false,revision:1})).body,{enabled:false,revision:2,...awaitingOwnership});
+  Object.assign(process.env, {
+    ARTSOUL_NFT_OWNERSHIP_ENABLED:'true', ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:'0x'+'a'.repeat(40),
+    ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA:'0x'+'b'.repeat(40), ARTSOUL_NFT_OWNERSHIP_CORE_CODE_HASH:'0x'+'a'.repeat(64),
+    ARTSOUL_NFT_OWNERSHIP_NFT_CODE_HASH:'0x'+'b'.repeat(64), ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA:''
+  });
+  assert.deepEqual((await call()).body,{...saved,publicFrameSource:'awaiting_publisher'});
+  process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA = process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA + ':' + STAFF;
+  assert.deepEqual((await call()).body,{...saved,publicFrameSource:'configured'});
+  process.env.ARTSOUL_NFT_OWNERSHIP_ENABLED = 'invalid';
+  assert.deepEqual((await call()).body,{...saved,publicFrameSource:'unavailable'});
   rotatedDuringRequest=true;
   assert.equal((await call({enabled:true,revision:2})).statusCode,403);
   assert.equal((await call()).statusCode,403);

@@ -14,11 +14,11 @@ export function auraFrameClassName(kind = 'none') {
     }
 }
 
-const labels = {
+export const auraFrameLabels = Object.freeze({
     platform: 'ArtSoul platform NFT',
     genesis: 'Genesis aura',
     partner: 'Partner collection NFT'
-};
+});
 
 export function projectedArtworkAura(artwork) {
     if (artwork?.source !== 'v41_projection' || artwork.minted !== true ||
@@ -28,6 +28,6 @@ export function projectedArtworkAura(artwork) {
     if (![8453, 84532, '8453', '84532'].includes(chain) ||
         (kind === 'genesis' && Number(chain) !== 8453)) return null;
     const className = auraFrameClassName(kind);
-    return className ? { className, label: labels[kind],
-        ...(artwork.aura_border_text === true ? { borderLabel: labels[kind] } : {}) } : null;
+    return className ? { className, label: auraFrameLabels[kind],
+        ...(artwork.aura_border_text === true ? { borderLabel: auraFrameLabels[kind] } : {}) } : null;
 }

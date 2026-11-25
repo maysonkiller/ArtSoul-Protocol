@@ -70,9 +70,10 @@ const request = (query = {}) => ({ method: 'GET', headers: {}, query });
 
 test('public NFT consumers use one verified history across cards, filters, saved items and timelines', async t => {
   const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]])), originalFetch = globalThis.fetch;
-  let rows, owners, marker, calls, afterRead, history;
+  let rows, owners, marker, calls, afterRead, history, frameSetting;
   t.beforeEach(() => {
     Object.assign(process.env, env); rows = fixture(); owners = [proof()]; marker = boundary(); calls = []; afterRead = null;
+    frameSetting = {enabled: true, revision: 1};
     history = { transfers: [{ ...transfer(), block_number: 30, log_index: 4, transaction_hash: hash(30), from_address: FIRST, to_address: BUYER }, transfer()], complete: true,
       lifecycle: lifecycle(), lifecycle_available: true, lifecycle_complete: true };
     globalThis.fetch = async (url, options = {}) => {
@@ -81,7 +82,7 @@ test('public NFT consumers use one verified history across cards, filters, saved
       const body = calls.at(-1).body;
       let result;
       if (name === 'rpc/read_verified_nft_boundary') result = [{ ...marker }];
-      else if (name === 'rpc/read_aura_border_setting') result = [{enabled: true, revision: 1}];
+      else if (name === 'rpc/read_aura_border_setting') result = [frameSetting];
       else if (name === 'rpc/read_verified_nft_cards') result = body.p_artwork_ids.map(id => ({ ...owners.find(row => row.artwork_id === id), ...marker }));
       else if (name === 'rpc/read_verified_nft_history') result = { ...history, ownership: { ...owners[0], ...marker } };
       else if (name === 'rpc/read_public_search_cards') result = { artworks: rows.v41_artworks, metadata: [{ name: 'Test' }],
@@ -138,6 +139,18 @@ test('public NFT consumers use one verified history across cards, filters, saved
     assert.ok(artworkReads.length >= 2 && artworkReads.every(call => call.query.get('select').split(',').includes('log_index')));
     rows.contract_events = [];
     assert.equal((await cardRequest({})).body.data[0].aura_kind, undefined);
+  });
+  await t.test('warm catalog and detail reads follow changes to the label while preserving frame eligibility', async () => {
+    designatePlatform();
+    for (const enabled of [true, false, true]) {
+      frameSetting = {enabled, revision: frameSetting.revision + 1};
+      for (const query of [{}, {id:'77'}]) {
+        const result = await cardRequest(query);
+        assert.equal(result.statusCode, 200);
+        assert.equal(result.body.data[0].aura_kind, 'platform');
+        assert.equal(result.body.data[0].aura_border_text, enabled ? true : undefined);
+      }
+    }
   });
   await t.test('reader omits the frame when the registration cannot confirm the projected identity', async () => {
     designatePlatform();
