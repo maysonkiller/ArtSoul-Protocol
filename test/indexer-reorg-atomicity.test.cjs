@@ -124,6 +124,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   await pool.query('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE EXTENSION pgcrypto');
   const migrations = [...read('src/indexer/setup-database.sql').matchAll(/^\\i (.+)$/gm)].map(match => match[1].trim());
   for (const migration of migrations) await pool.query(read(migration));
+  await t.test('ordinary demand report counts only indexed receipts for one issuer and block interval', async () => {
+    const { checkOrdinaryDemand } = await import('./helpers/ordinary-demand-postgres.mjs');
+    await checkOrdinaryDemand(pool);
+  });
   await t.test('pre-smoke database check detects residual projections and refuses row-filtered evidence', async () => {
     const {verifyMainnetProjectionRows} = await import('../scripts/verify-mainnet-catalog.mjs');
     const reader = await pool.connect();
