@@ -540,7 +540,8 @@ function ProtocolAdminPage() {
     const connectedWallet = currentSetupWallet();
     const roleLabel = { admin: 'Administrator', moderator: 'Moderator', team: 'Team' }[access?.role];
     const ready = accessState === 'ready';
-    const appearanceAllowed = access?.role === 'admin' && access?.dualWallet && access?.stepUpActive;
+    const appearanceAllowed = access?.dualWallet && access?.stepUpActive &&
+        (access.role === 'admin' || (access.role === 'team' && connectedWallet && authorityWallet === connectedWallet));
     const activeSection = (section === 'staff' && !rosterWallet || section === 'appearance' && !appearanceAllowed) ? 'queue' : section;
     const catalogEpoch = setupEpoch.current, catalogWallet = connectedWallet;
     const catalogSessionCurrent = () => sessionIsCurrent(catalogEpoch,catalogWallet)
@@ -582,7 +583,7 @@ function ProtocolAdminPage() {
             {verification}
             {!ready && <AccessGate state={accessState} message={message} walletAddress={connectedWallet} />}
             {section === 'appearance' && !appearanceAllowed && <p className="protocol-admin-message">
-                {ready || accessState === 'ineligible' ? 'This staff account does not have permission to manage NFT appearance.' : 'Verify an administrator account to open NFT appearance.'}
+                {ready || accessState === 'ineligible' ? 'This staff account does not have permission to manage NFT appearance.' : 'Verify your authorized staff wallet to open NFT appearance.'}
             </p>}
 
             {ready && <>

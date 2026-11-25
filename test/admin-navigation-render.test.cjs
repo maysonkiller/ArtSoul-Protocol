@@ -68,7 +68,7 @@ test('disconnected and connected guests receive different actionable guidance',(
 
 test('the NFT appearance destination preserves the account and verification gates',()=>{
     const locked=render({section:'appearance',role:'admin',state:'step_up'});
-    assert.match(locked,/Verify an administrator account to open NFT appearance/);
+    assert.match(locked,/Verify your authorized staff wallet to open NFT appearance/);
     assert.doesNotMatch(locked,/data-fixture="appearance"/);
     const moderator=render({section:'appearance',role:'moderator'});
     assert.match(moderator,/does not have permission to manage NFT appearance/);
@@ -76,6 +76,9 @@ test('the NFT appearance destination preserves the account and verification gate
     const administrator=render({section:'appearance',role:'admin'});
     assert.match(administrator,/aria-current="page">NFT appearance/);
     assert.match(administrator,/data-fixture="appearance"/);
+    assert.match(render({section:'appearance',role:'team',authority:true}),/data-fixture="appearance"/);
+    assert.doesNotMatch(render({section:'appearance',role:'team',authority:false}),/data-fixture="appearance"/);
+    assert.doesNotMatch(render({section:'appearance',role:'team',authority:true,state:'step_up'}),/data-fixture="appearance"/);
 });
 
 test('a factor dialog has one stable location before the protected body',()=>{

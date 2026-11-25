@@ -49,7 +49,7 @@ One aura can be auto-assigned to an NFT by priority:
 
 Users do not pick aura colors. The Future border label defaults to off. The admin panel's **NFT appearance** setting applies to verified frames on cards and artwork details. Platform and Partner labels move along the bottom edge. Genesis and reduced-motion labels stay stationary. Classic retains its static frame.
 
-The [appearance migration](../../sql/migrations/20261125170000_aura_border_setting.sql) stores each change with its revision, verified administrator and staff authorization version. The current role-bound staff sign-in is required. The database rechecks the active administrator grant and expected revision in the write transaction. The public artwork API reads the boolean only for already verified frames. Missing settings storage leaves labels off. Apply the migration to the intended database before using the control there.
+Open [NFT appearance](/admin#nft-appearance) with a verified administrator wallet or an active Team wallet in the current staff-authority pair. Each change records the actor, staff authorization version and setting revision. Team changes also record the [authority policy version](../../sql/migrations/20261125185000_aura_authority_team.sql). Saving checks the role and revision in the same transaction and rechecks Team membership for the site's origin and network. The public artwork API reads the boolean only for already verified frames. Missing settings storage leaves labels off.
 
 ### Evidence for each frame
 

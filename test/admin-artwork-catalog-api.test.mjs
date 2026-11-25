@@ -30,21 +30,26 @@ function fixture(t,custom=()=>undefined){const calls=[]; t.mock.method(globalThi
   throw new Error(`Unexpected test request ${path}`);
 });return calls;}
 
-test('only the verified current administrator wallet can read and change the border setting', async t => {
+test('frame settings require verified admin or a team wallet still in the current authority pair', async t => {
   const old = process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
   process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = 'true';
   t.after(() => {
     if (old === undefined) delete process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
     else process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = old;
   });
-  let role = 'admin', saved = { enabled: false, revision: 0 };
+  let role = 'admin', member = false, rotatedDuringRequest = false, saved = { enabled: false, revision: 0 };
   const calls = fixture(t, (path, options) => {
     if (path.startsWith('artsoul_staff_roles?')) return json([{role,authorization_version:2}]);
-    if (path === 'rpc/read_aura_border_setting') return json([saved]);
-    if (path === 'rpc/set_aura_border_setting') {
+    if (path.startsWith('artsoul_staff_authority_policy?')) return json([{origin:'https://example.com',chain_id:84532,
+      version:3,wallet_a:member ? STAFF : '0x'+'2'.repeat(40),wallet_b:'0x'+'3'.repeat(40)}]);
+    if (path === 'rpc/manage_aura_border_setting') {
       const body = JSON.parse(options.body);
       assert.equal(body.p_wallet, STAFF);
       assert.equal(body.p_authorization_version, 2);
+      assert.equal(body.p_origin,role==='team'?'https://example.com':null);
+      assert.equal(body.p_policy_version,role==='team'?'3':null);
+      if (rotatedDuringRequest) return json({message:'AURA_ADMIN_REQUIRED'},400);
+      if (body.p_enabled===null && body.p_expected_revision===null) return json([saved]);
       if (body.p_expected_revision !== saved.revision) return json({message:'AURA_REVISION_CONFLICT'},400);
       saved = {enabled:body.p_enabled,revision:saved.revision+1};
       return json([saved]);
@@ -69,6 +74,19 @@ test('only the verified current administrator wallet can read and change the bor
   assert.deepEqual((await call({enabled:true,revision:0})).body,{enabled:true,revision:1});
   assert.equal((await call({enabled:false,revision:0})).statusCode,409);
   assert.deepEqual((await call()).body,{enabled:true,revision:1});
+  role='team';member=true;
+  assert.deepEqual((await call()).body,{enabled:true,revision:1});
+  assert.equal((await call(null,{cookie:cookie(false)})).statusCode,403);
+  assert.equal((await call(null,{cookie:cookie(true,1)})).statusCode,403);
+  assert.equal((await call({enabled:false,revision:1},{headers:{origin:'https://unrelated.example'}})).statusCode,403);
+  assert.deepEqual((await call({enabled:false,revision:1})).body,{enabled:false,revision:2});
+  rotatedDuringRequest=true;
+  assert.equal((await call({enabled:true,revision:2})).statusCode,403);
+  assert.equal((await call()).statusCode,403);
+  member=false;rotatedDuringRequest=false;
+  assert.equal((await call({enabled:true,revision:2})).statusCode,403);
+  role='moderator';member=true;
+  assert.equal((await call({enabled:true,revision:2})).statusCode,403);
 });
 test('catalog requires current wallet, staff role and factor before reading any artwork',async t=>{
   const calls=fixture(t);
