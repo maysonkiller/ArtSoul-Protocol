@@ -31,6 +31,8 @@ Give reviewers the commit, manifest, storage layout, economics, access rules, te
 
 ## Internal review dispositions, November 25
 
+The [wallet dependency release](https://github.com/maysonkiller/ArtSoul-Protocol/pull/520) updated the lockfile and Hardhat version after the original reviews. On the released dependency lock, the SHA-256 of the ordinary manifest is `2b3e952161ca69a7d78c70322ad7d29b4a1a7c2ba2764dee553fe9126d4080be`; the payout manifest is `ac49c111151487d340e7c0a928f017c614c3e8fa83666ca6dd484f1a896ae3ba`. Both include the LF-normalized lockfile SHA-256 `02beaac49d5dfd0952c2405de34eeef361f893403055c6eec669e71f062328d4`. Comparing the old and new manifests shows identical Solidity inputs, ABI, compiler metadata, creation and runtime bytecode, and immutable offsets. Use these updated manifest digests when verifying the current release. The earlier digests identify the pre-update builds recorded below and above.
+
 A native solc rebuild reproduced the manifest above from the 21 pinned sources. On an isolated EVM, the treasury-binding, resale, runner-up and keeper suites passed all 28 cases. The scope of these results is the ordinary pair.
 
 | Question | Disposition |

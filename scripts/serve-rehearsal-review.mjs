@@ -20,7 +20,7 @@ function check(condition, message) {
 }
 
 // Bound request bursts to each public test endpoint, including concurrent wallet refreshes.
-function sequencedRead(url) {
+export function sequencedRead(url) {
     const rpc = readRpc(url);
     let tail = Promise.resolve();
     const read = (method, params) => {
