@@ -199,12 +199,16 @@ export async function readOrdinaryRegistration(listener, options) {
             logs[0].topics?.[0]?.toLowerCase() !== event.topicHash) throw new Error('Missing or ambiguous ordinary registration');
         const [log] = logs;
         receiptLogIndex(log, receipt);
+        // Two ABI words precede the padded URI. Bound the payload before decoding it.
+        if (typeof log.data !== 'string' || log.data.length > 2 + 2 * (64 + 2048) || log.topics.length !== 3) {
+            throw new Error('Invalid ordinary registration event');
+        }
         const { artworkId, creator } = getters.decodeEventLog(event, log.data, log.topics);
         const topics = getters.encodeFilterTopics(event, [artworkId, creator]);
         // The contract accepts up to 2048 URI bytes, including non-UTF-8 and NUL.
         const coder = AbiCoder.defaultAbiCoder();
         const [metadataUriHex] = coder.decode(['bytes'], log.data);
-        if (!artworkId || !nonzero(creator) || topics.length !== log.topics.length ||
+        if (!artworkId || !nonzero(creator) ||
             topics.some((topic, i) => topic !== log.topics[i].toLowerCase()) ||
             metadataUriHex.length <= 2 || metadataUriHex.length > 2 + 2048 * 2 ||
             coder.encode(['bytes'], [metadataUriHex]) !== log.data.toLowerCase()) throw new Error('Invalid ordinary registration event');
