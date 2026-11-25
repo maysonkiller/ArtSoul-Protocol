@@ -75,3 +75,21 @@ test('paid mode requires explicit clip IDs, a batch limit and a budget before an
       /explicit_generation_limits_required/);
   }
 });
+
+test('recovery requires identical journal and published records even when their WAV hashes agree', async t => {
+  const {root,entry} = await fixture(t);
+  const published = {...entry, usage:{input_tokens:8, output_tokens:30}, estimated_usd:0.0006048};
+  const manifest = {...header, clips:[published]};
+  const received = {id:'en-r2Greeting', status:'received', reservedUsd:0.025};
+  const replay = recording => audio.reconcileReceived(manifest, {version:1, attempts:[{...received, recording}]}, [phrase], root);
+  for (const change of [{id:'r2Other'}, {lang:'ru'}, {voice:'other'}, {text:'Different phrase.'},
+    {estimated_usd:0}, {usage:{input_tokens:8, output_tokens:300}}]) {
+    const recording = {...published, ...change};
+    await assert.rejects(() => audio.reconcileReceived(manifest, {version:1, attempts:[{
+      ...received, id:recording.lang+'-'+recording.id, recording
+    }]}, [phrase], root), /conflicting_recording/);
+  }
+  const recovered = await replay({...published, usage:{output_tokens:30, input_tokens:8}});
+  assert.equal(recovered.ledger.attempts[0].status, 'completed');
+  assert.deepEqual(recovered.manifest, manifest);
+});

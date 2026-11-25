@@ -6,7 +6,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash, randomUUID} from 'node:crypto';
-import {parseEnv} from 'node:util';
+import {isDeepStrictEqual, parseEnv} from 'node:util';
 
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -270,7 +270,9 @@ export async function reconcileReceived(manifest, ledger, phrases, publicRoot) {
     const entry = attempt.recording;
     if (!entry || attempt.id !== entry.lang + '-' + entry.id) throw new Error('invalid_ledger_recording');
     const existing = clips.find(clip => clip.url === entry.url);
-    if (existing && existing.sha256 !== entry.sha256) throw new Error('conflicting_recording');
+    // A crash can leave the manifest published while the journal still says received.
+    // Finalize only the same record, including its phrase, provider metadata and usage.
+    if (existing && !isDeepStrictEqual(existing, entry)) throw new Error('conflicting_recording');
     if (!existing) clips.push(entry);
     return {...attempt,status:'completed'};
   });
