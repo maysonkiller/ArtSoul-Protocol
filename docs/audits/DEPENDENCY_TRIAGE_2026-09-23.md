@@ -8,7 +8,29 @@ wallet connector version or deployment target changed.
 Repository: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, starting commit
 `25917f09edaa683b22049989d23600e5ad8d9d1f`. This is the consolidated working copy.
 
-## Current evidence
+## November 25 dependency recheck
+
+The November 21 audit listed 71 affected package names on the main lock.
+On November 25 the same lock listed 72, including a new inherited entry for
+`@base-org/account`. Matching the two November 25 full JSON reports by package
+name gives the following result for the proposed lock in
+[PR #520](https://github.com/maysonkiller/ArtSoul-Protocol/pull/520).
+
+| November 25 npm audit | Main lock | Candidate `c25314e4` |
+| --- | ---: | ---: |
+| Affected package names | 72 | 53 |
+| Critical / high / moderate / low | 2 / 34 / 17 / 19 | 0 / 11 / 11 / 31 |
+| Affected names with dev dependencies omitted | 60 | 44 |
+
+Of the original 72 names, 26 disappear and 46 remain. Seven of the 46
+drop in severity. Seven additional names appear on the proposed lock.
+Both critical entries, `handlebars` and `proxy-addr`, disappear.
+The published register covers all 79 distinct names. Advisory-specific
+reachability and wallet-device acceptance are recorded separately.
+[Original JSON reports and lock hashes](https://github.com/maysonkiller/ArtSoul-Protocol/blob/c25314e44a21510b28e873aff7a31c3d64db976c/docs/audits/npm-2026-11-25/DATA.md) ·
+[Residual risks](https://github.com/maysonkiller/ArtSoul-Protocol/blob/c25314e44a21510b28e873aff7a31c3d64db976c/docs/audits/npm-2026-11-25/SECURITY_RESIDUAL_RISK.md)
+
+## September evidence
 
 The 2026-09-23 lockfile audit reported **58 affected package names: 26 high,
 13 moderate, 19 low, zero critical**. This supersedes the July count. The count

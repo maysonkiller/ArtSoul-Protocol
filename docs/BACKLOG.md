@@ -1,6 +1,6 @@
 # ArtSoul Durable Backlog
 
-Updated: 2026-11-20
+Updated: 2026-11-25
 Canonical phase model: `A-D` from [`docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`](canon/ARTSOUL_CANON_BIBLE_FULL.md) section 17.
 
 This is the repository's durable work register. It consolidates verified completed work, open implementation work, founder-owned inputs, and code-level follow-ups so that ideas do not remain authoritative only in chat sessions or external prompt files.
@@ -16,6 +16,10 @@ This is the repository's durable work register. It consolidates verified complet
 7. Resource-gated work follows [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md). Missing funding defers activation; it never waives security, audit, role-separation, legal, migration, or mainnet acceptance requirements.
 
 ## Canonical Phase Mapping
+
+### November 25 test deployment and dependency review
+
+C13 has a [public test deployment and read-only auction rehearsal](testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md). D2 intake now accepts its reviewed register directly. Signed settlement, hosted indexing and production custody remain open. The [dependency triage](audits/DEPENDENCY_TRIAGE_2026-09-23.md#november-25-dependency-recheck) reconciles the November 21 and 25 package counts with the separately tested security draft.
 
 ### November 20 phase acceptance
 

@@ -1,0 +1,113 @@
+// Read-only rehearsal against the state immediately after a fresh Base Sepolia deployment.
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { Interface, getAddress, isHexString, keccak256, parseEther, toQuantity } from 'ethers';
+import { readRpc } from './verify-treasury-safes.mjs';
+
+const [registerFile, blockHash] = process.argv.slice(2);
+assert(registerFile && isHexString(blockHash, 32), 'Usage: node scripts/simulate-rehearsal-auction.mjs <pair-register.json> <creation-block-hash>');
+const register = JSON.parse(await readFile(registerFile, 'utf8'));
+assert.equal(register.chainId, 84532);
+const [market, nft] = await Promise.all(['OrdinaryMarket', 'SettledArtworkNFT'].map(async name => {
+    const artifact = new URL('../artifacts/contracts/replacement/' + name + '.sol/' + name + '.json', import.meta.url);
+    return new Interface(JSON.parse(await readFile(artifact, 'utf8')).abi);
+}));
+// These are simulated callers. Only their balances are overridden.
+const [artist, collector, buyer] = [1001, 1002, 1003].map(id => getAddress('0x' + id.toString(16).padStart(40, '0')));
+const price = parseEther('0.10'), deposit = parseEther('0.01'), resale = parseEther('0.20');
+const uri = 'ipfs://artwork-rehearsal';
+
+async function simulate(url) {
+    const rpc = readRpc(url);
+    assert.equal(BigInt(await rpc('eth_chainId', [])), 84532n);
+    const block = await rpc('eth_getBlockByHash', [blockHash, false]);
+    assert.equal(block.hash, blockHash);
+    const at = { blockHash, requireCanonical: true };
+    for (const item of [register.core, register.nft]) {
+        assert.equal(keccak256(await rpc('eth_getCode', [item.address, at])), item.codeHash);
+    }
+    const start = Number(BigInt(block.timestamp)) + 1;
+    const end = start + 86400;
+    const secondStart = end + 1;
+    const secondEnd = secondStart + 86400;
+    const extendedEnd = secondEnd + 600;
+    const defaultTime = extendedEnd + 86401;
+    const higherBid = parseEther('0.11'), higherDeposit = parseEther('0.011');
+    function call(abi, method, args = [], from = artist, value = 0n) {
+        return { from, to: abi === market ? register.core.address : register.nft.address,
+            data: abi.encodeFunctionData(method, args), value: toQuantity(value), gas: '0x100000' };
+    }
+    const roles = [artist, collector, register.protocolTreasury.address, register.ecosystemTreasury.address];
+    const virtualBlocks = [
+        { blockOverrides: { time: toQuantity(start) },
+            stateOverrides: Object.fromEntries([artist, collector, buyer].map(account => [account, { balance: toQuantity(parseEther('1')) }])),
+            calls: [call(market, 'registerArtwork', [uri]), call(market, 'createAuction', [1, price, 86400]),
+                call(market, 'placeBid', [1, price], collector, deposit), call(nft, 'totalSupply')] },
+        { blockOverrides: { time: toQuantity(end) },
+            calls: [call(market, 'settleAuction', [1], collector, price - deposit), call(nft, 'ownerOf', [1]),
+                call(nft, 'approve', [register.core.address, 1], collector), call(market, 'listResale', [1, 0, resale], collector),
+                call(market, 'buyResale', [1, 1], buyer, resale), call(nft, 'ownerOf', [1]), call(nft, 'firstCollector', [1]),
+                call(nft, 'tokenCreator', [1]), ...roles.map(address => call(market, 'credits', [address]))] },
+        { blockOverrides: { time: toQuantity(secondStart) }, calls: [
+            call(market, 'registerArtwork', [uri + '-second']), call(market, 'createAuction', [2, price, 86400]),
+            call(market, 'placeBid', [2, price], collector, deposit),
+            call(market, 'registerArtwork', [uri + '-bidless']), call(market, 'createAuction', [3, price, 86400])] },
+        { blockOverrides: { time: toQuantity(secondEnd - 60) }, calls: [
+            call(market, 'placeBid', [2, higherBid], buyer, higherDeposit), call(market, 'auctions', [2])] },
+        { blockOverrides: { time: toQuantity(extendedEnd) }, calls: [
+            call(market, 'currentAuctionForWork', [3]), call(market, 'closeAuction', [3]),
+            call(market, 'closeAuction', [2]), call(market, 'auctions', [2]), call(nft, 'totalSupply')] },
+        { blockOverrides: { time: toQuantity(defaultTime) }, calls: [
+            call(market, 'finalizeDefault', [2]), call(market, 'runnerUpOffers', [2]),
+            call(market, 'processRefunds', [2, 1]), call(market, 'acceptRunnerUpOffer', [2], collector, price),
+            call(nft, 'firstCollector', [2]), call(nft, 'artworkToToken', [3]), ...roles.map(address => call(market, 'credits', [address]))] }
+    ];
+    const result = await rpc('eth_simulateV1', [{ blockStateCalls: virtualBlocks, validation: false }, block.number]);
+    assert.equal(result.length, virtualBlocks.length);
+    for (const [i, { calls }] of result.entries()) {
+        assert.equal(calls.length, virtualBlocks[i].calls.length);
+        for (const [j, response] of calls.entries()) {
+            assert.equal(response.status, '0x1', 'Simulated call failed at block ' + i + ', position ' + j);
+        }
+    }
+    const [before, after, , lastBid, close, fallback] = result.map(entry => entry.calls);
+    const value = (abi, method, result) => abi.decodeFunctionResult(method, result.returnData)[0];
+    assert.equal(value(market, 'registerArtwork', before[0]), 1n);
+    assert.equal(value(market, 'createAuction', before[1]), 1n);
+    assert.equal(value(nft, 'totalSupply', before[3]), 0n);
+    assert.equal(value(market, 'settleAuction', after[0]), 1n);
+    assert.equal(value(nft, 'ownerOf', after[1]), collector);
+    assert.equal(value(nft, 'ownerOf', after[5]), buyer);
+    assert.equal(value(nft, 'firstCollector', after[6]), collector);
+    assert.equal(value(nft, 'tokenCreator', after[7]), artist);
+    // Primary 97.5/2.5 and resale 92.5/5.5/1/1, summed across the two sales.
+    const credit = after.slice(8).map(response => value(market, 'credits', response));
+    assert.deepEqual(credit, ['0.1085', '0.185', '0.0045', '0.002'].map(parseEther));
+    const late = market.decodeFunctionResult('auctions', lastBid[1].returnData);
+    assert.equal(late.originalEnd, BigInt(secondEnd));
+    assert.equal(late.end, BigInt(extendedEnd));
+    assert.equal(value(market, 'currentAuctionForWork', close[0]), 0n);
+    assert.equal(market.decodeFunctionResult('auctions', close[3].returnData).deadline, BigInt(extendedEnd + 86400));
+    assert.equal(value(nft, 'totalSupply', close[4]), 1n);
+    const offer = market.decodeFunctionResult('runnerUpOffers', fallback[1].returnData);
+    assert.deepEqual([offer.bidder, offer.price, offer.deadline], [collector, price, BigInt(defaultTime + 86400)]);
+    const refundLog = fallback[2].logs.find(log => log.address.toLowerCase() === register.core.address.toLowerCase() &&
+        log.topics[0] === market.getEvent('OutbidRefundProcessed').topicHash);
+    assert(refundLog, 'Expected the runner-up deposit refund');
+    const refund = market.parseLog(refundLog).args;
+    assert.deepEqual([refund.creditor, refund.amount, refund.paid], [collector, deposit, true]);
+    assert.equal(value(nft, 'firstCollector', fallback[4]), collector);
+    assert.equal(value(nft, 'artworkToToken', fallback[5]), 0n);
+    const finalCredit = fallback.slice(6).map(response => value(market, 'credits', response));
+    // Add a second primary sale and the defaulted winner's 80/20 deposit split.
+    assert.deepEqual(finalCredit, ['0.2148', '0.185', '0.0092', '0.002'].map(parseEther));
+    assert.equal((await rpc('eth_getBlockByNumber', [block.number, false])).hash, blockHash);
+    assert.equal(BigInt(await rpc('eth_call', [call(market, 'workCount'), at])), 0n);
+    assert.equal(BigInt(await rpc('eth_call', [call(nft, 'totalSupply'), at])), 0n);
+    return { block: Number(BigInt(block.number)), blockHash, saleAndResaleCreditsWei: credit.map(String),
+        creditsAfterRunnerUpWei: finalCredit.map(String), runnerUpRefundWei: String(refund.amount) };
+}
+
+const [first, second] = await Promise.all(['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(simulate));
+assert.deepEqual(first, second);
+console.log(JSON.stringify({ simulation: 'eth_simulateV1', chainId: 84532, providers: 2, ...first }, null, 2));
