@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { id, toQuantity } from 'ethers';
+import { id, keccak256, toQuantity } from 'ethers';
 import { prepareGenesisGrants } from '../scripts/prepare-genesis-grants.mjs';
 import { verifyGenesisGrants } from '../scripts/verify-genesis-grants.mjs';
 
@@ -13,6 +13,25 @@ test('two providers confirm only the reviewed Genesis serials including founder 
     assert.deepEqual(result.grants.map(g => [g.tokenId, g.recipient, g.mintIndex, g.lockIndex, g.grantIndex]),
         [[0, founder, '8', '10', '11'], [201, mainnetCollector, '12', '14', '15']]);
     assert.deepEqual(result.grants.map(g => g.decisionHash), prepareGenesisGrants(review).grants.map(g => g.decisionHash));
+});
+
+test('retains the reviewed issuer and decision binding when the input changes during RPC reads', async () => {
+    const document = structuredClone(review);
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const delayed = rpc => async (...args) => { await gate; return rpc(...args); };
+    const result = verifyGenesisGrants(document, tx, [delayed(provider()), delayed(provider())]);
+    document.genesisCodeHash = id('changed runtime');
+    document.policyHash = id('changed policy');
+    document.founder = mainnetCollector;
+    document.grants[1].recipient = founder;
+    release();
+    const proof = await result;
+    assert.equal(proof.founder, founder);
+    assert.equal(proof.genesisCodeHash, review.genesisCodeHash);
+    assert.equal(proof.policyHash, review.policyHash);
+    assert.equal(proof.calldataHash, keccak256(prepareGenesisGrants(review).transaction.data));
+    assert.equal(proof.grants[1].recipient, mainnetCollector);
 });
 
 test('rejects a wrong chain, deployment, Safe, runtime or policy even for an internally consistent receipt', async () => {
