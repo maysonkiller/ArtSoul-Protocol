@@ -4,18 +4,63 @@ import { readFile } from 'node:fs/promises';
 import { Interface, getAddress, isHexString, keccak256, parseEther, toQuantity } from 'ethers';
 import { readRpc } from './verify-treasury-safes.mjs';
 
-const [registerFile, blockHash] = process.argv.slice(2);
-assert(registerFile && isHexString(blockHash, 32), 'Usage: node scripts/simulate-rehearsal-auction.mjs <pair-register.json> <creation-block-hash>');
+const [registerFile, blockHash, option, ...extra] = process.argv.slice(2);
+const payout = option === '--payout';
+assert(registerFile && isHexString(blockHash, 32) && (!option || payout) && !extra.length,
+    'Usage: node scripts/simulate-rehearsal-auction.mjs <pair-register.json> <creation-block-hash> [--payout]');
 const register = JSON.parse(await readFile(registerFile, 'utf8'));
 assert.equal(register.chainId, 84532);
-const [market, nft] = await Promise.all(['OrdinaryMarket', 'SettledArtworkNFT'].map(async name => {
+const [market, nft] = await Promise.all([payout ? 'OrdinaryPayoutMarket' : 'OrdinaryMarket', 'SettledArtworkNFT'].map(async name => {
     const artifact = new URL('../artifacts/contracts/replacement/' + name + '.sol/' + name + '.json', import.meta.url);
     return new Interface(JSON.parse(await readFile(artifact, 'utf8')).abi);
 }));
-// These are simulated callers. Only their balances are overridden.
+// These are virtual participants in read-only RPC simulations.
 const [artist, collector, buyer] = [1001, 1002, 1003].map(id => getAddress('0x' + id.toString(16).padStart(40, '0')));
 const price = parseEther('0.10'), deposit = parseEther('0.01'), resale = parseEther('0.20');
 const uri = 'ipfs://artwork-rehearsal';
+
+async function simulateCreditRoute(rpc, block, start) {
+    const fixture = JSON.parse(await readFile(new URL('../artifacts/contracts/test/OrdinaryAuctionFixture.sol/OrdinaryBidderFixture.json', import.meta.url), 'utf8'));
+    const wallet = new Interface(fixture.abi);
+    const walletAddress = getAddress('0x0000000000000000000000000000000000001004');
+    assert.equal(await rpc('eth_getCode', [walletAddress, { blockHash, requireCanonical: true }]), '0x');
+    const core = register.core.address;
+    const call = (from, to, abi, method, args, amount = 0n) => ({
+        from, to, data: abi.encodeFunctionData(method, args), value: toQuantity(amount), gas: '0x100000'
+    });
+    const higher = parseEther('0.11'), higherDeposit = parseEther('0.011');
+    const blocks = [
+        { blockOverrides: { time: toQuantity(start) }, stateOverrides: {
+            [artist]: { balance: toQuantity(parseEther('1')) }, [buyer]: { balance: toQuantity(parseEther('1')) },
+            [walletAddress]: { code: fixture.deployedBytecode, state: {} }
+        }, calls: [
+            call(artist, core, market, 'registerArtwork', [uri]), call(artist, core, market, 'createAuction', [1, price, 86400]),
+            call(artist, walletAddress, wallet, 'bid', [core, 1, price], deposit),
+            call(buyer, core, market, 'placeBid', [1, higher], higherDeposit)
+        ] },
+        { blockOverrides: { time: toQuantity(start + 86400) }, calls: [
+            call(artist, core, market, 'closeAuction', [1]), call(artist, core, market, 'processRefunds', [1, 1]),
+            call(artist, core, market, 'credits', [walletAddress]), call(artist, walletAddress, wallet, 'balanceAt', [collector]),
+            call(artist, walletAddress, wallet, 'withdrawTo', [core, collector]), call(artist, walletAddress, wallet, 'balanceAt', [collector]),
+            call(artist, core, market, 'credits', [walletAddress]), call(artist, walletAddress, wallet, 'balanceAt', [core])
+        ] }
+    ];
+    const simulated = await rpc('eth_simulateV1', [{ blockStateCalls: blocks, validation: false }, block.number]);
+    assert.deepEqual(simulated.map(b => b.calls.map(c => c.status)), blocks.map(b => b.calls.map(() => '0x1')));
+    const [, refund, before, oldBalance, withdrawal, newBalance, after, held] = simulated[1].calls;
+    const eventArgs = (result, name) => {
+        const logs = result.logs.filter(log => log.address.toLowerCase() === core.toLowerCase() && log.topics[0] === market.getEvent(name).topicHash);
+        assert.equal(logs.length, 1, name);
+        return [...market.parseLog(logs[0]).args];
+    };
+    assert.deepEqual(eventArgs(refund, 'OutbidRefundProcessed'), [1n, 0n, walletAddress, deposit, false]);
+    assert.deepEqual(eventArgs(withdrawal, 'CreditRouted'), [walletAddress, collector]);
+    assert.deepEqual(eventArgs(withdrawal, 'CreditWithdrawn'), [walletAddress, deposit]);
+    assert.deepEqual([BigInt(before.returnData), BigInt(after.returnData), BigInt(held.returnData)], [deposit, 0n, higherDeposit]);
+    const delivered = BigInt(newBalance.returnData) - BigInt(oldBalance.returnData);
+    assert.equal(delivered, deposit);
+    return delivered.toString();
+}
 
 async function simulate(url) {
     const rpc = readRpc(url);
@@ -112,7 +157,8 @@ async function simulate(url) {
     assert.equal((await rpc('eth_getBlockByNumber', [block.number, false])).hash, blockHash);
     assert.equal(BigInt(await rpc('eth_call', [call(market, 'workCount'), at])), 0n);
     assert.equal(BigInt(await rpc('eth_call', [call(nft, 'totalSupply'), at])), 0n);
-    return { block: Number(BigInt(block.number)), blockHash, saleAndResaleCreditsWei: credit.map(String),
+    const routed = payout ? { routedCreditWei: await simulateCreditRoute(rpc, block, start) } : {};
+    return { ...routed, block: Number(BigInt(block.number)), blockHash, saleAndResaleCreditsWei: credit.map(String),
         creditsAfterRunnerUpWei: finalCredit.map(String), runnerUpRefundWei: String(refund.amount) };
 }
 

@@ -4,7 +4,7 @@ This backlog tracks the A–D phase model in `ARTSOUL_CANON_BIBLE_FULL.md` §17.
 
 Work proceeds one contained task at a time. One backlog item normally equals one focused PR. Contract changes require focused tests and explicit storage-layout review.
 
-**C1 / C12 / C13, November 25.** The [ordinary payout candidate](../security/C12_ORDINARY_AUDIT_HANDOFF.md) implements delivery of accrued credits to a creditor-selected address. Release tooling distinguishes its bytecode and paired NFT from the existing Base Sepolia deployment. Public rehearsal of the new candidate and independent audit acceptance are outstanding.
+**C1 / C12 / C13, November 25.** The [ordinary payout Core](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md#core-with-creditor-directed-withdrawals) was deployed to Base Sepolia. Two RPC providers simulated delivery of the full credited amount to the selected recipient and retention of the current winner's deposit. Signed auction and settlement journeys, hosted intake and independent audit acceptance remain outstanding.
 
 **November 25 acceptance count.** Of 38 active numbered items, 17 are accepted (44.7%) and 21 remain. Phase A has 12 of 12 accepted, B has 1 of 5 (B4), C has 4 of 16 (C2, C3, C6 and C11), and D has 0 of 5. C16 and D1 were retired without completion credit. Each active item carries equal weight. The founder closed the B engineering workstream on November 18. Open public-beta journeys carry into C13.
 

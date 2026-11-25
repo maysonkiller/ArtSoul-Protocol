@@ -38,6 +38,7 @@ contract OrdinaryBidderFixture is IERC721Receiver {
     }
     function withdraw(OrdinaryArtAuctions engine) external { engine.withdraw(); }
     function withdrawTo(OrdinaryPayoutMarket engine, address payable recipient) external { engine.withdrawTo(recipient); }
+    function balanceAt(address account) external view returns (uint256) { return account.balance; }
     receive() external payable { require(acceptsETH); }
     function onERC721Received(address, address, uint256, bytes calldata) external view returns (bytes4) {
         require(acceptsNFT);
