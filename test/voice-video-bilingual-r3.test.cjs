@@ -33,7 +33,7 @@ const cases=[
  ['why are you speaking English','почему ты говоришь на английском','reply'],
  ['did you do it','это сделал','reply'],
  ['help','помощь','help'],
- ['open nfc','открой ен эф ти','replyOrPrompt'],
+ ['open nfc','открой нфс','replyOrPrompt'],
  ['my activity','моя активность','get_my_activity'],
  ['what auctions are open','покажи открытые аукционы','find_active_auctions'],
  ['what happens after the auction','объясни что будет после аукциона','explain_settlement'],
@@ -132,7 +132,7 @@ test('UI actions call only reviewed header controls, never connect or sign autom
  assert.equal(signatures,0,'never request or sign transactions');
  assert.match(f({kind:'ui',action:'networkStatus'},{doc,win,lang:'ru'}).show,/Base Sepolia/);
  assert.match(f({kind:'ui',action:'networkStatus'},{doc,win,lang:'en'}).show,/Base Sepolia/);
- assert.match(f({kind:'ui',action:'unknown'}, {doc,win,lang:'ru'}).show,/недоступна/);
+ assert.match(f({kind:'ui',action:'unknown'}, {doc,win,lang:'ru'}).show,/unavailable/);
  assert.equal(signatures,0);
 });
 test('voice text is never replaced with an arbitrary browser TTS or private dynamic audio',()=>{

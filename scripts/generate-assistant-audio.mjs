@@ -5,9 +5,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createHash} from 'node:crypto';
+import {createHash, randomUUID} from 'node:crypto';
 import {parseEnv} from 'node:util';
-import WebSocket from 'ws';
+
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const model = 'gpt-realtime-2.1-mini';
@@ -72,14 +72,23 @@ async function readJson(file, fallback) {
   catch (error) { if (error.code === 'ENOENT') return fallback; throw new Error('invalid_local_record'); }
 }
 
-async function writeJson(file, value) {
+async function writeAtomic(file, data, {exclusive = false} = {}) {
   await fs.mkdir(path.dirname(file), {recursive: true});
-  const temporary = `${file}.${process.pid}.tmp`;
-  await fs.writeFile(temporary, JSON.stringify(value, null, 2) + '\n', {flag: 'wx'});
-  await fs.rename(temporary, file);
+  const temporary = file + '.' + randomUUID() + '.tmp';
+  try {
+    await fs.writeFile(temporary, data, {flag:'wx'});
+    if (exclusive) await fs.link(temporary, file);
+    else await fs.rename(temporary, file);
+  } finally {
+    await fs.rm(temporary, {force:true});
+  }
 }
 
-async function loadClips() {
+function writeJson(file, value) {
+  return writeAtomic(file, JSON.stringify(value, null, 2) + '\n');
+}
+
+export async function loadClips() {
   // Match the parser tests: no document or tool registry means no UI is mounted.
   const win = {};
   new Function('window', 'document', 'navigator', await fs.readFile(path.join(root, 'voice-commands.js'), 'utf8'))(win, undefined, {});
@@ -105,7 +114,8 @@ async function loadClips() {
   return clips;
 }
 
-function generateClip(clip, apiKey) {
+async function generateClip(clip, apiKey) {
+  const {default:WebSocket} = await import('ws');
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`, {
       headers: {Authorization: `Bearer ${apiKey}`}, maxPayload: 4 * 1024 * 1024,
@@ -182,38 +192,120 @@ function generateClip(clip, apiKey) {
   });
 }
 
-async function syncVerifiedIndex(manifest) {
-  const entries = [];
-  for (const clip of manifest.clips) {
-    if (!clip?.id?.startsWith('r2') ||
-        !/^\/audio\/assistant\/v1\/phrases\/(?:ru|en)-r2[A-Za-z0-9]+\.wav$/.test(clip.url || '') ||
-        typeof clip.text !== 'string' || typeof clip.sha256 !== 'string') continue;
-    try {
-      if (hash(await fs.readFile(path.join(root,'public',clip.url))) === clip.sha256)
-        entries.push([clip.text,clip.url]);
-    } catch(error) {
-      if(error.code !== 'ENOENT')throw new Error('audio_index_validation_failed');
+// Clip paths come from the reviewed bank. Reject redirected components, including directory junctions.
+async function recordingStat(publicRoot, url) {
+  const segments = url.slice(1).split('/');
+  let current = publicRoot;
+  for (let i = 0; i <= segments.length; i++) {
+    if (i) current = path.join(current, segments[i - 1]);
+    const stat = await fs.lstat(current).catch(error => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (!stat) return null;
+    if (stat.isSymbolicLink() || !(i === segments.length ? stat.isFile() : stat.isDirectory())) {
+      throw new Error('unsafe_audio_path');
+    }
+    if (i === segments.length) return stat;
+  }
+}
+
+export async function verifyRecordingInventory(manifest, phrases, publicRoot = path.join(root, 'public')) {
+  if (manifest?.version !== 1 || manifest.voice !== voice || manifest.model !== model ||
+      manifest.sample_rate !== sampleRate || !Array.isArray(manifest.clips)) throw new Error('invalid_manifest');
+  const records = new Map(manifest.clips.map(clip => [clip?.url, clip]));
+  const approved = new Set(phrases.map(clip => clip.url));
+  if (records.size !== manifest.clips.length || [...records.keys()].some(url => !approved.has(url))) {
+    throw new Error('unapproved_manifest_record');
+  }
+  for (const phrase of phrases) {
+    const {lang, id, url, text} = phrase;
+    if (!['en','ru'].includes(lang) || !/^[a-z][a-zA-Z0-9]*$/.test(id) ||
+        url !== '/audio/assistant/v1/' + (id.startsWith('r2') ? 'phrases/' : '') + lang + '-' + id + '.wav') {
+      throw new Error('unsafe_audio_path');
+    }
+    const stat = await recordingStat(publicRoot, url);
+    const record = records.get(url);
+    if (!record && !stat) continue;
+    if (!record) throw new Error('orphan_recording_requires_review');
+    if (!stat || record.lang !== lang || record.id !== id || record.text !== text ||
+        record.model !== model || record.voice !== voice || typeof record.transcript !== 'string' ||
+        normalizeTranscript(record.transcript) !== normalizeTranscript(text) ||
+        stat.size !== record.bytes || stat.size <= 44 || stat.size > 44 + 60 * sampleRate * 2) {
+      throw new Error('invalid_recording');
+    }
+    const wav = await fs.readFile(path.join(publicRoot, url));
+    if (hash(wav) !== record.sha256 || wav.length !== stat.size || (wav.length - 44) % 2 !== 0 ||
+        wav.toString('ascii', 0, 4) !== 'RIFF' || wav.readUInt32LE(4) !== wav.length - 8 ||
+        wav.toString('ascii', 8, 16) !== 'WAVEfmt ' || wav.readUInt32LE(16) !== 16 ||
+        wav.readUInt16LE(20) !== 1 || wav.readUInt16LE(22) !== 1 || wav.readUInt32LE(24) !== sampleRate ||
+        wav.readUInt32LE(28) !== sampleRate * 2 || wav.readUInt16LE(32) !== 2 ||
+        wav.readUInt16LE(34) !== 16 || wav.toString('ascii', 36, 40) !== 'data' ||
+        wav.readUInt32LE(40) !== wav.length - 44 || !Number.isFinite(record.duration_seconds) ||
+        Math.abs(record.duration_seconds - (wav.length - 44) / (sampleRate * 2)) > 0.0051) {
+      throw new Error('invalid_recording');
     }
   }
-  if(new Map(entries).size !== entries.length)throw new Error('ambiguous_phrase');
+  return records;
+}
+
+export function checkGenerationLedger(ledger, batch, budgetUsd) {
+  if (ledger?.version !== 1 || !Array.isArray(ledger.attempts)) throw new Error('invalid_ledger');
+  const pending = new Set(batch.map(clip => clip.lang + '-' + clip.id));
+  let reserved = 0;
+  for (const attempt of ledger.attempts) {
+    if (!attempt || typeof attempt.id !== 'string' || !['started','received','failed','completed'].includes(attempt.status) ||
+        !Number.isFinite(attempt.reservedUsd) || attempt.reservedUsd <= 0) throw new Error('invalid_ledger');
+    if (pending.has(attempt.id)) throw new Error('previous_attempt_requires_review');
+    reserved += attempt.reservedUsd;
+  }
+  if (reserved + batch.length * reserveUsd > budgetUsd) throw new Error('generation_budget_exceeded');
+}
+
+export async function reconcileReceived(manifest, ledger, phrases, publicRoot) {
+  checkGenerationLedger(ledger, [], Infinity);
+  const clips = [...manifest.clips];
+  const attempts = ledger.attempts.map(attempt => {
+    if (attempt.status !== 'received') return attempt;
+    const entry = attempt.recording;
+    if (!entry || attempt.id !== entry.lang + '-' + entry.id) throw new Error('invalid_ledger_recording');
+    const existing = clips.find(clip => clip.url === entry.url);
+    if (existing && existing.sha256 !== entry.sha256) throw new Error('conflicting_recording');
+    if (!existing) clips.push(entry);
+    return {...attempt,status:'completed'};
+  });
+  const repaired = {...manifest, clips};
+  const records = await verifyRecordingInventory(repaired, phrases, publicRoot);
+  return {manifest:repaired, ledger:{...ledger, attempts}, records};
+}
+
+async function syncVerifiedIndex(records) {
+  const entries = [...records.values()].filter(clip => clip.lang === 'en' && clip.id.startsWith('r2'))
+    .map(clip => [clip.text,clip.url]);
+  if (new Map(entries).size !== entries.length) throw new Error('ambiguous_phrase');
   const js = "(function(){'use strict';const map=new Map(" + JSON.stringify(entries) +
     ");window.ArtSoulVoiceAudioBank=Object.freeze({lookup:text=>map.get(text)||''});})();\n";
-  const final = path.join(root,'voice-audio-bank-r2.js');
-  const temp = final+'.'+process.pid+'.tmp';
-  await fs.writeFile(temp,js,{flag:'wx'}); await fs.rename(temp,final);
-  console.log(JSON.stringify({audio_index:'updated',verified_clips:entries.length}));
+  await writeAtomic(path.join(root, 'voice-audio-bank-r2.js'), js);
+  console.log(JSON.stringify({audio_index:'updated', verified_clips:entries.length}));
+}
+
+export function checkGenerationScope(args, only) {
+  if (!only || !args.includes('--max-new') || !args.includes('--budget-usd')) {
+    throw new Error('explicit_generation_limits_required');
+  }
 }
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help')) {
-    console.log('node scripts/generate-assistant-audio.mjs [--generate] [--max-new 10] [--budget-usd 1] [--only ru-r2Greeting,en-r2Greeting] [--sync-bank]');
-    console.log('Default: dry run, no credentials read or API calls. Existing verified clips are skipped.');
+    console.log('node scripts/generate-assistant-audio.mjs [--generate] [--max-new 10] [--budget-usd 1] [--only ru-r2Greeting,en-r2Greeting] [--sync-bank] | --recover');
+    console.log('Default: dry run. Paid generation requires --only, --max-new and --budget-usd. Existing verified clips are skipped.');
     return;
   }
-  let generate=false,only=null,syncBank=false,maxNew=10,budgetUsd=defaultBudgetUsd;
+  let generate=false,only=null,syncBank=false,recover=false,maxNew=10,budgetUsd=defaultBudgetUsd;
   for (let i=0;i<args.length;i++) {
     if(args[i]==='--generate')generate=true;
+    else if(args[i]==='--recover' && args.length===1)recover=true;
     else if(args[i]==='--sync-bank')syncBank=true;
     else if(args[i]==='--only'&&args[i+1])only=new Set(args[++i].split(','));
     else if(args[i]==='--max-new'&&args[i+1]){
@@ -224,37 +316,35 @@ async function main() {
       budgetUsd=v;
     } else throw new Error('unknown_argument');
   }
+  if (generate) checkGenerationScope(args, only);
   const all = await loadClips();
   if (only && [...only].some(key => !all.some(clip => `${clip.lang}-${clip.id}` === key))) throw new Error('unknown_clip');
   const clips = all.filter(clip => !only || only.has(`${clip.lang}-${clip.id}`));
   let lock;
-  if (generate) {
+  if (generate || syncBank || recover) {
     await fs.mkdir(path.dirname(ledgerPath), {recursive: true});
     try { lock = await fs.open(`${ledgerPath}.lock`, 'wx'); }
     catch { throw new Error('generation_already_locked'); }
   }
   try {
     const manifest = await readJson(manifestPath, {version: 1, model, voice, sample_rate: sampleRate, clips: []});
-    if (manifest.version !== 1 || !Array.isArray(manifest.clips)) throw new Error('invalid_manifest');
-    const pending = [];
-    for (const clip of clips) {
-      const existing = manifest.clips.find(item => item.url === clip.url && item.text === clip.text);
-      let verified = false;
-      if (existing) {
-        try { verified = hash(await fs.readFile(path.join(root, 'public', clip.url))) === existing.sha256; }
-        catch (error) { if (error.code !== 'ENOENT') throw new Error('asset_read_failed'); }
-      }
-      if (!verified) pending.push(clip);
+    if (recover) {
+      const ledger = await readJson(ledgerPath, null);
+      const restored = await reconcileReceived(manifest, ledger, all);
+      await writeJson(manifestPath, restored.manifest);
+      await syncVerifiedIndex(restored.records);
+      await writeJson(ledgerPath, restored.ledger);
+      return;
     }
+    const records = await verifyRecordingInventory(manifest, all);
+    const pending = clips.filter(clip => !records.has(clip.url));
     const batch=pending.slice(0,maxNew);
     console.log(JSON.stringify({mode:generate?'generate':'dry_run',model,voice,pendingTotal:pending.length,
       planned:batch.map(clip=>`${clip.lang}-${clip.id}`),reservedUsd:batch.length*reserveUsd,budgetUsd}));
-    if(!generate){if(syncBank)await syncVerifiedIndex(manifest);return;}
-    if(!batch.length){if(syncBank)await syncVerifiedIndex(manifest);return;}
+    if(!generate){if(syncBank)await syncVerifiedIndex(records);return;}
+    if(!batch.length){if(syncBank)await syncVerifiedIndex(records);return;}
     const ledger = await readJson(ledgerPath, {version: 1, attempts: []});
-    if (ledger.version !== 1 || !Array.isArray(ledger.attempts)) throw new Error('invalid_ledger');
-    const reserved = ledger.attempts.reduce((sum, attempt) => sum + Number(attempt.reservedUsd), 0);
-    if (!Number.isFinite(reserved) || reserved < 0 || reserved + batch.length * reserveUsd > budgetUsd) throw new Error('generation_budget_exceeded');
+    checkGenerationLedger(ledger, batch, budgetUsd);
     // Codex or a local operator may supply a narrowly scoped environment secret.
     // Never print it, write it to evidence, or put it in tracked source files.
     let apiKey = typeof process.env.OPENAI_API_KEY === 'string'
@@ -272,24 +362,26 @@ async function main() {
         const result = await generateClip(clip, apiKey);
         if (result.estimatedUsd > reserveUsd) throw new Error('unexpected_usage');
         const target = path.join(root, 'public', clip.url);
-        await fs.mkdir(path.dirname(target), {recursive: true});
-        await fs.writeFile(target, result.wav);
         const entry = {...clip, transcript: result.transcript, sha256: hash(result.wav), bytes: result.wav.length,
           duration_seconds: (result.wav.length - 44) / (sampleRate * 2), generated_at: attempt.at,
           model, voice, usage: result.usage, estimated_usd: result.estimatedUsd};
+        attempt.status = 'received';
+        attempt.recording = entry;
+        await writeJson(ledgerPath, ledger);
+        await writeAtomic(target, result.wav, {exclusive:true});
         manifest.clips = [...manifest.clips.filter(item => item.url !== clip.url), entry];
         await writeJson(manifestPath, manifest);
         attempt.status = 'completed'; attempt.estimatedUsd = result.estimatedUsd;
         console.log(JSON.stringify({id: attempt.id, status: 'generated', bytes: result.wav.length, estimatedUsd: result.estimatedUsd}));
       } catch (error) {
-        attempt.status = 'failed';
+        if (attempt.status === 'started') attempt.status = 'failed';
         await writeJson(ledgerPath, ledger);
         throw error;
       }
       await writeJson(ledgerPath, ledger);
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    if(syncBank)await syncVerifiedIndex(manifest);
+    await syncVerifiedIndex(await verifyRecordingInventory(manifest, all));
   } finally {
     if (lock) {
       await lock.close();

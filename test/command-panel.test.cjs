@@ -115,29 +115,29 @@ test('no microphone support still exposes a labelled keyboard composer without r
 
 test('opening, typing, examples and language selection never start the microphone', async () => {
   const h = harness({speech: true}); h.open(); h.submit('help'); await flush();
-  h.ru.fire('click'); assert.equal(h.get('h2').textContent, 'Команды ArtSoul');
-  assert.equal(h.get('.artsoul-voice-panel').attrs.lang, 'ru');
+  h.ru.fire('click'); assert.equal(h.get('h2').textContent, 'ArtSoul commands');
+  assert.equal(h.get('.artsoul-voice-panel').attrs.lang, 'en');
   h.submit('помощь'); await flush();
   assert.equal(h.calls.length, 0); assert.equal(h.sessions.length, 0); assert.equal(h.prompts(), 0);
 });
 
-test('Russian commands use the archived RU female recording; English retains its own clip', async () => {
+test('English and Russian commands play the same reviewed English reply', async () => {
   for (const stored of [false, true]) {
     const storage = new Map(stored ? [['artsoul.voice.lang', 'ru']] : []);
     const h = harness({speech: true, audio: true, browserLanguage: 'ru-RU', storage});
     h.open();
-    assert.equal(h.get('.artsoul-voice-panel').attrs.lang, stored ? 'ru' : 'en');
+    assert.equal(h.get('.artsoul-voice-panel').attrs.lang, 'en');
     assert.equal(h.ru.attrs['aria-pressed'], String(stored));
     h.submit(stored ? 'помощь' : 'help'); await flush();
     h.get('.artsoul-voice-replay').fire('click');
-    assert.equal(h.plays[0].src, '/audio/assistant/v1/' + (stored ? 'ru' : 'en') + '-helpSpeech.wav');
+    assert.equal(h.plays[0].src, '/audio/assistant/v1/en-helpSpeech.wav');
     assert.equal(h.spoken.length, 0, 'speechSynthesis may not replace the selected voice');
   }
 });
 test('NFT clarification accepts a short typed answer and closing the panel clears the choice', async () => {
   const h = harness({execute: async () => JSON.stringify({opened: true, page: 'marketplace', title: 'Marketplace', url: '/gallery#marketplace'})});
   h.open(); h.ru.fire('click'); h.submit('открой NFT'); await flush();
-  assert.match(h.get('.artsoul-voice-answer').textContent, /маркетплейс/);
+  assert.match(h.get('.artsoul-voice-answer').textContent, /marketplace/);
   assert.deepEqual(h.calls, []);
   h.submit('на маркетплейсе'); await flush();
   assert.deepEqual(h.calls, [{name: 'open_page', args: {page: 'marketplace'}}]);
@@ -198,11 +198,11 @@ test('voice chat resumes only after a complete recorded reply and stops by voice
   h.open(); h.ru.fire('click');
   const chat = h.get('.artsoul-voice-chat');
   chat.fire('click'); await flush();
-  assert.equal(chat.textContent, 'Завершить диалог');
+  assert.equal(chat.textContent, 'End voice chat');
   assert.equal(chat.dataset.listening, 'true');
   h.sessions[0].onresult({results: [[{transcript:'помощь',confidence:1}]]}); await flush();
   assert.equal(h.sessions[0].aborted,true);
-  assert.equal(h.plays[0].src,'/audio/assistant/v1/ru-helpSpeech.wav');
+  assert.equal(h.plays[0].src,'/audio/assistant/v1/en-helpSpeech.wav');
   h.players[0].emit('playing');
   assert.equal(h.sessions.length,1,'never recognize its own speech');
   h.players[0].emit('ended');
@@ -222,7 +222,7 @@ test('voice chat without a verified audio engine stops safely after the text ans
   assert.equal(h.sessions.length,1,'no audio means no blind microphone restart');
   assert.equal(h.get('.artsoul-voice-chat').attrs['aria-pressed'],'false');
   assert.equal(h.spoken.length,0);
-  assert.match(h.get('.artsoul-voice-answer').textContent,/Могу найти работы/);
+  assert.match(h.get('.artsoul-voice-answer').textContent,/open gallery/);
 });
 test('ending voice chat, typing or leaving the page cancels any queued next turn', async () => {
   for (const stop of ['button', 'typing', 'hidden', 'close', 'account', 'language', 'pagehide']) {
@@ -400,17 +400,17 @@ test('replay of a confirmed wallet-submitted reply never submits again or speaks
   assert.ok(!h.plays.map(x=>x.src).join(' ').includes(hash));
   assert.equal(h.spoken.length,0);
 });
-test('Russian microphone help uses the original RU marin WAV and allows replay', async () => {
+test('Russian microphone help uses the reviewed English recording and allows replay', async () => {
   const h=harness({speech:true,audio:true});h.open();h.ru.fire('click');
   h.get('.artsoul-voice-mic').fire('click');await flush();
   h.sessions[0].onresult({results: [[{transcript:'помощь',confidence:1}]]});await flush();
   assert.equal(h.spoken.length,0);
-  assert.equal(h.plays[0].src,'/audio/assistant/v1/ru-helpSpeech.wav');
-  assert.match(h.get('.artsoul-voice-answer').textContent,/Могу найти работы/);
+  assert.equal(h.plays[0].src,'/audio/assistant/v1/en-helpSpeech.wav');
+  assert.match(h.get('.artsoul-voice-answer').textContent,/open gallery/);
   h.players[0].emit('playing');h.players[0].emit('ended');
   const replay=h.get('.artsoul-voice-replay');replay.fire('click');
   assert.equal(h.plays.length,2);
-  assert.equal(h.plays[1].src,'/audio/assistant/v1/ru-helpSpeech.wav');
+  assert.equal(h.plays[1].src,'/audio/assistant/v1/en-helpSpeech.wav');
   assert.equal(h.calls.length,0);
 });
 test('unknown dynamic speech cannot fall back to a male browser voice', async () => {
@@ -482,15 +482,15 @@ test('wallet, auth, language, and page lifecycle revoke prior recorded playback'
     assert.equal(h.calls.length,0);
   }
 });
-test('fixed bilingual prerecorded replies play in the original click and replay without tool calls', async () => {
+test('English replies to bilingual input play in the original click and replay without tool calls', async () => {
   for(const lang of ['en','ru']){
     const h=harness({audio:true,speech:true});delete h.window.speechSynthesis;
     h.open();if(lang==='ru')h.ru.fire('click');
     h.submit(lang==='ru'?'поиск':'search');await flush();
     const replay=h.get('.artsoul-voice-replay');
     const answer=h.get('.artsoul-voice-answer').textContent;
-    const clip=h.window.ArtSoulVoice.replyClips.find(entry=>entry.lang===lang&&entry.text===answer);
-    assert.ok(clip,lang+' must have its own recorded response');
+    const clip=h.window.ArtSoulVoice.replyClips.find(entry=>entry.lang==='en'&&entry.text===answer);
+    assert.ok(clip,lang+' input must receive a reviewed English reply');
     assert.equal(h.plays.length,0);
     assert.equal(replay.disabled,false);
     replay.fire('click');
@@ -506,7 +506,7 @@ test('fixed bilingual prerecorded replies play in the original click and replay 
     assert.equal(h.utterances.length,0);
   }
 });
-test('recorded settlement uses separate verified RU and EN submitted/confirmed audio', async () => {
+test('recorded settlement uses different submitted and confirmed English audio for both input languages', async () => {
   for(const lang of ['en','ru']){
     const urls=[];
     for(const confirmed of [false,true]){
@@ -514,7 +514,7 @@ test('recorded settlement uses separate verified RU and EN submitted/confirmed a
       const h=harness({audio:true,execute:async()=>JSON.stringify(result)});
       h.open();if(lang==='ru')h.ru.fire('click');
       h.submit(lang==='ru'?'оплати работу 31':'pay for artwork 31');await flush();
-      const clip=h.window.ArtSoulVoice.replyClips.find(entry=>entry.lang===lang&&entry.id===(confirmed?'settled':'submitted'));
+      const clip=h.window.ArtSoulVoice.replyClips.find(entry=>entry.lang==='en'&&entry.id===(confirmed?'settled':'submitted'));
       assert.ok(clip);
       assert.equal(h.plays.length,0);
       const replay=h.get('.artsoul-voice-replay');replay.fire('click');
@@ -525,9 +525,9 @@ test('recorded settlement uses separate verified RU and EN submitted/confirmed a
       assert.equal(h.get('input').value,'');
       assert.equal(h.utterances.length,0);
       assert.doesNotMatch(clip.text,/0x/);
-      if(confirmed)assert.match(clip.text,lang==='ru'?/Расчёт подтверждён/:/Settlement confirmed/);
+      if(confirmed)assert.match(clip.text,/Settlement confirmed/);
       else assert.doesNotMatch(clip.text,/NFT is yours|NFT теперь ваша|Settlement confirmed|Расчёт подтверждён/);
-      assert.equal(h.get('.artsoul-voice-answer').textContent,lang==='ru'?clip.text:h.window.ArtSoulVoice.describeResult('complete_settlement',result).show);
+      assert.equal(h.get('.artsoul-voice-answer').textContent,h.window.ArtSoulVoice.describeResult('complete_settlement',result).show);
     }
     assert.notEqual(urls[0],urls[1],'submitted and settled must use different WAVs');
   }
@@ -866,6 +866,29 @@ test('microphone denial leaves text usable and a failed tool can be retried deli
   assert.equal(h.calls.length, 2); assert.equal(h.spoken.length, 0);
 });
 
+test('a single microphone turn cannot invoke a financial tool until the person submits the transcript', async () => {
+  for (const confidence of [0, undefined, 0.25, 1]) {
+    const h = harness({speech:true, dialogue:true});
+    h.open(); h.get('.artsoul-voice-mic').fire('click'); await flush();
+    h.sessions[0].onresult({results:[[{transcript:'buy artwork 31',confidence}]]}); await flush();
+    assert.equal(h.calls.length,0);
+    assert.equal(h.get('input').value,'buy artwork 31');
+    h.get('form').fire('submit'); await flush();
+    assert.deepEqual(h.calls,[{name:'buy_resale_listing',args:{artwork_id:'31'}}]);
+  }
+});
+
+test('a read-only tool response cannot produce a wallet confirmation or play the corresponding WAV', async () => {
+  const h = harness({audio:true,execute:async()=>JSON.stringify({
+    submitted:true,confirmed:true,transaction_hash:'0x'+'ab'.repeat(32)
+  })});
+  h.open(); h.submit('search moon'); await flush();
+  assert.doesNotMatch(h.get('.artsoul-voice-answer').textContent,/wallet approved|NFT is yours/);
+  h.get('.artsoul-voice-replay').fire('click');
+  assert.equal(h.plays.length,0);
+  assert.equal(h.calls.length,1);
+});
+
 test('Escape restores launcher focus; untrusted text stays text, never markup', async () => {
   const h = harness(); h.open(); h.submit('<img src=x onerror=alert(1)>'); await flush();
   assert.match(h.get('.artsoul-voice-heard').textContent, /<img/);
@@ -979,42 +1002,42 @@ test('real integrated RU and EN NFT requests navigate to gallery instead of sear
  }
 });
 
-test('RU mode shows Russian microphone status and never claims missing audio exists',async()=>{
+test('Russian recognition keeps English microphone controls and never claims missing audio exists',async()=>{
  const h=harness({dialogue:true,speech:true,audio:true});
  h.open();h.ru.fire('click');
  const panel=h.get('.artsoul-voice-panel');
- assert.equal(panel.attrs.lang,'ru');
- assert.match(h.get('.artsoul-voice-hint').textContent,/RU.*marin/);
+ assert.equal(panel.attrs.lang,'en');
+ assert.match(h.get('.artsoul-voice-hint').textContent,/Replies are in English/);
  h.get('.artsoul-voice-mic').fire('click');await flush();
  assert.equal(h.sessions[0].lang,'ru-RU');
- assert.match(h.get('.artsoul-voice-answer').textContent,/Слушаю/);
+ assert.match(h.get('.artsoul-voice-answer').textContent,/Listening/);
  h.sessions[0].onresult({results:[[{transcript:'открой нфт',confidence:1}]]});await flush();
  assert.deepEqual(h.calls[0],{name:'open_page',args:{page:'nfts'}});
  assert.equal(h.spoken.length,0,'no fallback to unreviewed browser speech');
 });
 
 
-test('RU microphone responds in Russian after Latin STT and accepts NFT clarification',async()=>{
+test('Russian microphone shows English clarification after a misheard Latin transcript and accepts NFT clarification',async()=>{
  const h=harness({dialogue:true,speech:true,audio:true,
   execute:async()=>JSON.stringify({opened:true,page:'nfts',title:'NFTs',url:'/gallery#nft'})});
  h.open();h.ru.fire('click');
  h.get('.artsoul-voice-mic').fire('click');await flush();
  assert.equal(h.sessions[0].lang,'ru-RU');
  h.sessions[0].onresult({results:[[{transcript:'open NFC',confidence:1}]]});await flush();
- assert.match(h.get('.artsoul-voice-answer').textContent,/Похоже, фраза/,'RU text despite Latin misrecognition');
+ assert.match(h.get('.artsoul-voice-answer').textContent,/may be misheard/,'English clarification despite Latin misrecognition');
  assert.equal(h.calls.length,0,'NFC does not cause unapproved navigation');
  h.submit('галерея');await flush();
  assert.deepEqual(h.calls,[{name:'open_page',args:{page:'nfts'}}]);
  assert.equal(h.spoken.length,0,'unrecorded reply never switches to browser voice');
 });
 
-test('RU microphone can still parse a Latin-recognized existing command with RU answer',async()=>{
+test('RU microphone can still parse a Latin-recognized command with an English answer',async()=>{
  const h=harness({dialogue:true,speech:true,
   execute:async()=>JSON.stringify({opened:true,page:'profile',title:'Profile',url:'/profile'})});
  h.open();h.ru.fire('click');
  h.get('.artsoul-voice-mic').fire('click');await flush();
  h.sessions[0].onresult({results:[[{transcript:'open profile',confidence:1}]]});await flush();
  assert.deepEqual(h.calls,[{name:'open_page',args:{page:'profile'}}]);
- assert.match(h.get('.artsoul-voice-answer').textContent,/Открываю страницу ArtSoul/,
-   'RU microphone must not switch its answer to English');
+ assert.match(h.get('.artsoul-voice-answer').textContent,/Profile/,
+   'Microphone language must not change the product language');
 });

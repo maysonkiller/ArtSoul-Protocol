@@ -324,10 +324,9 @@ test('a low-confidence wallet command is not run; a read is', () => {
   const bid = parse('bid 0.05 on artwork 31');
   assert.equal(voice.mayRun(bid, 0.3), false, 'misheard money is asked again');
   assert.equal(voice.mayRun(bid, 0.9), true);
-  // An engine that does not measure confidence reports 0. That is unknown, not
-  // low, and the tool gate still confirms the figure on the page.
-  assert.equal(voice.mayRun(bid, 0), true);
-  assert.equal(voice.mayRun(bid, undefined), true);
+  for (const unknown of [0, undefined, null, NaN, Infinity, -1, 1.01]) {
+    assert.equal(voice.mayRun(bid, unknown), false);
+  }
   assert.equal(voice.mayRun(parse('what auctions are open'), 0.1), true);
 });
 

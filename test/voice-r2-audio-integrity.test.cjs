@@ -122,7 +122,7 @@ test('every generated r2 file is indexed by the manifest; dynamic text is silent
   assert.equal(w.ArtSoulVoiceAudioBank.lookup('A user balance, signed receipt, or dynamic reply'), '');
   for(const clip of allPhrases){
     const lookup=w.ArtSoulVoiceAudioBank.lookup(clip.text);
-    if(entries.has(clip.url))assert.equal(lookup,clip.url,'recorded phrase must be indexed');
+    if(clip.lang === 'en' && entries.has(clip.url))assert.equal(lookup,clip.url,'recorded English phrase must be indexed');
     else assert.equal(lookup,'','unrecorded phrase must not be voiced');
   }
 });

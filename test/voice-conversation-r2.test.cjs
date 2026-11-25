@@ -24,8 +24,10 @@ test('context resets and invalid navigation IDs are rejected',()=>{
 test('all site scripts load conversation before voice commands',()=>{
   for(const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol']){
     const html=fs.readFileSync(page+'.html','utf8');
-    assert.ok(html.indexOf('/voice-conversation-r2.js?v=4')>=0,page);
-    assert.ok(html.indexOf('/voice-conversation-r2.js?v=4')<html.indexOf('/voice-commands.js?v=23'),page);
+    const scriptOrder = ['/voice-conversation-r2.js?', '/voice-audio-bank-r2.js?', '/voice-commands.js?'];
+    const indices = scriptOrder.map(script => html.indexOf(script));
+    assert.ok(indices[0] >= 0 && indices[0] < indices[1] && indices[1] < indices[2], page);
+    for (const script of scriptOrder) assert.equal(html.indexOf(script), html.lastIndexOf(script), page);
   }
 });
 

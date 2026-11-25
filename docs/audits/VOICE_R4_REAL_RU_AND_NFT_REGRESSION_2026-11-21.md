@@ -1,5 +1,7 @@
 # ArtSoul Voice R4 — real RU microphone and NFT navigation remediation
 
+The November 25 review supersedes this draft's Russian reply and interface selection. Multilingual recognition continues with English product copy and English recorded responses. [Current voice QA](VOICE_R2_QA_2026-11-25.md)
+
 **Date:** 2026-11-21 | **Scope:** SOURCE_ONLY / TEST_ONLY | **PR:** #519 (Draft)
 **Owner symptom:** Despite earlier passing tests, the RU language toggle still felt English and spoken "открой NFT" failed to open the desired section.
 

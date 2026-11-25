@@ -17,6 +17,10 @@ This is the repository's durable work register. It consolidates verified complet
 
 ## Canonical Phase Mapping
 
+### November 25 voice draft review
+
+In progress on draft #519. Offline checks cover English replies for multilingual input, manual review of microphone wallet requests, independent checks against the approved phrase bank and recovery from interrupted writes. The phrase inventory has 187 unrecorded entries. Real-device listening remains open. [Verification and repeatable checks](audits/VOICE_R2_QA_2026-11-25.md)
+
 ### November 20 phase acceptance
 
 The [numbered checklist](canon/12_IMPLEMENTATION_BACKLOG.md) has 17 of 40 accepted items. B engineering is closed. Its named public-beta journeys are tracked in C13. The ordinary-market candidate passed C2 auction Core implementation, C3 artwork NFT implementation, C6 pool accounting and C11 contract and invariant testing. The independent review, fresh hosted rehearsal, announced Snapshot A, production custody and mainnet go/no-go are still open.

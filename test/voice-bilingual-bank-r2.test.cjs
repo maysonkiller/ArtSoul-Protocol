@@ -12,7 +12,7 @@ test('the bilingual audio library is bounded, unique and public-generic',()=>{
  assert.equal(bank.clips.filter(x=>x.lang==='en').length,83);
  assert.equal(bank.clips.filter(x=>x.lang==='ru').length,83);
 });
-test('male voice fallback is not reachable and audio index is empty before generation',()=>{
+test('male voice fallback is not reachable for unrecorded answers',()=>{
  const w={};new Function('window','document','navigator',voice)(w,undefined,{});
  new Function('window',fs.readFileSync('voice-audio-bank-r2.js','utf8'))(w);
  assert.equal(w.ArtSoulVoiceAudioBank.lookup('Unrecorded dynamic result'),'');
@@ -24,7 +24,7 @@ test('no public page loads the old voice script cache key and all load the bank 
  for(const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol']){
   const html=fs.readFileSync(page+'.html','utf8');
   assert.ok(html.indexOf('/voice-audio-bank-r2.js?v=1')>=0,page);
-  assert.ok(html.indexOf('/voice-audio-bank-r2.js?v=1')<html.indexOf('/voice-commands.js?v=23'),page);
+  assert.ok(html.indexOf('/voice-audio-bank-r2.js?v=1')<html.indexOf('/voice-commands.js?v=24'),page);
  }
  assert.match(fs.readFileSync('vite.config.js','utf8'),/'voice-audio-bank-r2.js'/);
 });
@@ -32,8 +32,8 @@ test('asset generator remains dry-run by default and bank index requires verifie
  const generator=fs.readFileSync('scripts/generate-assistant-audio.mjs','utf8');
  assert.match(generator,/if\(!generate\)/);
  assert.match(generator,/invalid_budget/);
- assert.match(generator,/audio_index_validation_failed/);
- assert.match(generator,/hash\(await fs.readFile/);
+ assert.match(generator,/verifyRecordingInventory/);
+ assert.match(generator,/previous_attempt_requires_review/);
  assert.doesNotMatch(voice,/\bfetch\(/);
 });
 test('fixed tool summaries narrate only verified generic facts, not private data',()=>{
@@ -52,7 +52,7 @@ test('fixed tool summaries narrate only verified generic facts, not private data
  ];
  for(const [tool,data,name] of fixtures)for(const lang of ['en','ru']){
   const cue=summary(tool,data,lang);
-  assert.equal(cue,bank.clips.find(x=>x.id===name&&x.lang===lang)?.text,name+lang);
+  assert.equal(cue,bank.clips.find(x=>x.id===name&&x.lang==='en')?.text,name+lang);
   assert.ok(!cue.includes('Mock Work')&&!cue.includes('0x123')&&!cue.includes('0.05'));
  }
 });
