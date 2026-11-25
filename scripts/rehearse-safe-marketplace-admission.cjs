@@ -27,6 +27,7 @@ async function main() {
 
     async function createRehearsalNetwork(chainId, safeCount) {
         const chain = { ...config.networks.hardhat, chainId, forking: undefined };
+        if (chainId === 8453) chain.initialDate = '2030-01-01T00:00:00Z';
         const evm = await createProvider({ ...config, networks: { hardhat: chain } }, 'hardhat', artifacts);
         const provider = new ethers.BrowserProvider(evm, undefined, { cacheTimeout: -1 });
         provider.pollingInterval = 10;
@@ -34,7 +35,12 @@ async function main() {
         const [relayer, ...accounts] = await provider.listAccounts();
         const owners = accounts.slice(0, 3);
         const addresses = owners.map(owner => owner.address);
+        let nextTimestamp = Date.parse('2030-01-01T00:00:00Z') / 1000;
+        async function setGrantBlockTime() {
+            if (chainId === 8453) await evm.send('evm_setNextBlockTimestamp', [nextTimestamp += 60]);
+        }
         async function deploy({ abi, bytecode }, ...args) {
+            await setGrantBlockTime();
             return (await new ethers.ContractFactory(abi, bytecode, relayer).deploy(...args)).waitForDeployment();
         }
         const singleton = await deploy(safeArtifact('SafeL2'));
@@ -43,6 +49,7 @@ async function main() {
         const init = singleton.interface.encodeFunctionData('setup', [addresses, 2, zero, '0x', handler.target, zero, 0, zero]);
         const safes = [];
         for (let salt = 1; salt <= safeCount; salt++) {
+            await setGrantBlockTime();
             const receipt = await mine(factory.createProxyWithNonce(singleton.target, init, salt));
             const creation = receipt.logs.find(log => log.fragment?.name === 'ProxyCreation');
             const safe = singleton.attach(creation.args.proxy);
@@ -51,8 +58,28 @@ async function main() {
             assert.deepEqual([...(await safe.getOwners())], addresses);
             safes.push(safe);
         }
-        return { provider, evm, relayer, accounts, owners, addresses, deploy, safes,
+        return { provider, evm, relayer, accounts, owners, addresses, deploy, safes, setGrantBlockTime,
             adminSingleton: singleton.target, adminHandler: handler.target };
+    }
+
+    if (process.argv[3] === '--genesis-evidence') {
+        const first = await executeGenesisGrant();
+        const second = await executeGenesisGrant();
+        assert.deepEqual(second.review, first.review);
+        assert.equal(second.hash, first.hash);
+        const observations = [{}, {}];
+        // The two EVMs execute the signed batch separately. Preserve each
+        // response read by the real verifier for the isolated PostgreSQL test.
+        const readers = [first, second].map(({ evm }, i) => async (method, params) => {
+            const request = JSON.stringify([method, params]);
+            const response = await evm.send(method, params);
+            observations[i][request] = response;
+            return response;
+        });
+        const { verifyGenesisGrants } = await import('./verify-genesis-grants.mjs');
+        const proof = await verifyGenesisGrants(first.review, first.hash, readers);
+        process.stdout.write(JSON.stringify({ review: first.review, hash: first.hash, block: proof.block, observations }));
+        return;
     }
 
     const { provider, evm, relayer, accounts, owners, addresses, deploy, safes: allSafes, adminSingleton, adminHandler } =
@@ -288,28 +315,36 @@ async function main() {
         assert.equal(await evm.send('evm_revert', [snapshot]), true);
     }
 
-    const pilot = await createRehearsalNetwork(8453, 1);
-    const grantSafe = pilot.safes[0];
-    const founder = pilot.accounts[4].address;
-    const genesis = await pilot.deploy(await artifacts.readArtifact('ArtSoulGenesis'), grantSafe.target, founder,
-        'ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3pteozf5b6tk3twtpjfeqmczy/');
-    const { prepareGenesisGrants } = await import('./prepare-genesis-grants.mjs');
-    const prepared = prepareGenesisGrants({
-        chainId: 8453, safe: grantSafe.target, genesis: genesis.target, founder, policyHash: ethers.id('local-policy'),
-        grants: [{ category: 'Founder', tokenId: 0, recipient: founder, activityChainId: 0, evidenceHash: ethers.id('local-decision') }]
-    });
-    const { data } = prepared.transaction;
-    const oneApproval = await signedTransfer(grantSafe, genesis.target, 0n, data, [pilot.owners[0]]);
-    await assert.rejects(grantSafe.execTransaction.staticCall(...oneApproval), /GS020/);
-    assert.equal(await genesis.totalSupply(), 0n);
-    const authorized = await signedTransfer(grantSafe, genesis.target, 0n, data, [pilot.owners[0], pilot.owners[2]]);
-    await mine(grantSafe.execTransaction(...authorized));
-    assert.equal(await genesis.ownerOf(0), founder);
-    assert.equal(await genesis.locked(0), true);
-    assert.equal((await genesis.grantRecord(0)).decisionHash, prepared.grants[0].decisionHash);
-    assert.equal(await grantSafe.nonce(), 1n);
+    await executeGenesisGrant();
     console.log('PASS: a separate disposable Base simulation rejected one signature and recorded the exact Genesis decision with two.');
 
+    async function executeGenesisGrant() {
+        const pilot = await createRehearsalNetwork(8453, 1);
+        const grantSafe = pilot.safes[0];
+        const founder = pilot.accounts[4].address;
+        const genesis = await pilot.deploy(await artifacts.readArtifact('ArtSoulGenesis'), grantSafe.target, founder,
+            'ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3pteozf5b6tk3twtpjfeqmczy/');
+        const { prepareGenesisGrants } = await import('./prepare-genesis-grants.mjs');
+        const review = {
+            chainId: 8453, safe: grantSafe.target, genesis: genesis.target, founder, policyHash: ethers.id('local-policy'),
+            genesisCodeHash: ethers.keccak256(await pilot.provider.getCode(genesis.target)),
+            grants: [{ category: 'Founder', tokenId: 0, recipient: founder, activityChainId: 0, evidenceHash: ethers.id('local-decision') }]
+        };
+        const prepared = prepareGenesisGrants(review);
+        const { data } = prepared.transaction;
+        const oneApproval = await signedTransfer(grantSafe, genesis.target, 0n, data, [pilot.owners[0]]);
+        await assert.rejects(grantSafe.execTransaction.staticCall(...oneApproval), /GS020/);
+        assert.equal(await genesis.totalSupply(), 0n);
+        const authorized = await signedTransfer(grantSafe, genesis.target, 0n, data, [pilot.owners[0], pilot.owners[2]]);
+        await pilot.setGrantBlockTime();
+        const receipt = await mine(grantSafe.execTransaction(...authorized));
+        assert.equal(await genesis.ownerOf(0), founder);
+        assert.equal(await genesis.locked(0), true);
+        assert.equal((await genesis.grantRecord(0)).decisionHash, prepared.grants[0].decisionHash);
+        assert.equal(await grantSafe.nonce(), 1n);
+        await pilot.evm.send('hardhat_mine', ['0x80', '0x1']);
+        return { evm: pilot.evm, review, hash: receipt.hash };
+    }
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

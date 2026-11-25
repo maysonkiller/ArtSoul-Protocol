@@ -14,6 +14,13 @@ const review = { chainId: 8453, safe, genesis, founder, genesisCodeHash: keccak2
         { tokenId: 201, category: 'MainnetActivity', recipient: mainnetCollector, activityChainId: 8453, evidenceHash: id('fixture eligibility') }] };
 const tx = id('fixture grant tx'), block = { hash: id('fixture block'), number: '0x20', transactions: [id('other tx'), tx] };
 const head = { hash: id('finalized'), number: '0x21' };
+const safeAbi = new Interface(['function execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)']);
+export function safeTransaction(reviewed = review, hash = tx, header = block, changes = {}) {
+    const prepared = prepareGenesisGrants(reviewed).transaction;
+    const { to, value, data, operation } = { ...prepared, ...changes };
+    const input = safeAbi.encodeFunctionData('execTransaction', [to, value, data, operation, 0, 0, 0, ZeroAddress, ZeroAddress, '0x11']);
+    return { hash, to: reviewed.safe, blockHash: header.hash, blockNumber: header.number, transactionIndex: '0x1', input };
+}
 export function receipt(reviewed = review, hash = tx, header = block) {
     const genesis = reviewed.genesis;
     const result = { status: '0x1', transactionHash: hash, transactionIndex: '0x1', blockNumber: header.number, blockHash: header.hash, logs: [] };
@@ -45,6 +52,9 @@ export function provider(overrides = {}, reviewed = review, hash = tx, header = 
         case 'eth_getTransactionReceipt':
             assert.deepEqual(params, [hash]);
             return overrides.receipt ?? receipt(reviewed, hash, header);
+        case 'eth_getTransactionByHash':
+            assert.deepEqual(params, [hash]);
+            return overrides.transaction ?? safeTransaction(reviewed, hash, header);
         case 'eth_getCode':
             assert.deepEqual(params, [genesis, { blockHash: header.hash, requireCanonical: true }]);
             return overrides.code ?? code;

@@ -57,7 +57,7 @@ The artwork API can supply Platform status when ownership verification is active
 
 The resolver also accepts evidence for the two new mint formats. A finalized mint receipt must match a canonical block obtained independently, and the NFT contract must emit the ERC-721 mint to the same recipient as its grant or collection event.
 
-- A grant on the designated Base mainnet Genesis contract identifies that exact Genesis token. Showing a frame on a separate artwork requires its own verified link. The transferable testnet prototype and a creator's wallet holdings cannot establish that link.
+- A grant on the designated Base mainnet Genesis contract identifies that exact Genesis token. The receipt must show its mint, lock and grant in order, from the same issuer. Showing a frame on a separate artwork requires its own verified link. The transferable testnet prototype and a creator's wallet holdings cannot establish that link.
 - A Partner mint requires the current curated Partner approval for that chain and collection address, plus a matching token in the range emitted by `CollectionMinted`. A blue identity check authenticates the collection's origin and confers no Partner status.
 - Top-100k is a numbered mainnet profile badge. It has no input to this resolver. Its live display depends on confirmed eligibility and issuance records.
 

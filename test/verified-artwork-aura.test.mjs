@@ -6,6 +6,7 @@ import { projectedArtworkAura } from '../src/ui/components/aura-frame.js';
 
 const abi = new Interface([
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+  'event Locked(uint256 tokenId)',
   'event GenesisGranted(uint256 indexed tokenId, address indexed recipient, uint8 indexed category, bytes32 decisionHash)',
   'event CollectionMinted(uint256 indexed phaseId, address indexed payer, address indexed recipient, uint256 firstTokenId, uint256 quantity, uint256 unitPrice)'
 ]);
@@ -18,8 +19,9 @@ const log = (name, args) => ({
 });
 const mint = log('Transfer', [ZeroAddress, recipient, 9n]);
 const grant = log('GenesisGranted', [9n, recipient, 1, transactionHash]);
+const lock = log('Locked', [9n]);
 const collection = log('CollectionMinted', [2, recipient, recipient, 7, 3, 400n]);
-function evidence(logs = [mint, grant, collection]) {
+function evidence(logs = [mint, lock, grant, collection]) {
   return { platformRegistration: {...deployment, tokenId: '9'}, genesisDeployment: deployment,
     partnerReview: {...deployment, approved: true}, canonicalMintBlock: {chainId: 8453, number: 11, hash: blockHash, finalizedThrough: 12},
     receipt: {status: 1, blockNumber: 11, blockHash, hash: transactionHash, logs} };
@@ -57,13 +59,17 @@ test('a replaced block, reverted receipt or incomplete mint cannot carry a frame
 });
 
 test('a grant belongs to its dedicated mainnet token and a reviewed collection needs its own mint range', () => {
-  const source = evidence([mint, grant]);
+  const source = evidence([mint, lock, grant]);
   delete source.platformRegistration;
   assert.equal(verifiedArtworkAura(identity, source), 'genesis');
   assert.equal(verifiedArtworkAura({...identity, chainId: 84532}, {...source,
     genesisDeployment: {...deployment, chainId: 84532}, canonicalMintBlock: {...source.canonicalMintBlock, chainId: 84532}}), null);
-  source.receipt.logs[1] = log('GenesisGranted', [9, recipient, 1, ZeroHash]);
+  source.receipt.logs[2] = log('GenesisGranted', [9, recipient, 1, ZeroHash]);
   assert.equal(verifiedArtworkAura(identity, source), null);
+  for (const logs of [[mint, grant], [mint, grant, lock], [mint, lock, lock, grant],
+      [mint, {...lock, address: recipient}, grant], [mint, log('Locked', [10]), grant]]) {
+    assert.equal(verifiedArtworkAura(identity, {...source, receipt: {...source.receipt, logs}}), null);
+  }
   source.receipt.logs = [mint, collection];
   assert.equal(verifiedArtworkAura(identity, source), 'partner');
   for (const review of [{...deployment, verified: true}, {...deployment, approved: false}, {...deployment, address: recipient, approved: true}]) {

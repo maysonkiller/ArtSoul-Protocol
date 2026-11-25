@@ -1,9 +1,46 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { id, keccak256 } from 'ethers';
 import { ingestGenesisGrants } from '../../scripts/index-genesis-grants.mjs';
 import { readGenesisHolder } from '../../scripts/read-genesis-holder.mjs';
 import { block, founder, mainnetCollector, provider, review, tx } from './genesis-grant-rpc.mjs';
+
+export async function checkMinedGenesisGrant(pool, safeArchive) {
+    const script = fileURLToPath(new URL('../../scripts/rehearse-safe-marketplace-admission.cjs', import.meta.url));
+    const output = execFileSync(process.execPath, [script, safeArchive, '--genesis-evidence'], {
+        encoding: 'utf8', timeout: 120000, windowsHide: true
+    });
+    const evidence = JSON.parse(output);
+    const issuer = evidence.review;
+    const { hash, observations } = evidence;
+    const save = reads => ingestGenesisGrants(pool, issuer, hash, reads.map(node => async (method, params) => {
+        const key = JSON.stringify([method, params]);
+        assert.ok(Object.hasOwn(node, key), 'The receipt check must use an observed RPC response: ' + method);
+        return structuredClone(node[key]);
+    }));
+    const read = async () => (await readGenesisHolder(pool, issuer, issuer.founder)).evidence;
+
+    const changed = structuredClone(observations);
+    const receiptKey = JSON.stringify(['eth_getTransactionReceipt', [hash]]);
+    const grantedTopic = id('GenesisGranted(uint256,address,uint8,bytes32)');
+    const grant = changed[1][receiptKey].logs.find(log => log.topics[0] === grantedTopic);
+    grant.data = id('different local grant decision');
+    await assert.rejects(save(changed), /Different GenesisGranted data/);
+    assert.equal(await read(), null);
+    assert.equal((await save(observations)).inserted, true);
+    assert.equal((await save(observations)).inserted, false);
+    const persisted = await read();
+    assert.equal(persisted.token_id, 0);
+    assert.equal(persisted.transaction_hash, hash);
+    assert.equal(persisted.block_hash, evidence.block.hash);
+    assert.equal(BigInt(persisted.grant_index), BigInt(grant.logIndex));
+    const counts = await pool.query(`SELECT
+        (SELECT count(*)::int FROM artsoul_private.genesis_grant_batches WHERE genesis_address=$1) AS batches,
+        (SELECT count(*)::int FROM artsoul_private.genesis_grants WHERE genesis_address=$1) AS grants`, [issuer.genesis.toLowerCase()]);
+    assert.deepEqual(counts.rows[0], { batches: 1, grants: 1 });
+}
 
 // The caller supplies a newly created isolated PostgreSQL cluster with migration 021.
 export async function checkGenesisGrantIntake(pool) {

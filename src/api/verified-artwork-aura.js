@@ -2,6 +2,7 @@ import { Interface, ZeroAddress, ZeroHash } from 'ethers';
 
 const mintEvents = new Interface([
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+  'event Locked(uint256 tokenId)',
   'event GenesisGranted(uint256 indexed tokenId, address indexed recipient, uint8 indexed category, bytes32 decisionHash)',
   'event CollectionMinted(uint256 indexed phaseId, address indexed payer, address indexed recipient, uint256 firstTokenId, uint256 quantity, uint256 unitPrice)'
 ]);
@@ -53,8 +54,14 @@ export function verifiedArtworkAura({ chainId, nftAddress, tokenId }, {
     event.args.to !== ZeroAddress && event.args.tokenId === id);
   if (mints.length !== 1) return null;
   const recipient = mints[0].args.to;
-  if (genesis && events.filter(event => event.name === 'GenesisGranted' && event.args.tokenId === id &&
-      event.args.recipient === recipient && event.args.category <= 3n && event.args.decisionHash !== ZeroHash).length === 1) return 'genesis';
+  if (genesis) {
+    const tokenEvents = events.filter(event => event.args.tokenId === id);
+    if (tokenEvents.length === 3) {
+      const [mint, lock, grant] = tokenEvents;
+      if (mint === mints[0] && lock.name === 'Locked' && grant.name === 'GenesisGranted' &&
+          grant.args.recipient === recipient && grant.args.category <= 3n && grant.args.decisionHash !== ZeroHash) return 'genesis';
+    }
+  }
   if (partner && events.filter(event => event.name === 'CollectionMinted' && event.args.recipient === recipient &&
       event.args.firstTokenId <= id && id < event.args.firstTokenId + event.args.quantity).length === 1) return 'partner';
   return null;
