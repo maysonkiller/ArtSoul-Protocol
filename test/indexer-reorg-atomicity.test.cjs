@@ -127,7 +127,9 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   await t.test('pre-smoke database check detects residual projections and refuses row-filtered evidence', async () => {
     const {verifyMainnetProjectionRows} = await import('../scripts/verify-mainnet-catalog.mjs');
     const reader = await pool.connect();
-    const verify = () => verifyMainnetProjectionRows(reader, CORE, 160);
+    const pair = {chainId: 8453, coreAddress: CORE, nftAddress: CREATOR,
+      expectedCoreCodeHash: hash(1), expectedNftCodeHash: hash(2)};
+    const verify = (reviewed = pair) => verifyMainnetProjectionRows(reader, reviewed, 160);
     try {
       await assert.rejects(verify(), /database cursor/);
       // Migration 001 supplies a legacy cursor. Simulate the isolated cutover.
@@ -137,6 +139,26 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
         VALUES ($1,$2,172,170,now(),now(),'running')`, [chain,address]);
       await seedCursor(8453,CORE);
       assert.ok(await verify() > 20);
+      const journal = await pool.query(`INSERT INTO public.contract_events
+        (chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
+        VALUES (8453,'MarketplaceAdmissionScheduled',$1,169,$2,0,$3) RETURNING id`,
+        [CORE, hash(169), {operator: WINNER, readyAt: 1800000000}]);
+      try {
+        assert.ok(await verify() > 20, 'reviewed deployment administration can precede publication');
+        for (const source of [null, WINNER]) {
+          await pool.query('UPDATE public.contract_events SET contract_address=$1 WHERE id=$2',[source,journal.rows[0].id]);
+          await assert.rejects(verify(), /public\.contract_events/);
+        }
+        for (const [name, event] of [
+          ['ArtworkRegistered',{artworkId:'1'}], ['BidAccepted',{auctionId:'1'}], ['ResaleListed',{tokenId:'1'}]
+        ]) {
+          await pool.query(`UPDATE public.contract_events SET contract_address=$1, event_name=$2,
+            event_data=$3 WHERE id=$4`, [CORE,name,event,journal.rows[0].id]);
+          await assert.rejects(verify(), /public\.contract_events/);
+        }
+      } finally {
+        await pool.query('DELETE FROM public.contract_events WHERE id=$1',[journal.rows[0].id]);
+      }
       const fixtureKey = 'pre-smoke-queue';
       const outbox = await pool.query(`INSERT INTO public.outbox_events
         (aggregate_type,aggregate_id,event_type,payload,idempotency_key)
@@ -163,6 +185,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
         (chain_id,core_address,nft_address,core_code_hash,nft_code_hash) VALUES (8453,$1,$2,$3,$4)`,
         [CORE, CREATOR, hash(1), hash(2)]);
       assert.ok(await verify() > 20, 'the reviewed issuer can be registered before the first artwork');
+      for (const mismatch of [{nftAddress: WINNER}, {expectedCoreCodeHash: hash(3)}, {expectedNftCodeHash: hash(3)}]) {
+        await assert.rejects(verify({...pair, ...mismatch}), /artsoul_private\.ordinary_issuers/);
+      }
+      await assert.rejects(verify({...pair, chainId: CHAIN}), /reviewed Base mainnet pair/);
       await pool.query(`INSERT INTO artsoul_private.ordinary_runner_up_observations
         (chain_id,core_address,auction_id,artwork_id,block_number,block_hash,status,bidder,price_wei,deadline)
         VALUES (8453,$1,1,1,169,$2,'open',$3,10,1800000000)`, [CORE, hash(169), WINNER]);

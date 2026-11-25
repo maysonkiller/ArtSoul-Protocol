@@ -142,19 +142,26 @@ Use an existing operator role with unfiltered read access. Keep credentials
 out of command arguments and verification records.
 
 ```bash
-node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-address> <deployment-block> --database
+node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-address> <deployment-block> --database <reviewed-mainnet-pair.json>
 ```
 
 The command compares the database cursor with the reviewed Base mainnet Core
 and deployment block, then checks for residual product rows, including retired
 auction tables, bids, withdrawals, floor history, trust signals, eligibility,
-settlement evidence and the counters backing public metrics. Keep the old workers
-stopped while checking. Pending or in-flight work in the persistent event queue
+settlement evidence and the counters backing public metrics. Supply the reviewed
+mainnet custody register or compact pair file used by the settlement intake.
+Before the first publication the issuer table can be empty. Any issuer already present
+must match the reviewed chain, Core, NFT and both initialized runtime hashes.
+
+Keep the old workers stopped while checking. Pending or in-flight work in the persistent event queue
 or outbox, and retryable failed outbox effects, block acceptance even when the
 public catalog is empty. Completed queue history can remain. A mainnet metrics
-row containing zero activity is permitted. Unrelated or pre-deployment chain
-events fail the check. The database reads use one read-only, repeatable-read
-transaction. Insufficient visibility, missing tables and unavailable services
+row containing zero activity is permitted. The event journal may contain deployment
+administration from the reviewed pair. A missing or unrelated emitter, a
+pre-deployment event, or a journal entry carrying an artwork, auction or token ID fails
+the check even when the gallery and its projections are empty.
+The database reads use one read-only, repeatable-read transaction.
+Insufficient visibility, missing tables and unavailable services
 cause the command to fail. It reports table names without printing row data.
 
 Retain the result with the public catalog check and the isolated database and media restore evidence. Also verify browser configuration,
