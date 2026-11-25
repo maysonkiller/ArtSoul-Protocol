@@ -37,6 +37,14 @@ async function simulate(url) {
         return { from, to: abi === market ? register.core.address : register.nft.address,
             data: abi.encodeFunctionData(method, args), value: toQuantity(value), gas: '0x100000' };
     }
+    const readNft = async (method, args = []) => nft.decodeFunctionResult(method,
+        await rpc('eth_call', [call(nft, method, args), at]))[0];
+    assert.equal(await readNft('name'), 'ArtSoul NFT');
+    assert.equal(await readNft('symbol'), 'ARTSOUL');
+    // ERC-165, ERC-721, metadata and ERC-2981, followed by the ERC-165 negative control.
+    for (const interfaceId of ['0x01ffc9a7', '0x80ac58cd', '0x5b5e139f', '0x2a55205a', '0xffffffff']) {
+        assert.equal(await readNft('supportsInterface', [interfaceId]), interfaceId !== '0xffffffff');
+    }
     const roles = [artist, collector, register.protocolTreasury.address, register.ecosystemTreasury.address];
     const virtualBlocks = [
         { blockOverrides: { time: toQuantity(start) },

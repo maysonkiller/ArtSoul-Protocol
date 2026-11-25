@@ -30,6 +30,21 @@ reachability and wallet-device acceptance are recorded separately.
 [Original JSON reports and lock hashes](https://github.com/maysonkiller/ArtSoul-Protocol/blob/c25314e44a21510b28e873aff7a31c3d64db976c/docs/audits/npm-2026-11-25/DATA.md) ·
 [Residual risks](https://github.com/maysonkiller/ArtSoul-Protocol/blob/c25314e44a21510b28e873aff7a31c3d64db976c/docs/audits/npm-2026-11-25/SECURITY_RESIDUAL_RISK.md)
 
+The subsequent tooling candidate `e6f74294` pins the serializer used by Mocha
+and the temporary-file library used by solc. The matched registry scans found
+50 affected package names (zero critical, nine high, 11 moderate, 30 low), or
+41 with dev dependencies omitted. The nine high-rated entries are Zod and
+eight Reown packages. The security draft retains its separate release review.
+[Six audit reports and compatibility checks](https://github.com/maysonkiller/ArtSoul-Protocol/blob/e6f74294adedb3522a5b6ccd1b6322b8095f4b9d/docs/audits/npm-2026-11-25/TOOLCHAIN_FOLLOWUP.md)
+
+A separate compatibility check ran 27 ordinary input fixtures through the
+distributed frame schemas of `@reown/appkit-wallet@1.8.21`. Substituting
+Zod 4.6.7 for 3.22.4 changed two validation results. In particular, the
+existing schema accepted an RPC success event with an omitted payload on
+3.22.4 and rejected it on 4.6.7. The sender's real-world use of this form
+is unverified. The candidate retains the original wallet dependency pending
+compatible frame semantics and device checks.
+
 ## September evidence
 
 The 2026-09-23 lockfile audit reported **58 affected package names: 26 high,
