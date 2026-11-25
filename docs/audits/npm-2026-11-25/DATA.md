@@ -1,5 +1,7 @@
 # Dependency audit evidence, November 25, 2026
 
+The [Mocha and solc follow-up](TOOLCHAIN_FOLLOWUP.md) records the next lock with 50 affected packages, including nine high and zero critical. The table below preserves the earlier snapshots.
+
 The historical baseline workflow ran at `42dd819be00f0cd6d83a8a34c8cf226cd97fd215`. Its package lock is byte-identical to `ef17eeabe21255b2be41008e74b5f9044b8e187e` on main. The historical security candidate is `023faed9e4ffe4ea7263efce535044522f49e98e`. The revised candidate is identified by the lock SHA-256 below.
 
 | Lock and registry snapshot | Full: total / critical / high / moderate / low | Omit dev: same order | Lock SHA-256 |

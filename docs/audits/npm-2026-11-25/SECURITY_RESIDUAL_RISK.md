@@ -1,5 +1,7 @@
 # Residual dependency risk, November 25, 2026
 
+The [follow-up check](TOOLCHAIN_FOLLOWUP.md) removed the serializer, temporary-file and inherited solc entries. The nine high-rated records still in the lock are Zod and eight Reown packages. The sections below describe the preceding 53-entry candidate.
+
 The revised candidate has 53 open affected package records. The remaining high-severity records are `@reown/appkit`, `@reown/appkit-adapter-wagmi`, `@reown/appkit-controllers`, `@reown/appkit-pay`, `@reown/appkit-scaffold-ui`, `@reown/appkit-ui`, `@reown/appkit-utils`, `@reown/appkit-wallet`, `serialize-javascript`, `tmp`, `zod`. Records for multiple parents can originate from one nested advisory. Each severity and package path is available in the [inventory](SECURITY_FINDINGS.csv).
 
 ## Wallet and authorization

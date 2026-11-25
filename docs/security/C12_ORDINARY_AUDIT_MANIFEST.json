@@ -261,6 +261,6 @@
     "hardhat": "2.29.2",
     "localConfigLfSha256": "d9538322e98a41ad2899ddf7e00bd57a42a1c9edf86e9fd83d7e7f24fdbb5767",
     "openZeppelinContracts": "5.0.0",
-    "packageLockLfSha256": "11230780d39bc3d090175bbff565621c6b868f4ae3409f518f21bb0e9db1c8d4"
+    "packageLockLfSha256": "ee017fe2799cff27199d2f5de1db24a6790122bbfac9cb1d94ff2652efc644dd"
   }
 }
