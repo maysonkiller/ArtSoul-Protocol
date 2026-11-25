@@ -60,6 +60,12 @@ The local review page can prepare one call to `registerArtwork(string)` with zer
 
 On November 25 both public providers confirmed an empty registry at finalized block 63,511,976 (`0x4eea0a59f0fb6e4fdae84d07335fd2b32613f7e8d434abdc911c336f31a26ae0`). Both simulated work ID 1 for the zero-value call with calldata hash `0x556480cecd493fa790352edfbb659bf12d96c82ed0148272301120df53ff902e`. This observation prepared an unsigned request. The contract assigns the ID at execution.
 
+The payer submitted the registration with nonce 18. Base and PublicNode returned a successful zero-value receipt at transaction index 4 in block 63,521,080 (`0xaa095aa18eed6d600b5aaf47754a098cb2d4c953bcad27d1d81e43186b1c1e34`, 17:01:24 UTC). Both canonical blocks contained the transaction at that index. The receipt used 306,949 gas and emitted one log. At 17:15 UTC both providers had marked this block safe. By 17:24 UTC the two-provider `--verify-receipt` command passed, confirming finality, the event, stored artwork, reciprocal Core/NFT bindings and all three two-of-three Safe configurations at the inclusion block. [Registration receipt](https://sepolia.basescan.org/tx/0xe6e6f19235b714814c40bb1ab20aebd4ff2408f17c9e8bc4f15e1e7ee391eacf)
+
+Both providers returned `workCount = 1`, `auctionCount = 0` and NFT `totalSupply = 0` when queried by that canonical block hash. Work 1 stored the reviewed payer and metadata URI, with zero active auction and zero floor.
+
+The [indexer's event reader](../../src/indexer/event-listener.js) independently decoded a single `ArtworkRegistered` from each provider at block log index 2, with artwork ID 1 and creator `0xE6d6658DD5013B30Ab8cA9CBD667D0b5a5A1b215`. The [metadata reader](../../src/api/safe-artwork-fetch.js) decoded the title **ArtSoul Base Sepolia Rehearsal**, media type `image/jpeg` and image URL `https://artsoulprotocol.com/favicon.jpg`. Hosted indexer persistence and the public artwork card still require separate verification.
+
 ```sh
 node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json> --plan
 node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair-register.json>
