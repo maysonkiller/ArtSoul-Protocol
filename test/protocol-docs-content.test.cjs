@@ -63,7 +63,12 @@ test('the public guide offers local self-help, private reporting and a user-init
   const support = sections.find(section => section.id === 'support');
   const html = renderToStaticMarkup(React.createElement(Section, {section: support, isOpen: true}));
   const official = /^Contact: (mailto:[^\s]+)$/m.exec(fs.readFileSync('public/.well-known/security.txt', 'utf8'))[1];
-  assert.deepEqual([...html.matchAll(/href="([^"]+)"/g)].map(match => match[1]), ['/docs-protocol#faq', official, '/.well-known/security.txt']);
+  const address = official.slice('mailto:'.length);
+  const securityDraft = official + '?subject=Security%20report';
+  assert.deepEqual([...html.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].map(([,href, label]) => [href,label]), [
+    ['/docs-protocol#faq', 'Read the frequently asked questions'], [official, 'Email ' + address],
+    [securityDraft, 'Email a security report to ' + address]
+  ]);
   assert.match(html, /opens a draft in your mail app/);
   assert.doesNotMatch(html, /<form|<input|<textarea/);
   for (const filename of ['index.html','visual-lab.html']) {
@@ -74,7 +79,9 @@ test('the public guide offers local self-help, private reporting and a user-init
   const h = await harness('#support');
   h.render();
   assert.equal(h.values[0].support, true);
-  h.click(official, { preventDefault() { assert.fail('the email draft must use native navigation'); } });
+  for (const draft of [official, securityDraft]) {
+    h.click(draft, { preventDefault() { assert.fail('the email draft must use native navigation'); } });
+  }
   assert.equal(h.window.location.hash, '#support');
 });
 

@@ -45,7 +45,6 @@ artsoul-media-player:has(> video) > .ap-controls { position: absolute; inset: au
 artsoul-media-player:fullscreen { width: 100vw; height: 100vh; background: var(--c-bg); }
 artsoul-media-player:fullscreen > video { width: 100% !important; height: 100% !important; object-fit: contain !important; }
 @container (max-width: 220px) {
-    .ap-controls .ap-time { display: none; }
-    artsoul-media-player > .ap-controls { grid-template-columns: auto 1fr auto; gap: 0; justify-items: center; }
-    .ap-controls .artsoul-media-toggle, .ap-controls .artsoul-media-mute, .ap-controls .ap-options { width: 30px; height: 30px; }
+    artsoul-media-player > .ap-controls { grid-template-columns: repeat(3, 1fr); gap: 0; justify-items: center; }
+    .ap-controls .ap-time { grid-column: 1 / -1; grid-row: 2; }
 }

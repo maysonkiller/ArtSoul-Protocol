@@ -384,6 +384,8 @@ test('DOM cards render two isolated overlay buttons and keep only one media play
     await Promise.resolve();
     assert.equal(mediaElements[0].paused, true);
     assert.equal(mediaElements[1].paused, false);
+    mediaElements[0].dispatch('play');
+    assert.equal(mediaElements[1].paused, false, 'a delayed play event from a paused preview must not interrupt the active preview');
 
     audioControls.children[1].dispatch('click');
     assert.equal(mediaElements[1].muted, true);
@@ -451,6 +453,72 @@ test('muted audio shows loading, progress, interruption and retry without changi
     audio.ended = true;
     audio.dispatch('ended');
     assert.equal(label.textContent, 'AUDIO');
+});
+
+test('an active audio preview samples the real position when timeupdate is sparse and releases the ticker on pause', () => {
+    const { api, mediaElements, window, document } = loadDomCardRuntime();
+    let tick;
+    let clears = 0;
+    window.setInterval = (callback, interval) => {
+        assert.equal(interval, 1000);
+        assert.equal(tick, undefined, 'only one ticker should be active');
+        tick = callback;
+        return 7;
+    };
+    window.clearInterval = id => { assert.equal(id, 7); tick = undefined; clears++; };
+    const wrap = api.createMediaElement({ file_type: 'audio', file_url: 'music.mp3' }).children[0];
+    const label = wrap.children[0], [audio] = mediaElements;
+    Object.assign(audio, { isConnected: true, ownerDocument: document, currentTime: 0, readyState: 2 });
+    assert.equal(tick, undefined);
+    audio.play();
+    audio.dispatch('playing');
+    audio.currentTime = 4.25;
+    tick();
+    assert.equal(label.textContent, '0:04', 'a progressing playhead takes precedence over low readiness');
+    audio.dispatch('waiting');
+    tick();
+    assert.equal(label.textContent, 'Wait');
+    audio.currentTime = 5.25;
+    tick();
+    assert.equal(label.textContent, '0:05');
+    audio.readyState = 4;
+    audio.dispatch('waiting');
+    assert.equal(label.textContent, '0:05', 'a stale waiting event does not overwrite a ready stream');
+    tick();
+    tick();
+    assert.equal(label.textContent, 'Wait', 'a stationary native playhead must never gain fictitious seconds');
+    audio.currentTime = 8.01;
+    tick();
+    assert.equal(label.textContent, '0:08');
+    audio.pause();
+    assert.equal(tick, undefined);
+    assert.equal(clears, 1);
+    assert.equal(label.textContent, 'Paused');
+});
+
+test('only a visible playing audio interrupted by its mute gesture makes one immediate recovery attempt', () => {
+    for (const [playing, interrupted, hidden, connected, ended, expected] of [
+        [true, true, false, true, false, 1], [false, true, false, true, false, 0],
+        [true, false, false, true, false, 0], [true, true, true, true, false, 0],
+        [true, true, false, false, false, 0], [true, true, false, true, true, 0]
+    ]) {
+        const { api, mediaElements } = loadDomCardRuntime();
+        const wrap = api.createMediaElement({ file_type: 'audio', file_url: 'music.mp3' }).children[0];
+        const [, mute] = wrap.children.find(node => node.className === 'artsoul-card-media-controls').children;
+        const [audio] = mediaElements;
+        Object.assign(audio, { isConnected: connected, ownerDocument: { hidden }, paused: !playing, ended });
+        let muted = false, attempts = 0;
+        Object.defineProperty(audio, 'muted', {
+            get() { return muted; },
+            set(value) { muted = value; if (interrupted) this.pause(); }
+        });
+        audio.play = () => { attempts++; audio.paused = false; return Promise.resolve(); };
+        mute.dispatch('click');
+        assert.equal(attempts, expected);
+        assert.equal(audio.muted, true);
+        audio.dispatch('volumechange');
+        assert.equal(attempts, expected, 'a later system volume event must not initiate playback');
+    }
 });
 
 test('cards omit unsafe media and remove themselves when media loading fails', () => {
