@@ -42,12 +42,21 @@ that older, stricter block-count boundary. Supported overrides are:
 ```text
 ARTSOUL_INDEXER_HEALTH_URL
 ARTSOUL_MONITOR_EXPECTED_CHAIN_ID
+ARTSOUL_MONITOR_EXPECTED_CORE_ADDRESS
 ARTSOUL_MONITOR_EXPECTED_CONFIRMATION_DEPTH
 ARTSOUL_MONITOR_MAX_BLOCKS_BEHIND
 ARTSOUL_MONITOR_MAX_RPC_ERRORS_PER_MINUTE
 ARTSOUL_MONITOR_MAX_RESPONSE_AGE_MS
 ARTSOUL_MONITOR_REQUEST_TIMEOUT_MS
 ```
+
+For a mainnet stability observation, set the expected chain to `8453`, the
+expected Core address to the reviewed deployment, and the confirmation depth
+and alert thresholds to the reviewed mainnet values. Pinning the Core also
+checks that the worker's confirmed and indexed blocks are in order and that
+the RPC head minus the indexed block equals the reported lag. The result
+includes these watermarks and the observation time. Keep successive results
+for the duration approved at go/no-go. A single observation covers one instant.
 
 Production values are Base Sepolia, depth `3`, lag strictly below `50`, at most
 `5` RPC errors per minute, response age at most `120000` ms and request timeout
