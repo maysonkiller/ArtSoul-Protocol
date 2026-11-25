@@ -79,7 +79,7 @@ Phase D exit requires stable Base mainnet operations, verified treasury activity
 
 ## Delivery sequence for the first Base release (November 19, 2026)
 
-The product we can demonstrate today is the Base Sepolia testnet marketplace. A founder-led walkthrough can show publication, bidding, a settled NFT with its creator, First Collector and owner, and resale using the [recorded journeys](../PHASE_B_STATUS_2026-11-02.md). Identify the network and test ETH throughout. Use a recorded settlement when a live auction is still running. The replacement contracts have a separate local test record. A demo using them on a public network requires fresh C13 deployment receipts.
+The public marketplace uses the earlier Base Sepolia deployment. A walkthrough can show publication, bidding, a settled NFT with its creator, First Collector and owner, and resale using the [recorded journeys](../PHASE_B_STATUS_2026-11-02.md). Identify the network and test ETH throughout. On November 25 the replacement Core and NFT were also live on Base Sepolia. Two RPC providers verified one registered artwork, zero auctions and zero minted tokens on that pair at finalized block 63,573,369. The website and its indexer still selected the earlier Core. Use the [rehearsal register](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md) to distinguish the deployments when demonstrating either one.
 
 For a short demo that requires no wallet signature:
 

@@ -60,6 +60,20 @@ describe('Additive Collection Launch security and accounting', function () {
     await fail(c.connect(signers[2]).pause());
   });
 
+  it('blocks the current unrestricted collection candidates at the operator release gate', async () => {
+    const {rehearseCollectionOperators, requireRestrictedOperators} = require('../scripts/check-collection-operator-policy.cjs');
+    const report = await rehearseCollectionOperators({network, artifacts});
+    for (const candidate of report.candidates) {
+      assert.equal(candidate.directTransfer, true);
+      for (const probe of candidate.probes) {
+        assert.deepEqual([probe.tokenGrant, probe.portfolioGrant], ['permitted', 'permitted']);
+      }
+    }
+    assert.equal(report.forgeWithIndividualConsent, true);
+    assert.throws(() => requireRestrictedOperators(report), /CollectionLaunch, PartnerFirstWorkLaunch, CollectionForge/);
+    assert.throws(() => requireRestrictedOperators({...report, candidates: []}));
+  });
+
   it('preserves primary 97.5/2.5, exact payment, wallet limit and lifetime cap', async () => {
     const c = await configured([phase({allocation: 2, walletLimit: 1})], 2);
     const buyer = signers[2], recipient = await buyer.getAddress();
