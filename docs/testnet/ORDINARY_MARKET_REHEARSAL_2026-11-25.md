@@ -46,7 +46,7 @@ The same test payer deployed the [payout candidate](../security/C12_ORDINARY_PAY
 | OrdinaryPayoutMarket | `0xC4b756B6E3714E4BaB6E7dd4965400F390403CD2` | `0x4d18f0243cff1ef906a07a3517949045c6fe3a9e8b584e60bcbe7ad021bef54e` |
 | SettledArtworkNFT | `0x810DD5459c9cC5d82f13F8D52545a654Ec0bbe4c` | `0xcbff8b3bb46c10d150d5812846d5d8c990c0156215d5978b44e238a86d141bac` |
 
-Two RPC providers agreed on receipt inclusion, input hash and both initialized runtime hashes at creation block hash `0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df`. The input hash was `0x6e3ca34d58de3872abfb9d9a49a533f94572e1af3856bc59ec69f519a32a6f44`.
+Two RPC providers finalized the creation block `0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df`. They agreed on receipt inclusion, both initialized runtime hashes, reciprocal contract bindings, all three two-of-three Safe configurations, and the eight-entry refund limit with 30,000 gas per attempted delivery. The input hash was `0x6e3ca34d58de3872abfb9d9a49a533f94572e1af3856bc59ec69f519a32a6f44`.
 
 The [read-only rehearsal](../../scripts/simulate-rehearsal-auction.mjs) passed the preceding ordinary lifecycle cases against this pair on both providers. A separate simulation supplied a virtual bidder contract that refused ETH. Processing the outbid refund credited it 0.01 test ETH. Its own call to `withdrawTo` delivered exactly 0.01 test ETH to its chosen recipient, verified by the recipient's balance increase. The credit became zero and the Core retained the winner's 0.011 test ETH deposit. These simulated balances never entered the public ledger.
 
