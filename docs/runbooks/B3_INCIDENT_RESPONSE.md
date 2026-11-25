@@ -190,6 +190,23 @@ testers, a grant application or investor material.
 
 ---
 
+## Solo founder support and incident ownership
+
+The founder is the sole human contact for the current testnet. Visitors can read the [Guide and FAQ](https://artsoulprotocol.com/docs-protocol#faq), use the site's bundled documentation search, or open the project mailbox from [Help and contact](https://artsoulprotocol.com/docs-protocol#support). Email opens as a user-controlled draft. The site collects no support form on this route.
+
+| Request | First step | Who handles an unresolved case |
+| --- | --- | --- |
+| Using a wallet, publishing, bidding or refunds | Use Guide search or the FAQ. | The founder replies from the project mailbox with a public guide or a status verified against the reported network and transaction. |
+| Copyright or abusive content | Use **Report** on the affected artwork. Use email if the form is unavailable. | The founder checks the protected queue and records the reason and case reference under the existing moderation procedure in §6. |
+| Security, outage or unexpected transaction | Send a brief private description to the published security contact. | The founder checks the public status and relevant receipt, records the incident privately and follows §§2–6 or the [Safe recovery procedure](A8D_SAFE_RECOVERY.md). Critical operations still require the approvals configured for that operation. |
+| Contracts, treasury, legal and launch commitments | Route the question to the founder. | The founder decides spending, legal review and release scope. On-chain treasury and security actions use the applicable Safe quorum. |
+
+The founder currently owns support, moderation, incident response and release decisions. When an operator takes over a queue, record the assignee, backup contact and handover date privately. Grant access for that queue through the existing access procedure. Treasury authority has its own Safe approval process.
+
+The local assistant can open the Guide and search its published topics. It has no support mailbox access or authority to adjudicate complaints, move funds or sign. The three signing devices provide distinct keys operated by the founder. An activity that explicitly requires independent human review stays pending until a separate reviewer is available.
+
+During an announced rehearsal the founder checks the mailbox and moderation queue before opening, during the scheduled session and at close. Prioritize security, access or payment problems, then complaints and general questions. If the founder is unavailable, defer a new supported session and leave financial permissions unchanged. There is no commitment to continuous coverage. Keep personal correspondence private. Record only a case reference, date, disposition and necessary evidence. Publish sanitized incident details where useful. Before mainnet, verify mailbox receive/reply coverage and access recovery, approve a retention procedure and operating budget, and complete applicable operator, terms, privacy and IP review.
+
 ## Recording an incident
 
 One entry per incident, in this file, appended below. Short is fine. What

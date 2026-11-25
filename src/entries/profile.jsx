@@ -135,6 +135,19 @@ const { useState, useEffect, useRef } = React;
             return <a href="/admin" className="profile-admin-shortcut">{signedIn === expected && !entry.signIn ? 'Admin panel' : 'Staff sign-in'}</a>;
         }
 
+        function getProfileArtworkHref(artwork = {}) {
+            const sharedHref = window.ArtSoulArtworkCard?.detailHref?.(artwork) || '';
+            if (!sharedHref || sharedHref.includes('id=pending%3A')) return '';
+            return sharedHref;
+        }
+
+        function ProfileArtworkCard({ artwork, onStartAuction }) {
+            const SharedCard = window.ArtSoulArtworkCard?.ReactCard;
+            const href = getProfileArtworkHref(artwork);
+            return SharedCard ? <SharedCard artwork={artwork} minimal={true} surface="profile"
+                href={href} onStartAuction={onStartAuction} /> : null;
+        }
+
         function ProfilePage({ initialSkeletonVisible = false }) {
             const savedEnabled = useSavedEnabled();
             const walletNftsEnabled = useWalletNftsEnabled();
@@ -613,24 +626,6 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 return result;
-            }
-
-            function getProfileArtworkHref(artwork = {}) {
-                const sharedHref = window.ArtSoulArtworkCard?.detailHref?.(artwork) || '';
-                if (!sharedHref || sharedHref.includes('id=pending%3A')) return '';
-                return sharedHref;
-            }
-
-            function ProfileArtworkCard({ artwork }) {
-                const SharedCard = window.ArtSoulArtworkCard?.ReactCard;
-                const href = getProfileArtworkHref(artwork);
-                return SharedCard ? <SharedCard
-                    artwork={artwork}
-                    minimal={true}
-                    surface="profile"
-                    href={href}
-                    onStartAuction={() => handleStartAuction(artwork)}
-                /> : null;
             }
 
             // Canon rule 13 / Phase A7: write eligibility fails closed. Only
@@ -2095,7 +2090,8 @@ const { useState, useEffect, useRef } = React;
                                         )}
 
                                         {visibleArtworks.map(artwork => (
-                                            <ProfileArtworkCard key={artwork.id} artwork={artwork} />
+                                            <ProfileArtworkCard key={artwork.id} artwork={artwork}
+                                                onStartAuction={() => handleStartAuction(artwork)} />
                                         ))}
 
                                         {!artworksError && visibleArtworks.length === 0 && (

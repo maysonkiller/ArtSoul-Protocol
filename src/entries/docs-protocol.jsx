@@ -131,7 +131,7 @@ function ProtocolDocsApp() {
             <div className="protocol-docs-intro">
                 <p className="protocol-eyebrow">ArtSoul</p>
                 <h1>Protocol Docs</h1>
-                <p>Everything users need to publish, discover, bid, settle, collect, and resell artwork through ArtSoul.</p>
+                <p>Learn how to publish, bid, collect and resell artwork. <a href="#support">Get help or contact ArtSoul</a>.</p>
             </div>
 
             <button className="protocol-nav-toggle" type="button" onClick={() => setNavOpen(value => !value)} aria-expanded={navOpen} aria-controls="protocolSideNav">

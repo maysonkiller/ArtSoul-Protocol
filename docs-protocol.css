@@ -413,6 +413,7 @@ body:is(.classic, .future) .protocol-section-body h3 { font-size: 1rem; }
 body:is(.classic, .future) .protocol-section-body p,
 body:is(.classic, .future) .protocol-section-body li { line-height: 1.75; }
 
+body:is(.classic, .future) .protocol-docs-intro a,
 body:is(.classic, .future) .protocol-section-body a {
     color: var(--c-accent);
     text-decoration: underline;
@@ -425,7 +426,7 @@ body:is(.classic, .future) .protocol-nav-toggle {
     border-radius: 0.5rem;
 }
 
-body:is(.classic, .future) .protocol-docs-shell :is(.protocol-section-trigger, .protocol-side-nav a, .protocol-section-body a, .protocol-nav-toggle):focus-visible {
+body:is(.classic, .future) .protocol-docs-shell :is(.protocol-section-trigger, .protocol-side-nav a, .protocol-docs-intro a, .protocol-section-body a, .protocol-nav-toggle):focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: -2px;
 }

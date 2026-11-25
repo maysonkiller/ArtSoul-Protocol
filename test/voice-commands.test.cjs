@@ -28,6 +28,8 @@ test('page commands navigate to the requested ArtSoul destination in both langua
     ['en', 'go to the home page', 'home'], ['en', 'open my profile', 'profile'],
     ['en', 'open create', 'create'], ['en', 'show the upload page', 'create'],
     ['en', 'open how it works', 'guide'], ['en', 'go to documentation', 'guide'],
+    ['en', 'Contact support.', 'support'], ['en', 'Talk to a person, please!', 'support'], ['en', 'open support', 'support'],
+    ['ru', 'Связаться с поддержкой', 'support'], ['ru', 'открой поддержку', 'support'],
     ['ru', 'открой галерею', 'gallery'], ['ru', 'перейди в галерею', 'gallery'],
     ['ru', 'открой мою галерею', 'gallery'], ['ru', 'покажи мою коллекцию', 'collected'],
     ['ru', 'давай создадим искусство', 'create'],
@@ -50,12 +52,14 @@ test('negated and combined page requests cannot navigate or trigger wallet actio
   for (const [lang, statements] of [
     ['en', ['do not open gallery', 'do not open my profile', 'open gallery and buy artwork 31',
       'buy artwork 31 and open gallery', 'open gallery and open artwork 31', 'open gallery and open home',
-      '"open gallery"', 'open https://example.test/', 'open admin']],
+      '"open gallery"', 'open https://example.test/', 'open admin', 'do not contact support',
+      'contact support and buy artwork 31', 'contact support via mailto:private@example.test']],
     ['ru', ['не открой галерею', 'не открывай мой профиль', 'открой галерею и купи работу 31',
       'купи работу 31 и открой галерею', 'открой галерею и открой работу 31', 'открой галерею и открой главную',
       'открой галерею, затем открой работу 31', 'открой галерею; открой работу 31',
       'открой галерею. открой работу 31', 'не открывай галерею и открой работу 31',
-      '«открой галерею»', 'открой https://example.test/', 'открой админку']]
+      '«открой галерею»', 'открой https://example.test/', 'открой админку', 'не надо связаться с поддержкой',
+      'связаться с поддержкой и купи работу 31']]
   ]) for (const said of statements) {
     const command = parse(said, lang);
     assert.equal(voice.isWrite(command), false, said);

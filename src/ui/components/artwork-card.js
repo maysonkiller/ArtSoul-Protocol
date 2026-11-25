@@ -252,7 +252,7 @@
         button.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${label}`);
     }
 
-    function createPlaybackButton(media, label) {
+    function createPlaybackButton(media, label, onPlayError) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'artsoul-media-toggle';
@@ -261,7 +261,10 @@
         button.setAttribute('aria-label', `Play ${label}`);
         isolateMediaControl(button);
         button.addEventListener('click', () => {
-            if (media.paused) media.play().catch(() => syncPlaybackButton(button, media, label));
+            if (media.paused) media.play().catch(error => {
+                syncPlaybackButton(button, media, label);
+                if (media.paused) onPlayError?.(error);
+            });
             else media.pause();
         });
         return button;
@@ -270,6 +273,14 @@
     function syncMuteButton(button, media, label) {
         button.dataset.muted = String(media.muted);
         button.setAttribute('aria-label', `${media.muted ? 'Unmute' : 'Mute'} ${label}`);
+    }
+
+    function audioPreviewStatus(audio, event) {
+        if (event === 'ended' || event === 'emptied' || audio.ended) return 'AUDIO';
+        if (audio.paused) return event === 'pause' ? 'Paused' : null;
+        if (event === 'waiting' || audio.readyState < 3) return 'Wait';
+        const seconds = Math.floor(audio.currentTime || 0);
+        return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
     }
 
     function createMuteButton(media, label) {
@@ -863,7 +874,10 @@
             const controls = document.createElement('div');
             controls.className = 'artsoul-card-media-controls';
             isolateMediaControl(controls);
-            const toggle = createPlaybackButton(audio, 'audio preview');
+            const toggle = createPlaybackButton(audio, 'audio preview', error => {
+                label.textContent = error.name === 'AbortError' ? 'Paused' : 'Retry';
+                if (label.textContent === 'Retry') toggle.setAttribute('aria-label', 'Retry audio preview');
+            });
             const mute = createMuteButton(audio, 'audio preview');
             const sync = () => {
                 const playing = !audio.paused && !audio.ended;
@@ -874,6 +888,13 @@
             audio.addEventListener('pause', sync);
             audio.addEventListener('ended', sync);
             audio.addEventListener('error', () => onUnavailable?.());
+            const updateStatus = event => {
+                const status = audioPreviewStatus(audio, event.type);
+                if (status && label.textContent !== status) label.textContent = status;
+            };
+            for (const type of ['play', 'waiting', 'playing', 'timeupdate', 'pause', 'ended', 'emptied']) {
+                audio.addEventListener(type, updateStatus);
+            }
             audio.addEventListener('volumechange', () => syncMuteButton(mute, audio, 'audio preview'));
             controls.append(toggle, mute);
             audioWrap.appendChild(label);
@@ -1120,6 +1141,11 @@
         const ref = React.useRef(null);
         const [playing, setPlaying] = React.useState(false);
         const [muted, setMuted] = React.useState(false);
+        const [label, setLabel] = React.useState('AUDIO');
+        const updateStatus = event => {
+            const status = audioPreviewStatus(event.currentTarget, event.type);
+            if (status) setLabel(status);
+        };
         React.useEffect(() => () => ref.current?.pause(), [url]);
         React.useEffect(() => {
             const restore = () => {
@@ -1132,7 +1158,13 @@
         const toggle = event => {
             stopCardActivation(event);
             const audio = ref.current;
-            if (audio) audio.paused ? audio.play().catch(() => setPlaying(false)) : audio.pause();
+            if (!audio) return;
+            if (audio.paused) audio.play().catch(error => {
+                if (audio !== ref.current || !audio.paused) return;
+                setPlaying(false);
+                setLabel(error.name === 'AbortError' ? 'Paused' : 'Retry');
+            });
+            else audio.pause();
         };
         const toggleMute = event => {
             stopCardActivation(event);
@@ -1143,13 +1175,13 @@
         };
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
-                h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
+                h('div', { className: 'artsoul-card-audio-label' }, label),
                 h('img', { src: '/brand/artsoul-audio-cover-384.webp', alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
                 h('div', { className: 'artsoul-card-media-controls', draggable: false,
                     onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                     onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
                     h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-allow-rapid': 'true', 'data-state': playing ? 'playing' : 'paused',
-                        'aria-label': `${playing ? 'Pause' : 'Play'} audio preview`, draggable: false,
+                        'aria-label': label === 'Retry' ? 'Retry audio preview' : `${playing ? 'Pause' : 'Play'} audio preview`, draggable: false,
                         onClick: toggle, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                         onTouchStart: stopCardPropagation, onDragStart: stopCardActivation }),
                     h('button', { type: 'button', className: 'artsoul-media-mute', 'data-allow-rapid': 'true', 'data-muted': String(muted),
@@ -1158,8 +1190,10 @@
                         onTouchStart: stopCardPropagation, onDragStart: stopCardActivation })
                 ),
                 h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'none', muted,
-                    onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
-                    onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
+                    onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); updateStatus(event); },
+                    onPause: event => { setPlaying(false); updateStatus(event); },
+                    onEnded: event => { setPlaying(false); updateStatus(event); },
+                    onPlaying: updateStatus, onWaiting: updateStatus, onTimeUpdate: updateStatus, onEmptied: updateStatus,
                     onError: onUnavailable || undefined,
                     onVolumeChange: event => setMuted(event.currentTarget.muted) })
             )

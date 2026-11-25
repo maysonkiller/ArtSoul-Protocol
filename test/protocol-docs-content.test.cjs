@@ -40,7 +40,7 @@ async function components(runtime = React, bindings = {}) {
 
 test('shared documentation preserves every section ID, title and its original order', async () => {
   const {sections} = await components();
-  assert.deepEqual(sections.filter(section => !['collection-verification', 'nft-frames', 'roadmap', 'genesis-grants'].includes(section.id))
+  assert.deepEqual(sections.filter(section => !['collection-verification', 'nft-frames', 'roadmap', 'genesis-grants', 'support'].includes(section.id))
     .map(section => [section.id, section.title]), original.map(([id, title]) => [id, title]));
   assert.equal(new Set(sections.map(section => section.id)).size, sections.length);
   const data = fs.readFileSync('src/content/protocol-docs.js', 'utf8');
@@ -55,6 +55,27 @@ test('original documentation sections retain their rendered content', async () =
       section.blocks.map((block, key) => React.createElement(Block, {block, key}))));
     assert.equal(createHash('sha256').update(html).digest('hex'), expected, id);
   }
+});
+
+test('the public guide offers local self-help, private reporting and a user-initiated email draft', async () => {
+  const {searchSiteContent} = await import('../src/features/search/site-content-search.js');
+  const {sections, Section} = await components();
+  const support = sections.find(section => section.id === 'support');
+  const html = renderToStaticMarkup(React.createElement(Section, {section: support, isOpen: true}));
+  const official = /^Contact: (mailto:[^\s]+)$/m.exec(fs.readFileSync('public/.well-known/security.txt', 'utf8'))[1];
+  assert.deepEqual([...html.matchAll(/href="([^"]+)"/g)].map(match => match[1]), ['/docs-protocol#faq', official, '/.well-known/security.txt']);
+  assert.match(html, /opens a draft in your mail app/);
+  assert.doesNotMatch(html, /<form|<input|<textarea/);
+  for (const filename of ['index.html','visual-lab.html']) {
+    assert.deepEqual([...fs.readFileSync(filename,'utf8').matchAll(/href="(mailto:[^"]+)"/g)].map(match => match[1]), [official]);
+  }
+  assert.match(fs.readFileSync('src/entries/docs-protocol.jsx', 'utf8'), /href="#support">Get help or contact ArtSoul/);
+  assert.equal(searchSiteContent('contact support', 'docs').docs.items[0].url, '/docs-protocol#support');
+  const h = await harness('#support');
+  h.render();
+  assert.equal(h.values[0].support, true);
+  h.click(official, { preventDefault() { assert.fail('the email draft must use native navigation'); } });
+  assert.equal(h.window.location.hash, '#support');
 });
 
 test('the public roadmap opens from search and contents at the same accessible Guide section', async () => {

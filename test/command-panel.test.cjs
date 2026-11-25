@@ -723,6 +723,17 @@ test('missing search terms request clarification without fetching or opening a w
   assert.equal(h.calls.length, 0); assert.equal(h.prompts(), 0);
 });
 
+test('an unrecognized command offers an optional local support link without contacting anyone', async () => {
+  const h = harness(); h.open(); h.submit('My question has no command'); await flush();
+  assert.match(h.get('.artsoul-voice-answer').textContent, /didn’t recognize that command/);
+  const results = h.get('.artsoul-voice-results');
+  assert.deepEqual(results.children.map(link => [link.textContent, link.href]), [['Help and contact', '/docs-protocol#support']]);
+  assert.equal(h.get('.artsoul-voice-panel').hidden, false);
+  assert.equal(h.calls.length, 0); assert.equal(h.prompts(), 0);
+  results.children[0].fire('click', {button: 0, preventDefault() {assert.fail('keep native link navigation');}});
+  assert.equal(h.get('.artsoul-voice-panel').hidden, true);
+});
+
 test('page and documentation command links allow only public routes and safe section anchors', async () => {
   const data = structuredClone(searchResult);
   data.groups.artworks.items = [];

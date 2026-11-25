@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const http = require('node:http');
 const path = require('node:path');
+const readSilentAudio = require('./silent-audio.cjs');
 const { chromium, webkit } = require(process.env.PLAYWRIGHT_PACKAGE || 'playwright-core');
 const root = path.resolve(__dirname, '../..');
 const resources = {
@@ -21,10 +22,7 @@ const resources = {
 async function serverForCards() {
     const gallery = await fs.readFile(path.join(root, 'gallery.html'), 'utf8');
     // Exercise real playback and mute controls without sending any sound to the host.
-    const silentAudio = await fs.readFile(path.join(root, resources['/silence.wav'][0]));
-    const samples = silentAudio.indexOf('data', 36);
-    assert(samples >= 36 && silentAudio.readUInt16LE(20) === 1 && silentAudio.readUInt16LE(34) === 16);
-    silentAudio.fill(0, samples + 8);
+    const silentAudio = await readSilentAudio();
     const silentVideo = await fs.readFile(path.join(root, resources['/motion.mp4'][0]));
     assert(!silentVideo.includes(Buffer.from('soun')), 'The video fixture needs a video-only MP4');
     const silentMedia = new Map([['/silence.wav', silentAudio], ['/motion.mp4', silentVideo]]);
@@ -141,8 +139,15 @@ async function run(engine, name, screenshots, origin) {
                                 assert(await media.evaluate(m => m.paused), 'Changing mute must not start playback');
                                 await press(play);
                                 await page.waitForFunction(m => !m.paused && m.currentTime > .1, await media.elementHandle());
+                                const audioLabel = card.locator('.artsoul-card-audio-label');
+                                if (await audioLabel.count()) {
+                                    await page.waitForFunction(el => /^\d+:\d{2}$/.test(el.textContent), await audioLabel.elementHandle());
+                                }
                                 await press(play);
                                 assert(await media.evaluate(m => m.paused), where);
+                                if (await audioLabel.count()) {
+                                    await page.waitForFunction(el => el.textContent === 'Paused', await audioLabel.elementHandle());
+                                }
                                 assert.equal(page.url(), origin + '/', 'Playback controls must leave the artwork link untouched');
                             }
                             completed++;
