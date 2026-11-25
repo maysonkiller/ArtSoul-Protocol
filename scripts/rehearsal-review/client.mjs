@@ -20,6 +20,20 @@ export const rehearsalOpening = Object.freeze({
     dataSha256: '11aa24f9a1a3fbfdd11b3f749cd96d166f0998452dbe27564627193579c7c8d7'
 });
 
+export const rehearsalLateBid = Object.freeze({
+    bidder: '0x5e3167636c5EB7Fe143a3C9f40EA2Bf1d6888383',
+    deposit: '0x2386f26fc10000', deadline: 1795728524, window: 600,
+    dataSha256: '10c6ad880f409d520be64832b4ef0463869a2acc64dc461b36a25476304472ac'
+});
+
+export function lateBidWindow(blockTime, now = Math.floor(Date.now() / 1000)) {
+    const { deadline, window } = rehearsalLateBid;
+    check(Number.isSafeInteger(blockTime) && Math.abs(now - blockTime) <= 60, 'Recent chain time and local time disagree. Refresh before reviewing a bid.');
+    if (Math.max(blockTime, now) >= deadline) return 'expired';
+    if (Math.min(blockTime, now) < deadline - window) return 'early';
+    return 'open';
+}
+
 const testChain = '0x14a34';
 const factory = '0x4e1dcf7ad4e460cfd30791ccc4f9c8a4f820ec67';
 const roleName = { protocolTreasury: 'Protocol treasury', ecosystemTreasury: 'Ecosystem treasury', adminSecurity: 'Admin security' };
@@ -63,13 +77,16 @@ export async function walletRequest(provider, plan) {
     const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
     const artwork = plan.operation === 'registerArtwork';
     const opening = plan.operation === 'createAuction';
-    if (artwork || opening) {
-        const approved = artwork ? rehearsalArtwork : rehearsalOpening;
+    const bid = plan.operation === 'placeBid';
+    if (artwork || opening || bid) {
+        const approved = bid ? rehearsalLateBid : artwork ? rehearsalArtwork : rehearsalOpening;
         check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === approved.dataSha256 &&
             plan.deployments.length === 0 &&
             plan.codeChecks.length === 2 && sameAddress(plan.codeChecks[0].address, rehearsalArtwork.core) &&
             sameAddress(plan.codeChecks[1].address, rehearsalArtwork.nft), 'Unexpected artwork request.');
         if (artwork) check(plan.metadataUri === rehearsalMetadataUri, 'Unexpected registration metadata.');
+        if (bid) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === rehearsalLateBid.deposit,
+            'Unexpected bidder or deposit.');
     } else {
         check(create || ['protocolTreasury', 'ecosystemTreasury'].includes(plan.operation), 'Unknown rehearsal operation.');
         check(create ? plan.target === 'Direct contract creation' :
@@ -95,15 +112,22 @@ export async function walletRequest(provider, plan) {
         check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === 1n,
             opening ? 'Auction history changed. Refresh the chain evidence.' : 'Work registry changed. Refresh the chain evidence.');
     }
+    if (bid) {
+        const call = { from: plan.payer, to: rehearsalArtwork.core, value: rehearsalLateBid.deposit, data: plan.data };
+        const simulated = await rpc('eth_call', [call, 'pending']);
+        const head = await rpc('eth_getBlockByNumber', ['latest', false]);
+        check(simulated === '0x' && lateBidWindow(Number(BigInt(head.timestamp))) === 'open',
+            'The reviewed first late bid is unavailable. Refresh the chain evidence.');
+    }
     await matchWallet(provider, plan);
-    const tx = { from: plan.payer, chainId: testChain, nonce: plan.nonce, value: '0x0', data: plan.data };
+    const tx = { from: plan.payer, chainId: testChain, nonce: plan.nonce, value: bid ? rehearsalLateBid.deposit : '0x0', data: plan.data };
     if (!create) tx.to = plan.target;
     return tx;
 }
 
 export function sameReview(first, next) {
-    return !next.complete && !next.waitingForFinality && first.chainId === next.chainId && first.operation === next.operation &&
-        first.payer === next.payer && first.nonce === next.nonce && first.target === next.target &&
+    return !next.complete && !next.waitingForFinality && !next.lateBidStatus && first.chainId === next.chainId && first.operation === next.operation &&
+        first.payer === next.payer && first.nonce === next.nonce && first.target === next.target && first.value === next.value &&
         first.dataHash === next.dataHash && first.dataSha256 === next.dataSha256 &&
         JSON.stringify(first.codeChecks) === JSON.stringify(next.codeChecks) &&
         JSON.stringify(first.deployments) === JSON.stringify(next.deployments) &&
@@ -191,10 +215,17 @@ export async function start() {
         return response.json();
     }
     function showOutcome(current) {
-        if (!current.waitingForFinality && !current.complete) return false;
+        if (!current.waitingForFinality && !current.complete && !current.lateBidStatus) return false;
         ++stateRevision; plan = undefined; connected = undefined; wrongChain = false;
         byId('review').hidden = true;
-        if (current.existingAuctionHistory) {
+        if (current.lateBidStatus) {
+            const messages = {
+                early: 'Waiting for the late-bid window. Refresh between November 26, 21:18:44 and 21:28:44 UTC (22:18:44–22:28:44 Warsaw).',
+                expired: 'The original late-bid window has ended.',
+                changed: 'The first bid or auction state has changed. This rehearsal request is closed.'
+            };
+            status(messages[current.lateBidStatus]);
+        } else if (current.existingAuctionHistory) {
             status('The reviewed Core already has finalized auction history. This first-auction request is closed. Use the opening receipt to verify the work and its terms.');
         } else if (current.finalizedArtwork) {
             status('Verified artwork ' + current.finalizedArtwork.id + ' · ' + rehearsalArtwork.title +
@@ -230,15 +261,22 @@ export async function start() {
             const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
             const artwork = plan.operation === 'registerArtwork';
             const opening = plan.operation === 'createAuction';
-            byId('operation').textContent = opening ? 'Open the first rehearsal auction' : artwork ? 'Register rehearsal artwork' :
+            const bid = plan.operation === 'placeBid';
+            byId('operation').textContent = bid ? 'First late bid · auction 1' : opening ? 'Open the first rehearsal auction' : artwork ? 'Register rehearsal artwork' :
                 create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
             byId('fields').replaceChildren();
             addField('Network', 'Base Sepolia · 84532');
             addField('Sender', plan.payer);
-            addField('Value', '0 test ETH · wallet estimates gas');
+            addField('Value', bid ? '0.01 test ETH deposit plus test gas' : '0 test ETH · wallet estimates gas');
             addField('Nonce', String(BigInt(plan.nonce)));
-            addField(artwork || opening ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
-            if (opening) {
+            addField(artwork || opening || bid ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
+            if (bid) {
+                addField('Work and auction', 'Work 1 · Auction 1');
+                addField('Price offered', '0.001 test ETH');
+                addField('Method', 'placeBid(1, 1000000000000000)');
+                addField('Deadline before your bid', new Date(rehearsalLateBid.deadline * 1000).toISOString());
+                addField('If included in time', 'Bidding extends by 10 minutes. If you win, settle within the payment window.');
+            } else if (opening) {
                 addField('Work', '1 · ' + rehearsalArtwork.title);
                 addField('Method', 'createAuction(uint256,uint256,uint256)');
                 addField('Starting price', '0.001 test ETH');

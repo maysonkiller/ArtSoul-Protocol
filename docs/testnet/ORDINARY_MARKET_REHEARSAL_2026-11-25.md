@@ -137,6 +137,8 @@ node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair
 
 At block 63,602,202 both providers reported no bid, an open round, a minimum bid of 0.001 test ETH and a deposit of 0.01 test ETH. A read-only simulation of the first bid by a distinct funded test participant returned successfully on each provider. Subsequent bidders must refresh the minimum bid, deposit and current deadline. The simulation records no bid.
 
+For this auction, `node scripts/review-rehearsal-late-bid.mjs --plan` checks the finalized opening and returns the availability of the first late bid. Use `--serve` to open the private wallet review on the same computer. It becomes available from November 26 at 21:18:44 UTC until 21:28:44 UTC if no other bid has arrived. The request is limited to the reviewed bidder, Core and auction, a bid of 0.001 test ETH and a deposit of 0.01 test ETH. Only the wallet holder submits the transaction. The inclusion block determines whether an extension occurs.
+
 ## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.
