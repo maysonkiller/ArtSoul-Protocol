@@ -208,7 +208,7 @@ A November 19 rehearsal used three separate Safe L2 1.5.0 accounts on Hardhat ch
 | Choice | Concrete recommendation to review; not approval |
 | --- | --- |
 | Retirement and critical powers | Specify who may close new publication entry, change permitted configuration and authorize any exceptional, consented migration. The selected deployment lifetime preserves original NFT identity and obligations. No general mint/escrow override |
-| Accounting configuration | The Safe addresses and largest-remainder payout rule are selected. Verify their release binding and determine the bounded refund execution limits and alternate recipient policy. |
+| Accounting configuration | The Safe addresses and largest-remainder payout rule are selected. The payout candidate lets only the credited account choose an alternate recipient. Verify the release binding and select production refund execution limits. |
 | Governance and sold rights | Verify the selected Safe and admission policy in the release. Decide any remaining recovery and metadata-change policy. Website Team/moderator approval does not grant contract custody. Construction-time pairing cannot hide a later upgrade bypass |
 | Optional payment automation/routes | Choose whether to add payment prefunding, protected-account delegation or execution reserves, and their costs/recovery. Choose a concrete route/refund policy before activation. These choices can remain deferred for the native-ETH replacement slice |
 

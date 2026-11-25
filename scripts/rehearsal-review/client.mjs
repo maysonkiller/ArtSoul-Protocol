@@ -38,8 +38,8 @@ export async function matchWallet(provider, plan) {
 export async function walletRequest(provider, plan) {
     const rpc = (method, params) => provider.request({ method, params });
     await matchWallet(provider, plan);
-    check(['protocolTreasury', 'ecosystemTreasury', 'OrdinaryMarket'].includes(plan.operation), 'Unknown rehearsal operation.');
-    const create = plan.operation === 'OrdinaryMarket';
+    const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
+    check(create || ['protocolTreasury', 'ecosystemTreasury'].includes(plan.operation), 'Unknown rehearsal operation.');
     check(create ? plan.target === 'Direct contract creation' :
         sameAddress(plan.target, factory) && plan.data.startsWith('0x1688f0b9'), 'Unexpected transaction target or method.');
     check(await sha256(plan.data) === plan.dataSha256, 'Transaction data changed.');
@@ -181,8 +181,8 @@ export async function start() {
             if (showOutcome(current)) return;
             plan = current;
             if (previous !== plan.data) submitted = false;
-            const create = plan.operation === 'OrdinaryMarket';
-            byId('operation').textContent = create ? 'Deploy OrdinaryMarket and its NFT' : 'Create Safe · ' + roleName[plan.operation];
+            const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
+            byId('operation').textContent = create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
             byId('fields').replaceChildren();
             addField('Network', 'Base Sepolia · 84532');
             addField('Sender', plan.payer);
