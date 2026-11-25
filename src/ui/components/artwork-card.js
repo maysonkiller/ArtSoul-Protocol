@@ -958,6 +958,13 @@
         if (saved) preview.appendChild(saved);
         card.appendChild(preview);
         card.appendChild(body);
+        if (aura?.borderLabel) {
+            const caption = document.createElement('span');
+            caption.className = 'artsoul-aura-caption';
+            caption.setAttribute('aria-hidden', 'true');
+            caption.textContent = aura.borderLabel;
+            card.appendChild(caption);
+        }
         if (menu) card.appendChild(menu);
         let link = null;
         const countdown = createCountdownElement(artwork, now => {
@@ -1204,6 +1211,7 @@
                 }
             } : undefined
         },
+            aura?.borderLabel && h('span', { className: 'artsoul-aura-caption', 'aria-hidden': true }, aura.borderLabel),
             h('div', { className: 'artsoul-card-preview' },
                 h(ReactMedia, { artwork, onUnavailable: () => {
                     setMediaUnavailable(true);

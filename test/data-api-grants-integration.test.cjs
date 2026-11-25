@@ -29,7 +29,7 @@ const features = [
   'a8a_moderation_passkey_foundation',
   'a8b_artwork_report_intake', 'a8c_protocol_admin_review', 'a8d_moderation_safe_recovery',
   'a8e_moderation_totp_persistence', 'a8f_moderation_dual_wallet_authority',
-  'a8g_staff_factor_setup', 'a8h_staff_factor_pgcrypto_resolution',
+  'a8g_staff_factor_setup', 'a8h_staff_factor_pgcrypto_resolution', '20261125170000_aura_border_setting',
   'launch_service_quotas', 'profile_email_verification', 'artist_support',
   'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation',
   'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks',
@@ -151,6 +151,9 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     query(noImplicitGrants);
     query(fs.readFileSync(`sql/migrations/${name}.sql`, 'utf8'));
   }
+  await t.test('the appearance setting is revisioned and restricted to current administrators', () => {
+    query(fs.readFileSync('test/fixtures/aura-border-setting.sql', 'utf8'));
+  });
   await t.test('notification recovery ledger and writer stay inaccessible to every Data API role', () => {
     const table = 'artsoul_private.notification_reorg_identities';
     assert.equal(query(`SELECT relrowsecurity AND relforcerowsecurity FROM pg_class

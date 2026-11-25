@@ -786,6 +786,36 @@ body.future .artwork-page-compact-action {
     border-color: var(--c-aura-gold);
 }
 
+.artsoul-aura-caption { display: none; }
+.future .artsoul-aura-frame > .artsoul-aura-caption {
+    display: block;
+    position: absolute;
+    inset-inline-start: .85rem;
+    inset-block-end: 1px;
+    z-index: 2;
+    max-inline-size: calc(100% - 1.7rem);
+    overflow: hidden;
+    white-space: nowrap;
+    pointer-events: none;
+    padding-inline: .3rem;
+    border-radius: .2rem;
+    background: var(--c-bg);
+    color: var(--aura-glow, var(--c-accent));
+    font-size: .625rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .future .artsoul-aura-frame--platform > .artsoul-aura-caption,
+    .future .artsoul-aura-frame--partner > .artsoul-aura-caption {
+        animation: artsoulAuraCaption 12s ease-in-out infinite alternate;
+    }
+}
+@keyframes artsoulAuraCaption {
+    from { left: .85rem; transform: translateX(0); }
+    to { left: calc(100% - .85rem); transform: translateX(-100%); }
+}
+
 @supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
     .future .artsoul-aura-frame--platform::after,
     .future .artsoul-aura-frame--partner::after {

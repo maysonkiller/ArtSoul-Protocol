@@ -76,6 +76,7 @@ Verify against the database before applying or re-applying it.
 
 | File | Disposition |
 | --- | --- |
+| `sql/migrations/20261125170000_aura_border_setting.sql` | Local PostgreSQL 18.4 verified the default-off setting, revision conflicts, audit history and administrator role-version check after the staff authorization migration. The service role can execute two scoped RPCs. Data API roles cannot modify the history table directly. Hosted application is pending. Roll back the visual by switching the setting off and retain the history. |
 | `sql/migrations/001_core_indexer_schema.sql` | Indexer sequence 1. Runner-managed. |
 | `sql/migrations/002_auction_state_schema.sql` | Indexer sequence 2. Runner-managed. |
 | `sql/migrations/003_resilience_schema.sql` | Indexer sequence 3. Runner-managed. |
