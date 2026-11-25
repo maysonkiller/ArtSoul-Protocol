@@ -7,7 +7,7 @@ import { getAddress, keccak256, toQuantity } from 'ethers';
 import { prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
 import { expectedRehearsalPairRegister, loadReviewedPair } from './prepare-rehearsal-core.mjs';
 import { prepareRehearsalSafes, rehearsalSafeRelease as release } from './prepare-rehearsal-safes.mjs';
-import { readRpc, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
+import { readRpc, requireIndependentProviders, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
 const asset = name => new URL('./rehearsal-review/' + name, import.meta.url);
 const json = async path => JSON.parse(await readFile(path, 'utf8'));
@@ -23,11 +23,12 @@ function check(condition, message) {
 function sequencedRead(url) {
     const rpc = readRpc(url);
     let tail = Promise.resolve();
-    return (method, params) => {
+    const read = (method, params) => {
         const result = tail.then(() => rpc(method, params));
         tail = result.catch(() => {}).then(() => new Promise(resolve => setTimeout(resolve, 150)));
         return result;
     };
+    return Object.assign(read, { origin: rpc.origin });
 }
 
 async function agreed(providers, method, params) {
@@ -37,6 +38,7 @@ async function agreed(providers, method, params) {
 }
 
 export async function reviewedRuntimePresent(providers, address, expectedHash) {
+    requireIndependentProviders(providers);
     const [code, nonce] = await Promise.all([
         agreed(providers, 'eth_getCode', [address, 'latest']),
         agreed(providers, 'eth_getTransactionCount', [address, 'pending'])
@@ -47,6 +49,7 @@ export async function reviewedRuntimePresent(providers, address, expectedHash) {
 }
 
 export async function reviewedPairStatus(providers, register, block) {
+    requireIndependentProviders(providers);
     const entries = [register.core, register.nft];
     const latest = await Promise.all(entries.map(entry => reviewedRuntimePresent(providers, entry.address, entry.codeHash)));
     check(latest[0] === latest[1], 'The current block contains only part of the reviewed pair.');

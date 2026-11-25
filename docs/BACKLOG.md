@@ -21,9 +21,13 @@ This is the repository's durable work register. It consolidates verified complet
 
 C13 has a [public test deployment and read-only auction rehearsal](testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md). D2 intake now accepts its reviewed register directly. Signed settlement, hosted indexing and production custody remain open. The [dependency triage](audits/DEPENDENCY_TRIAGE_2026-09-23.md#november-25-dependency-recheck) reconciles the November 21 and 25 package counts with the separately tested security draft.
 
+The reviewed [dependency candidate](audits/npm-2026-11-25/RESIDUAL_FOLLOWUP.md) reduced the full inventory from 50 to 18 affected package names and the production-scope inventory from 41 to nine. The nine high records share one wallet dependency. The [wallet compatibility and contract checks](audits/npm-2026-11-25/SECURITY_RESIDUAL_RISK.md) record the remaining release work.
+
 ### November 20 phase acceptance
 
 The [numbered checklist](canon/12_IMPLEMENTATION_BACKLOG.md) has 17 of 38 active items accepted; the two retired archive gates receive no completion credit. B engineering is closed. Its named public-beta journeys are tracked in C13. The ordinary-market candidate passed C2 auction Core implementation, C3 artwork NFT implementation, C6 pool accounting and C11 contract and invariant testing. The independent review, fresh hosted rehearsal, production custody and mainnet go/no-go are still open.
+
+The [C5 collection metadata check](canon/CONTRACT_REWORK_PLAN.md#first-work-attempts-for-partner-launches) verifies a minted opening token against its draft at one finalized block. The [regressions](../test/collection-metadata-preflight.test.mjs) cover distinct original buyer and owner, a wrong chain or runtime, a changed URI, an inconsistent collector and a replaced block. Public collection acceptance still needs a reviewed Base Sepolia deployment and settlement.
 
 ### November 20 review of older proposals
 

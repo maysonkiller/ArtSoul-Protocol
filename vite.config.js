@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { reownFrameCompatibility } from './scripts/reown-frame-compatibility.mjs';
 import { inlineCriticalFirstPaint } from './scripts/critical-first-paint.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -261,8 +262,9 @@ function serveArtworkPage(server) {
 
 export default defineConfig({
     appType: 'mpa',
+    optimizeDeps: { rolldownOptions: { plugins: [reownFrameCompatibility()] } },
     plugins: [
-        react(),
+        reownFrameCompatibility(), react(),
         { name: 'local-artwork-route', configureServer: serveArtworkPage, configurePreviewServer: serveArtworkPage },
         inlineCriticalFirstPaintPlugin(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets(), seasonalPreviewOnlyPlugin(), socialPreviewMetadataPlugin()
     ],

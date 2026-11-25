@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { checkCollectionMetadata } from '../scripts/check-collection-metadata.mjs';
-import { createDraft } from '../src/features/collections/launch-config.js';
+import { Interface, keccak256, ZeroAddress } from 'ethers';
+import { checkCollectionMetadata, checkIssuedFirstWork } from '../scripts/check-collection-metadata.mjs';
+import { createDraft, createFirstArtworkDraft } from '../src/features/collections/launch-config.js';
 import { MAX_METADATA_BYTES } from '../src/config/upload-policy.js';
 
 const cid = 'Qm' + 'a'.repeat(44);
@@ -57,4 +58,55 @@ test('an unreadable, oversized or malformed response never produces a metadata c
         try { await assert.rejects(checkCollectionMetadata(draft()), message); }
         finally { mock.mock.restore(); }
     }
+});
+
+test('issued first-work evidence binds the draft, paying collector and current holder to one finalized contract', async t => {
+    const draft = createFirstArtworkDraft();
+    draft.media.metadataBaseURI = prefix;
+    const json = JSON.stringify(draft);
+    const address = '0x' + '1'.repeat(40), buyer = '0x' + '2'.repeat(40), holder = '0x' + '3'.repeat(40);
+    const block = { number: '0x12', hash: '0x' + 'a'.repeat(64) };
+    const code = '0x601160ff', runtime = keccak256(code);
+    const body = JSON.stringify(metadata), digest = createHash('sha256').update(body).digest('hex');
+    const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(body));
+    const abi = new Interface([
+        'function creator() returns (address)', 'function firstCollector(uint256) returns (address)',
+        'function collectionFirstCollector() returns (address)', 'function ownerOf(uint256) returns (address)',
+        'function tokenURI(uint256) returns (string)', 'function mintPrice(uint256) returns (uint256)'
+    ]);
+    const values = { creator: address, firstCollector: buyer, collectionFirstCollector: buyer,
+        ownerOf: holder, tokenURI: prefix + '1', mintPrice: 42n };
+    let chain = '0x14a34', canonical = block;
+    async function rpc(method, params) {
+        if (method === 'eth_chainId') return chain;
+        if (method === 'eth_getBlockByNumber') return params[0] === 'finalized' ? block : canonical;
+        assert.deepEqual(params[1], { blockHash: block.hash, requireCanonical: true });
+        if (method === 'eth_getCode') { assert.equal(params[0], address); return code; }
+        assert.equal(method, 'eth_call');
+        assert.equal(params[0].to, address);
+        const call = abi.parseTransaction({ data: params[0].data });
+        if (call.args.length) assert.equal(call.args[0], 1n);
+        return abi.encodeFunctionResult(call.fragment, [values[call.name]]);
+    }
+    const check = () => checkIssuedFirstWork(json, address, runtime, digest, rpc);
+    const report = await check();
+    assert.equal(report.firstCollector, buyer);
+    assert.equal(report.owner, holder);
+    assert.equal(report.publicMintPriceWei, '42');
+    assert.deepEqual(report.block, block);
+    assert.equal(report.metadata.sha256, digest);
+    await assert.rejects(checkIssuedFirstWork(json, address, keccak256('0x01'), digest, rpc), /runtime differs/);
+    for (const [field, bad, expected] of [['collectionFirstCollector', holder, /do not agree/],
+        ['ownerOf', ZeroAddress, /do not agree/], ['mintPrice', 0n, /do not agree/], ['tokenURI', prefix + '2', /URI differs/]]) {
+        const previous = values[field];
+        values[field] = bad;
+        await assert.rejects(check(), expected);
+        values[field] = previous;
+    }
+    chain = '0x2105';
+    await assert.rejects(check(), /Wrong RPC chain/);
+    assert.equal(fetch.mock.callCount(), 1);
+    chain = '0x14a34';
+    canonical = { ...block, hash: '0x' + 'b'.repeat(64) };
+    await assert.rejects(check(), /disagree on the finalized block/);
 });

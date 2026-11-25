@@ -7,14 +7,37 @@ const test = require('node:test');
 const root = path.resolve(__dirname, '..');
 const baseline = require('../docs/architecture/C1_REPLACEMENT_STORAGE_2026-11-19.json');
 const pair = require('../docs/architecture/C1_ORDINARY_PAIR_STORAGE_2026-11-20.json');
+const payout = require('../docs/architecture/C1_ORDINARY_PAYOUT_STORAGE.json');
 
 test('the fresh contract layout record matches every normalized source in its compiler input', () => {
     assert.equal(baseline.compiler, '0.8.24+commit.e11b9ed9');
-    for (const [name, { sha256 }] of [...Object.entries(baseline.sources), ...Object.entries(pair.sources)]) {
+    for (const [name, { sha256 }] of [...Object.entries(baseline.sources), ...Object.entries(pair.sources), ...Object.entries(payout.sources)]) {
         assert.match(name, /^(?:contracts\/replacement\/|@openzeppelin\/contracts\/)/);
         const file = path.join(root, name.startsWith('@') ? 'node_modules' : '', name);
         const source = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
         assert.equal(crypto.createHash('sha256').update(source).digest('hex'), sha256, name);
+    }
+});
+
+test('credit redirection preserves every storage slot, nested member and immutable role in both contracts', () => {
+    function layoutShape(layout) {
+        // Compiler AST numbers and instruction offsets can change when a method is added.
+        const typeName = id => id === undefined ? undefined : layout.types[id].label;
+        const slots = fields => fields.map(({ label, slot, offset, type }) => [label, slot, offset, typeName(type)]);
+        const types = Object.values(layout.types).map(type => [type.label, {
+            encoding: type.encoding, bytes: type.numberOfBytes, key: typeName(type.key),
+            value: typeName(type.value), base: typeName(type.base), members: type.members && slots(type.members)
+        }]);
+        assert.equal(new Set(types.map(([label]) => label)).size, types.length);
+        const immutables = layout.immutables.map(({ name, declaredIn, type, bytecodeReferences }) => {
+            assert.ok(bytecodeReferences.length);
+            return [name, declaredIn, type];
+        });
+        return { slots: slots(layout.storage), types: Object.fromEntries(types), immutables };
+    }
+    const contract = (record, name) => record.contracts[`contracts/replacement/${name}.sol:${name}`];
+    for (const [before, after] of [['OrdinaryMarket', 'OrdinaryPayoutMarket'], ['SettledArtworkNFT', 'SettledArtworkNFT']]) {
+        assert.deepEqual(layoutShape(contract(payout, after)), layoutShape(contract(pair, before)));
     }
 });
 

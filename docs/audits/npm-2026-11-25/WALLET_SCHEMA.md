@@ -1,0 +1,9 @@
+# Wallet dependency compatibility
+
+Reown AppKit 1.8.21 pins Zod 3.22.4 in its wallet frame. The npm override selects 4.6.7 for that consumer. The security advisory identifies 4.6.6 as the first patched version. Other packages resolve their own dependencies. [Zod advisory](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) · [Zod 4 migration guide](https://zod.dev/v4/changelog).
+
+The production build and development optimizer resolve only the reviewed Reown frame schema's Zod import through an ArtSoul adapter. The adapter uses the new parser while preserving the frame's optional unconstrained properties and existing email grammar. The build checks the upstream schema digest before applying the adapter. Changes to Reown require a new compatibility review. The upstream package files stay byte-identical to npm's distribution.
+
+On November 25, a clean installation added 948 packages. npm 11.6.2 reported zero production findings and nine in the full tree (eight low via the Hardhat 2 / elliptic chain and one moderate in OpenZeppelin). The lock SHA-256 is `02beaac49d5dfd0952c2405de34eeef361f893403055c6eec669e71f062328d4`. The [remaining toolchain findings](RESIDUAL_FOLLOWUP.md) retain their independent compiler and compatibility gates. The inventory workflow exports both raw reports at the tested commit.
+
+The [bundled frame regression](../../../test/reown-frame-compatibility.test.mjs) checks omitted, undefined, null and populated RPC responses, malformed events, account and smart account data, signing request shapes, network selection, theme and email fields. The same successful empty reply and email grammar were verified through Vite's development prebundle. Both ordinary contract manifests reproduced with Solidity 0.8.24 using the new lock, including creation and runtime bytecode, ABI and metadata for each deployed pair.
