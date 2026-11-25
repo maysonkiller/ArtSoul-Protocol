@@ -1,7 +1,20 @@
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { isAddress, isHexString, ZeroAddress, ZeroHash } from 'ethers';
+import { requireIndependentProviders } from './verify-treasury-safes.mjs';
 
 export class InputError extends Error {}
+
+export async function verifyPairReading(pair, options, providers, read) {
+    requireIndependentProviders(providers);
+    const [first, second] = await Promise.all(providers.map(send => {
+        const listener = { chainId: pair.chainId, contractAddress: pair.coreAddress, nftAddress: pair.nftAddress,
+            _readRpcCall: operation => operation({ send }) };
+        return read(listener, { ...options, ...pair, isCurrent: () => true });
+    }));
+    assert.deepStrictEqual(first, second, 'Independent providers disagree on the finalized evidence');
+    return { ...first, rpcReadings: 2 };
+}
 
 export async function readReviewedOrdinaryPair(file) {
     const record = JSON.parse((await readFile(file, 'utf8')).trimStart());

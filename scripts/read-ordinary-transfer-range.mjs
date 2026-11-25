@@ -1,18 +1,10 @@
-import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readOrdinaryTransferRange } from '../src/indexer/nft-deployment-proof.js';
-import { InputError, readReviewedOrdinaryPair } from './read-reviewed-ordinary-pair.mjs';
-import { readRpc, requireIndependentProviders } from './verify-treasury-safes.mjs';
+import { InputError, readReviewedOrdinaryPair, verifyPairReading } from './read-reviewed-ordinary-pair.mjs';
+import { readRpc } from './verify-treasury-safes.mjs';
 
 export async function checkOrdinaryTransferRange(pair, range, providers) {
-    requireIndependentProviders(providers);
-    const [first, second] = await Promise.all(providers.map(send => {
-        const listener = { chainId: pair.chainId, contractAddress: pair.coreAddress, nftAddress: pair.nftAddress,
-            _readRpcCall: operation => operation({ send }) };
-        return readOrdinaryTransferRange(listener, { ...range, ...pair, isCurrent: () => true });
-    }));
-    assert.deepStrictEqual(first, second, 'Independent providers disagree on the finalized transfer range');
-    return { ...first, rpcReadings: 2 };
+    return verifyPairReading(pair, range, providers, readOrdinaryTransferRange);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
