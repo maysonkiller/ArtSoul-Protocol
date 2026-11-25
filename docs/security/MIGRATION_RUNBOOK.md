@@ -76,7 +76,7 @@ Verify against the database before applying or re-applying it.
 
 | File | Disposition |
 | --- | --- |
-| `sql/migrations/20261125170000_aura_border_setting.sql` | Local PostgreSQL 18.4 verified the default-off setting, revision conflicts, audit history and administrator role-version check after the staff authorization migration. The service role can execute two scoped RPCs. Data API roles cannot modify the history table directly. Hosted application is pending. Roll back the visual by switching the setting off and retain the history. |
+| `sql/migrations/20261125170000_aura_border_setting.sql` | Applied to hosted ArtSoul on November 25 after owner approval. The read RPC returned disabled at revision zero with zero history rows. Catalog checks confirmed RLS, no direct table access for anon, authenticated or service_role, and execution of both scoped RPCs for service_role alone among these roles. Local PostgreSQL 18.4 exercised authorization, revision conflicts and append-only history. Roll back the visual by switching the setting off and retaining the history. |
 | `sql/migrations/001_core_indexer_schema.sql` | Indexer sequence 1. Runner-managed. |
 | `sql/migrations/002_auction_state_schema.sql` | Indexer sequence 2. Runner-managed. |
 | `sql/migrations/003_resilience_schema.sql` | Indexer sequence 3. Runner-managed. |

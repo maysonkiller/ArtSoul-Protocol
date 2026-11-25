@@ -183,7 +183,7 @@ test('React card also places Saved inside the media preview, independent of card
         assert.ok(preview, file_type + ' must have a shared media-local preview');
         assert.equal(preview.children[0].type, api.ReactMedia);
         assert.equal(preview.children[1].type, api.ReactSavedControl);
-        assert.ok(!card.children.some(child => child.type === api.ReactSavedControl),
+        assert.ok(!card.children.some(child => child?.type === api.ReactSavedControl),
             'Saved must not be positioned relative to the variable card body');
     }
 });

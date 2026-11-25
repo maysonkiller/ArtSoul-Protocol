@@ -1211,7 +1211,6 @@
                 }
             } : undefined
         },
-            aura?.borderLabel && h('span', { className: 'artsoul-aura-caption', 'aria-hidden': true }, aura.borderLabel),
             h('div', { className: 'artsoul-card-preview' },
                 h(ReactMedia, { artwork, onUnavailable: () => {
                     setMediaUnavailable(true);
@@ -1239,7 +1238,8 @@
             href || onOpen ? h(ReactActionMenu, { artwork }) : null,
             h(ReactCountdown, { artwork, onEnd: refreshAuctionState }),
             href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
-                'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null
+                'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null,
+            aura?.borderLabel && h('span', { className: 'artsoul-aura-caption', 'aria-hidden': true }, aura.borderLabel)
         );
     }
 
