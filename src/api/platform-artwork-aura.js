@@ -7,14 +7,20 @@ function matchesRegistrationId(value, id) {
 
 // The deployment and publisher are designated together. Changing the active
 // Core cannot carry a previous deployment's visual status into its successor.
-export async function readArtworkAuraKinds(artworks, ownership) {
-  const qualified = new Map();
-  if (!ownership || ownership.config.chainId !== 84532) return qualified;
+export function platformPublisherFor(config) {
+  if (config?.chainId !== 84532) return null;
   const designation = process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA || '';
   const [core, publisher, ...extra] = designation.toLowerCase().split(':');
-  if (extra.length || core !== ownership.config.coreAddress ||
-      !normalizeWallet(publisher) || /^0x0{40}$/.test(publisher)) return qualified;
+  if (extra.length || core !== config.coreAddress ||
+      !normalizeWallet(publisher) || /^0x0{40}$/.test(publisher)) return null;
+  return publisher;
+}
 
+export async function readArtworkAuraKinds(artworks, ownership) {
+  const qualified = new Map();
+  const publisher = platformPublisherFor(ownership?.config);
+  if (!publisher) return qualified;
+  const core = ownership.config.coreAddress;
   const confirmed = Number(ownership.confirmed_through);
   const proven = new Map(ownership.rows.map(row => [row.artwork_id, row]));
   const candidates = artworks.filter(artwork => {

@@ -4,9 +4,21 @@ import { getModerationAccess, readAuthorityPolicy } from '../../moderation-acces
 import { getWebAuthnConfig, readModerationSession, roleBoundSessionsEnabled } from '../../moderation-passkey.js';
 import { requireProtocolAdminEnabled } from '../../protocol-admin-config.js';
 import { validateAuraSetting } from '../../aura-border-setting.js';
+import { readNftOwnershipConfig } from '../../nft-ownership.js';
+import { platformPublisherFor } from '../../platform-artwork-aura.js';
 
 function fail(statusCode, code, message) {
     return Object.assign(new Error(message), { statusCode, code });
+}
+
+function publicFrameSource() {
+    try {
+        const config = readNftOwnershipConfig();
+        if (!config) return 'awaiting_ownership';
+        return platformPublisherFor(config) ? 'configured' : 'awaiting_publisher';
+    } catch {
+        return 'unavailable';
+    }
 }
 
 export default async function handler(req, res) {
@@ -45,7 +57,7 @@ export default async function handler(req, res) {
         if (data && (saved.enabled !== data.enabled || (saved.revision !== data.revision && saved.revision !== data.revision + 1))) {
             throw fail(503, 'AURA_SETTING_UNCONFIRMED', 'Reload the current appearance setting to verify the change.');
         }
-        return res.status(200).json(saved);
+        return res.status(200).json({ ...saved, publicFrameSource: publicFrameSource() });
     } catch (error) {
         const detail = String(error?.details?.message || error.message || '');
         if (detail.includes('AURA_REVISION_CONFLICT')) error = fail(409, 'AURA_REVISION_CONFLICT', 'The setting changed. Reload it before saving.');
