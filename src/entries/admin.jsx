@@ -212,7 +212,7 @@ function ProtocolAdminPage() {
     const [queueTarget, setQueueTarget] = useState(null);
     const queueTargetRef = useRef(null);
     const [data, setData] = useState({ reports: [], events: [], hidden: [], moderationLog: [], notifications: [] });
-    const [section, setSection] = useState('queue');
+    const [section, setSection] = useState(() => window.location?.hash === '#nft-appearance' ? 'appearance' : 'queue');
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState('');
     const [decision, setDecision] = useState(null);
@@ -251,6 +251,9 @@ function ProtocolAdminPage() {
         let waitingForWallet = window.artsoulWalletStateSettled !== true;
         let lastWallet = currentSetupWallet();
         let lastAuthenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
+        const walletWait = waitingForWallet ? setTimeout(() => {
+            if (waitingForWallet) checkAccessRef.current?.();
+        }, 12000) : null;
         const clearSession = () => {
             completedSignIn.current = '';
             queueTargetRef.current = null;
@@ -282,6 +285,7 @@ function ProtocolAdminPage() {
         };
         const walletChanged = () => sessionChanged(true);
         const authChanged = () => sessionChanged();
+        const showLinkedSection = () => setSection(window.location?.hash === '#nft-appearance' ? 'appearance' : 'queue');
         const storage = event => { if (!event.key || ['artsoul_wallet', 'artsoul_authenticated_wallet'].includes(event.key)) clearSession(); };
         const resume = () => {
             if (document.visibilityState === 'hidden' || !currentSetupWallet()) return;
@@ -300,6 +304,7 @@ function ProtocolAdminPage() {
         };
         window.addEventListener('artsoul:wallet-state-changed', walletChanged);
         window.addEventListener('artsoul:auth-state-changed', authChanged);
+        window.addEventListener('hashchange', showLinkedSection);
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', clearSession);
         window.addEventListener('focus', resume);
@@ -314,8 +319,10 @@ function ProtocolAdminPage() {
             setupEpoch.current++;
             readySession.current = null;
             clearTimeout(expiryTimer.current);
+            clearTimeout(walletWait);
             window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
             window.removeEventListener('artsoul:auth-state-changed', authChanged);
+            window.removeEventListener('hashchange', showLinkedSection);
             window.removeEventListener('storage', storage);
             window.removeEventListener('pagehide', clearSession);
             window.removeEventListener('focus', resume);
@@ -391,7 +398,7 @@ function ProtocolAdminPage() {
         setBusy(true);
         setMessage('');
         try {
-            const result = await api(`access?expectedWallet=${encodeURIComponent(wallet)}`);
+            const result = await api(`access?expectedWallet=${encodeURIComponent(wallet)}`, { signal: AbortSignal.timeout(15000) });
             if (!isCurrent()) return;
             // Use the server's remaining lifetime and subtract the whole request
             // duration. Client wall-clock skew and slow responses cannot extend it.
@@ -430,7 +437,7 @@ function ProtocolAdminPage() {
                 await loadQueue(queueStatusRef.current);
             }
         } catch (error) {
-            if (isCurrent()) accessFailed(error);
+            if (isCurrent()) accessFailed(error.name === 'TimeoutError' ? new Error('The access check timed out. Retry to confirm your staff session.') : error);
         } finally {
             if (isCurrent()) setBusy(false);
         }
@@ -533,7 +540,8 @@ function ProtocolAdminPage() {
     const connectedWallet = currentSetupWallet();
     const roleLabel = { admin: 'Administrator', moderator: 'Moderator', team: 'Team' }[access?.role];
     const ready = accessState === 'ready';
-    const appearanceAllowed = access?.role === 'admin' && access?.dualWallet && access?.stepUpActive;
+    const appearanceAllowed = access?.dualWallet && access?.stepUpActive &&
+        (access.role === 'admin' || (access.role === 'team' && connectedWallet && authorityWallet === connectedWallet));
     const activeSection = (section === 'staff' && !rosterWallet || section === 'appearance' && !appearanceAllowed) ? 'queue' : section;
     const catalogEpoch = setupEpoch.current, catalogWallet = connectedWallet;
     const catalogSessionCurrent = () => sessionIsCurrent(catalogEpoch,catalogWallet)
@@ -562,7 +570,7 @@ function ProtocolAdminPage() {
                         : 'Secure moderation tools for verified staff wallets.'}</p>
                     <div className="protocol-admin-session">
                         <span className={`protocol-admin-access-status${ready ? ' is-verified' : ''}`} role="status">{statusLabel}</span>
-                        <span>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : 'No staff wallet connected'}{roleLabel ? ` / ${roleLabel}` : ''}</span>
+                        <span>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : accessState === 'loading' ? 'Waiting for your wallet' : 'No staff wallet connected'}{roleLabel ? ` / ${roleLabel}` : ''}</span>
                     </div>
                 </div>
                 <div className="protocol-admin-header-actions">
@@ -574,6 +582,9 @@ function ProtocolAdminPage() {
 
             {verification}
             {!ready && <AccessGate state={accessState} message={message} walletAddress={connectedWallet} />}
+            {section === 'appearance' && !appearanceAllowed && <p className="protocol-admin-message">
+                {ready || accessState === 'ineligible' ? 'This staff account does not have permission to manage NFT appearance.' : 'Verify your authorized staff wallet to open NFT appearance.'}
+            </p>}
 
             {ready && <>
                 <div className="protocol-admin-overview" role="group" aria-label="Current workspace counts">
@@ -591,7 +602,12 @@ function ProtocolAdminPage() {
                                     type="button"
                                     className={activeSection === value ? 'is-active' : ''}
                                     aria-current={activeSection === value ? 'page' : undefined}
-                                    onClick={() => setSection(value)}
+                                    onClick={() => {
+                                        setSection(value);
+                                        if (value === 'appearance' || window.location.hash === '#nft-appearance') {
+                                            window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (value === 'appearance' ? '#nft-appearance' : ''));
+                                        }
+                                    }}
                                 >
                                     {label}
                                 </button>

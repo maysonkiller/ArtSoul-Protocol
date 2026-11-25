@@ -541,12 +541,15 @@
         if (launcher?.dataset.commandsInitialized) return;
         const agent = window.ArtSoulWebMCP;
         const tools = new Map(agent.createTools(agent.browserDependencies()).map(tool => [tool.name, tool]));
+        const staffPage = agent.isStaffPage?.() === true;
+        const staffHelp = 'Use public catalog commands here. Try “open gallery”, “search moon” or “open artwork 31”.';
 
         let inputLanguage = readStored(LANG_KEY) === 'ru' ? 'ru' : 'en';
         let recognition = null;
         let handsFree = false;
         let leavingFor = null;
         let arrivingFrom = takeNavigation();
+        if (staffPage) arrivingFrom = null;
         let pendingDraftField = null;
         let pendingPrompt = null;
         let voiceConsent = readStored(NOTICE_KEY) === 'accepted';
@@ -632,6 +635,7 @@
             if (/^\/upload(?:\.html)?\/?$/.test(window.location?.pathname || '')) {
                 panel.querySelector('.artsoul-voice-hint').textContent += ' For a draft, say “title” and dictate it, or say “choose 48 hours”.';
             }
+            if (staffPage) panel.querySelector('.artsoul-voice-hint').textContent = staffHelp;
             panel.querySelector('label').textContent = t.input;
             input.placeholder = t.placeholder;
             close.setAttribute('aria-label', t.close);
@@ -641,7 +645,7 @@
             support.hidden = typeof Recognition === 'function';
             support.textContent = t.noSpeech;
             panel.querySelector('summary').textContent = t.examples;
-            panel.querySelector('.artsoul-voice-examples p').textContent = t.help;
+            panel.querySelector('.artsoul-voice-examples p').textContent = staffPage ? staffHelp : t.help;
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => {
                 el.setAttribute('aria-pressed', String(el.dataset.lang === inputLanguage));
             });
@@ -912,7 +916,12 @@
                 return;
             }
             if (command.help) {
-                reply(transcript, t.help, t.helpSpeech);
+                if (staffPage) reply(transcript, staffHelp);
+                else reply(transcript, t.help, t.helpSpeech);
+                return;
+            }
+            if (staffPage && (command.publicationPrompt || command.tool && !tools.has(command.tool))) {
+                reply(transcript, staffHelp);
                 return;
             }
             if (command.searchPrompt || command.publicationPrompt) {

@@ -1697,6 +1697,9 @@
             }
         }));
 
+        if (isStaffPage()) {
+            return [searchCatalog, searchArtworks, findActiveAuctions, getArtwork, getAuctionState, getArtworkProvenance, openPage, openArtwork];
+        }
         return [
             searchCatalog,
             searchArtworks,
@@ -1781,7 +1784,7 @@
     function browserDependencies() {
         return {
             fetchJson: async (path) => {
-                const response = await fetch(path, { headers: { Accept: 'application/json' } });
+                const response = await fetch(path, { headers: { Accept: 'application/json' }, credentials: isStaffPage() ? 'omit' : 'same-origin' });
                 if (!response.ok) throw new Error(`ArtSoul request failed: ${response.status}`);
                 return response.json();
             },
@@ -1851,6 +1854,7 @@
 
     window.ArtSoulWebMCP = Object.freeze({
         createTools,
+        isStaffPage,
         browserDependencies,
         register,
         modelContextOf,
@@ -1861,6 +1865,13 @@
         CHAIN_ID
     });
 
+    // Local commands can navigate the public catalogue. A staff page never
+    // registers tools with an external browser agent.
+    function isStaffPage() {
+        return /\/admin(?:\.html)?\/?$/i.test(window.location?.pathname || '') ||
+            (typeof document !== 'undefined' && document?.body?.classList?.contains('protocol-admin-page') === true);
+    }
+    if (isStaffPage()) return;
     const context = modelContextOf(
         typeof document === 'undefined' ? null : document,
         typeof navigator === 'undefined' ? null : navigator

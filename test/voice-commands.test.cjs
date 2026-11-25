@@ -454,12 +454,11 @@ test('the voice script loads after the agent tools on every page that has them',
   assert.match(fs.readFileSync('vite.config.js', 'utf8'), /'voice-commands\.js',/);
 });
 
-test('the command launcher is present in the header before scripts run, outside Admin', () => {
-  for (const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol']) {
+test('the command launcher is present in each shared header before scripts run', () => {
+  for (const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol','admin']) {
     const html = fs.readFileSync(page + '.html', 'utf8');
     assert.match(html, /class="site-header-actions">[\s\S]*?class="artsoul-voice-button"/);
     assert.equal((html.match(/class="artsoul-voice-button"/g) || []).length, 1);
   }
-  assert.doesNotMatch(fs.readFileSync('admin.html', 'utf8'), /voice-commands|artsoul-voice-button/);
   assert.doesNotMatch(source, /artsoul-voice-spacer|requestIdleCallback/);
 });

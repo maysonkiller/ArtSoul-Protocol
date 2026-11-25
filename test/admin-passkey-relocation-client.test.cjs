@@ -30,7 +30,7 @@ function harness(response=access(), settled=true) {
         document:{visibilityState:'visible',
             addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},
             removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)},
-        performance:{now:()=>0},
+        performance:{now:()=>0}, AbortSignal,
         setTimeout:()=>1,clearTimeout:()=>{},
         currentAdminWallet:()=>scope.window.artsoulWalletStateSettled ? state.wallet : '', emptyAdminData:empty, encodeURIComponent,
         api:async(path,options)=>{state.calls.push({path,options});if(state.api)return state.api(path,options);return path.startsWith('access')?state.access:{data:state.queue};},

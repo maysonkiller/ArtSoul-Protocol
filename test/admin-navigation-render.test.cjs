@@ -14,16 +14,17 @@ test.before(async()=>{
         'admin-navigation-render.jsx',{jsx:{runtime:'classic'}})).code;
 });
 
-function render({state='ready',wallet=WALLET,staff=true,authority=true,section='queue',dialog=false}={}) {
+function render({state='ready',wallet=WALLET,staff=true,authority=true,role=authority?'team':'moderator',section='queue',dialog=false}={}) {
     const ready = state==='ready';
     const data = {reports:[],events:[],hidden:[],moderationLog:[],notifications:[]};
     // Use actual page JSX with explicit state fixtures. No network, wallet or
     // native credential operation is executed by a static render.
-    const states = [state,staff?{role:authority?'team':'moderator',dualWallet:true,stepUpActive:ready}:null,
+    const states = [state,staff?{role,dualWallet:true,stepUpActive:ready}:null,
         'pending_review',null,data,section,false,'',null,staff?wallet:'',authority?wallet:'',dialog];
     let index=0;
     const scope={React:{...React,useState:initial=>[index<states.length?states[index++]:initial,()=>{}]},
         window:{artsoulWalletStateSettled:true,getCurrentWalletAddress:()=>wallet},
+        AuraAppearance:()=>React.createElement('section',{'data-fixture':'appearance'},'Frame label controls'),
         StaffFactorDialog:()=>React.createElement('dialog',{'data-fixture':'factor'},'Factor dialog'),
         StaffPasskeyDialog:()=>React.createElement('dialog',{'data-fixture':'passkey'},'Passkey dialog'),
         StaffAuthority:()=>React.createElement('div',{'data-fixture':'staff'},'Team fixture')};
@@ -63,6 +64,21 @@ test('disconnected and connected guests receive different actionable guidance',(
     const connected=render({state:'unauthenticated',staff:false,authority:false});
     assert.match(connected,/>Verify wallet</);
     assert.doesNotMatch(connected,/data-fixture="staff"|id="reviewQueueTitle"/);
+});
+
+test('the NFT appearance destination preserves the account and verification gates',()=>{
+    const locked=render({section:'appearance',role:'admin',state:'step_up'});
+    assert.match(locked,/Verify your authorized staff wallet to open NFT appearance/);
+    assert.doesNotMatch(locked,/data-fixture="appearance"/);
+    const moderator=render({section:'appearance',role:'moderator'});
+    assert.match(moderator,/does not have permission to manage NFT appearance/);
+    assert.doesNotMatch(moderator,/data-fixture="appearance"/);
+    const administrator=render({section:'appearance',role:'admin'});
+    assert.match(administrator,/aria-current="page">NFT appearance/);
+    assert.match(administrator,/data-fixture="appearance"/);
+    assert.match(render({section:'appearance',role:'team',authority:true}),/data-fixture="appearance"/);
+    assert.doesNotMatch(render({section:'appearance',role:'team',authority:false}),/data-fixture="appearance"/);
+    assert.doesNotMatch(render({section:'appearance',role:'team',authority:true,state:'step_up'}),/data-fixture="appearance"/);
 });
 
 test('a factor dialog has one stable location before the protected body',()=>{

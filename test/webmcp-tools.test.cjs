@@ -10,14 +10,14 @@ const source = fs.readFileSync('webmcp-tools.js', 'utf8');
  * browser. `modelContext` is what a WebMCP-capable browser exposes; leaving it
  * out is the ordinary visitor, and that path must register nothing.
  */
-function load({ modelContext = null, contracts = null } = {}) {
+function load({ modelContext = null, contracts = null, pathname = '/', fetchImpl = fetch } = {}) {
   const win = {
     ArtSoulContracts: contracts,
     setTimeout: (fn) => fn(),
-    location: { assign() {} }
+    location: { pathname, assign() {} }
   };
   const doc = modelContext ? { modelContext } : {};
-  new Function('window', 'document', 'navigator', 'console', source)(win, doc, {}, console);
+  new Function('window', 'document', 'navigator', 'console', 'fetch', source)(win, doc, {}, console, fetchImpl);
   return win;
 }
 
@@ -67,6 +67,22 @@ test('an ordinary browser gets no tools, no requests and no handlers', () => {
   win.requestIdleCallback = () => { idleAsked = true; };
   assert.equal(idleAsked, false);
   assert.equal(typeof win.ArtSoulWebMCP.createTools, 'function');
+});
+
+test('the staff assistant uses public catalog reads without staff cookies and registers no external tools', async () => {
+  for (const pathname of ['/admin', '/admin/', '/admin.html']) {
+    const registered = [], requests = [];
+    const win = load({pathname, modelContext:{registerTool: tool => registered.push(tool.name)},
+      fetchImpl: async (path,options) => {requests.push({path,options});return {ok:true,json:async()=>({data:[]})};}});
+    const available = toolsFrom(win, win.ArtSoulWebMCP.browserDependencies());
+    assert.deepEqual([...available.keys()], ['search_catalog','search_artworks','find_active_auctions','get_artwork',
+      'get_auction_state','get_artwork_provenance','open_page','open_artwork']);
+    await available.get('get_artwork').execute({artwork_id:'31'});
+    assert.ok(requests.length);
+    assert.ok(requests.every(({path,options})=>path.startsWith('/api/public/') && options.credentials==='omit'));
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.deepEqual(registered,[]);
+  }
 });
 
 test('the ArtSoul tools are registered when the browser supports WebMCP', async () => {
