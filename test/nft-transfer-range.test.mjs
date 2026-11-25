@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Interface, keccak256 } from 'ethers';
 import EventListener from '../src/indexer/event-listener.js';
-import { readNftTransferRange } from '../src/indexer/nft-deployment-proof.js';
+import { readNftTransferRange, readOrdinaryTransferRange } from '../src/indexer/nft-deployment-proof.js';
+import { checkOrdinaryTransferRange } from '../scripts/read-ordinary-transfer-range.mjs';
 
 const address = n => `0x${n.toString(16).padStart(40, '0')}`;
 const hash = n => `0x${n.toString(16).padStart(64, '0')}`;
@@ -68,6 +69,68 @@ test('ordered mint and ordinary transfers retain exact IDs, timestamps and deplo
 test('empty complete range is explicit; it is not mistaken for an unavailable RPC', async () => {
     const f = fixture(); f.logs = []; const batch = await f.run();
     assert.deepEqual(batch.events, []); assert.equal(batch.blockNumber, 110); assert.equal(f.calls.length, 11);
+});
+
+const pairGetters = new Interface(['function nft() view returns(address)', 'function core() view returns(address)']);
+function ordinaryFixture() {
+    const f = fixture();
+    f.finalized = 110;
+    f.reverse = CORE;
+    f.hook = (method, params) => {
+        if (method === 'eth_getBlockByNumber' && params[0] === 'finalized') return {number: hex(f.finalized), hash: hash(f.finalized)};
+        if (method !== 'eth_call') return;
+        const [call, block] = params;
+        const getter = pairGetters.parseTransaction(call)?.name;
+        if (getter) {
+            assert.deepEqual(block, {blockHash: hash(110), requireCanonical: true});
+            assert.equal(call.to, getter === 'nft' ? CORE : NFT);
+            return pairGetters.encodeFunctionResult(getter, [getter === 'nft' ? NFT : f.reverse]);
+        }
+        if (call.data === abi.encodeFunctionData('nftContract')) throw Error('Unknown prototype selector');
+    };
+    return f;
+}
+
+test('explicit ordinary range verifies the immutable pair, finality and a zero-supply origin before returning transfers', async () => {
+    const f = ordinaryFixture();
+    const batch = await readOrdinaryTransferRange(f.listener, f.options);
+    assert.equal(batch.events.length, 3);
+    assert.deepEqual(f.calls.filter(call => call.method === 'eth_call').map(call => call.params[0].data),
+        [pairGetters.encodeFunctionData('nft'), pairGetters.encodeFunctionData('core'), abi.encodeFunctionData('totalSupply')]);
+    f.supply = 1n;
+    await assert.rejects(readOrdinaryTransferRange(f.listener,f.options),/already has minted tokens/);
+});
+
+test('an ordinary continuation checks finality and reciprocal binding even after tokens have been minted', async () => {
+    const f = ordinaryFixture();
+    f.options.bootstrap = false;
+    f.supply = 3n;
+    assert.equal((await readOrdinaryTransferRange(f.listener,f.options)).events.length,3);
+    f.finalized = 109;
+    await assert.rejects(readOrdinaryTransferRange(f.listener,f.options),/not finalized/);
+    f.finalized = 110;
+    f.reverse = A;
+    await assert.rejects(readOrdinaryTransferRange(f.listener,f.options),/reciprocal binding mismatch/);
+});
+
+test('a mismatched pair reader never probes the other Core getter', async () => {
+    const prototype = fixture(), ordinary = ordinaryFixture();
+    await assert.rejects(readOrdinaryTransferRange(prototype.listener,prototype.options));
+    await assert.rejects(readNftTransferRange(ordinary.listener,ordinary.options),/Unknown prototype selector/);
+    for (const [deployment, selector] of [[prototype,pairGetters.encodeFunctionData('nft')],[ordinary,abi.encodeFunctionData('nftContract')]]) {
+        assert.deepEqual(deployment.calls.filter(call=>call.method==='eth_call').map(call=>call.params[0].data),[selector]);
+        assert.equal(deployment.calls.some(call=>call.method==='eth_getLogs'),false);
+    }
+});
+
+test('two-node range check rejects disagreement even when both sources separately return valid batches', async () => {
+    const first = ordinaryFixture(), second = ordinaryFixture();
+    const providers = [first,second].map(f=>f.provider.send.bind(f.provider));
+    const {chainId,coreAddress,nftAddress,expectedCoreCodeHash,expectedNftCodeHash,...range} = first.options;
+    const pair = {chainId,coreAddress,nftAddress,expectedCoreCodeHash,expectedNftCodeHash};
+    assert.equal((await checkOrdinaryTransferRange(pair,range,providers)).rpcReadings,2);
+    second.logs = [];
+    await assert.rejects(checkOrdinaryTransferRange(pair,range,providers),/disagree/);
 });
 
 function archiveFixture() {

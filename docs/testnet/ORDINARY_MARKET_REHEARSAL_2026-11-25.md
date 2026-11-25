@@ -73,3 +73,15 @@ node scripts/review-rehearsal-artwork.mjs <payout-core-review.json> <payout-pair
 ```
 
 Open the loopback address printed by the second command. Review the payer, Base Sepolia, the payout Core and the zero-value registration in the wallet. A matching existing registration disables the request. If someone registered a different first work, the page stops and the public transaction hash can be checked independently. The verifier uses the actual ID from the finalized receipt, confirms the single event, its emitter and stored creator/URI, and rechecks the contract pair and its custody at the inclusion block through two providers. Auction, settlement, refunds, hosted indexing and UI acceptance have separate evidence.
+
+## First NFT transfer range on the payout pair
+
+Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.
+
+The [ordinary transfer reader](../../scripts/read-ordinary-transfer-range.mjs) checks `Core.nft()`, `NFT.core()`, both runtime hashes and endpoint finality. The first range uses the creation block as its zero-supply predecessor. Both nodes independently returned an empty batch for block 63,494,033. To repeat the read, set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to independent HTTPS endpoints for Base Sepolia and supply the reviewed payout pair register.
+
+```sh
+node scripts/read-ordinary-transfer-range.mjs <payout-pair-register.json> bootstrap 63494033 0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df 63494033 0x3868ea2419c15a5bf9ee332628da9776f8828ff3f1fc67033c8b2c204a1f79e4
+```
+
+For a contiguous follow-up, use `continuation` with the next block number, the previous report's endpoint hash, and the new endpoint number and hash. The command returns a read-only observation. Hosted transfer persistence and the first minted token still need independent acceptance.
