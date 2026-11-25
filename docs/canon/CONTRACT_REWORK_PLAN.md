@@ -189,6 +189,14 @@ node scripts/check-collection-metadata.mjs draft.json
 
 The check fetches the builder's exact token 1 URI from the public IPFS gateway or the configured public ArtSoul artwork store. It requires a display name and image URL, checks the optional animation URL, and prints the SHA-256 of the original response bytes. A later run can pass that digest as the second argument to detect changes. The check reads only the JSON document. Media availability, the rest of the edition, and a deployed contract's actual `tokenURI(1)` each require separate evidence. Other HTTPS hosts require an independent read.
 
+After token 1 has been issued on Base Sepolia, set `ARTSOUL_COLLECTION_RPC_URL` to a read-only HTTPS endpoint. Take the collection address and initialized runtime Keccak-256 from the reviewed deployment record and the metadata SHA-256 from the approved draft preflight.
+
+```sh
+node scripts/check-collection-metadata.mjs --issued draft.json METADATA_SHA256 COLLECTION_ADDRESS RUNTIME_KECCAK256
+```
+
+This checks the contract at a finalized block, compares its token URI and served bytes with the draft, and reports the creator, paying First Collector, current owner and public mint price in wei. An isolated EVM run settled the opening at 770 wei, minted to the buyer's nominated recipient and transferred token 1 again. The check preserved the original buyer and returned the new owner. The public testnet collection still needs an issued token and a reviewed deployment record.
+
 #### Auction of mint reservations
 
 **Local prototype, open for drafting by individual creators and projects.** The builder previews both prices before bidding. The [reservation escrow](../../contracts/launch/MintReservationEscrow.sol) reuses the funded auction and holds the price of each place through its own redemption window. The [local fixture](../../contracts/test/MintReservationFixture.sol) exercises custody and NFT issuance on a disposable EVM. The builder has no payment or publishing entry point for this format.
