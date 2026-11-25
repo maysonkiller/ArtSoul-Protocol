@@ -36,6 +36,10 @@ function harness({speech = false, audio = false, execute = async () => JSON.stri
       return node;
     }
   };
+  const headerLauncher = document.createElement('button');
+  headerLauncher.className = 'artsoul-voice-button';
+  headerLauncher.setAttribute('aria-expanded', 'false');
+  nodes.set('.site-header-actions .artsoul-voice-button', headerLauncher);
   const en = document.createElement(), ru = document.createElement(); en.dataset.lang = 'en'; ru.dataset.lang = 'ru';
   class Recognition {
     constructor() {

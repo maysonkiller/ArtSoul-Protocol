@@ -537,12 +537,11 @@
     if (!window.ArtSoulWebMCP || typeof document === 'undefined') return;
 
     function mount() {
-        const launcher = document.querySelector('.artsoul-voice-button');
-        if (launcher?.dataset.commandsInitialized) return;
+        const button = document.querySelector('.site-header-actions .artsoul-voice-button');
+        if (!button || button.dataset.commandsInitialized) return;
         const agent = window.ArtSoulWebMCP;
         const tools = new Map(agent.createTools(agent.browserDependencies()).map(tool => [tool.name, tool]));
         const staffPage = agent.isStaffPage?.() === true;
-        const workspaceShortcut = staffPage ? document.querySelector('[data-admin-assistant-shortcut]') : null;
         const staffHelp = 'Use public catalog commands here. Try “open gallery”, “search moon” or “open artwork 31”.';
 
         let inputLanguage = readStored(LANG_KEY) === 'ru' ? 'ru' : 'en';
@@ -571,15 +570,7 @@
         };
         let wallet = walletIdentity();
 
-        const button = launcher || document.createElement('button');
-        let openedBy = button;
         button.dataset.commandsInitialized = 'true';
-        button.type = 'button';
-        button.className = 'artsoul-voice-button';
-        button.setAttribute('aria-expanded', 'false');
-        button.setAttribute('aria-haspopup', 'dialog');
-        button.setAttribute('aria-controls', 'artsoulVoicePanel');
-        button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>';
 
         const panel = document.createElement('div');
         panel.id = 'artsoulVoicePanel';
@@ -744,16 +735,12 @@
         function setPanelOpen(open) {
             panel.hidden = !open;
             button.setAttribute('aria-expanded', String(open));
-            if (workspaceShortcut) {
-                workspaceShortcut.hidden = open;
-                workspaceShortcut.setAttribute('aria-expanded', String(open));
-            }
         }
 
         function closePanel() {
             stopVoice();
             setPanelOpen(false);
-            openedBy.focus({ preventScroll: true });
+            button.focus({ preventScroll: true });
         }
 
         function afterPlayback(failed) {
@@ -1090,17 +1077,11 @@
             }
         }
 
-        function togglePanel(event) {
+        button.addEventListener('click', () => {
             if (!panel.hidden) { closePanel(); return; }
-            openedBy = event?.currentTarget || button;
             setPanelOpen(true);
             (input.disabled ? close : input).focus({ preventScroll: true });
-        }
-        button.addEventListener('click', togglePanel);
-        if (workspaceShortcut) {
-            workspaceShortcut.addEventListener('click', togglePanel);
-            workspaceShortcut.hidden = false;
-        }
+        });
         mic.addEventListener('click', start);
         chat.addEventListener('click', () => {
             if (handsFree) { stopVoice(); return; }
@@ -1180,7 +1161,6 @@
 
         label();
         document.body.appendChild(panel);
-        if (!launcher) document.body.appendChild(button);
         if (arrivingFrom && voiceConsent && document.visibilityState === 'visible' && typeof Recognition === 'function') {
             setPanelOpen(true);
             show('', TEXT.resumeMic);

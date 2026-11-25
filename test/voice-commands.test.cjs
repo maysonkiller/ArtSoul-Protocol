@@ -454,11 +454,13 @@ test('the voice script loads after the agent tools on every page that has them',
   assert.match(fs.readFileSync('vite.config.js', 'utf8'), /'voice-commands\.js',/);
 });
 
-test('the command launcher is present in each shared header before scripts run', () => {
+test('every shared page has one waveform launcher in the header before scripts run', () => {
   for (const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol','admin']) {
     const html = fs.readFileSync(page + '.html', 'utf8');
-    assert.match(html, /class="site-header-actions">[\s\S]*?class="artsoul-voice-button"/);
-    assert.equal((html.match(/class="artsoul-voice-button"/g) || []).length, 1);
+    const header = html.match(/class="site-header-actions">([\s\S]*?)<\/header>/)?.[1];
+    assert.ok(header, page);
+    assert.match(header, /class="artsoul-voice-button"[^>]*aria-controls="artsoulVoicePanel"[^>]*><svg[^>]*>\s*<path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/, page);
+    assert.equal((html.match(/aria-controls="artsoulVoicePanel"/g) || []).length, 1, page);
   }
   assert.doesNotMatch(source, /artsoul-voice-spacer|requestIdleCallback/);
 });
