@@ -19,13 +19,14 @@ const secret = () => ({...empty(), reports:[{id:'private-report',details:'privat
 const tick = () => new Promise(resolve=>setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((done, fail)=>{resolve=done;reject=fail;}); return {promise,resolve,reject}; };
 
-function harness(response=access()) {
-    const state = {wallet:WALLET,auth:WALLET,calls:[],access:response,queue:secret(),now:0,visibility:'visible',ensureAuthenticated:async()=>true};
+function harness(response=access(), settled=true) {
+    const state = {wallet:WALLET,auth:WALLET,settled,calls:[],access:response,queue:secret(),now:0,visibility:'visible',ensureAuthenticated:async()=>true};
     const values=[],refs=[],effects=[],callbacks=[],listeners=new Map();
     const timers=new Map();let timerId=0;
     let si,ri,ei,ci,pending;
     const scope = {
-        window:{artsoulWalletStateSettled:true,getCurrentWalletAddress:()=>state.wallet,
+        AbortSignal,
+        window:{get artsoulWalletStateSettled(){return state.settled;},getCurrentWalletAddress:()=>state.wallet,
             navigator:{connection:{addEventListener:(name,fn)=>{listeners.set('connection:'+name,new Set([fn]));},
                 removeEventListener:(name,fn)=>listeners.get('connection:'+name)?.delete(fn)}},
             SupabaseAuth:{getAuthenticatedWallet:()=>state.auth},ensureAuthenticated:()=>state.ensureAuthenticated(),
@@ -269,6 +270,30 @@ test('a newer queue filter wins over an older result or error in the same sessio
         else older.resolve({data:{...empty(),reports:[{id:'old-filter'}]}});
         await old;const view=h.render();assert.equal(view.accessState,'ready');assert.equal(view.data.reports[0].id,'latest-filter');assert.equal(view.busy,false);
     }
+});
+
+test('a stalled wallet restore offers sign-in and a late provider still checks access with the actual wallet',async()=>{
+    const h=harness(access(),false);await tick();
+    assert.equal(h.render().accessState,'loading');
+    await h.advance(12000);
+    assert.equal(h.render().accessState,'unauthenticated');
+    assert.equal(h.state.calls.length,0);
+    h.state.settled=true;h.event('artsoul:wallet-state-changed');await tick();
+    assert.equal(h.render().accessState,'ready');
+    assert.equal(h.state.calls[0].path,'access?expectedWallet='+WALLET);
+    h.unmount();
+});
+
+test('a stalled server access request unlocks retry and keeps private data out of view',async()=>{
+    const h=harness(access(),false);await tick();
+    h.state.api=async (path,options)=>{
+        assert.ok(options.signal instanceof AbortSignal);
+        throw new DOMException('Request expired','TimeoutError');
+    };
+    h.state.settled=true;h.event('artsoul:wallet-state-changed');await tick();
+    const view=h.render();assert.equal(view.accessState,'error');assert.equal(view.busy,false);
+    assert.match(view.message,/timed out/);assert.equal(view.data.reports.length,0);
+    h.unmount();
 });
 
 test('guest access does not request queue data or remain on an indefinite loading gate', async()=>{
