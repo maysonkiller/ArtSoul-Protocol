@@ -1,3 +1,7 @@
+import { previewHomepageBanners } from '../features/discovery/banner-preview.js';
+import { sampleTime, sampleSchedule, sampleCreatives } from '../features/discovery/visual-lab-banner-sample.js';
+import { discloseHomePromotion } from '../ui/components/home-banner-card.js';
+
 (function() {
             var theme = localStorage.getItem('artsoul_visual_lab_theme') || localStorage.getItem('artsoul_theme') || 'classic';
             document.documentElement.classList.remove('classic', 'future');
@@ -31,65 +35,72 @@
                 ['Silver Index', 'Floor growth preview', '+14%'],
                 ['Mira V.', 'Trending creator preview', 'Established'],
                 ['First Light', 'Unminted discovery', 'Published'],
-                ['Soft Geometry', 'Guidance preview', 'High confidence']
-            ];
+                ['Soft Geometry', 'Guidance preview', 'High confidence'],
+                ['Copper Plate', 'Drypoint print on paper', 'Print'],
+                ['Studio Window', 'Photographic study', 'Photograph'],
+                ['Open Workshop', 'Hand-pulled relief print', 'Print']
+            ].map((item, index) => ({ id: index + 1, item }));
 
             function renderSpotlights() {
                 if (!gallery) return;
                 gallery.innerHTML = '';
+                const preview = document.getElementById('labPromotionPreview')?.checked;
+                const slots = previewHomepageBanners(mockArtworks, preview ? sampleSchedule : null, sampleCreatives, sampleTime);
+                for (const slot of slots) gallery.appendChild(discloseHomePromotion(makeMockCard(slot), slot.promotion));
+            }
 
-                mockArtworks.forEach(function(item, index) {
-                    var label = spotlightLabels[index] || 'Discovery Spotlight';
-                    var card = document.createElement('a');
-                    card.href = '#';
-                    card.className = 'card rounded-xl overflow-hidden lab-spotlight-card';
+            function makeMockCard({ artwork, promotion }) {
+                const item = artwork.item;
+                const index = artwork.id - 1;
+                var label = spotlightLabels[index] || 'Discovery Spotlight';
+                var card = document.createElement('article');
+                card.className = 'card rounded-xl overflow-hidden lab-spotlight-card';
 
-                    var imageContainer = document.createElement('div');
-                    imageContainer.className = 'aspect-square overflow-hidden bg-black relative lab-artwork-preview';
+                var imageContainer = document.createElement('div');
+                imageContainer.className = 'aspect-square overflow-hidden bg-black relative lab-artwork-preview';
 
-                    var pattern = document.createElement('div');
-                    pattern.className = 'lab-card-pattern';
+                var pattern = document.createElement('div');
+                pattern.className = 'lab-card-pattern';
 
-                    var imageText = document.createElement('p');
-                    imageText.className = 'text-2xl font-light opacity-30';
-                    imageText.textContent = index < 4 ? label : 'Mock Artwork';
-                    imageText.style.cssText = 'position:absolute;left:1rem;bottom:1rem;right:1rem;';
+                var imageText = document.createElement('p');
+                imageText.className = 'text-2xl font-light opacity-30';
+                imageText.textContent = index < 4 ? label : 'Mock Artwork';
+                imageText.style.cssText = 'position:absolute;left:1rem;bottom:1rem;right:1rem;';
 
-                    imageContainer.appendChild(pattern);
-                    imageContainer.appendChild(imageText);
+                imageContainer.appendChild(pattern);
+                imageContainer.appendChild(imageText);
 
-                    var info = document.createElement('div');
-                    info.className = 'p-4 lab-card-copy';
+                var info = document.createElement('div');
+                info.className = 'p-4 lab-card-copy';
 
-                    var slotLabel = document.createElement('p');
-                    slotLabel.className = 'text-xs uppercase tracking-wide opacity-60 mb-1';
-                    slotLabel.textContent = label;
+                var slotLabel = document.createElement('p');
+                slotLabel.className = 'text-xs uppercase tracking-wide opacity-60 mb-1';
+                slotLabel.textContent = label;
 
-                    var title = document.createElement('h3');
-                    title.className = 'font-semibold text-lg mb-1 truncate';
-                    title.textContent = item[0];
+                var title = document.createElement('h3');
+                title.className = 'font-semibold text-lg mb-1 truncate';
+                title.textContent = item[0];
 
-                    var desc = document.createElement('p');
-                    desc.className = 'text-sm opacity-70 mb-2 line-clamp-2';
-                    desc.textContent = item[1];
+                var desc = document.createElement('p');
+                desc.className = 'text-sm opacity-70 mb-2 line-clamp-2';
+                desc.textContent = item[1];
 
-                    var price = document.createElement('p');
-                    price.className = 'text-sm font-bold';
-                    price.textContent = item[2];
+                var price = document.createElement('p');
+                price.className = 'text-sm font-bold';
+                price.textContent = item[2];
 
-                    var signalLine = document.createElement('p');
-                    signalLine.className = 'text-xs opacity-60 mt-2';
-                    signalLine.textContent = 'Mock signals - no live data';
+                var signalLine = document.createElement('p');
+                signalLine.className = 'text-xs opacity-60 mt-2';
+                signalLine.textContent = 'Mock signals - no live data';
 
-                    info.appendChild(slotLabel);
-                    info.appendChild(title);
-                    info.appendChild(desc);
-                    info.appendChild(price);
-                    info.appendChild(signalLine);
-                    card.appendChild(imageContainer);
-                    card.appendChild(info);
-                    gallery.appendChild(card);
-                });
+                if (!promotion) info.appendChild(slotLabel);
+                info.appendChild(title);
+                info.appendChild(desc);
+                info.appendChild(price);
+                if (!promotion) info.appendChild(signalLine);
+                card.appendChild(imageContainer);
+                card.appendChild(info);
+                return card;
             }
 
             function setTheme(theme) {
@@ -171,6 +182,7 @@
                 if (avatarButton) avatarButton.setAttribute('aria-expanded', 'false');
             });
 
+            document.getElementById('labPromotionPreview')?.addEventListener('change', renderSpotlights);
             renderSpotlights();
             setTheme(document.documentElement.classList.contains('future') ? 'future' : 'classic');
             setHeaderSize('current');

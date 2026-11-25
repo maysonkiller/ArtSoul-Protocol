@@ -6,8 +6,43 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { checkBannerSchedule } from '../scripts/check-banner-schedule.mjs';
+import { previewHomepageBanners } from '../src/features/discovery/banner-preview.js';
+import { sampleTime, sampleSchedule, sampleCreatives } from '../src/features/discovery/visual-lab-banner-sample.js';
 
 const at = hour => '2030-03-01T' + String(hour).padStart(2, '0') + ':00:00Z';
+const catalog = Object.freeze(Array.from({ length: 15 }, (_, i) => Object.freeze({ id: i + 1 })));
+const preview = (schedule = sampleSchedule, creatives = sampleCreatives, when = sampleTime) =>
+    previewHomepageBanners(catalog, schedule, creatives, when);
+const positions = slots => slots.map(slot => slot.artwork.id);
+
+test('banner delivery preview protects nine ranked positions and discloses exact banner consideration', () => {
+    const slots = preview();
+    assert.deepEqual(positions(slots), [1,2,3,4,5,6,7,8,9,13,14,15]);
+    assert.ok(slots.slice(0,9).every(({promotion}) => !promotion));
+    assert.deepEqual(slots.slice(9).map(slot => slot.promotion.consideration), [
+        'Free partner placement', 'Winning banner bid of 0.025 ETH', 'Negotiated fee of 0.005 ETH plus workshop space'
+    ]);
+    assert.deepEqual(slots.slice(9).map(slot => slot.promotion.sponsor), ['Print Room','Studio Nine','Night School']);
+    assert.ok(slots.every(slot => slot.artwork === catalog[slot.artwork.id - 1]));
+    const schedule = structuredClone(sampleSchedule);
+    schedule.placements[2].feeWei = '1';
+    assert.match(preview(schedule)[11].promotion.consideration, /0\.000000000000000001 ETH/);
+});
+
+test('ineligible and unavailable promotion slots return to organic works in their original order', () => {
+    const ids = catalog.slice(0,12).map(art => art.id);
+    assert.deepEqual(positions(preview(null)), ids);
+    assert.deepEqual(positions(preview(sampleSchedule, sampleCreatives, at(9))), ids);
+    assert.deepEqual(positions(preview(sampleSchedule, sampleCreatives, '2030-03-02T10:00:00Z')), ids);
+    assert.deepEqual(positions(preview({...sampleSchedule, placements:[...sampleSchedule.placements, sampleSchedule.placements[0]]})), ids);
+    assert.deepEqual(positions(preview({...sampleSchedule, awards:[]})), [1,2,3,4,5,6,7,8,9,13,10,15]);
+    const creatives = new Map(sampleCreatives);
+    creatives.set('sample-partner', { ...creatives.get('sample-partner'), artworkId: 1 });
+    creatives.set('sample-auction', { ...creatives.get('sample-auction'), sponsorGroup: 'someone-else' });
+    creatives.set('sample-sponsor', { ...creatives.get('sample-sponsor'), artworkId: 99 });
+    assert.deepEqual(positions(preview(sampleSchedule, creatives)), ids);
+    assert.deepEqual(positions(previewHomepageBanners(catalog.slice(0,5),sampleSchedule,sampleCreatives,sampleTime)), ids.slice(0,5));
+});
 const empty = { placements: [], awards: [] };
 const plan = (placements, awards = []) => ({ placements, awards });
 const common = {

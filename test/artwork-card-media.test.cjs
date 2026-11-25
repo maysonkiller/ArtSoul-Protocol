@@ -19,6 +19,22 @@ vm.runInNewContext(
 vm.runInNewContext(source, { window, document: {}, CustomEvent });
 const { mediaType, mediaUrl, posterUrl, mediaDescriptor } = window.ArtSoulArtworkCard;
 
+test('only a failed generated preview retries the original video once', () => {
+    const { retryVideoPreview, startVideoFromPreview } = window.ArtSoulArtworkCard;
+    const url = 'https://cdn.example.test/work.mp4?quality=source';
+    const video = { src: url + '#t=0.1', currentTime: 0.1, dataset: {}, getAttribute() { return this.src; } };
+    assert.equal(retryVideoPreview(video, url), true);
+    assert.equal(video.src, url);
+    assert.equal(retryVideoPreview(video, url), false);
+    startVideoFromPreview(video, url);
+    assert.equal(video.currentTime, 0.1);
+    for (const [source, poster] of [[url + '#t=0.1', 'poster.png'], [url + '#t=0.1', '']]) {
+        video.src = source;
+        assert.equal(retryVideoPreview(video, source, poster), false, 'authored fragments stay intact');
+        assert.equal(video.src, source);
+    }
+});
+
 test('a posterless preview requests one frame and first playback includes the opening soundtrack', () => {
     const { videoPreviewSource, startVideoFromPreview } = window.ArtSoulArtworkCard;
     const url = 'https://cdn.example.test/work.mp4?quality=source';

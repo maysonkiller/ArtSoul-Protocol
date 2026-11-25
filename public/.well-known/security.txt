@@ -1,0 +1,3 @@
+Contact: mailto:artsoulprotocol@gmail.com
+Expires: 2027-10-31T23:59:59Z
+Canonical: https://artsoulprotocol.com/.well-known/security.txt
