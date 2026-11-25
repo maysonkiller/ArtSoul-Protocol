@@ -261,6 +261,14 @@ test('a real sign-in event performs a fresh access check even when the old authe
     assert.equal(h.state.calls.filter(call=>call.path.startsWith('review-queue')).length,1);
 });
 
+test('cancelled sign-in leaves a direct retry and does not issue a second wallet or access request',async()=>{
+    const h=harness(access({authenticated:false}));await tick();h.render();
+    h.state.ensureAuthenticated=async()=>false;
+    const count=h.state.calls.length;await h.actions.authenticate();
+    const view=h.render();assert.equal(view.accessState,'unauthenticated');assert.equal(view.busy,false);
+    assert.match(view.message,/sign-in/);assert.equal(h.state.calls.length,count);
+});
+
 test('a newer queue filter wins over an older result or error in the same session', async()=>{
     for(const failOlder of [false,true]) {
         const h=harness();await tick();h.render();const older=deferred(),newer=deferred();
@@ -295,6 +303,16 @@ test('a stalled server access request unlocks retry and keeps private data out o
     const view=h.render();assert.equal(view.accessState,'error');assert.equal(view.busy,false);
     assert.match(view.message,/timed out/);assert.equal(view.data.reports.length,0);
     h.unmount();
+});
+
+test('a stalled queue after verified access releases Refresh and can be retried',async()=>{
+    const h=harness(access(),false);await tick();
+    h.state.api=(path,options)=>path.startsWith('access')?access():
+        new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(options.signal.reason),{once:true}));
+    h.state.settled=true;h.event('artsoul:wallet-state-changed');await tick();await h.advance(15000);
+    const view=h.render();assert.equal(view.accessState,'error');assert.equal(view.busy,false);
+    assert.deepEqual(Array.from(view.data.reports),[]);assert.match(view.message,/queue took too long/);
+    h.state.api=null;await h.actions.checkAccess();assert.equal(h.render().accessState,'ready');
 });
 
 test('guest access does not request queue data or remain on an indefinite loading gate', async()=>{
@@ -419,6 +437,34 @@ test('duplicate focus and same-wallet updates preserve the workspace; a real for
     h.event('pagehide');assert.equal(h.render().data.reports.length,0);
     h.state.access=access({eligible:false,access:null});
     h.event('pageshow',{persisted:true});await tick();
+    assert.equal(h.render().accessState,'ineligible');assert.equal(h.render().data.reports.length,0);
+});
+
+test('throughput changes recheck access without discarding a healthy draft and fail closed on revocation',async()=>{
+    const h=harness();await tick();h.render();
+    const connection=h.scope.window.navigator.connection;
+    connection.downlink=3;connection.rtt=160;
+    h.actions.setDecision({action:'hide',report:{id:'private-draft'}});h.render();
+    const first=deferred();h.state.api=()=>first.promise;const before=h.state.calls.length;
+    h.event('connection:change');connection.downlink=2;h.event('connection:change');
+    assert.equal(h.state.calls.length,before+1);assert.equal(h.render().decision.report.id,'private-draft');
+    first.resolve(access());await tick();
+    assert.equal(h.state.calls.length,before+1,'no extra queue or catalog reload');
+    assert.equal(h.render().decision.report.id,'private-draft');
+    h.state.api=()=>Promise.resolve(access({eligible:false,access:null}));h.event('connection:change');await tick();
+    const revoked=h.render();assert.equal(revoked.accessState,'ineligible');assert.equal(revoked.decision,null);
+    assert.equal(revoked.data.reports.length,0);
+});
+
+test('a transport change locks immediately and a late speed check cannot restore the previous session',async()=>{
+    const h=harness();await tick();h.render();
+    const connection=h.scope.window.navigator.connection;
+    connection.downlink=4;
+    const soft=deferred(),hard=deferred();let count=0;h.state.api=()=>++count===1?soft.promise:hard.promise;
+    h.event('connection:change');const oldSignal=h.state.calls.at(-1).options.signal;
+    connection.type='cellular';h.event('connection:change');
+    assert.ok(oldSignal.aborted);assert.equal(h.render().data.reports.length,0);
+    hard.resolve(access({eligible:false,access:null}));await tick();soft.resolve(access());await tick();
     assert.equal(h.render().accessState,'ineligible');assert.equal(h.render().data.reports.length,0);
 });
 

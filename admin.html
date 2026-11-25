@@ -104,10 +104,12 @@
     </header>
     <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
 
-    <main id="app" class="protocol-admin-root"></main>
-    <button type="button" data-admin-assistant-shortcut hidden aria-label="Open ArtSoul assistant" title="Open ArtSoul assistant" aria-haspopup="dialog" aria-controls="artsoulVoicePanel" aria-expanded="false">
-        <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></svg>
-    </button>
+    <div class="admin-workspace-frame">
+        <button type="button" data-admin-assistant-shortcut hidden aria-label="Open ArtSoul assistant" title="Open ArtSoul assistant" aria-haspopup="dialog" aria-controls="artsoulVoicePanel" aria-expanded="false">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></svg>
+        </button>
+        <main id="app" class="protocol-admin-root"></main>
+    </div>
     <script type="module" src="/src/entries/admin.jsx"></script>
 </body>
 </html>

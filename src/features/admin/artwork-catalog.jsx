@@ -107,7 +107,7 @@ export function AdminArtworkCatalog({ api, isSessionCurrent, onAccessError, onRe
             <h2 id="adminArtworkCatalogTitle">Artworks</h2>
             <button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => load(cursor)}>Refresh artworks</button>
         </div>
-        <p className="admin-catalog-intro">Base Sepolia · Public and hidden works</p>
+        <p className="admin-catalog-intro">Public and hidden works on Base Sepolia</p>
         {message && <p className="protocol-admin-message" role="status">{message}</p>}
         {!loaded ? <p role="status">{busy ? 'Loading artworks...' : 'The catalog is unavailable. Retry with Refresh artworks.'}</p> : <>
             <div className="protocol-admin-catalog-grid" aria-busy={busy}>
@@ -115,11 +115,11 @@ export function AdminArtworkCatalog({ api, isSessionCurrent, onAccessError, onRe
                     <AdminArtworkPreview artwork={artwork} />
                     <div className="admin-catalog-card-body">
                     <div className="admin-catalog-card-meta">
-                        <span>#{artwork.artwork_id}{artwork.media_type && ' · ' + artwork.media_type}</span>
+                        <span>#{artwork.artwork_id}{artwork.media_type && ' / ' + artwork.media_type}</span>
                         <span className="admin-visibility" data-hidden={artwork.hidden}>{artwork.hidden ? 'Hidden' : 'Public'}</span>
                     </div>
                     <h3 title={artwork.title}>{artwork.title}</h3>
-                    <p>{artwork.report_count === 0 ? 'No artwork reports' : `${artwork.report_count} artwork ${artwork.report_count === 1 ? 'report' : 'reports'} · ${artwork.pending_count} pending · ${artwork.actioned_count} active`}</p>
+                    <p>{artwork.report_count === 0 ? 'No artwork reports' : `${artwork.report_count} artwork ${artwork.report_count === 1 ? 'report' : 'reports'} (${artwork.pending_count} pending, ${artwork.actioned_count} active)`}</p>
                     {artwork.donation_report_count > 0 && <p>{artwork.donation_report_count} donation-message {artwork.donation_report_count === 1 ? 'report' : 'reports'}</p>}
                     {artwork.hidden && artwork.hidden_reason && <p className="protocol-admin-report-text">Hidden: {artwork.hidden_reason}</p>}
                     <div className="protocol-admin-card-actions">

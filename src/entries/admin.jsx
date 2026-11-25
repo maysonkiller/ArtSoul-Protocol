@@ -201,7 +201,7 @@ function AccessGate({ state, message, walletAddress }) {
     return (
         <section className="protocol-admin-gate protocol-admin-access-guide" aria-live="polite">
             <h2>{copy[0]}</h2>
-            <p>{copy[1]}</p>
+            <p>{state === 'unauthenticated' && message ? message : copy[1]}</p>
         </section>
     );
 }
@@ -225,6 +225,7 @@ function ProtocolAdminPage() {
     const setupEpoch = useRef(0), openedSetupFor = useRef('');
     const accessRequest = useRef(0), queueRequest = useRef(0), readySession = useRef(null);
     const accessController = useRef(null);
+    const queueController = useRef(null);
     const checkAccessRef = useRef(null);
     const expiryTimer = useRef(null);
     const accessHeading = useRef(null);
@@ -236,6 +237,7 @@ function ProtocolAdminPage() {
         expiryTimer.current = null;
         readySession.current = null;
         queueRequest.current++;
+        queueController.current?.abort();
         setData({ reports: [], events: [], hidden: [], moderationLog: [], notifications: [] });
         setDecision(null);
     };
@@ -308,6 +310,19 @@ function ProtocolAdminPage() {
             if (leftPage) { leftPage = false; resume(); }
         };
         const restoredPage = event => { if (event.persisted) { leftPage = false; resume(); } };
+        const connection = window.navigator?.connection;
+        let transport = connection?.type;
+        const connectionChanged = () => {
+            const previous = transport;
+            transport = connection?.type;
+            if (transport !== previous || typeof connection?.downlink !== 'number' && typeof connection?.rtt !== 'number') {
+                resume();
+            } else if (document.visibilityState !== 'hidden' && currentSetupWallet()) {
+                // Chrome also emits change for throughput estimates while typing or playing media.
+                // Confirm the server-bound session without replacing an unchanged workspace.
+                checkAccessRef.current?.({ background: true });
+            }
+        };
         const offline = () => {
             expireView();
             setAccessState('error');
@@ -323,14 +338,14 @@ function ProtocolAdminPage() {
         window.addEventListener('online', resume);
         window.addEventListener('offline', offline);
         window.addEventListener('pageshow', restoredPage);
-        const connection = window.navigator?.connection;
-        connection?.addEventListener('change', resume);
+        connection?.addEventListener('change', connectionChanged);
         document.addEventListener('visibilitychange', foreground);
         if (!waitingForWallet) checkAccessRef.current?.();
         return () => {
             setupEpoch.current++;
             accessController.current?.abort();
             readySession.current = null;
+            queueController.current?.abort();
             clearTimeout(expiryTimer.current);
             clearTimeout(walletWait);
             window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
@@ -343,7 +358,7 @@ function ProtocolAdminPage() {
             window.removeEventListener('online', resume);
             window.removeEventListener('offline', offline);
             window.removeEventListener('pageshow', restoredPage);
-            connection?.removeEventListener('change', resume);
+            connection?.removeEventListener('change', connectionChanged);
             document.removeEventListener('visibilitychange', foreground);
         };
     }, []);
@@ -361,16 +376,25 @@ function ProtocolAdminPage() {
     const loadQueue = useCallback(async status => {
         const epoch = setupEpoch.current, wallet = currentSetupWallet(), request = ++queueRequest.current;
         if (readySession.current?.epoch !== epoch || readySession.current.wallet !== wallet) return false;
+        queueController.current?.abort();
+        const controller = new AbortController();
+        queueController.current = controller;
+        const timeout = setTimeout(() => controller.abort(), 15000);
         let result;
         try {
             const target = queueTargetRef.current;
             result = await api(`review-queue?status=${encodeURIComponent(status)}` + (target
                 ? target.target_type === 'profile_content'
                     ? `&target_type=profile_content&profile_wallet=${encodeURIComponent(target.profile_wallet)}`
-                    : `&chainId=${encodeURIComponent(target.chain_id)}&artworkId=${encodeURIComponent(target.artwork_id)}&target_type=${encodeURIComponent(target.target_type || 'artwork')}` : ''));
+                    : `&chainId=${encodeURIComponent(target.chain_id)}&artworkId=${encodeURIComponent(target.artwork_id)}&target_type=${encodeURIComponent(target.target_type || 'artwork')}` : ''), { signal: controller.signal });
+            if (controller.signal.aborted) throw controller.signal.reason;
         } catch (error) {
             if (!sessionIsCurrent(epoch, wallet) || request !== queueRequest.current) return false;
+            if (controller.signal.aborted) throw new Error('The queue took too long to load. Retry to check your staff session.');
             throw error;
+        } finally {
+            clearTimeout(timeout);
+            if (queueController.current === controller) queueController.current = null;
         }
         if (!sessionIsCurrent(epoch, wallet) || request !== queueRequest.current) return false;
         setData(result.data || { reports: [], events: [], hidden: [], moderationLog: [], notifications: [] });
@@ -393,7 +417,8 @@ function ProtocolAdminPage() {
         setMessage(error.message);
     };
 
-    const checkAccess = useCallback(async ({ verified = false } = {}) => {
+    const checkAccess = useCallback(async ({ verified = false, background = false } = {}) => {
+        if (background && accessController.current) return;
         const wallet = currentSetupWallet(), epoch = setupEpoch.current, request = ++accessRequest.current;
         accessController.current?.abort();
         if (verified && signInIntent.current === 'login') completedSignIn.current = wallet;
@@ -409,8 +434,7 @@ function ProtocolAdminPage() {
             setBusy(false);
             return;
         }
-        setBusy(true);
-        setMessage('');
+        if (!background) { setBusy(true); setMessage(''); }
         const controller = new AbortController();
         accessController.current = controller;
         const timeout = setTimeout(() => controller.abort(), 15000);
@@ -427,6 +451,15 @@ function ProtocolAdminPage() {
             const canSetup = result.setupEnabled === true && result.authenticated === true && result.eligible === true;
             const canApprove = result.setupEnabled === true && result.authenticated === true && result.authorityEligible === true;
             if (result.authenticated === true && typeof result.eligible === 'boolean') staffEntryHint(wallet, window, canSetup || canApprove);
+            const previous = readySession.current;
+            if (background && previous?.epoch === epoch && previous.wallet === wallet &&
+                result.enabled && canSetup && result.access?.stepUpActive &&
+                previous.role === result.access.role && previous.authority === canApprove &&
+                previous.dualWallet === result.access.dualWallet) {
+                clearTimeout(expiryTimer.current);
+                expiryTimer.current = setTimeout(expireView, remaining);
+                return;
+            }
             setAuthorityWallet(canApprove ? wallet : '');
             setSetupWallet(canSetup ? wallet : '');
             if (!canSetup) { completedSignIn.current = ''; setPasskeyOpen(false); }
@@ -452,7 +485,7 @@ function ProtocolAdminPage() {
             } else if (!result.access?.stepUpActive) {
                 setAccessState('step_up');
             } else {
-                readySession.current = { epoch, wallet, request };
+                readySession.current = { epoch, wallet, request, role: result.access.role, authority: canApprove, dualWallet: result.access.dualWallet };
                 setAccessState('ready');
                 await loadQueue(queueStatusRef.current);
             }
@@ -461,7 +494,7 @@ function ProtocolAdminPage() {
         } finally {
             clearTimeout(timeout);
             if (accessController.current === controller) accessController.current = null;
-            if (isCurrent()) setBusy(false);
+            if (isCurrent() && !background) setBusy(false);
         }
     }, [loadQueue]);
     checkAccessRef.current = checkAccess;
@@ -472,8 +505,15 @@ function ProtocolAdminPage() {
         setMessage('');
         try {
             if (typeof window.ensureAuthenticated !== 'function') throw new Error('Wallet authentication is not ready.');
-            await window.ensureAuthenticated();
+            let signInError;
+            const signedIn = await window.ensureAuthenticated({ onError: error => { signInError = error; } });
             if (!sessionIsCurrent(epoch, wallet)) return;
+            if (!signedIn) {
+                setBusy(false);
+                setMessage(signInError?.code === 'ACTION_REJECTED' ? 'Wallet sign-in was cancelled. You can try again when ready.' : 'Complete wallet sign-in to check staff access.');
+                setAccessState('unauthenticated');
+                return;
+            }
             await checkAccess();
         } catch (error) {
             if (!sessionIsCurrent(epoch, wallet)) return;
