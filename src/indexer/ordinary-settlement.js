@@ -13,7 +13,7 @@ const quantity = value => typeof value === 'string' && /^0x(?:0|[1-9a-f][0-9a-f]
 export function parseOrdinarySettlement(receipt, proof, transactionHash, auctionId) {
     if (receipt?.status !== '0x1' || receipt.transactionHash?.toLowerCase() !== transactionHash ||
         receipt.blockHash?.toLowerCase() !== proof.blockHash || !quantity(receipt.blockNumber) ||
-        BigInt(receipt.blockNumber) !== BigInt(proof.blockNumber) || !Array.isArray(receipt.logs)) {
+        BigInt(receipt.blockNumber) !== BigInt(proof.blockNumber) || !quantity(receipt.transactionIndex) || !Array.isArray(receipt.logs)) {
         throw new Error('Missing successful ordinary settlement receipt in the expected block');
     }
 
@@ -28,7 +28,7 @@ export function parseOrdinarySettlement(receipt, proof, transactionHash, auction
         const index = quantity(log.logIndex) ? Number(BigInt(log.logIndex)) : NaN;
         if (log.removed === true || log.blockHash?.toLowerCase() !== proof.blockHash ||
             log.transactionHash?.toLowerCase() !== transactionHash || log.blockNumber !== receipt.blockNumber ||
-            !Number.isSafeInteger(index)) throw new Error('Invalid ordinary settlement log position');
+            log.transactionIndex !== receipt.transactionIndex || !Number.isSafeInteger(index)) throw new Error('Invalid ordinary settlement log position');
         const args = events.decodeEventLog(name, log.data, log.topics);
         const canonical = events.encodeEventLog(name, args);
         if (canonical.data !== log.data.toLowerCase() || canonical.topics.length !== log.topics.length ||

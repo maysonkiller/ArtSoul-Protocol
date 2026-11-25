@@ -411,7 +411,7 @@ function floorByArtwork(floors = []) {
   for (const floor of floors) {
     const key = keyFor(floor.chain_id, floor.artwork_id);
     const current = map.get(key);
-    if (!current || toNumber(floor.block_number) > toNumber(current.block_number)) {
+    if (!current || compareProjectionOrder(floor, current) > 0) {
       map.set(key, floor);
     }
   }
@@ -571,7 +571,10 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
   const status = statusFromProjection(artwork, auction, resale);
   const title = normalizeText(metadata.name || metadata.title) || `Artwork #${artworkId}`;
   const description = normalizeText(metadata.description) || 'Protocol-backed ArtSoul testnet artwork.';
-  const canonicalFloor = weiToEth(floor?.floor_price, artwork.canonical_floor, auction?.final_price);
+  // The artwork row and the bounded history page are read independently.
+  const canonicalFloor = toNumber(artwork.last_updated_block) > toNumber(floor?.block_number)
+    ? weiToEth(artwork.canonical_floor, floor?.floor_price, auction?.final_price)
+    : weiToEth(floor?.floor_price, artwork.canonical_floor, auction?.final_price);
   const currentBid = weiToEth(auction?.current_bid, auction?.winning_bid);
   const startPrice = weiToEth(auction?.start_price);
   const salePrice = resale?.active ? resale.price : 0;
@@ -820,8 +823,8 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }, initialBounda
     );
   const v41FloorHistoryPromise = queryTable(
       'v41_floor_history',
-      'select=chain_id,artwork_id::text,floor_price::text,block_number' +
-        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc&limit=1`,
+      'select=chain_id,artwork_id::text,floor_price::text,block_number,log_index' +
+        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=1`,
       warnings
     );
   const artworkSocialSignalsPromise = queryTable(
@@ -987,7 +990,7 @@ async function buildProjectionSnapshot() {
     ),
     queryTable(
       'v41_floor_history',
-      `select=chain_id,artwork_id::text,floor_price::text,block_number&chain_id=${chainFilter}&limit=200`,
+      `select=chain_id,artwork_id::text,floor_price::text,block_number,log_index&chain_id=${chainFilter}&order=block_number.desc,log_index.desc&limit=200`,
       warnings
     ),
     queryTable('v41_trust_signals', `select=chain_id&chain_id=${chainFilter}&limit=1000`, warnings),
