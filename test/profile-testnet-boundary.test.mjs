@@ -27,7 +27,8 @@ test('neither large testnet activity nor prototype flags can satisfy invented Ge
     assert.equal(progress.total, 0);
     assert.equal(progress.requirements.length, 0);
     assert.equal(progress.availability, 'mainnet-only');
-    assert.match(source, /Testnet does not qualify\./);
+    const status = fs.readFileSync(new URL('../src/features/profile/genesis-status.jsx', import.meta.url), 'utf8');
+    assert.match(status, /Testnet does not qualify\./);
     assert.doesNotMatch(source, /'Genesis Holder'|genesisProgress\.completed/);
 });
 

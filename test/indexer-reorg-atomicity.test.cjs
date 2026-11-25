@@ -254,6 +254,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     await pool.query(ordinaryMigration);
     assert.equal((await pool.query('SELECT count(*) FROM artsoul_private.ordinary_settlements')).rows[0].count, '3');
   });
+  await t.test('profile Genesis status requires one mainnet catalog and returns only the verified public serial', async () => {
+    const { checkProfileGenesis } = await import('./helpers/profile-genesis-postgres.mjs');
+    await checkProfileGenesis(pool);
+  });
   await t.test('runner-up observations advance by finalized block and retain independent deployment states', async () => {
     const { checkRunnerUpIntake } = await import('./helpers/ordinary-settlement-postgres.mjs');
     await checkRunnerUpIntake(pool);
