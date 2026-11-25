@@ -39,9 +39,15 @@ export async function verifyMainnetProjectionRows(client, pair, deploymentBlock)
             FROM public.indexer_state`, [pair.coreAddress, deploymentBlock]);
         assert.equal(state.valid, true, 'The database cursor must identify the same reviewed Base mainnet deployment');
         const conditions = emptyIndexerTables.map(table => [table, 'true']);
+        // Withdrawals can prove prior economic activity without carrying an artwork, auction or token ID.
+        // ERC-721 portfolio approval, however, is possible before an owner has ever received an NFT.
         conditions.push(['public.contract_events', `chain_id IS DISTINCT FROM 8453 OR block_number < $1
-                OR contract_address IS NULL OR contract_address NOT IN (lower($2), lower($3))
-                OR artwork_id IS NOT NULL OR event_data ?| ARRAY['artworkId', 'auctionId', 'tokenId']`],
+                OR contract_address IS NULL OR NOT (
+                    (contract_address = lower($2) AND event_name IN ('Paused', 'Unpaused', 'MarketplaceAdmissionScheduled',
+                        'MarketplaceAdmissionCancelled', 'MarketplaceAdmissionChanged')) OR
+                    (contract_address = lower($3) AND event_name = 'ApprovalForAll'))
+                OR artwork_id IS NOT NULL OR jsonb_typeof(event_data) IS DISTINCT FROM 'object'
+                OR event_data ?| ARRAY['artworkId', 'auctionId', 'tokenId']`],
             // These workers claim by status across all chains. A retry must not replay earlier product work.
             ['public.outbox_events', "processing_status IN ('pending', 'processing', 'failed')"],
             ['public.event_queue_spillover', "status IN ('pending', 'processing')"],

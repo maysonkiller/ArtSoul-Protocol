@@ -179,6 +179,14 @@ The release check requires two independent RPC endpoints. Both must confirm the 
 node scripts/verify-treasury-safes.mjs /private/path/to/approved-custody.json --require-pair
 ```
 
+For the ordinary payout release, also verify the mined creation against the independently approved deployment file. Set `ARTSOUL_CUSTODY_RPC_URL` and `ARTSOUL_CUSTODY_RPC_CHECK_URL` to two independent HTTPS providers on the chosen chain. Run the command from the build whose C12 manifest was reviewed.
+
+```sh
+node scripts/verify-ordinary-deployment.mjs /private/path/to/deployment-review.json /private/path/to/approved-custody.json <creation-transaction-hash>
+```
+
+This read-only command checks the creation input, deployer nonce, transaction position and finalized receipt. It derives both CREATE addresses, reconstructs the two immutable runtime hashes from the reviewed build and checks the custody bindings on both providers. The independent deployment review supplies the refund batch and gas settings for the selected network. On November 25 the two Base Sepolia providers verified the [existing payout deployment](testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md#core-with-creditor-directed-withdrawals) in block 63,494,032, transaction index 4. A Base mainnet release needs its own custody register, limits, receipt and verification.
+
 File the result with the private handover journal. Owner addresses and thresholds establish on-chain configuration. Independent human custody and the ability to recover a lost signer require separate ceremony evidence. Recheck after owner, threshold, extension or implementation changes. [Safe owner read](https://docs.safe.global/reference-smart-account/owners/getOwners), [threshold read](https://docs.safe.global/reference-smart-account/owners/getThreshold) and [enabled modules](https://docs.safe.global/reference-smart-account/modules/getModulesPaginated).
 
 ## Funding Evidence Rule

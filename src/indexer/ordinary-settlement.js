@@ -2,6 +2,7 @@ import { Interface, ZeroAddress, toBeHex } from 'ethers';
 import { checkReceipt, decodeReceiptLog } from './settlement-receipt.js';
 
 const events = new Interface([
+    'event ProceedsCredited(uint256 indexed auctionId,address indexed creator,address indexed treasury,uint256 creatorAmount,uint256 protocolAmount)',
     'event AuctionSettled(uint256 indexed auctionId, uint256 indexed artworkId, uint256 tokenId, uint256 price)',
     'event RunnerUpOfferAccepted(uint256 indexed auctionId, address indexed bidder, uint256 price)',
     'event SettledArtworkIssued(uint256 indexed auctionId, uint256 indexed artworkId, uint256 indexed tokenId, address creator, address firstCollector)',
@@ -37,9 +38,25 @@ export function parseOrdinarySettlement(receipt, proof, transactionHash, auction
     if (offer && (offer.index >= issued.index || offer.args.bidder !== firstCollector || offer.args.price !== price)) {
         throw new Error('Runner-up acceptance and settlement disagree');
     }
+    // A default can credit proceeds for the same auction in this transaction.
+    // Only the credit immediately before issuance belongs to the paid sale.
+    const beforeMint = receipt.logs.filter(log => log.logIndex?.toLowerCase() === '0x' + (issued.index - 1).toString(16));
+    const creditLog = beforeMint[0];
+    if (beforeMint.length !== 1 || creditLog.address?.toLowerCase() !== proof.coreAddress ||
+        creditLog.topics?.[0]?.toLowerCase() !== events.getEvent('ProceedsCredited').topicHash) {
+        throw new Error('Missing or ambiguous ordinary primary sale credit');
+    }
+    const credit = decodeReceiptLog(events, 'ProceedsCredited', creditLog, receipt);
+    const protocolShare = price / 40n + (price % 40n > 20n ? 1n : 0n);
+    if (credit.args.auctionId !== BigInt(auctionId) || credit.args.creator !== creator || credit.args.treasury === ZeroAddress ||
+        credit.args.protocolAmount !== protocolShare || credit.args.creatorAmount !== price - protocolShare) {
+        throw new Error('Ordinary primary sale credit disagrees with settlement');
+    }
     return {
         ...proof, transactionHash, logIndex: settled.index, auctionId, artworkId: artworkId.toString(),
         tokenId: tokenId.toString(), priceWei: price.toString(), creator: creator.toLowerCase(),
+        protocol: credit.args.treasury.toLowerCase(), protocolWei: credit.args.protocolAmount.toString(),
+        creatorWei: credit.args.creatorAmount.toString(), creditLogIndex: credit.index,
         firstCollector: firstCollector.toLowerCase(), runnerUpAccepted: Boolean(offer)
     };
 }

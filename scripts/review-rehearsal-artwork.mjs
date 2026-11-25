@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { Interface, getAddress, isHexString, keccak256, toQuantity } from 'ethers';
 import { verifyArtworkRegistration as readPublicationEvidence } from '../src/api/upload-registration-evidence.js';
-import { rehearsalArtwork as fixture, rehearsalMetadataUri as uri } from './rehearsal-review/client.mjs';
+import { rehearsalArtwork as fixture, rehearsalMetadataUri as uri, rehearsalOpening } from './rehearsal-review/client.mjs';
 import { listenForReview, sequencedRead } from './serve-rehearsal-review.mjs';
 import { confirmFinalizedBlock, finalizedBlock, requireIndependentProviders, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
@@ -18,9 +18,11 @@ const market = new Interface([
     'event ArtworkRegistered(uint256 indexed artworkId, address indexed creator, string metadataURI)'
 ]);
 const data = market.encodeFunctionData('registerArtwork', [uri]);
+const openingData = market.encodeFunctionData('createAuction', [1n, rehearsalOpening.reserveWei, Number(rehearsalOpening.hours) * 3600]);
 const chain = '0x14a34';
 const sha = bytes => createHash('sha256').update(Buffer.from(bytes.slice(2), 'hex')).digest('hex');
 assert.equal(sha(data), fixture.dataSha256, 'Unsigned fixture differs from the browser review');
+assert.equal(sha(openingData), rehearsalOpening.dataSha256, 'Unsigned auction differs from the browser review');
 
 function checkedPayer(review, register) {
     assert.equal(review.chainId, 84532);
@@ -59,9 +61,13 @@ export async function registrationAtHead(rpc, payer, block) {
         await checkWork(rpc, 1n, payer, 'latest');
         return { waitingForFinality: { role: 'registerArtwork' } };
     }
+    return firstWorkRequest(rpc, payer, 'registerArtwork', data);
+}
+
+async function firstWorkRequest(rpc, payer, operation, callData) {
     const [nonce, pending, code, predicted, ...codeChecks] = await Promise.all([
         rpc('eth_getTransactionCount', [payer, 'latest']), rpc('eth_getTransactionCount', [payer, 'pending']),
-        rpc('eth_getCode', [payer, 'latest']), rpc('eth_call', [{ from: payer, to: fixture.core, data, value: '0x0' }, 'pending']),
+        rpc('eth_getCode', [payer, 'latest']), rpc('eth_call', [{ from: payer, to: fixture.core, data: callData, value: '0x0' }, 'pending']),
         ...['core', 'nft'].map(async key => {
             const runtime = await rpc('eth_getCode', [fixture[key], 'latest']);
             assert.equal(keccak256(runtime), fixture[key + 'Hash'], 'Latest runtime differs from review');
@@ -70,16 +76,29 @@ export async function registrationAtHead(rpc, payer, block) {
     ]);
     assert.equal(code, '0x', 'Select the reviewed externally owned test payer');
     assert.equal(nonce, pending, 'A payer request is pending. Check the wallet activity before retrying.');
-    assert.equal(market.decodeFunctionResult('registerArtwork', predicted)[0], 1n, 'Pending rehearsal registry changed');
-    return { operation: 'registerArtwork', nonce: toQuantity(BigInt(nonce)), target: fixture.core,
-        metadataUri: uri, data, dataHash: keccak256(data), dataSha256: fixture.dataSha256, deployments: [], codeChecks };
+    assert.equal(predicted.toLowerCase(), market.encodeFunctionResult(operation, [1n]), 'Pending rehearsal history changed');
+    return { operation, nonce: toQuantity(BigInt(nonce)), target: fixture.core,
+        ...(operation === 'registerArtwork' && { metadataUri: uri }),
+        data: callData, dataHash: keccak256(callData), dataSha256: sha(callData), deployments: [], codeChecks };
 }
 
-export async function buildArtworkReview(review, register, providers) {
+export async function openingAtHead(rpc, payer, block) {
+    const at = { blockHash: block.hash, requireCanonical: true };
+    const [finalized] = await view(rpc, 'auctionCount', [], at);
+    if (finalized > 0n) return { complete: true, existingAuctionHistory: true };
+    const [latest] = await view(rpc, 'auctionCount', [], 'latest');
+    if (latest > 0n) return { waitingForFinality: { role: 'createAuction' } };
+    await simulateRegisteredOpening(rpc, payer, block, rehearsalOpening.reserveWei, rehearsalOpening.hours);
+    return firstWorkRequest(rpc, payer, 'createAuction', openingData);
+}
+
+export async function buildArtworkReview(review, register, providers, { opening = false } = {}) {
     const payer = checkedPayer(review, register);
     const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });
-    const [first, second] = await Promise.all(providers.map(rpc => registrationAtHead(rpc, payer, block)));
-    assert.deepEqual(first, second, 'Providers disagree on the registration state. Refresh later.');
+    const observe = opening ? openingAtHead : registrationAtHead;
+    const [first, second] = await Promise.all(providers.map(rpc => observe(rpc, payer, block)));
+    assert.deepEqual(first, second, 'Providers disagree on the rehearsal state. Refresh later.');
+    await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
     return { chainId: chain, payer, block, ...first };
 }
 
@@ -181,11 +200,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
         const [reviewFile, registerFile, option, hash, ...extra] = process.argv.slice(2);
         const opening = option === '--check-opening' && hash && extra.length === 1;
-        assert(reviewFile && registerFile && (opening || (!extra.length && ((!option && !hash) || (option === '--plan' && !hash) ||
-            (option === '--verify-receipt' && hash)))), 'Usage: review-rehearsal-artwork.mjs review.json register.json [--plan | --verify-receipt HASH | --check-opening RESERVE_WEI HOURS]');
+        const auctionRequest = option === '--opening-plan' || option === '--serve-opening';
+        assert(reviewFile && registerFile && (opening || (!extra.length && ((!hash && (!option || auctionRequest || option === '--plan')) ||
+            (option === '--verify-receipt' && hash)))), 'Usage: review-rehearsal-artwork.mjs review.json register.json [--plan | --verify-receipt HASH | --check-opening RESERVE_WEI HOURS | --opening-plan | --serve-opening]');
         const [review, register] = await Promise.all([reviewFile, registerFile].map(async path => JSON.parse(await readFile(path, 'utf8'))));
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
-        const getPlan = () => buildArtworkReview(review, register, providers);
+        const getPlan = () => buildArtworkReview(review, register, providers, { opening: auctionRequest });
         if (opening) {
             const payer = checkedPayer(review, register);
             const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });
@@ -193,7 +213,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             assert.deepEqual(first, second, 'Providers disagree on the simulated auction');
             await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
             console.log(JSON.stringify({ ...first, rpcReadings: 2 }, null, 2));
-        } else if (option) console.log(JSON.stringify(option === '--plan' ? await getPlan() : await verifyArtworkRegistration(review, register, hash, providers), null, 2));
+        } else if (option === '--verify-receipt') console.log(JSON.stringify(await verifyArtworkRegistration(review, register, hash, providers), null, 2));
+        else if (option === '--plan' || option === '--opening-plan') console.log(JSON.stringify(await getPlan(), null, 2));
         else {
             checkedPayer(review, register);
             const { url } = await listenForReview(getPlan);

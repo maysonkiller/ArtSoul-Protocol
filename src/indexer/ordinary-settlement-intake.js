@@ -20,12 +20,17 @@ export async function withOrdinaryIssuer(pool, listener, options, proof, write) 
 
 export async function ingestOrdinarySettlement(pool, listener, options) {
     const sale = await listener.readOrdinarySettlement(options);
-    const inserted = await withOrdinaryIssuer(pool, listener, options, sale, client => appendExact(client, 'ordinary_settlements', {
-        chain_id: sale.chainId, core_address: sale.coreAddress, auction_id: sale.auctionId, artwork_id: sale.artworkId,
-        token_id: sale.tokenId, price_wei: sale.priceWei, creator: sale.creator, first_collector: sale.firstCollector,
-        runner_up_accepted: sale.runnerUpAccepted, transaction_hash: sale.transactionHash, block_number: sale.blockNumber,
-        block_hash: sale.blockHash, log_index: sale.logIndex
-    }));
+    const inserted = await withOrdinaryIssuer(pool, listener, options, sale, async client => {
+        const key = { chain_id: sale.chainId, core_address: sale.coreAddress, auction_id: sale.auctionId };
+        const created = await appendExact(client, 'ordinary_settlements', {
+            ...key, artwork_id: sale.artworkId, token_id: sale.tokenId, price_wei: sale.priceWei, creator: sale.creator,
+            first_collector: sale.firstCollector, runner_up_accepted: sale.runnerUpAccepted,
+            transaction_hash: sale.transactionHash, block_number: sale.blockNumber, block_hash: sale.blockHash, log_index: sale.logIndex
+        });
+        await appendExact(client, 'ordinary_primary_credits', { ...key, protocol_treasury: sale.protocol,
+            protocol_wei: sale.protocolWei, creator_wei: sale.creatorWei, log_index: sale.creditLogIndex });
+        return created;
+    });
     return { inserted, sale };
 }
 

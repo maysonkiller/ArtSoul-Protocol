@@ -158,13 +158,32 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
           await pool.query('UPDATE public.contract_events SET contract_address=$1 WHERE id=$2',[source,journal.rows[0].id]);
           await assert.rejects(verify(), /public\.contract_events/);
         }
-        for (const [name, event] of [
-          ['ArtworkRegistered',{artworkId:'1'}], ['BidAccepted',{auctionId:'1'}], ['ResaleListed',{tokenId:'1'}]
+        for (const [emitter, name, event] of [
+          [CORE,'ArtworkRegistered',{artworkId:'1'}], [CORE,'BidAccepted',{auctionId:'1'}], [CORE,'ResaleListed',{tokenId:'1'}],
+          [CORE,'CreditWithdrawn',{creditor:WINNER,amount:'1'}], [CORE,'CreditRouted',{creditor:WINNER,recipient:CREATOR}],
+          [CORE,'ArtworkRegistered',{}], [CREATOR,'Transfer',{}], [CORE,'UnrecognizedEvent',{}],
+          [CREATOR,'MarketplaceAdmissionChanged',{operator:WINNER}], [CORE,'ApprovalForAll',{operator:WINNER}],
+          [CORE,'Paused',{tokenId:'1'}], [CORE,'Paused',[]]
         ]) {
           await pool.query(`UPDATE public.contract_events SET contract_address=$1, event_name=$2,
-            event_data=$3 WHERE id=$4`, [CORE,name,event,journal.rows[0].id]);
+            event_data=$3 WHERE id=$4`, [emitter,name,JSON.stringify(event),journal.rows[0].id]);
           await assert.rejects(verify(), /public\.contract_events/);
         }
+        for (const [emitter, name, event] of [
+          [CORE,'Paused',{account:WINNER}], [CORE,'Unpaused',{account:WINNER}],
+          [CORE,'MarketplaceAdmissionChanged',{operator:WINNER,generation:'1',active:true}],
+          [CORE,'MarketplaceAdmissionCancelled',{operator:WINNER}],
+          [CREATOR,'ApprovalForAll',{owner:WINNER,operator:CORE,approved:true}]
+        ]) {
+          await pool.query(`UPDATE public.contract_events SET contract_address=$1,event_name=$2,event_data=$3 WHERE id=$4`,
+            [emitter,name,event,journal.rows[0].id]);
+          assert.ok(await verify() > 20);
+        }
+        await pool.query('UPDATE public.contract_events SET chain_id=$1 WHERE id=$2',[CHAIN,journal.rows[0].id]);
+        await assert.rejects(verify(), /public\.contract_events/);
+        const retained = await pool.query('SELECT chain_id,event_name FROM public.contract_events WHERE id=$1',[journal.rows[0].id]);
+        assert.equal(Number(retained.rows[0].chain_id), CHAIN);
+        assert.equal(retained.rows[0].event_name, 'ApprovalForAll');
       } finally {
         await pool.query('DELETE FROM public.contract_events WHERE id=$1',[journal.rows[0].id]);
       }

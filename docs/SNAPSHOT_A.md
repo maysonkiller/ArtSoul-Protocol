@@ -175,10 +175,12 @@ its selected public and database sources.
 Keep the old workers stopped while checking. Pending or in-flight work in the persistent event queue
 or outbox, and retryable failed outbox effects, block acceptance even when the
 public catalog is empty. Completed queue history can remain. A mainnet metrics
-row containing zero activity is permitted. The event journal may contain deployment
-administration from the reviewed pair. A missing or unrelated emitter, a
-pre-deployment event, or a journal entry carrying an artwork, auction or token ID fails
-the check even when the gallery and its projections are empty.
+row containing zero activity is permitted. Before the first publication the reviewed Core can emit pause,
+unpause and marketplace admission events. The paired NFT can emit `ApprovalForAll` even when its signer owns zero tokens.
+The journal check accepts those event names only from their respective contracts after deployment.
+Withdrawals, routed credits, unknown events and records referring to an artwork, auction or token block acceptance,
+including when the gallery is empty. A testnet row in the candidate database also blocks acceptance.
+The read-only check leaves its evidence intact. Keep the original testnet environment separate.
 The database reads use one read-only, repeatable-read transaction.
 Insufficient visibility, missing tables and unavailable services
 cause the command to fail. It reports table names without printing row data.

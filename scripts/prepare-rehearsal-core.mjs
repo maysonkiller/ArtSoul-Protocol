@@ -37,9 +37,16 @@ export function buildRehearsalCoreReview(artifact, manifest, custody, payer, non
 export function expectedRehearsalPairRegister(custody, review, manifest, layout, coreArtifact, nftArtifact) {
     assert.deepEqual(review, buildRehearsalCoreReview(coreArtifact, manifest, custody, review.payer, review.nonce),
         'Core review differs from the independently encoded test deployment');
+    return expectedOrdinaryPairRegister(custody, review, manifest, layout, coreArtifact, nftArtifact);
+}
+
+export function expectedOrdinaryPairRegister(custody, review, manifest, layout, coreArtifact, nftArtifact) {
+    const plan = prepareOrdinaryDeployment(coreArtifact, review, custody);
+    assert.equal(keccak256(coreArtifact.bytecode), manifest.contracts[review.contract].creation.keccak256,
+        'Core creation bytecode differs from C12');
+    const [refundBatchLimit, refundTransferGas] = review.constructorArgs.slice(3);
     const values = {
-        ...Object.fromEntries(roles.map(role => [role, custody[role].address])),
-        core: review.expectedCore, nft: review.expectedNFT, refundBatchLimit: rehearsalLimits[0], refundTransferGas: rehearsalLimits[1]
+        ...plan.roles, core: plan.core, nft: plan.nft, refundBatchLimit, refundTransferGas
     };
     function boundRuntime(artifact) {
         const key = artifact.sourceName + ':' + artifact.contractName;
@@ -62,9 +69,8 @@ export function expectedRehearsalPairRegister(custody, review, manifest, layout,
     }
     return {
         ...custody,
-        core: { address: review.expectedCore, codeHash: boundRuntime(coreArtifact),
-            refundBatchLimit: rehearsalLimits[0], refundTransferGas: rehearsalLimits[1] },
-        nft: { address: review.expectedNFT, codeHash: boundRuntime(nftArtifact) }
+        core: { address: plan.core, codeHash: boundRuntime(coreArtifact), refundBatchLimit, refundTransferGas },
+        nft: { address: plan.nft, codeHash: boundRuntime(nftArtifact) }
     };
 }
 
@@ -90,8 +96,13 @@ export async function readUnusedCoreNonce(payer, providers) {
 }
 
 export async function verifyRehearsalCoreReceipt(txHash, review, register, providers = defaultProviders()) {
-    assert(isHexString(txHash, 32), 'Expected a public deployment transaction hash');
     assert.equal(register.chainId, 84532, 'Expected a Base Sepolia register');
+    return verifyOrdinaryCoreReceipt(txHash, review, register, providers);
+}
+
+export async function verifyOrdinaryCoreReceipt(txHash, review, register, providers) {
+    assert(isHexString(txHash, 32), 'Expected a public deployment transaction hash');
+    assert([8453, 84532].includes(register.chainId), 'Select a reviewed Base network');
     assert.equal(review.chainId, register.chainId, 'Review chain differs from register');
     assert.equal(getAddress(review.expectedCore), getAddress(register.core.address), 'Unexpected Core in register');
     assert.equal(getAddress(review.expectedNFT), getAddress(register.nft.address), 'Unexpected NFT in register');

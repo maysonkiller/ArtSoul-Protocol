@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { Interface, keccak256 } from 'ethers';
 import { readArtworkMetadata } from '../src/api/safe-artwork-fetch.js';
-import { rehearsalArtwork as work, rehearsalMetadataUri as uri, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { checkRegistrationPublication, inspectRegistrationReceipt, registrationAtHead, simulateRegisteredOpening, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
+import { rehearsalArtwork as work, rehearsalMetadataUri as uri, rehearsalOpening, walletRequest } from '../scripts/rehearsal-review/client.mjs';
+import { checkRegistrationPublication, inspectRegistrationReceipt, openingAtHead, registrationAtHead, simulateRegisteredOpening, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
 
 const market = new Interface([
     'function registerArtwork(string) returns (uint256)', 'function workCount() view returns (uint256)',
@@ -18,6 +18,47 @@ const hash = '0x' + 'a'.repeat(64), block = { number: '0x10', hash: '0x' + 'b'.r
 const data = market.encodeFunctionData('registerArtwork', [uri]), value = '0x0', chainId = '0x14a34';
 const digest = hex => createHash('sha256').update(Buffer.from(hex.slice(2), 'hex')).digest('hex');
 const returned = (method, values) => market.encodeFunctionResult(method, values);
+
+test('first-only opening retires its request as soon as either latest or finalized auction history appears', async () => {
+    function reader(finalized, latest) {
+        return async (method, [call, at]) => {
+            assert.equal(method, 'eth_call');
+            assert.deepEqual(call, { to: work.core, data: market.encodeFunctionData('auctionCount') });
+            if (at === 'latest') return returned('auctionCount', [latest]);
+            assert.deepEqual(at, { blockHash: block.hash, requireCanonical: true });
+            return returned('auctionCount', [finalized]);
+        };
+    }
+    assert.deepEqual(await openingAtHead(reader(0, 1), payer, block), { waitingForFinality: { role: 'createAuction' } });
+    assert.deepEqual(await openingAtHead(reader(2, 2), payer, block), { complete: true, existingAuctionHistory: true });
+});
+
+test('opening wallet review accepts only work 1 at the displayed reserve and duration and the first pending auction ID', async () => {
+    const open = market.encodeFunctionData('createAuction', [1, 1000000000000000n, 86400]);
+    assert.equal(digest(open), rehearsalOpening.dataSha256);
+    assert.equal(keccak256(open), '0x08130d8ab39d1264a70fbf21cfb22dd88f926ba91952124a6e0a782db8ee8a14');
+    const codes = new Map([[work.core, '0x6001'], [work.nft, '0x6002']]);
+    const plan = { operation: 'createAuction', target: work.core, deployments: [], payer, chainId, nonce: '0x13',
+        codeChecks: [...codes].map(([address, runtime]) => ({ address, sha256: digest(runtime) })), data: open, dataSha256: digest(open) };
+    let predicted = 1n;
+    const provider = { request: async ({ method, params = [] }) => {
+        if (method === 'eth_chainId') return chainId;
+        if (method === 'eth_accounts') return [payer];
+        if (method === 'eth_getTransactionCount') return plan.nonce;
+        if (method === 'eth_getCode') return codes.get(params[0]) ?? '0x';
+        assert.equal(method, 'eth_call');
+        assert.deepEqual(params, [{ from: payer, to: work.core, data: open, value }, 'pending']);
+        return returned('createAuction', [predicted]);
+    } };
+    assert.deepEqual(await walletRequest(provider, plan), { from: payer, to: work.core, chainId, nonce: plan.nonce, value, data: open });
+    for (const args of [[2, 1000000000000000n, 86400], [1, 2000000000000000n, 86400], [1, 1000000000000000n, 172800]]) {
+        const substituted = market.encodeFunctionData('createAuction', args);
+        await assert.rejects(walletRequest(provider, { ...plan, data: substituted, dataSha256: digest(substituted) }), /Unexpected artwork/);
+    }
+    await assert.rejects(walletRequest(provider, { ...plan, target: work.nft }), /Unexpected artwork/);
+    predicted = 2n;
+    await assert.rejects(walletRequest(provider, plan), /Auction history changed/);
+});
 
 test('first auction rehearsal uses only hash-pinned calls for the registered, unsold work', async () => {
     let creator = payer, active = 0n, floor = 0n, token = 0n, next = 4n, simulations = 0;

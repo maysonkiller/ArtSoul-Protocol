@@ -13,6 +13,7 @@ import { ingestOrdinaryRunnerUpOffer } from '../../src/indexer/ordinary-runner-u
 const address = n => '0x' + n.toString(16).padStart(40, '0');
 const hash = n => '0x' + n.toString(16).padStart(64, '0');
 const abi = new Interface([
+    'event ProceedsCredited(uint256 indexed auctionId,address indexed creator,address indexed treasury,uint256 creatorAmount,uint256 protocolAmount)',
     'function nft() view returns (address)', 'function core() view returns (address)',
     'function auctions(uint256) view returns(uint256,uint256,uint256,uint256,uint256,address,uint256,uint256,uint8,address)',
     'function runnerUpOffers(uint256) view returns(address,uint256,uint256)',
@@ -38,10 +39,12 @@ function fixture(pair, overrides = {}) {
         ...abi.encodeEventLog(event, values)
     });
     const firstIndex = stateOffer ? 1 : 0;
+    const protocolShare = BigInt(price) / 40n + (BigInt(price) % 40n > 20n ? 1n : 0n);
     const logs = [
-        log(nftAddress, 'SettledArtworkIssued', [auctionId, artwork, token, creator, buyer], firstIndex),
-        log(nftAddress, 'Transfer', [ZeroAddress, buyer, token], firstIndex + 1),
-        log(coreAddress, 'AuctionSettled', [auctionId, artwork, token, price], firstIndex + 2)
+        log(coreAddress, 'ProceedsCredited', [auctionId, creator, address(46), BigInt(price) - protocolShare, protocolShare], firstIndex),
+        log(nftAddress, 'SettledArtworkIssued', [auctionId, artwork, token, creator, buyer], firstIndex + 1),
+        log(nftAddress, 'Transfer', [ZeroAddress, buyer, token], firstIndex + 2),
+        log(coreAddress, 'AuctionSettled', [auctionId, artwork, token, price], firstIndex + 3)
     ];
     if (stateOffer && !overrides.omitAcceptance) logs.unshift(log(coreAddress, 'RunnerUpOfferAccepted', [auctionId, buyer, price], 0));
     let offerRead = false;
@@ -169,9 +172,18 @@ export async function checkRunnerUpIntake(pool) {
 }
 
 export async function checkOrdinaryIntake(pool) {
+    // A settlement recorded before migration 023 must acquire its credit on replay.
+    const older = fixture(2);
+    const sale = await older.listener.readOrdinarySettlement(older.options);
+    await pool.query(`INSERT INTO artsoul_private.ordinary_issuers(chain_id,core_address,nft_address,core_code_hash,nft_code_hash)
+        VALUES ($1,$2,$3,$4,$5)`, [sale.chainId,sale.coreAddress,sale.nftAddress,sale.coreCodeHash,sale.nftCodeHash]);
+    await pool.query(`INSERT INTO artsoul_private.ordinary_settlements(chain_id,core_address,auction_id,artwork_id,
+        token_id,price_wei,creator,first_collector,runner_up_accepted,transaction_hash,block_number,block_hash,log_index)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, [sale.chainId,sale.coreAddress,sale.auctionId,sale.artworkId,
+        sale.tokenId,sale.priceWei,sale.creator,sale.firstCollector,sale.runnerUpAccepted,sale.transactionHash,sale.blockNumber,sale.blockHash,sale.logIndex]);
     const results = await Promise.all([intake(pool, 1), intake(pool, 1), intake(pool, 2)]);
     assert.deepEqual(results.slice(0, 2).map(row => row.inserted).sort(), [false, true]);
-    assert.equal(results[2].inserted, true);
+    assert.equal(results[2].inserted, false);
     await assert.rejects(intake(pool, 1, { price: '1000000000000000002' }), /Conflicting finalized evidence/);
     await assert.rejects(intake(pool, 3, { location: { transactionHash: hash(21) } }), /Conflicting finalized evidence/);
     await assert.rejects(intake(pool, 3, { location: { nftAddress: address(11) } }), /Conflicting finalized evidence/);
@@ -192,7 +204,11 @@ export async function checkOrdinaryIntake(pool) {
     const stored = await pool.query('SELECT runner_up_accepted,price_wei,first_collector FROM artsoul_private.ordinary_settlements WHERE core_address=$1', [address(3)]);
     assert.deepEqual(stored.rows, [{runner_up_accepted:true,price_wei:'1000000000000000001',first_collector:address(41)}]);
     await assert.rejects(pool.query('DELETE FROM artsoul_private.ordinary_settlements'), /append-only/);
-    for (const table of ['ordinary_issuers', 'ordinary_settlements']) {
+    const fees = await pool.query('SELECT core_address,protocol_treasury,protocol_wei,creator_wei FROM artsoul_private.ordinary_primary_credits ORDER BY core_address');
+    assert.deepEqual(fees.rows, [1, 2, 3].map(i => ({core_address:address(i),protocol_treasury:address(46),
+        protocol_wei:'25000000000000000',creator_wei:'975000000000000001'})));
+    await assert.rejects(pool.query('DELETE FROM artsoul_private.ordinary_primary_credits'), /append-only/);
+    for (const table of ['ordinary_issuers', 'ordinary_settlements','ordinary_primary_credits']) {
         const { rows: privileges } = await pool.query(`SELECT rolname, has_table_privilege(rolname, $1, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') AS permitted
             FROM pg_roles WHERE rolname IN ('anon', 'authenticated', 'service_role')`, ['artsoul_private.' + table]);
         assert.equal(privileges.length, 3);

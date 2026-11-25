@@ -15,6 +15,11 @@ export const rehearsalMetadataUri = 'data:application/json;base64,' + btoa(JSON.
     media_type: 'image/jpeg'
 }));
 
+export const rehearsalOpening = Object.freeze({
+    reserveWei: '1000000000000000', hours: '24',
+    dataSha256: '11aa24f9a1a3fbfdd11b3f749cd96d166f0998452dbe27564627193579c7c8d7'
+});
+
 const testChain = '0x14a34';
 const factory = '0x4e1dcf7ad4e460cfd30791ccc4f9c8a4f820ec67';
 const roleName = { protocolTreasury: 'Protocol treasury', ecosystemTreasury: 'Ecosystem treasury', adminSecurity: 'Admin security' };
@@ -57,11 +62,14 @@ export async function walletRequest(provider, plan) {
     await matchWallet(provider, plan);
     const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
     const artwork = plan.operation === 'registerArtwork';
-    if (artwork) {
-        check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === rehearsalArtwork.dataSha256 &&
-            plan.metadataUri === rehearsalMetadataUri && plan.deployments.length === 0 &&
+    const opening = plan.operation === 'createAuction';
+    if (artwork || opening) {
+        const approved = artwork ? rehearsalArtwork : rehearsalOpening;
+        check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === approved.dataSha256 &&
+            plan.deployments.length === 0 &&
             plan.codeChecks.length === 2 && sameAddress(plan.codeChecks[0].address, rehearsalArtwork.core) &&
-            sameAddress(plan.codeChecks[1].address, rehearsalArtwork.nft), 'Unexpected artwork registration.');
+            sameAddress(plan.codeChecks[1].address, rehearsalArtwork.nft), 'Unexpected artwork request.');
+        if (artwork) check(plan.metadataUri === rehearsalMetadataUri, 'Unexpected registration metadata.');
     } else {
         check(create || ['protocolTreasury', 'ecosystemTreasury'].includes(plan.operation), 'Unknown rehearsal operation.');
         check(create ? plan.target === 'Direct contract creation' :
@@ -82,9 +90,10 @@ export async function walletRequest(provider, plan) {
         })
     ]);
     check(latest === plan.nonce && pending === plan.nonce && payerCode === '0x', 'Payer state changed. Refresh the chain evidence.');
-    if (artwork) {
+    if (artwork || opening) {
         const simulation = await rpc('eth_call', [{ from: plan.payer, to: rehearsalArtwork.core, data: plan.data, value: '0x0' }, 'pending']);
-        check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === 1n, 'Work registry changed. Refresh the chain evidence.');
+        check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === 1n,
+            opening ? 'Auction history changed. Refresh the chain evidence.' : 'Work registry changed. Refresh the chain evidence.');
     }
     await matchWallet(provider, plan);
     const tx = { from: plan.payer, chainId: testChain, nonce: plan.nonce, value: '0x0', data: plan.data };
@@ -96,6 +105,7 @@ export function sameReview(first, next) {
     return !next.complete && !next.waitingForFinality && first.chainId === next.chainId && first.operation === next.operation &&
         first.payer === next.payer && first.nonce === next.nonce && first.target === next.target &&
         first.dataHash === next.dataHash && first.dataSha256 === next.dataSha256 &&
+        JSON.stringify(first.codeChecks) === JSON.stringify(next.codeChecks) &&
         JSON.stringify(first.deployments) === JSON.stringify(next.deployments) &&
         JSON.stringify(first.owners) === JSON.stringify(next.owners) && JSON.stringify(first.roles) === JSON.stringify(next.roles);
 }
@@ -184,7 +194,9 @@ export async function start() {
         if (!current.waitingForFinality && !current.complete) return false;
         ++stateRevision; plan = undefined; connected = undefined; wrongChain = false;
         byId('review').hidden = true;
-        if (current.finalizedArtwork) {
+        if (current.existingAuctionHistory) {
+            status('The reviewed Core already has finalized auction history. This first-auction request is closed. Use the opening receipt to verify the work and its terms.');
+        } else if (current.finalizedArtwork) {
             status('Verified artwork ' + current.finalizedArtwork.id + ' · ' + rehearsalArtwork.title +
                 ' · creator ' + current.payer + ' at finalized Base Sepolia block ' + BigInt(current.block.number) + '.');
         } else if (current.finalizedPair) {
@@ -197,7 +209,8 @@ export async function start() {
                 : 'Both treasury Safes were verified at a finalized block.');
         } else {
             const waiting = current.waitingForFinality;
-            const found = waiting.role === 'registerArtwork' ? 'Both providers see the expected artwork registration' :
+            const found = waiting.role === 'createAuction' ? 'Both providers see auction history on the reviewed Core' :
+                waiting.role === 'registerArtwork' ? 'Both providers see the expected artwork registration' :
                 waiting.role === 'OrdinaryMarket' ? 'Both providers see the expected Core ' + waiting.core + ' and NFT ' + waiting.nft :
                 roleName[waiting.role] + ' · ' + waiting.address + '. Both providers see the expected Safe proxy';
             status(found + '. Waiting for Base Sepolia finality. Refresh chain evidence later.');
@@ -216,15 +229,21 @@ export async function start() {
             if (previous !== plan.data) submitted = false;
             const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
             const artwork = plan.operation === 'registerArtwork';
-            byId('operation').textContent = artwork ? 'Register rehearsal artwork' :
+            const opening = plan.operation === 'createAuction';
+            byId('operation').textContent = opening ? 'Open the first rehearsal auction' : artwork ? 'Register rehearsal artwork' :
                 create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
             byId('fields').replaceChildren();
             addField('Network', 'Base Sepolia · 84532');
             addField('Sender', plan.payer);
             addField('Value', '0 test ETH · wallet estimates gas');
             addField('Nonce', String(BigInt(plan.nonce)));
-            addField(artwork ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
-            if (artwork) {
+            addField(artwork || opening ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
+            if (opening) {
+                addField('Work', '1 · ' + rehearsalArtwork.title);
+                addField('Method', 'createAuction(uint256,uint256,uint256)');
+                addField('Starting price', '0.001 test ETH');
+                addField('Duration', rehearsalOpening.hours + ' hours from inclusion');
+            } else if (artwork) {
                 addField('Title', rehearsalArtwork.title);
                 addField('Method', 'registerArtwork(string) · no mint or auction');
                 addField('Expected work', '1 if the registry is still empty at inclusion');
