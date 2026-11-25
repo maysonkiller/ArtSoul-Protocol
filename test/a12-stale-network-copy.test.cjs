@@ -59,8 +59,7 @@ test('all consumers receive the updated shared runtime assets', () => {
     'docs-protocol.html'
   ];
   const contractPages = [
-    'index.html',
-    'src/features/discovery/gallery-contract-runtime.js',
+    'src/features/discovery/public-contract-runtime.js',
     'artwork.html',
     'profile.html',
     'upload.html'
@@ -74,7 +73,7 @@ test('all consumers receive the updated shared runtime assets', () => {
   for (const path of contractPages) {
     assert.match(read(path), /contracts-integration\.js\?v=22/, path);
   }
-  assert.match(read('gallery.html'), /gallery-contract-runtime\.js\?v=2/);
+  assert.match(read('gallery.html'), /gallery-contract-runtime\.js\?v=3/);
 });
 
 test('A12 production acceptance is durable and reconciled across handoff and backlogs', () => {

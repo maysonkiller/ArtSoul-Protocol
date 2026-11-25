@@ -4,9 +4,11 @@ import { wrapArtworkMedia } from '../ui/components/artwork-player.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
 import { projectedArtworkAura } from '../ui/components/aura-frame.js';
+import { installPublicContractRuntime } from '../features/discovery/public-contract-runtime.js';
 
 // The homepage uses DOM cards. The inbox loads React when a connected wallet needs it.
 window.ArtSoulArtworkAura = projectedArtworkAura;
+installPublicContractRuntime();
 
 let morphActive = false;
         let originalPositions = [];

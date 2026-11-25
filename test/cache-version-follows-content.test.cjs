@@ -19,7 +19,8 @@ const fs = require('node:fs');
  */
 const RUNTIME = {
   'src/features/discovery/discovery-service.js': { version: 2, sha256: 'c9a152e266934f4f' },
-  'src/features/discovery/gallery-contract-runtime.js': { version: 2, sha256: '13248d405b954dc8' },
+  'src/features/discovery/gallery-contract-runtime.js': { version: 3, sha256: '5f1e3a95ef176761' },
+  'src/features/discovery/public-contract-runtime.js': { version: 1, sha256: '16ace3baeafdae78' },
   'unified-styles.css': { version: 101, sha256: '1ea1ad0a64e318c6' },
   'mobile-no-motion.css': { version: 3, sha256: '88eb61864da7f616' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
@@ -91,9 +92,12 @@ test('on-demand command imports use the same card policy version as page scripts
   assert.equal(Number(match[1]), RUNTIME[file].version, 'commands must not load an obsolete card policy');
 });
 
-test('the gallery loads the same contract adapter version as the other pages', () => {
-  const loader = fs.readFileSync('src/features/discovery/gallery-contract-runtime.js', 'utf8');
-  assert.ok(loader.includes(`import('/contracts-integration.js?v=${RUNTIME['contracts-integration.js'].version}')`));
+test('public browsing loads the same contract adapter version as the other pages', () => {
+  const shared = 'src/features/discovery/public-contract-runtime.js';
+  const loader = fs.readFileSync(shared, 'utf8');
+  assert.ok(loader.includes(`'/contracts-integration.js?v=${RUNTIME['contracts-integration.js'].version}'`));
+  const gallery = fs.readFileSync('src/features/discovery/gallery-contract-runtime.js', 'utf8');
+  assert.ok(gallery.includes(`'./public-contract-runtime.js?v=${RUNTIME[shared].version}'`));
 });
 
 test('no page loads one of these without a version at all', () => {

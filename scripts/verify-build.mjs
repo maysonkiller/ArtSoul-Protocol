@@ -123,6 +123,9 @@ for (const page of pages) {
     }
 
     if (page === 'index.html') {
+        if (/<(?:script|link)\b[^>]*\b(?:src|href)=["']\/(?:contracts-integration\.js|assets\/ethers-[^"']+\.js|src\/index\.js|src\/ui\/components\/index\.js)(?:\?[^"']*)?["']/i.test(built)) {
+            throw new Error('The guest homepage must not preload wallet or gallery services');
+        }
         const balancedHero = /<h1\b[^>]*>\s*Discover a work and start its next chapter\s*<\/h1>/;
         if (!balancedHero.test(source) || !balancedHero.test(built)) {
             throw new Error('The homepage headline must be one naturally wrapping phrase without a forced break.');
