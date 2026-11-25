@@ -18,6 +18,9 @@
     --accent-future-2: #ff00bf;
 }
 
+body:is(.classic, .future)[data-as-season="winter"] { --seasonal-control-ink: #d6f2ff; }
+body:is(.classic, .future)[data-as-season="newyear"] { --seasonal-control-ink: #f5ddb5; }
+
 /* Artwork detail page composition */
 .artsoul-skeleton,
 .artsoul-skeleton-card {
@@ -8719,8 +8722,6 @@ body:is(.classic, .future) .site-theme-toggle-glyph {
 }
 body:is(.classic, .future) .site-theme-toggle-classic { background: var(--c-surface); }
 body:is(.classic, .future) .site-theme-toggle-future { background: var(--c-accent); }
-body:is(.classic, .future)[data-as-season="winter"] { --seasonal-control-ink: #d6f2ff; }
-body:is(.classic, .future)[data-as-season="newyear"] { --seasonal-control-ink: #f5ddb5; }
 body.classic .site-theme-toggle[data-current-theme="classic"] { border-color: var(--c-accent); }
 body.future .site-theme-toggle[data-current-theme="future"] { border-color: var(--c-accent-2); }
 body:is(.classic, .future) .site-theme-toggle:focus-visible {
