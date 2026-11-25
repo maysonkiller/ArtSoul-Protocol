@@ -181,7 +181,10 @@ node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-addres
 The command compares the database cursor with the reviewed Base mainnet Core
 and deployment block, then checks for residual product rows, including retired
 auction tables, bids, withdrawals, floor history, trust signals, eligibility,
-settlement evidence and the counters backing public metrics. A mainnet metrics
+settlement evidence and the counters backing public metrics. Keep the old workers
+stopped while checking. Pending or in-flight work in the persistent event queue
+or outbox, and retryable failed outbox effects, block acceptance even when the
+public catalog is empty. Completed queue history can remain. A mainnet metrics
 row containing zero activity is permitted. Unrelated or pre-deployment chain
 events fail the check. The database reads use one read-only, repeatable-read
 transaction. Insufficient visibility, missing tables and unavailable services
