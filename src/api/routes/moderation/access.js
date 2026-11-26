@@ -60,6 +60,8 @@ export default async function handler(req, res) {
       ...(paired ? { authorityEligible: authority } : {}),
       access: {
         ...(paired ? { dualWallet: true } : {}),
+        ...(process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED === 'true' && paired && access?.stepUpActive &&
+          (access.role === 'admin' || (access.role === 'team' && authority)) ? { identityReviewer: true } : {}),
         role: access?.role || null,
         stepUpActive: access?.stepUpActive === true,
         stepUpExpiresAt: access?.stepUpActive === true ? access.stepUpExpiresAt : null,

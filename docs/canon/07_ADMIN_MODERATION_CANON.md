@@ -110,7 +110,7 @@ The [profile review migration](../../sql/migrations/20261126185730_profile_ident
 and public profile heading implement a separate mark for the reviewed wallet,
 profile record and exact displayed name. Each lookup reads the latest decision;
 a renamed, hidden or replaced profile has no mark. The hosted reviewer workflow,
-its grant authority and the first genuine public decisions remain open.
+its grant authority and the first genuine public decisions were open at the time of that migration.
 
 For the first review, record the requested public name, profile wallet and
 profile ID. A collection application also identifies its network, contract
@@ -122,6 +122,8 @@ Append a revocation on impersonation, lost control or incorrect attribution.
 An automated assistant can collect material and flag a missing field. Before
 accepting real applications, designate the human reviewer authorized to grant
 or revoke the mark. The appearance toggle manages frame labels only.
+
+On November 26 the founder authorized Administrators and active Team members in the current authority pair to review free applications after verified staff sign-in. The applicant signs in with their own wallet. A different wallet must decide the request. The decision records a reason, with separate, revocable registers for named profiles and creator relationships to collection contracts. The applicant can read the note in Edit Profile. Public profiles expose the mark and verified collection contracts. No reviewer can grant a subscription, fee benefit or Partner designation through identity review.
 
 ## October 8 factor setup and recovery amendment
 

@@ -8,6 +8,7 @@ import { isWalletStateSettled, resolveProfileOwnership } from '../features/profi
 import { EmailConnection } from '../features/profile/email-connection.jsx';
 import { GenesisStatus } from '../features/profile/genesis-status.jsx';
 import { VerificationMark } from '../ui/components/verification-mark.jsx';
+import { IdentityApplication, VerifiedCollections } from '../features/profile/identity-application.jsx';
 import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
 import { WalletNfts, useWalletNftsEnabled } from '../features/profile/wallet-nfts.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
@@ -185,6 +186,7 @@ const { useState, useEffect, useRef } = React;
             const [isOwnProfile, setIsOwnProfile] = useState(false);
             const [walletStateSettled, setWalletStateSettled] = useState(initiallySettled);
             const [emailVerificationEnabled, setEmailVerificationEnabled] = useState(false);
+            const [identityVerificationEnabled,setIdentityVerificationEnabled] = useState(false);
             const [discoveryProfile, setDiscoveryProfile] = useState(null);
             const [oauthNotice, setOAuthNotice] = useState(null);
             const fileInputRef = useRef(null);
@@ -234,6 +236,7 @@ const { useState, useEffect, useRef } = React;
                     .then(config => {
                         if (active) {
                             setEmailVerificationEnabled(config?.emailVerificationEnabled === true);
+                            setIdentityVerificationEnabled(config?.identityVerificationEnabled === true);
                             setProfileReportingEnabled(config?.profileReportingEnabled === true);
                             setGenesisProfileEnabled(config?.genesisProfileEnabled === true);
                         }
@@ -1696,6 +1699,7 @@ const { useState, useEffect, useRef } = React;
                                                 {profile?.profile_identity_verified === true && resolvedProfileName === profile.username &&
                                                     <VerificationMark label="Verified profile identity" />}
                                             </h1>
+                                            <VerifiedCollections collections={profile?.verified_collections} />
                                             {profile?.wallet_address && (
                                                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                                                     <button
@@ -1870,6 +1874,8 @@ const { useState, useEffect, useRef } = React;
                                                     className="profile-detail-input"
                                                 />
                                             </div>
+                                            {identityVerificationEnabled && isOwnProfile && walletStateSettled && connectedWalletAddress &&
+                                                <IdentityApplication key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} name={profile?.username} />}
                                             <section className="profile-connections" aria-labelledby="profileConnectionsTitle">
                                                 <h2 id="profileConnectionsTitle">Connected accounts</h2>
                                                 <p className="profile-connection-help">Connecting or disconnecting an account takes effect immediately. Save Profile and Cancel apply only to your profile details.</p>

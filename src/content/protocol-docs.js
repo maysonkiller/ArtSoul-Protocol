@@ -82,6 +82,7 @@ const sections = [
             {"type":"verification-mark","text":"Example blue check for a verified collection origin"},
             {"type":"paragraph","text":"Any artist or project team can publish an artwork or prepare a collection draft without a blue check or Partner status."},
             {"type":"paragraph","text":"A profile check identifies the artist or project reviewed for that profile name and wallet. A collection check identifies the reviewed creator of one collection contract on one network. Each decision can be revoked. Collection covers are in development."},
+            {"type":"paragraph","text":"To apply, open your profile, choose Edit Profile, then Identity verification. Choose Profile or Collection origin and link an official public source showing your wallet and, for a collection, its contract and network. Applying is free. No subscription or sales minimum is required. You can follow the decision in the same panel."},
             {"type":"paragraph","text":"Sales volume plays no part in this review. It carries no Trust weight or fee benefit and makes no claim about ownership, copyright or future value. Permission for a marketplace to transfer an NFT comes from its owner’s wallet."}
         ]
     },

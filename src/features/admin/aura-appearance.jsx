@@ -63,7 +63,7 @@ export function AuraAppearance({ api, wallet, isSessionCurrent }) {
             </select></label></figcaption>
             <div className={auraFrameClassName(preview)} aria-hidden="true">
                 <img src="/brand/artsoul-audio-cover-384.webp" alt="" width="96" height="96" />
-                {enabled && <span className="artsoul-aura-caption">{auraFrameLabels[preview]}</span>}
+                {enabled && <span className="artsoul-aura-caption"><span>{auraFrameLabels[preview]}</span></span>}
             </div>
             <p aria-live="polite">{eligibility[preview]}</p>
             <p className="admin-aura-classic-note">Classic shows the frame alone. Switch to Future in the header to see its label.</p>

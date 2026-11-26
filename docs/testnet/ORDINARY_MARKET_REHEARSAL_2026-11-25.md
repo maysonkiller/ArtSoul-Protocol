@@ -156,3 +156,15 @@ node scripts/read-ordinary-transfer-range.mjs <payout-pair-register.json> bootst
 ```
 
 For a contiguous follow-up, use `continuation` with the next block number, the previous report's endpoint hash, and the new endpoint number and hash. The command returns a read-only observation. Hosted transfer persistence and the first minted token still need independent acceptance.
+# Participant pilot before mainnet
+
+Use Base Sepolia with the replacement Core, NFT contract and matching public indexer. Confirm all three addresses against the candidate release before inviting participants. Keep the existing catalog readable during rehearsal.
+
+| Participant | Test from the normal website | Record |
+| --- | --- | --- |
+| Creator | Publish an artwork and start a timed auction. | Public work link, registration and auction receipts. |
+| Two collectors | Place competing bids, including one late bid. Reopen on a second device. | Updated deadline, deposit, outbid refund and independently observed notification. |
+| Winning collector | Settle and inspect the minted NFT, Creator, First Collector and Owner. Transfer it and reopen the work. | Receipt, token ID, current owner and retained provenance. |
+| Operator | Exercise default, runner-up, recovery and once-only refund in separate rounds. Repeat after correcting any blocking issue. | Receipts, indexed history and outstanding balances. |
+
+Allow several days for complete auction and payment windows. The release decision follows observed outcomes. Wallet signatures stay with each tester. Mainnet confirmation is a separate, explicitly authorized step after rehearsal and review.

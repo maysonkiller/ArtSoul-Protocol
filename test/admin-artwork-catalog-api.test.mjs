@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import auraBorder from '../src/api/routes/moderation/aura-border.js';
+import identityReviews from '../src/api/routes/moderation/identity-reviews.js';
+import identityApplication from '../src/api/routes/identity-application.js';
 Object.assign(process.env,{
   NODE_ENV:'test',SESSION_SECRET:'catalog-wallet-test',SUPABASE_URL:'https://example.supabase.co',
   SUPABASE_SERVICE_ROLE_KEY:'catalog-test-only',ARTSOUL_PROTOCOL_ADMIN_ENABLED:'true',
@@ -29,6 +31,36 @@ function fixture(t,custom=()=>undefined){const calls=[]; t.mock.method(globalThi
   if(path==='rpc/review_artwork_visibility')return json([{...row(1),hidden:JSON.parse(options.body).p_hidden}]);
   throw new Error(`Unexpected test request ${path}`);
 });return calls;}
+
+test('identity applications bind both sessions and expose decisions only to verified review staff', async t => {
+  const previous = process.env;
+  process.env = {...previous,ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED:'true',ARTSOUL_PUBLIC_ORIGIN:'https://example.com',ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true'};
+  t.after(() => { process.env=previous; });
+  let role='team', member=true;
+  const calls=fixture(t,(path,options) => {
+    if (path.startsWith('artsoul_staff_roles?')) return json([{role,authorization_version:2}]);
+    if (path.startsWith('artsoul_staff_authority_policy?')) return json([{origin:'https://example.com',chain_id:84532,version:3,
+      wallet_a:member ? STAFF : '0x'+'2'.repeat(40),wallet_b:'0x'+'3'.repeat(40)}]);
+    if (path==='rpc/request_identity_review') {
+      assert.deepEqual(JSON.parse(options.body),{p_wallet:STAFF,p_evidence:'https://artist.example/announcement',p_chain:null,p_collection:null});
+      return json('1');
+    }
+    if (path==='rpc/manage_identity_reviews') return json([]);
+  });
+  const form=req({cookie:cookie(false),method:'POST',body:{evidence:'https://artist.example/announcement',chain:null,collection:null}});
+  Object.assign(form.headers,{'x-artsoul-wallet':STAFF,origin:'https://example.com','content-type':'application/json'});
+  let res=response();await identityApplication(form,res);assert.deepEqual(res.body,{id:'1'});
+  form.headers['x-artsoul-wallet']=''; res=response();await identityApplication(form,res);assert.equal(res.statusCode,401);
+  form.headers['x-artsoul-wallet']=STAFF;form.headers.origin='https://another.example';res=response();await identityApplication(form,res);assert.equal(res.statusCode,403);
+  const check=async(auth) => { const out=response();await identityReviews(req({cookie:auth,query:{wallet:STAFF}}),out);return out; };
+  assert.ok([401,403].includes((await check(cookie(false))).statusCode));
+  assert.deepEqual((await check(cookie(true,2))).body,{applications:[],next:null});
+  member=false;assert.equal((await check(cookie(true,2))).statusCode,403);
+  role='admin';assert.equal((await check(cookie(true,2))).statusCode,200);
+  role='moderator';assert.equal((await check(cookie(true,2))).statusCode,403);
+  assert.equal(calls.filter(c=>c.path==='rpc/request_identity_review').length,1);
+  assert.equal(calls.filter(c=>c.path==='rpc/manage_identity_reviews').length,2);
+});
 
 test('frame settings require verified admin or a team wallet still in the current authority pair', async t => {
   const previous = process.env;

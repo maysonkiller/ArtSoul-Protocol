@@ -4,6 +4,7 @@ import { StaffFactorDialog } from '../features/admin/staff-factor-dialog.jsx';
 import { staffEntryHint } from '../features/admin/staff-entry.js';
 import { StaffAuthority } from '../features/admin/staff-authority.jsx';
 import { AuraAppearance } from '../features/admin/aura-appearance.jsx';
+import { IdentityReviews } from '../features/admin/identity-reviews.jsx';
 import { AdminArtworkCatalog, AdminArtworkPreview } from '../features/admin/artwork-catalog.jsx';
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
@@ -604,7 +605,8 @@ function ProtocolAdminPage() {
     const ready = accessState === 'ready';
     const appearanceAllowed = access?.dualWallet && access?.stepUpActive &&
         (access.role === 'admin' || (access.role === 'team' && connectedWallet && authorityWallet === connectedWallet));
-    const activeSection = (section === 'staff' && !rosterWallet || section === 'appearance' && !appearanceAllowed) ? 'queue' : section;
+    const identityAllowed = access?.identityReviewer === true && appearanceAllowed;
+    const activeSection = (section === 'staff' && !rosterWallet || section === 'identity' && !identityAllowed || section === 'appearance' && !appearanceAllowed) ? 'queue' : section;
     const catalogEpoch = setupEpoch.current, catalogWallet = connectedWallet;
     const catalogSessionCurrent = () => sessionIsCurrent(catalogEpoch,catalogWallet)
         && readySession.current?.epoch === catalogEpoch && readySession.current.wallet === catalogWallet;
@@ -615,7 +617,7 @@ function ProtocolAdminPage() {
     // One organized navigation and one compact summary; all counts come from
     // the already-authorized queue response. Do not add public/staff requests.
     const adminGroups = [
-        { title: 'Moderate', items: [['queue', 'Reports'], ['artworks', 'Artworks'], ['hidden', 'Hidden']] },
+        { title: 'Moderate', items: [['queue', 'Reports'], ['artworks', 'Artworks'], ['hidden', 'Hidden'], ...(identityAllowed ? [['identity','Identity reviews']] : [])] },
         { title: 'History', items: [['audit', 'Audit log'], ['notifications', 'Delivery']] },
         ...(appearanceAllowed ? [{ title: 'Site', items: [['appearance', 'NFT appearance']] }] : []),
         ...(rosterWallet ? [{ title: 'Access', items: [['staff', authorityWallet ? 'Staff access' : 'Team directory']] }] : [])
@@ -690,6 +692,8 @@ function ProtocolAdminPage() {
                 <div key="staff" hidden={ready && activeSection !== 'staff'}>{authorityControls}</div>}
 
             {ready && message && <p className="protocol-admin-message" role="status">{message}</p>}
+            {ready && identityAllowed && activeSection === 'identity' && <IdentityReviews
+                key={catalogEpoch + catalogWallet} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent} />}
             {ready && appearanceAllowed && activeSection === 'appearance' && <AuraAppearance
                 key={`${catalogEpoch}:${catalogWallet}`} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent} />}
 

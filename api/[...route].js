@@ -30,6 +30,8 @@ import {
   oauthUnlinkHandler
 } from '../src/api/routes/oauth.js';
 import profileHandler from '../src/api/routes/profile.js';
+import identityApplication from '../src/api/routes/identity-application.js';
+import identityReviews from '../src/api/routes/moderation/identity-reviews.js';
 import profileEmailHandler from '../src/api/routes/profile-email.js';
 import profileLayoutHandler from '../src/api/routes/profile-layout.js';
 import savedHandler from '../src/api/routes/saved.js';
@@ -52,6 +54,8 @@ const ROUTES = new Map([
   ['auth/session', sessionHandler],
   ['auth/verify', verifyHandler],
   ['profile', profileHandler],
+  ['profile/verification', identityApplication],
+  ['moderation/identity-reviews', identityReviews],
   ['profile/email', profileEmailHandler],
   ['profile/layout', profileLayoutHandler],
   ['saved', savedHandler],
