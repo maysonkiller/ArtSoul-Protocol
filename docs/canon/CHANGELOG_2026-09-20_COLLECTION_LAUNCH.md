@@ -69,8 +69,18 @@ node scripts/check-collection-operator-policy.cjs
 
 The command compiles the current collection contracts and creates disposable editions, first-work and forged tokens on Hardhat chain 31337. The report includes each fixture's runtime hash. For each token it simulates an owner's single-token and collection-wide approval for an unlisted wallet and an unlisted contract. It also transfers each token directly as its owner and checks the recipient. For the optional forge recipe, it attempts crafting with zero, one and two individual ingredient approvals. Only the fully authorized pair may burn and produce an output. No collection-wide grant is needed for that recipe.
 
-The November 25 candidates permitted all twelve unlisted grants. The command exits with status 1 and lists all three affected contracts. Keep collection marketplace release blocked. The ordinary NFT contract and the metadata and primary-launch checks have their own acceptance paths.
+The November 25 candidates permitted all twelve unlisted grants. The release check exited with status 1 and listed all three affected contracts.
 
-A passing run requires a policy-specific rejection on each unlisted grant, successful direct transfers and the owner-authorized forge result. Unrelated reverts and incomplete runs are inconclusive and exit nonzero. The check currently recognizes the ordinary NFT's `MarketplaceNotAllowed(address)` error with the attempted operator. Update that decoder and the characterization test when a reviewed collection policy implements a different denial or a dedicated burn authorization.
+A passing run requires a policy-specific rejection on each unlisted grant, successful direct transfers and the owner-authorized forge result. The check verifies the exact operator in the `MarketplaceNotAllowed(address)` error.
 
 Before enabling collection sales on a secondary venue, record the reviewed collection admission authority and operator, wallet consent and revocation behavior, and how the venue pays all required parties. ERC-2981 reports a royalty quote. Its response alone cannot verify proceeds. The [ordinary NFT admission decision](CONTRACT_REWORK_PLAN.md#external-marketplace-admission) and a local fixture hash do not establish a collection's deployed authority or the suitability of a venue.
+
+### November 27 — Shared marketplace admissions
+
+New testnet candidates use a single on-chain operator registry for all authors. Editions and first-work constructors require the reviewed Core address. Forged outputs read that address from their ingredient collection at construction. This changes the constructor ABI and storage layout of these local collection candidates. Release requires a fresh deployment. The Base Sepolia first-work receipt check reads the immutable registry at the same finalized block through both providers and compares it with the reviewed rehearsal Core.
+
+On the disposable chain the release check runs the actual payout Core with local Safe stand-ins. For each template it checks separate per-token and collection-wide consent, immediate disabling, a second 48-hour admission and fresh owner approval before an operator transfer. Direct owner transfers and metadata reads remain available. The registry's built-in approval for its own ordinary market does not authorize it on collection NFTs.
+
+An optional forge uses the owner's revocable burn permission for up to 32 named ingredients per call. Every transfer clears that token's burn permission, including a transfer to the same wallet. The locked recipe and ingredient ownership are checked again during crafting. The forge receives no right to transfer the inputs.
+
+The public testnet launch still needs a reviewed collection deployment, paid opening, first mint and hosted provenance. Mainnet requires a separately reviewed registry and deployment. Admission of a specific external venue requires its transfer operator, order and payout review. [ERC-721 owner approvals](https://eips.ethereum.org/EIPS/eip-721) · [Seaport models](https://docs.opensea.io/docs/seaport-models)

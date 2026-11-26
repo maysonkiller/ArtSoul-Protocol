@@ -8,8 +8,8 @@ import {MintReservationEscrow} from "../launch/MintReservationEscrow.sol";
 contract MintReservationFixture is MintReservationEscrow {
     uint256 private _failureTime;
 
-    constructor(uint32 supply, address artist, address treasury, uint32 claimHours, uint256 mintPrice_)
-        CollectionLaunch("Reservation fixture", "RSV", "ipfs://reservation-fixture/", supply, artist, treasury, artist, 550)
+    constructor(uint32 supply, address artist, address treasury, uint32 claimHours, uint256 mintPrice_, address registry)
+        CollectionLaunch("Reservation fixture", "RSV", "ipfs://reservation-fixture/", supply, artist, treasury, artist, 550, registry)
         MintReservationEscrow(claimHours, mintPrice_) {
         if (block.chainid != 31337) revert InvalidConfiguration();
     }

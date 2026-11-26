@@ -205,7 +205,7 @@ Partner collections use the same per-artwork floor system as normal artworks.
 
 ## 9. Marketplace Enforcement
 
-- NFT approvals are restricted to whitelisted marketplaces.
+- NFT approvals are restricted to whitelisted marketplaces. New collection templates for individuals and projects reuse the reviewed Core's external operator registry, with the same 48-hour admission and fresh owner approval after readmission. The forge can burn only ingredients explicitly approved by their owner for its locked recipe. [Collection operator rehearsal](CHANGELOG_2026-09-20_COLLECTION_LAUNCH.md#november-27--shared-marketplace-admissions)
 - For the new ordinary-artwork pair, the ArtSoul Admin Security Safe (2 of 3) publicly schedules the specific Base operator. Admission and readmission require a 48-hour delay. The Safe may cancel a pending admission or disable an active operator immediately. Each NFT owner decides whether to grant operator approval. Readmission requires fresh consent. [Operator admission](CONTRACT_REWORK_PLAN.md#external-marketplace-admission)
 - Wallet-to-wallet movement is a non-sale event.
 - Resale economics apply only to marketplace sales.
