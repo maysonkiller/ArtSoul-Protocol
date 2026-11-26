@@ -34,10 +34,10 @@ export function IdentityReviews({ api, wallet, isSessionCurrent }) {
         <p role="status">{message || (!result ? 'Loading requests…' : '')}</p>
         {result?.applications.length === 0 && <p>No {status} requests on this page.</p>}
         {result?.applications.map(row => <article className="protocol-admin-report-text" key={row.id}>
-            <h3>{row.profile_name} · {row.chain_id ? 'Collection origin' : 'Profile identity'} · #{row.id}</h3>
+            <h3>{row.profile_name} / {row.chain_id ? 'Collection origin' : 'Profile identity'} / #{row.id}</h3>
             <p>Applicant <a href={'/profile?address=' + row.wallet}>{row.wallet}</a></p>
-            {row.chain_id && <p>{row.chain_id === 8453 ? 'Base' : 'Base Sepolia'} · {row.collection_address}</p>}
-            <p>Evidence supplied by applicant · <a href={row.evidence} target="_blank" rel="noreferrer noopener nofollow">{row.evidence}</a></p>
+            {row.chain_id && <p>{row.chain_id === 8453 ? 'Base' : 'Base Sepolia'} / {row.collection_address}</p>}
+            <p>Evidence supplied by applicant / <a href={row.evidence} target="_blank" rel="noreferrer noopener nofollow">{row.evidence}</a></p>
             {row.wallet === wallet.toLowerCase() ? <p>Another authorized reviewer must decide this request.</p> :
                 ['pending','approved'].includes(status) && <><label>Decision note <textarea value={notes[row.id] || ''} maxLength={500}
                     onChange={e => setNotes({...notes,[row.id]:e.target.value})}/></label>

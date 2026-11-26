@@ -5,7 +5,7 @@ export function VerifiedCollections({ collections }) {
     if (!collections?.length) return null;
     return <details className="profile-connections identity-applications"><summary>Verified collections ({collections.length})</summary>
         <ul>{collections.map(c => <li key={c.chain_id + c.collection_address}>
-            <VerificationMark label="Verified collection origin" /> {c.chain_id === 8453 ? 'Base' : 'Base Sepolia'} ·{' '}
+            <VerificationMark label="Verified collection origin" /> {c.chain_id === 8453 ? 'Base' : 'Base Sepolia'} /{' '}
             <a href={'https://' + (c.chain_id === 8453 ? '' : 'sepolia.') + 'basescan.org/address/' + c.collection_address}
                 target="_blank" rel="noopener noreferrer">{c.collection_address}</a>
         </li>)}</ul></details>;
@@ -60,7 +60,7 @@ export function IdentityApplication({ wallet, name }) {
         <button type="button" className="btn-main" disabled={!name || busy || !evidence.trim() || (kind === 'collection' && !contract.trim())}
             onClick={submit}>{busy ? 'Submitting…' : 'Request verification'}</button>
         <p role="status">{message}</p>
-        {rows?.length > 0 && <ul aria-label="Your recent requests">{rows.map(row => <li key={row.id}>#{row.id} · {row.chain_id ?
-            (row.chain_id === 8453 ? 'Base' : 'Base Sepolia') + ' · ' + row.collection_address : row.profile_name} · {row.status}{row.note && ' — ' + row.note}</li>)}</ul>}
+        {rows?.length > 0 && <ul aria-label="Your recent requests">{rows.map(row => <li key={row.id}>#{row.id} / {row.chain_id ?
+            (row.chain_id === 8453 ? 'Base' : 'Base Sepolia') + ' / ' + row.collection_address : row.profile_name} / {row.status}{row.note && ' — ' + row.note}</li>)}</ul>}
     </details>;
 }
