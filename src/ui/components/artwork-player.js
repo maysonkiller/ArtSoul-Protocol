@@ -11,9 +11,9 @@ function mediaTime(seconds) {
 // All markup is fixed product copy. Artwork URLs are read only on user action.
 const controlsMarkup = `
     <input class="ap-seek" type="range" min="0" step="0.1" value="0" aria-label="Seek">
-    <button class="artsoul-media-toggle" type="button" aria-label="Play" title="Play"></button>
+    <button class="artsoul-media-toggle" type="button" data-allow-rapid="true" aria-label="Play" title="Play"></button>
     <span class="ap-time"></span>
-    <button class="artsoul-media-mute" type="button" aria-label="Mute" title="Mute"></button>
+    <button class="artsoul-media-mute" type="button" data-allow-rapid="true" aria-label="Mute" title="Mute"></button>
     <button class="ap-options" type="button" aria-label="Playback options" title="Playback options" aria-haspopup="dialog">•••</button>
     <dialog class="ap-dialog" aria-label="Playback options">
         <form method="dialog"><strong>Playback options</strong><button aria-label="Close playback options" title="Close" value="close">×</button></form>
@@ -124,7 +124,7 @@ class ArtworkMediaPlayer extends HTMLElement {
             const wasPlaying = !media.paused && !media.ended;
             if (media.volume === 0) { media.volume = 1; media.muted = false; }
             else media.muted = !media.muted;
-            if (wasPlaying && media.paused && !media.ended && media.isConnected && !document.hidden) startPlayback();
+            if (wasPlaying && (!media.muted || media.paused) && !media.ended && media.isConnected && !document.hidden) startPlayback();
             syncVolume();
         });
         listen(volume, 'input', () => { media.volume = Number(volume.value); media.muted = media.volume === 0; syncVolume(); });
@@ -137,6 +137,7 @@ class ArtworkMediaPlayer extends HTMLElement {
         for (const event of ['play', 'pause', 'ended', 'emptied']) listen(media, event, syncPlay);
         listen(media, 'volumechange', syncVolume);
         listen(media, 'play', () => {
+            if (media.paused || media.ended) return;
             for (const other of document.querySelectorAll('video, audio')) {
                 if (other !== media && !other.paused) other.pause();
             }

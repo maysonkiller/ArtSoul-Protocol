@@ -295,7 +295,7 @@
         button.setAttribute('aria-label', `Play ${label}`);
         isolateMediaControl(button);
         button.addEventListener('click', () => {
-            if (media.paused) media.play().catch(error => {
+            if (media.paused || media.ended) media.play().catch(error => {
                 syncPlaybackButton(button, media, label);
                 if (media.paused) onPlayError?.(error);
             });
@@ -309,62 +309,57 @@
         button.setAttribute('aria-label', `${media.muted ? 'Unmute' : 'Mute'} ${label}`);
     }
 
-    function bindAudioPreviewStatus(audio, show) {
+    function bindPreviewStatus(media, show) {
         let unsubscribe;
         let waitingAt = null;
-        let lastSample = null;
-        let repeatedSamples = 0;
+        let started = false;
         const events = ['play', 'playing', 'waiting', 'timeupdate', 'volumechange', 'seeked', 'pause', 'ended', 'emptied'];
         function display(type) {
-            const position = audio.currentTime || 0;
-            if (type === 'playing' || audio.paused || position !== waitingAt) waitingAt = null;
-            if (type === 'waiting' && audio.readyState < 3) waitingAt = position;
-            if (type === 'ended' || type === 'emptied' || audio.ended) show('AUDIO');
-            else if (audio.paused) {
-                if (type === 'pause') show('Paused');
-            } else if (waitingAt !== null || (position === 0 && audio.readyState < 3)) show('Wait');
+            const position = media.currentTime || 0;
+            if (type === 'play' || type === 'playing') started = true;
+            if (type === 'emptied') started = false;
+            if (type === 'playing' || media.paused || position !== waitingAt) waitingAt = null;
+            if (type === 'waiting' && media.readyState < 3) waitingAt = position;
+            if (!started) show(media.tagName);
+            else if (!media.paused && !position && (waitingAt !== null || media.readyState < 3)) show('Wait');
             else {
                 const seconds = Math.floor(position);
                 show(Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'));
             }
         }
         function sample() {
-            if (!audio.isConnected || audio.ownerDocument.hidden || audio.paused || audio.ended) {
+            if (!media.isConnected || media.ownerDocument.hidden || media.paused || media.ended) {
                 unsubscribe = null;
                 return false;
             }
-            const position = audio.currentTime || 0;
-            repeatedSamples = position === lastSample ? repeatedSamples + 1 : 0;
-            if (repeatedSamples >= 2) waitingAt = position;
-            lastSample = position;
             display('sample');
         }
         function update({ type }) {
-            if (audio.paused || audio.ended || type === 'emptied') {
+            if (media.paused || media.ended || type === 'emptied') {
                 unsubscribe?.();
                 unsubscribe = null;
             } else if (!unsubscribe && (type === 'play' || type === 'playing')) {
                 // Some mobile engines deliver timeupdate sparsely after a mute change.
                 // Sample the real playhead on the existing shared ticker until playback stops.
-                lastSample = null;
-                repeatedSamples = 0;
                 unsubscribe = subscribeSecond(sample);
             }
             display(type);
         }
-        for (const type of events) audio.addEventListener(type, update);
-        if (!audio.paused && !audio.ended) update({ type: 'play' });
+        for (const type of events) media.addEventListener(type, update);
+        if (!media.paused && !media.ended) update({ type: 'play' });
+        else display('bind');
         return () => {
             unsubscribe?.();
-            for (const type of events) audio.removeEventListener(type, update);
+            for (const type of events) media.removeEventListener(type, update);
         };
     }
 
     function togglePreviewMute(media, onPlayError) {
-        const wasPlaying = media.tagName === 'AUDIO' && !media.paused && !media.ended;
+        const wasPlaying = !media.paused && !media.ended;
         media.muted = !media.muted;
-        // Restore only playback interrupted synchronously by this mute button's own gesture.
-        if (wasPlaying && media.paused && !media.ended && media.isConnected && !media.ownerDocument.hidden) {
+        // Reaffirm active playback within the Unmute gesture. WebKit can queue the
+        // sound-policy change before reflecting it in paused or the volumechange event.
+        if (wasPlaying && (!media.muted || media.paused) && !media.ended && media.isConnected && !media.ownerDocument.hidden) {
             media.play().catch(error => { if (media.paused) onPlayError?.(error); });
         }
     }
@@ -915,6 +910,9 @@
             const badge = document.createElement('span');
             badge.className = 'artsoul-card-media-badge';
             badge.textContent = 'VIDEO';
+            bindPreviewStatus(video, status => {
+                if (badge.textContent !== status) badge.textContent = status;
+            });
             const controls = document.createElement('div');
             controls.className = 'artsoul-card-media-controls';
             isolateMediaControl(controls);
@@ -961,8 +959,9 @@
             controls.className = 'artsoul-card-media-controls';
             isolateMediaControl(controls);
             const reportPlayError = error => {
-                label.textContent = error.name === 'AbortError' ? 'Paused' : 'Retry';
-                if (label.textContent === 'Retry') toggle.setAttribute('aria-label', 'Retry audio preview');
+                if (error.name === 'AbortError') return;
+                label.textContent = 'Retry';
+                toggle.setAttribute('aria-label', 'Retry audio preview');
             };
             const toggle = createPlaybackButton(audio, 'audio preview', reportPlayError);
             const mute = createMuteButton(audio, 'audio preview', reportPlayError);
@@ -975,7 +974,7 @@
             audio.addEventListener('pause', sync);
             audio.addEventListener('ended', sync);
             audio.addEventListener('error', () => onUnavailable?.());
-            bindAudioPreviewStatus(audio, status => {
+            bindPreviewStatus(audio, status => {
                 if (label.textContent !== status) label.textContent = status;
             });
             audio.addEventListener('volumechange', () => syncMuteButton(mute, audio, 'audio preview'));
@@ -1149,6 +1148,7 @@
         const ref = React.useRef(null);
         const [playing, setPlaying] = React.useState(false);
         const [muted, setMuted] = React.useState(true);
+        const [label, setLabel] = React.useState('VIDEO');
         const [loaded, setLoaded] = React.useState(false);
         const [started, setStarted] = React.useState(false);
         const [posterFailed, setPosterFailed] = React.useState(false);
@@ -1156,7 +1156,9 @@
             setLoaded(false);
             setStarted(false);
             setPosterFailed(false);
-            return () => ref.current?.pause();
+            const video = ref.current;
+            const stopClock = bindPreviewStatus(video, setLabel);
+            return () => { stopClock(); video.pause(); };
         }, [url]);
         React.useEffect(() => {
             const restore = () => {
@@ -1174,13 +1176,16 @@
         const toggle = event => {
             stopCardActivation(event);
             const video = ref.current;
-            if (video) video.paused ? video.play().catch(() => setPlaying(false)) : video.pause();
+            if (!video) return;
+            if (video.paused || video.ended) video.play().catch(() => setPlaying(!video.paused && !video.ended));
+            else video.pause();
         };
+        const syncPlaying = event => setPlaying(!event.currentTarget.paused && !event.currentTarget.ended);
         const toggleMute = event => {
             stopCardActivation(event);
             const video = ref.current;
             if (!video) return;
-            video.muted = !video.muted;
+            togglePreviewMute(video);
             setMuted(video.muted);
         };
         return h('div', { className: 'artsoul-card-media artsoul-card-media-video', 'data-playing': String(playing) },
@@ -1190,14 +1195,14 @@
                 onLoadedData: () => setLoaded(true),
                 onPlay: event => {
                     startVideoFromPreview(event.currentTarget, url, poster);
-                    pauseOtherMedia(event.currentTarget); setPlaying(true); setStarted(true);
+                    pauseOtherMedia(event.currentTarget); syncPlaying(event); setStarted(true);
                 },
-                onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
+                onPause: syncPlaying, onEnded: syncPlaying,
                 onError: event => {
                     if (!retryVideoPreview(event.currentTarget, url, poster)) onUnavailable?.(event);
                 },
                 onVolumeChange: event => setMuted(event.currentTarget.muted) }),
-            h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO'),
+            h('span', { className: 'artsoul-card-media-badge' }, label),
             h('div', { className: 'artsoul-card-media-controls', draggable: false,
                 onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                 onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
@@ -1225,7 +1230,7 @@
         const [label, setLabel] = React.useState('AUDIO');
         React.useEffect(() => {
             const audio = ref.current;
-            const stopStatus = bindAudioPreviewStatus(audio, setLabel);
+            const stopStatus = bindPreviewStatus(audio, setLabel);
             const restore = () => {
                 audio.pause();
                 setPlaying(false);
@@ -1240,7 +1245,7 @@
         const reportPlayError = (audio, error) => {
             if (audio !== ref.current || !audio.paused) return;
             setPlaying(false);
-            setLabel(error.name === 'AbortError' ? 'Paused' : 'Retry');
+            if (error.name !== 'AbortError') setLabel('Retry');
         };
         const syncPlaying = event => {
             const audio = event.currentTarget;
@@ -1250,7 +1255,7 @@
             stopCardActivation(event);
             const audio = ref.current;
             if (!audio) return;
-            if (audio.paused) audio.play().catch(error => reportPlayError(audio, error));
+            if (audio.paused || audio.ended) audio.play().catch(error => reportPlayError(audio, error));
             else audio.pause();
         };
         const toggleMute = event => {

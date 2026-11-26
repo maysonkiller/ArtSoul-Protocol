@@ -64,7 +64,7 @@
         }
         @supports (width: 1cqw) {
             :root:not(#artsoul-motion-enabled) body.future :is(.artsoul-aura-frame--platform, .artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-word {
-                animation: artsoulAuraCaption 18s linear infinite !important;
+                animation: artsoulAuraCaption var(--aura-lap) linear infinite !important;
             }
         }
     }

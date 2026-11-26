@@ -47,7 +47,7 @@ One aura can be auto-assigned to an NFT by priority:
 3. Partner collection aura: gold, labeled ArtSoul Partner.
 4. None.
 
-Users do not pick aura colors. The Future border label defaults to off. The admin panel's **NFT appearance** setting applies to verified frames on cards and artwork details. Platform and Partner labels travel around all four sides as a single word or phrase. Both horizontal edges read from left to right. Genesis and reduced-motion labels stay stationary. Classic retains its static frame.
+Users do not pick aura colors. The Future border label defaults to off. The admin panel's **NFT appearance** setting applies to verified frames on cards and artwork details. When enabled, the label sits on the colored edge. Platform and Partner labels travel around all four sides as a single word or phrase. Both horizontal edges read from left to right. Larger artwork views use a larger label and a slower lap. Genesis and reduced-motion labels stay stationary. Classic retains its static frame.
 
 Open [NFT appearance](/admin#nft-appearance) with a verified administrator wallet or an active Team wallet in the current staff-authority pair. Each change records the actor, staff authorization version and setting revision. Team changes also record the [authority policy version](../../sql/migrations/20261125185000_aura_authority_team.sql). Saving checks the role and revision in the same transaction and rechecks Team membership for the site's origin and network. The public artwork API reads the boolean only for already verified frames. Missing settings storage leaves labels off.
 

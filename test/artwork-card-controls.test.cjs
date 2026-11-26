@@ -216,11 +216,13 @@ test('decorative disc rotation is limited to Future when the reader allows motio
 
 test('the mobile motion guard permits Future publisher and Partner captions when motion is allowed', () => {
     const touchCss = fs.readFileSync(path.join(root, 'mobile-no-motion.css'), 'utf8');
+    const desktopCss = fs.readFileSync(path.join(root, 'unified-styles.css'), 'utf8');
     const permitted = touchCss.slice(touchCss.indexOf('@media (prefers-reduced-motion: no-preference)'));
     const selector = 'body.future :is(.artsoul-aura-frame--platform, .artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-word';
     assert.ok(permitted.includes(selector));
     const rule = permitted.slice(permitted.indexOf(selector)).split('}')[0];
-    assert.match(rule, /animation: artsoulAuraCaption [^;]*infinite !important;/);
+    assert.match(rule, /animation: artsoulAuraCaption var\(--aura-lap\) linear infinite !important;/);
+    assert.match(desktopCss, /animation: artsoulAuraCaption var\(--aura-lap\) linear infinite;/);
     assert.equal(touchCss.match(/animation: artsoulAuraCaption/g)?.length, 1);
 });
 
@@ -443,7 +445,7 @@ test('muted audio shows loading, progress, interruption and retry without changi
     assert.equal(label.textContent, 'Wait');
     audio.pause();
     audio.dispatch('timeupdate');
-    assert.equal(label.textContent, 'Paused');
+    assert.equal(label.textContent, '0:00');
     const originalPlay = audio.play;
     audio.play = () => Promise.reject(Object.assign(new Error(), { name: 'NotAllowedError' }));
     play.dispatch('click');
@@ -462,7 +464,7 @@ test('muted audio shows loading, progress, interruption and retry without changi
     assert.equal(audio.paused, false);
     audio.ended = true;
     audio.dispatch('ended');
-    assert.equal(label.textContent, 'AUDIO');
+    assert.equal(label.textContent, '1:06');
 });
 
 test('an active audio preview samples the real position when timeupdate is sparse and releases the ticker on pause', () => {
@@ -487,7 +489,7 @@ test('an active audio preview samples the real position when timeupdate is spars
     assert.equal(label.textContent, '0:04', 'a progressing playhead takes precedence over low readiness');
     audio.dispatch('waiting');
     tick();
-    assert.equal(label.textContent, 'Wait');
+    assert.equal(label.textContent, '0:04');
     audio.currentTime = 5.25;
     tick();
     assert.equal(label.textContent, '0:05');
@@ -496,14 +498,45 @@ test('an active audio preview samples the real position when timeupdate is spars
     assert.equal(label.textContent, '0:05', 'a stale waiting event does not overwrite a ready stream');
     tick();
     tick();
-    assert.equal(label.textContent, 'Wait', 'a stationary native playhead must never gain fictitious seconds');
+    assert.equal(label.textContent, '0:05', 'a stationary native playhead must never gain fictitious seconds');
     audio.currentTime = 8.01;
     tick();
     assert.equal(label.textContent, '0:08');
     audio.pause();
     assert.equal(tick, undefined);
     assert.equal(clears, 1);
-    assert.equal(label.textContent, 'Paused');
+    assert.equal(label.textContent, '0:08');
+});
+
+test('sparse clocks stay at the last real second through pause, mute and a new Play gesture', () => {
+    for (const kind of ['audio', 'video']) {
+        const { api, mediaElements, window, document } = loadDomCardRuntime();
+        let tick;
+        window.setInterval = callback => { tick = callback; return 7; };
+        window.clearInterval = () => { tick = undefined; };
+        const card = api.createMediaElement({ file_type: kind, file_url: kind === 'audio' ? 'track.mp3' : 'clip.mp4' });
+        const container = kind === 'audio' ? card.children[0] : card;
+        const controls = container.children.find(el => el.className === 'artsoul-card-media-controls');
+        const label = container.children.find(el => ['artsoul-card-audio-label', 'artsoul-card-media-badge'].includes(el.className));
+        const [media] = mediaElements;
+        Object.assign(media, { isConnected: true, ownerDocument: document, readyState: 4, currentTime: 3.2 });
+        controls.children[0].dispatch('click');
+        for (let i = 0; i < 4; i++) tick();
+        assert.equal(media.paused, false, 'a sparse native clock must not interrupt audible playback');
+        controls.children[0].dispatch('click');
+        assert.equal(media.paused, true);
+        assert.equal(controls.children[0].dataset.state, 'paused');
+        assert.equal(label.textContent, '0:03');
+        assert.equal(tick, undefined);
+        controls.children[1].dispatch('click');
+        assert.equal(media.paused, true);
+        controls.children[0].dispatch('click');
+        media.currentTime = 4.8;
+        tick();
+        assert.equal(label.textContent, '0:04');
+        controls.children[0].dispatch('click');
+        assert.equal(label.textContent, '0:04');
+    }
 });
 
 test('only a visible playing audio interrupted by its mute gesture makes one immediate recovery attempt', () => {
