@@ -29,9 +29,14 @@ async function rehearseCollectionOperators({ network, artifacts }) {
         const { abi, bytecode } = await artifacts.readArtifact(name);
         return (await new ethers.ContractFactory(abi, bytecode, creator).deploy(...args)).waitForDeployment();
     }
+    const protocolSafe = await deploy('TreasuryAccountStub', 2);
+    const ecosystemSafe = await deploy('TreasuryAccountStub', 2);
+    const securitySafe = await deploy('TreasuryAccountStub', 2);
+    const registry = await deploy('OrdinaryPayoutMarket', protocolSafe.target, ecosystemSafe.target, securitySafe.target, 8, 30_000);
+    const marketplace = await deploy('SettledArtworkSourceFixture');
     const editions = await deploy('CollectionLaunch', 'Editions', 'EDS', 'ipfs://fixture/', 3,
-        creator.address, treasury.address, creator.address, 550);
-    const first = await deploy('PartnerFirstWorkLaunch', 'First work', 'FST', 'ipfs://fixture/', 2, creator.address, treasury.address);
+        creator.address, treasury.address, creator.address, 550, registry.target);
+    const first = await deploy('PartnerFirstWorkLaunch', 'First work', 'FST', 'ipfs://fixture/', 2, creator.address, treasury.address, registry.target);
     const forge = await deploy('CollectionForge', 'Forged', 'FRG', 'ipfs://fixture/', editions.target,
         2, 1, ethers.id('local recipe'), creator.address, creator.address, 550);
     const start = (await provider.getBlock('latest')).timestamp + 100;
@@ -54,23 +59,32 @@ async function rehearseCollectionOperators({ network, artifacts }) {
     const missingConsent = error => ethers.isError(error, 'CALL_EXCEPTION') &&
         error.data === editions.interface.getError('UnauthorizedForge').selector;
     await assert.rejects(craft.craft.staticCall([1, 2], holder.address), missingConsent);
-    await mine(editions.connect(holder).approve(forge.target, 1));
+    await mine(editions.connect(holder).setForgeBurnApproval([1], true));
     await assert.rejects(craft.craft.staticCall([1, 2], holder.address), missingConsent);
-    await mine(editions.connect(holder).approve(forge.target, 2));
+    await mine(editions.connect(holder).setForgeBurnApproval([2], true));
     assert.equal(await editions.isApprovedForAll(holder.address, forge.target), false);
     await mine(craft.craft([1, 2], holder.address));
     assert.equal(await editions.totalBurned(), 2n);
     assert.equal(await forge.ownerOf(1), holder.address);
 
     const candidates = [];
+    async function admit() {
+        const scheduled = await mine(securitySafe.scheduleMarket(registry.target, marketplace.target));
+        const readyAt = await registry.marketplaceAdmissionReadyAt(marketplace.target);
+        assert.equal(readyAt - BigInt((await provider.getBlock(scheduled.blockNumber)).timestamp), 48n * 3600n);
+        await network.provider.send('evm_setNextBlockTimestamp', [Number(readyAt)]);
+        await mine(registry.executeMarketplaceAdmission(marketplace.target, { gasLimit: 500_000 }));
+    }
     for (const [name, nft, token, unlistedContract] of [
         ['CollectionLaunch', editions, 3, first.target],
         ['PartnerFirstWorkLaunch', first, 1, editions.target],
         ['CollectionForge', forge, 1, first.target]
     ]) {
         const signed = nft.connect(holder);
+        assert.equal(await nft.marketplaceRegistry(), registry.target);
         assert.equal(await nft.ownerOf(token), holder.address);
         assert.equal(await nft.getApproved(token), ethers.ZeroAddress);
+        assert.equal(await approvalOutcome(() => signed.approve.staticCall(registry.target, token), registry.target), 'denied-by-policy');
         const probes = [];
         for (const [kind, operator] of [['wallet', other.address], ['contract', unlistedContract]]) {
             assert.equal(await nft.isApprovedForAll(holder.address, operator), false);
@@ -78,9 +92,27 @@ async function rehearseCollectionOperators({ network, artifacts }) {
             const portfolioGrant = await approvalOutcome(() => signed.setApprovalForAll.staticCall(operator, true), operator);
             probes.push({ kind, tokenGrant, portfolioGrant });
         }
+        await admit();
+        assert.equal(await signed.getApproved(token), ethers.ZeroAddress);
+        assert.equal(await signed.isApprovedForAll(holder.address, marketplace.target), false);
+        await mine(signed.approve(marketplace.target, token));
+        await mine(signed.setApprovalForAll(marketplace.target, true));
+        assert.equal(await signed.getApproved(token), marketplace.target);
+        assert.equal(await signed.isApprovedForAll(holder.address, marketplace.target), true);
+        await mine(securitySafe.disableMarket(registry.target, marketplace.target));
+        assert.equal(await signed.getApproved(token), ethers.ZeroAddress);
+        assert.equal(await signed.isApprovedForAll(holder.address, marketplace.target), false);
+        await admit();
+        assert.equal(await signed.getApproved(token), ethers.ZeroAddress);
+        assert.equal(await signed.isApprovedForAll(holder.address, marketplace.target), false);
+        await mine(signed.approve(marketplace.target, token));
+        await mine(marketplace.transferApproved(nft.target, holder.address, other.address, token));
+        await mine(nft.connect(other).transferFrom(other.address, holder.address, token));
+        await mine(securitySafe.disableMarket(registry.target, marketplace.target));
         await mine(signed.transferFrom(holder.address, other.address, token));
         assert.equal(await nft.ownerOf(token), other.address);
-        candidates.push({ name, runtimeHash: ethers.keccak256(await provider.getCode(nft.target)), probes, directTransfer: true });
+        candidates.push({ name, runtimeHash: ethers.keccak256(await provider.getCode(nft.target)), probes,
+            directTransfer: true, freshApprovalAfterReadmission: true });
     }
     return { chainId: 31337, forgeWithIndividualConsent: true, candidates };
 }
@@ -91,6 +123,7 @@ function requireRestrictedOperators(report) {
     assert.deepEqual(report.candidates.map(row => row.name), ['CollectionLaunch', 'PartnerFirstWorkLaunch', 'CollectionForge']);
     for (const row of report.candidates) {
         assert.equal(row.directTransfer, true);
+        assert.equal(row.freshApprovalAfterReadmission, true);
         assert.deepEqual(row.probes.map(probe => probe.kind), ['wallet', 'contract']);
     }
     const blocked = report.candidates.filter(candidate => candidate.probes.some(probe =>

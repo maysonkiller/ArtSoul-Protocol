@@ -40,9 +40,11 @@ describe('Mint reservation escrow on the disposable EVM', function () {
     }
 
     async function deployFixture(supply, claimHours = 36, additionalPayment = mintPrice, treasury = protocol.address) {
+        const source = await artifacts.readArtifact('SettledArtworkSourceFixture');
+        const registry = await (await new ethers.ContractFactory(source.abi, source.bytecode, creator).deploy()).waitForDeployment();
         const artifact = await artifacts.readArtifact('MintReservationFixture');
         const contract = await new ethers.ContractFactory(artifact.abi, artifact.bytecode, creator)
-            .deploy(supply, creator.address, treasury, claimHours, additionalPayment);
+            .deploy(supply, creator.address, treasury, claimHours, additionalPayment, registry.target);
         return contract.waitForDeployment();
     }
 

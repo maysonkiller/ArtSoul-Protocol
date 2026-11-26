@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./CollectionOperatorApprovals.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /// @notice Experimental additive collection launch; not the deployed 1/1 protocol.
 /// @dev No upgrade mechanism. Terms and metadata are immutable once locked.
-contract CollectionLaunch is ERC721, ERC2981, Ownable2Step, Pausable, ReentrancyGuard {
+contract CollectionLaunch is CollectionOperatorApprovals, ERC2981, Ownable2Step, Pausable, ReentrancyGuard {
     enum Kind { Fixed, Merkle, UniformAuction, FirstArtworkAuction }
 
     struct PhaseConfig {
@@ -58,6 +58,7 @@ contract CollectionLaunch is ERC721, ERC2981, Ownable2Step, Pausable, Reentrancy
     uint256 public allocatedSupply;
     bool public configurationLocked;
     address public forge;
+    mapping(uint256 => bool) public forgeBurnApproved;
     PhaseConfig[] internal _phases;
     mapping(uint256 => PhaseState) internal _states;
     mapping(uint256 => mapping(address => uint256)) public phaseMints;
@@ -94,12 +95,13 @@ contract CollectionLaunch is ERC721, ERC2981, Ownable2Step, Pausable, Reentrancy
     event RefundCredited(uint256 indexed phaseId, address indexed bidder, uint256 amount);
     event CreditWithdrawn(address indexed payee, address indexed recipient, uint256 amount);
     event ForgeConfigured(address indexed forge);
+    event ForgeBurnApproval(address indexed holder, uint256 indexed tokenId, bool approved);
 
     constructor(
         string memory name_, string memory symbol_, string memory metadataPrefix_,
         uint32 maxSupply_, address creator_, address protocolReceiver_,
-        address royaltyReceiver_, uint96 royaltyBps_
-    ) ERC721(name_, symbol_) Ownable(creator_) {
+        address royaltyReceiver_, uint96 royaltyBps_, address registry_
+    ) CollectionOperatorApprovals(name_, symbol_, registry_) Ownable(creator_) {
         if (maxSupply_ == 0 || protocolReceiver_ == address(0) || royaltyReceiver_ == address(0)
             || bytes(metadataPrefix_).length == 0 || royaltyBps_ > 10_000) revert InvalidConfiguration();
         maxSupply = maxSupply_;
@@ -259,9 +261,24 @@ contract CollectionLaunch is ERC721, ERC2981, Ownable2Step, Pausable, Reentrancy
         emit CreditWithdrawn(msg.sender, recipient, amount);
     }
 
+    function setForgeBurnApproval(uint256[] calldata tokenIds, bool approved) external {
+        if (!configurationLocked || forge == address(0) || tokenIds.length == 0 || tokenIds.length > 32) revert UnauthorizedForge();
+        for (uint256 i; i < tokenIds.length; ++i) {
+            uint256 id = tokenIds[i];
+            if (ownerOf(id) != msg.sender) revert UnauthorizedForge();
+            forgeBurnApproved[id] = approved;
+            emit ForgeBurnApproval(msg.sender, id, approved);
+        }
+    }
+
+    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+        if (forgeBurnApproved[tokenId]) delete forgeBurnApproved[tokenId];
+        return super._update(to, tokenId, auth);
+    }
+
     function burnForForge(address holder, uint256 tokenId) external {
         if (msg.sender != forge || !configurationLocked) revert UnauthorizedForge();
-        if (ownerOf(tokenId) != holder || !_isAuthorized(holder, msg.sender, tokenId)) revert UnauthorizedForge();
+        if (ownerOf(tokenId) != holder || !forgeBurnApproved[tokenId]) revert UnauthorizedForge();
         ++totalBurned;
         _burn(tokenId);
     }

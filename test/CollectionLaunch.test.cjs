@@ -27,7 +27,8 @@ function phase(overrides = {}) {
     enabled: true, rollover: false, priceSource: 0, fallbackEnabled: false, fallbackPrice: 0, ...overrides};
 }
 async function launch(max = 30) {
-  return deploy('CollectionLaunch', ['Fixture', 'FIX', 'ipfs://fixture/', max, await creator.getAddress(), await treasury.getAddress(), await creator.getAddress(), 550]);
+  const registry = await deploy('SettledArtworkSourceFixture');
+  return deploy('CollectionLaunch', ['Fixture', 'FIX', 'ipfs://fixture/', max, creator.address, treasury.address, creator.address, 550, registry.target]);
 }
 async function configured(phases, max = 30) {
   const collection = await launch(max);
@@ -60,17 +61,17 @@ describe('Additive Collection Launch security and accounting', function () {
     await fail(c.connect(signers[2]).pause());
   });
 
-  it('blocks the current unrestricted collection candidates at the operator release gate', async () => {
+  it('passes the operator release gate for all new collection templates', async () => {
     const {rehearseCollectionOperators, requireRestrictedOperators} = require('../scripts/check-collection-operator-policy.cjs');
     const report = await rehearseCollectionOperators({network, artifacts});
     for (const candidate of report.candidates) {
       assert.equal(candidate.directTransfer, true);
       for (const probe of candidate.probes) {
-        assert.deepEqual([probe.tokenGrant, probe.portfolioGrant], ['permitted', 'permitted']);
+        assert.deepEqual([probe.tokenGrant, probe.portfolioGrant], ['denied-by-policy', 'denied-by-policy']);
       }
     }
     assert.equal(report.forgeWithIndividualConsent, true);
-    assert.throws(() => requireRestrictedOperators(report), /CollectionLaunch, PartnerFirstWorkLaunch, CollectionForge/);
+    requireRestrictedOperators(report);
     assert.throws(() => requireRestrictedOperators({...report, candidates: []}));
   });
 
@@ -315,6 +316,7 @@ describe('Additive Collection Launch security and accounting', function () {
 
   it('crafts ten owned tokens atomically, rejects duplicates, and emits permanent ancestry', async () => {
     const c = await launch(20);
+    await fail(deploy('CollectionForge', ['Forged', 'FORGE', 'ipfs://forged/', creator.address, 10, 2, ethers.id('recipe-10'), creator.address, creator.address, 550]), 'InvalidRecipe');
     const f = await deploy('CollectionForge', ['Forged', 'FORGE', 'ipfs://forged/', await c.getAddress(), 10, 2, ethers.id('recipe-10'), await creator.getAddress(), await creator.getAddress(), 550]);
     await tx(c.setForge(await f.getAddress()));
     await tx(c.addPhase(phase({allocation: 20, walletLimit: 20, price: 0})));
@@ -323,7 +325,15 @@ describe('Additive Collection Launch security and accounting', function () {
     await tx(c.connect(buyer).mintPhase(0, 20, 0, [], addr));
     const ids = Array.from({length: 10}, (_, i) => i + 1);
     await fail(f.connect(buyer).craft(ids, addr), 'UnauthorizedForge');
-    await tx(c.connect(buyer).setApprovalForAll(await f.getAddress(), true));
+    await fail(c.connect(buyer).setApprovalForAll(f.target, true));
+    await fail(c.connect(signers[3]).setForgeBurnApproval(ids, true), 'UnauthorizedForge');
+    await tx(c.connect(buyer).setForgeBurnApproval([1], true));
+    await tx(c.connect(buyer).transferFrom(addr, addr, 1));
+    assert.equal(await c.forgeBurnApproved(1), false);
+    await tx(c.connect(buyer).setForgeBurnApproval([...ids, ...ids.map(id => id + 10)], true));
+    await tx(c.connect(buyer).setForgeBurnApproval([1], false));
+    await fail(f.connect(buyer).craft(ids, addr), 'UnauthorizedForge');
+    await tx(c.connect(buyer).setForgeBurnApproval([1], true));
     await fail(f.connect(buyer).craft(ids.slice(1), addr), 'InvalidIngredients');
     await fail(f.connect(buyer).craft([1, 1, ...ids.slice(2)], addr), 'InvalidIngredients');
     await fail(f.connect(signers[3]).craft(ids, addr), 'NotIngredientOwner');

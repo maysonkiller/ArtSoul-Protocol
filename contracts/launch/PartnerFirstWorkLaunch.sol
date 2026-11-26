@@ -18,8 +18,8 @@ contract PartnerFirstWorkLaunch is CollectionLaunch {
     event PublicMintWindowShifted(uint64 start, uint64 end);
 
     constructor(string memory name_, string memory symbol_, string memory metadataPrefix_, uint32 maxSupply_,
-        address creator_, address protocolReceiver_)
-        CollectionLaunch(name_, symbol_, metadataPrefix_, maxSupply_, creator_, protocolReceiver_, creator_, 550)
+        address creator_, address protocolReceiver_, address registry_)
+        CollectionLaunch(name_, symbol_, metadataPrefix_, maxSupply_, creator_, protocolReceiver_, creator_, 550, registry_)
     {
         if (maxSupply_ < 2) revert InvalidConfiguration();
     }

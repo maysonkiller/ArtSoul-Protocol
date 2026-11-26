@@ -5,6 +5,7 @@ import { Interface, keccak256, ZeroAddress } from 'ethers';
 import { checkCollectionMetadata, checkIssuedFirstWork } from '../scripts/check-collection-metadata.mjs';
 import { createDraft, createFirstArtworkDraft } from '../src/features/collections/launch-config.js';
 import { MAX_METADATA_BYTES } from '../src/config/upload-policy.js';
+import { rehearsalCore } from '../scripts/rehearsal-review/deployment.mjs';
 
 const cid = 'Qm' + 'a'.repeat(44);
 const prefix = `ipfs://${cid}/items/`;
@@ -77,11 +78,12 @@ test('issued first-work evidence binds the draft, paying collector and current h
         'function collectionFirstCollector() returns (address)', 'function ownerOf(uint256) returns (address)',
         'function tokenURI(uint256) returns (string)', 'function mintPrice(uint256) returns (uint256)',
         'function maxSupply() returns (uint32)', 'function configurationLocked() returns (bool)',
-        'function allocatedSupply() returns (uint256)', 'function royaltyInfo(uint256,uint256) returns (address,uint256)'
+        'function allocatedSupply() returns (uint256)', 'function royaltyInfo(uint256,uint256) returns (address,uint256)',
+        'function marketplaceRegistry() returns (address)'
     ]);
     const values = { creator: address, firstCollector: buyer, collectionFirstCollector: buyer,
         ownerOf: holder, tokenURI: prefix + '1', mintPrice: 42n, openingReserve: 31n, maxSupply: 5n,
-        allocatedSupply: 5n, configurationLocked: true, royaltyInfo: [address, 550n] };
+        allocatedSupply: 5n, configurationLocked: true, royaltyInfo: [address, 550n], marketplaceRegistry: rehearsalCore };
     let chain = '0x14a34', canonical = block;
     async function rpc(method, params) {
         if (method === 'eth_chainId') return chain;
@@ -103,6 +105,7 @@ test('issued first-work evidence binds the draft, paying collector and current h
     const check = (second = other) => checkIssuedFirstWork(json, address, runtime, digest, [rpc, second]);
     const report = await check();
     assert.equal(report.firstCollector, buyer);
+    assert.equal(report.marketplaceRegistry, rehearsalCore);
     assert.equal(report.owner, holder);
     assert.equal(report.publicMintPriceWei, '42');
     assert.equal(report.openingReserveWei, '31');
@@ -126,7 +129,8 @@ test('issued first-work evidence binds the draft, paying collector and current h
     for (const [field, bad, expected] of [['collectionFirstCollector', holder, /do not agree/],
         ['ownerOf', ZeroAddress, /do not agree/], ['mintPrice', 30n, /opening price/], ['tokenURI', prefix + '2', /URI differs/],
         ['maxSupply', 4n, /supply/], ['allocatedSupply', 3n, /allocation/], ['openingReserve', 32n, /opening price/],
-        ['configurationLocked', false, /Locked/], ['royaltyInfo', [holder, 550n], /creator royalty/],
+        ['configurationLocked', false, /Locked/], ['marketplaceRegistry', buyer, /marketplace registry/],
+        ['royaltyInfo', [holder, 550n], /creator royalty/],
         ['royaltyInfo', [address, 549n], /creator royalty/]]) {
         const previous = values[field];
         values[field] = bad;

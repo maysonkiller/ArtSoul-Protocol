@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./CollectionOperatorApprovals.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface IForgeIngredient {
+    function marketplaceRegistry() external view returns (address);
     function ownerOf(uint256 tokenId) external view returns (address);
     function burnForForge(address holder, uint256 tokenId) external;
     function maxSupply() external view returns (uint32);
@@ -18,7 +19,7 @@ interface IForgeIngredient {
 
 /// @notice Separate output collection with immutable recipe and event ancestry.
 /// @dev No Genesis promise or mint authority is created by this contract.
-contract CollectionForge is ERC721, ERC2981, Ownable2Step, Pausable, ReentrancyGuard {
+contract CollectionForge is CollectionOperatorApprovals, ERC2981, Ownable2Step, Pausable, ReentrancyGuard {
     IForgeIngredient public immutable ingredient;
     uint256 public immutable ingredientCount;
     uint256 public immutable maxSupply;
@@ -38,8 +39,8 @@ contract CollectionForge is ERC721, ERC2981, Ownable2Step, Pausable, ReentrancyG
         string memory name_, string memory symbol_, string memory metadataPrefix_,
         address ingredient_, uint256 ingredientCount_, uint256 maxSupply_,
         bytes32 recipeId_, address owner_, address royaltyReceiver_, uint96 royaltyBps_
-    ) ERC721(name_, symbol_) Ownable(owner_) {
-        if (ingredient_.code.length == 0 || ingredientCount_ < 2 || ingredientCount_ > 32
+    ) CollectionOperatorApprovals(name_, symbol_, _ingredientRegistry(ingredient_)) Ownable(owner_) {
+        if (ingredientCount_ < 2 || ingredientCount_ > 32
             || maxSupply_ == 0 || maxSupply_ > IForgeIngredient(ingredient_).maxSupply() / ingredientCount_
             || recipeId_ == bytes32(0) || bytes(metadataPrefix_).length == 0
             || royaltyReceiver_ == address(0) || royaltyBps_ > 10_000) revert InvalidRecipe();
@@ -49,6 +50,11 @@ contract CollectionForge is ERC721, ERC2981, Ownable2Step, Pausable, ReentrancyG
         recipeId = recipeId_;
         _metadataPrefix = metadataPrefix_;
         _setDefaultRoyalty(royaltyReceiver_, royaltyBps_);
+    }
+
+    function _ingredientRegistry(address source) private view returns (address) {
+        if (source.code.length == 0) revert InvalidRecipe();
+        return IForgeIngredient(source).marketplaceRegistry();
     }
 
     function craft(uint256[] calldata tokenIds, address recipient) external nonReentrant whenNotPaused returns (uint256 tokenId) {

@@ -35,9 +35,11 @@ describe('Partner collection first-work lifecycle', function () {
         provider = new ethers.BrowserProvider(network.provider, undefined, { cacheTimeout: -1 });
         provider.pollingInterval = 10;
         [creator, protocol, bidder, collector, publicBuyer] = await provider.listAccounts();
+        const source = await artifacts.readArtifact('SettledArtworkSourceFixture');
+        const registry = await (await new ethers.ContractFactory(source.abi, source.bytecode, creator).deploy()).waitForDeployment();
         const { abi, bytecode } = await artifacts.readArtifact('PartnerFirstWorkLaunch');
         launch = await (await new ethers.ContractFactory(abi, bytecode, creator)
-            .deploy('Fixture series', 'SER', 'ipfs://fixture/', 4, creator.address, protocol.address)).waitForDeployment();
+            .deploy('Fixture series', 'SER', 'ipfs://fixture/', 4, creator.address, protocol.address, registry.target)).waitForDeployment();
         const start = BigInt((await provider.getBlock('latest')).timestamp) + 120n;
         first = {kind: 3, start, end: start + day, allocation: 1, walletLimit: 1, price: 100n, merkleRoot: ethers.ZeroHash,
             enabled: true, rollover: false, priceSource: 0, fallbackEnabled: false, fallbackPrice: 0};
