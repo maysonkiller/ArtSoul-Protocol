@@ -1875,7 +1875,8 @@ const { useState, useEffect, useRef } = React;
                                                 />
                                             </div>
                                             {identityVerificationEnabled && isOwnProfile && walletStateSettled && connectedWalletAddress &&
-                                                <IdentityApplication key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} name={profile?.username} />}
+                                                <IdentityApplication key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress}
+                                                    profile={profile} connectedX={getProfileXLinks(profile).find(link => link.connected)?.handle} />}
                                             <section className="profile-connections" aria-labelledby="profileConnectionsTitle">
                                                 <h2 id="profileConnectionsTitle">Connected accounts</h2>
                                                 <p className="profile-connection-help">Connecting or disconnecting an account takes effect immediately. Save Profile and Cancel apply only to your profile details.</p>

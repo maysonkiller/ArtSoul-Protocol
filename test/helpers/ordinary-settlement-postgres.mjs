@@ -102,10 +102,19 @@ async function verifyCommand(pool) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const dir = await mkdtemp(join(tmpdir(), 'artsoul-ordinary-command-'));
     const pair = join(dir, 'pair.json'), locator = join(dir, 'receipt.json');
-    const command = (args = ['scripts/index-ordinary-settlement.mjs', pair, locator]) => promisify(execFile)(process.execPath, args, {
-        windowsHide: true, timeout: 25000, env: { ...process.env, ARTSOUL_ORDINARY_RPC_URL: 'http://127.0.0.1:' + server.address().port + '/' + secret,
-            ARTSOUL_ORDINARY_DATABASE_URL: 'postgresql://postgres@127.0.0.1:' + pool.options.port + '/postgres' }
-    });
+    const fixtureUrl = 'http://127.0.0.1:' + server.address().port + '/' + secret;
+    const settle = ['scripts/index-ordinary-settlement.mjs', pair, locator];
+    const redirectFixture = 'const send=globalThis.fetch; globalThis.fetch=(url,options)=>send(' + JSON.stringify(fixtureUrl) + ',options);';
+    const command = (args = settle, overrides = {}) => {
+        const primary = args[0] === settle[0];
+        const preload = primary ? ['--import','data:text/javascript,' + encodeURIComponent(redirectFixture)] : [];
+        return promisify(execFile)(process.execPath, [...preload, ...args], {
+            windowsHide: true, timeout: 25000, env: { ...process.env,
+                ARTSOUL_ORDINARY_RPC_URL: primary ? 'https://primary.example' : fixtureUrl,
+                ARTSOUL_ORDINARY_RPC_CHECK_URL: 'https://second.example',
+                ARTSOUL_ORDINARY_DATABASE_URL: 'postgresql://postgres@127.0.0.1:' + pool.options.port + '/postgres', ...overrides }
+        });
+    };
     try {
         const { chainId, coreAddress, nftAddress, expectedCoreCodeHash, expectedNftCodeHash, blockNumber, blockHash, transactionHash, auctionId } = options;
         await writeFile(pair, JSON.stringify({ chainId, coreAddress, nftAddress, expectedCoreCodeHash, expectedNftCodeHash }));
@@ -114,6 +123,10 @@ async function verifyCommand(pool) {
         const report = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
         assert.equal(report.inserted, false);
         assert.equal(report.sale.priceWei, '1000000000000000001');
+        assert.equal(report.sale.rpcReadings, 2);
+        const readOnly = await command([...settle,'--read-only'], {ARTSOUL_ORDINARY_DATABASE_URL:''});
+        assert.deepEqual(JSON.parse(readOnly.stdout), {sale:report.sale});
+        await assert.rejects(command(settle, {ARTSOUL_ORDINARY_RPC_CHECK_URL:'https://primary.example/another-path'}));
         assert.ok(!stdout.includes(secret));
         const privateOwner = address(70);
         await writeFile(pair, JSON.stringify({ chainId, adminSecurity: { owners: [privateOwner] },

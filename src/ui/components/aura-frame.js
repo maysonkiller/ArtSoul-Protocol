@@ -20,15 +20,13 @@ export const auraFrameLabels = Object.freeze({
     partner: 'Partner collection NFT'
 });
 
-export const auraWords = Object.freeze({platform: 'ArtSoul', genesis: 'Genesis', partner: 'Partner'});
+export const auraWords = Object.freeze({platform: 'ArtSoul', genesis: 'Genesis', partner: 'ArtSoul Partner'});
 
 // The caption stays decorative. Its parent exposes the full provenance label.
 export function auraCaption(h, word) {
     if (!Object.values(auraWords).includes(word)) return null;
     return h('span', {className: 'artsoul-aura-caption', 'aria-hidden': 'true'},
-        h('span', {className: 'aura-still'}, word),
-        ...Array.from(word, (letter, index) => h('i', {key: index,
-            style: {'--glyph-offset': (index * 0.73) + 'em'}}, letter)));
+        h('span', {className: 'aura-word'}, word));
 }
 
 export function projectedArtworkAura(artwork) {

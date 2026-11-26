@@ -151,6 +151,16 @@ Two Base Sepolia nodes verified the [first late bid](https://sepolia.basescan.or
 
 The winner used the local `--settle` review to [settle auction 1](https://sepolia.basescan.org/tx/0x07cd8c340164096abdf14f3762e0835254023b794ed7e5e2adfd567cf9864dfa). Both nodes verified the finalized sale and token in block 64,039,544 at 21:49:37 UTC. NFT 1 belongs to the winning bidder. The transaction carried zero test ETH and left 0.009 test ETH in withdrawable winner credit. Replaying the verified receipt twice through the settlement indexer in an isolated PostgreSQL database produced one sale and one credit record: 0.000975 test ETH to the creator and 0.000025 to Protocol Treasury. The public catalog still serves the earlier pair.
 
+The same sale was then imported into the private ArtSoul Supabase schema after migrations 018 and 023. The operator command read both independent RPCs before either database run. The first import returned `inserted: true`, the second returned `false`, and an independent database read found one matching sale and the exact two primary allocations. To reproduce the chain check, configure the two RPCs from the [intake runbook](../security/MIGRATION_RUNBOOK.md#ordinary-settlement-intake), then run:
+
+```sh
+node scripts/index-ordinary-settlement.mjs docs/testnet/ordinary-auction-1-settlement.json docs/testnet/ordinary-auction-1-settlement.json --read-only
+```
+
+### Restoring the first hosted sale
+
+A read-only, data-only PostgreSQL export included just the three private issuer, sale and credit tables. Its archive contained three table-data entries and occupied 2,540 bytes. Restoring into an empty local database with migrations 018 and 023 reproduced every field of the hosted issuer, finalized sale and allocations. The source and restored tables each had one row. The temporary database and local export were removed after comparison. This drill covers that sale. A full catalog and indexer recovery still requires its own release rehearsal.
+
 ## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.

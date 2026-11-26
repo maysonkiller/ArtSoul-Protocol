@@ -1,23 +1,29 @@
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import EventListener from '../src/indexer/event-listener.js';
-import { ingestOrdinarySettlement } from '../src/indexer/ordinary-settlement-intake.js';
-import { InputError, readReviewedOrdinaryPair } from './read-reviewed-ordinary-pair.mjs';
+import { readOrdinarySettlement } from '../src/indexer/nft-deployment-proof.js';
+import { persistOrdinarySettlement } from '../src/indexer/ordinary-settlement-intake.js';
+import { InputError, readReviewedOrdinaryPair, verifyPairReading } from './read-reviewed-ordinary-pair.mjs';
+import { sequencedRead } from './serve-rehearsal-review.mjs';
 
-let pool, listener;
+let pool;
 try {
     const [pairFile, receiptFile, ...extra] = process.argv.slice(2);
-    if (!pairFile || !receiptFile || extra.length) throw new InputError('Usage: node scripts/index-ordinary-settlement.mjs reviewed-pair.json receipt-location.json');
-    const rpcUrl = process.env.ARTSOUL_ORDINARY_RPC_URL;
-    const connectionString = process.env.ARTSOUL_ORDINARY_DATABASE_URL;
-    if (!rpcUrl || !connectionString) throw new InputError('Set ARTSOUL_ORDINARY_RPC_URL and ARTSOUL_ORDINARY_DATABASE_URL for this intake.');
+    const readOnly = extra.length === 1 && extra[0] === '--read-only';
+    if (!pairFile || !receiptFile || (extra.length && !readOnly)) throw new InputError('Usage: node scripts/index-ordinary-settlement.mjs reviewed-pair.json receipt-location.json [--read-only]');
     const pair = await readReviewedOrdinaryPair(pairFile);
-    const { chainId, coreAddress, nftAddress } = pair;
+    const urls = [process.env.ARTSOUL_ORDINARY_RPC_URL, process.env.ARTSOUL_ORDINARY_RPC_CHECK_URL];
+    if (!urls.every(Boolean)) throw new InputError('Configure both independent ordinary RPC endpoints.');
+    const connectionString = process.env.ARTSOUL_ORDINARY_DATABASE_URL;
+    if (!readOnly && !connectionString) throw new InputError('Set ARTSOUL_ORDINARY_DATABASE_URL for settlement intake.');
     const { blockNumber, blockHash, transactionHash, auctionId } = JSON.parse((await readFile(receiptFile, 'utf8')).trimStart());
-    listener = new EventListener({ chainId, contractAddress: coreAddress, nftAddress, rpcUrl });
-    pool = new pg.Pool({ connectionString, max: 1, connectionTimeoutMillis: 10000 });
-    const result = await ingestOrdinarySettlement(pool, listener, { ...pair, blockNumber, blockHash,
-        transactionHash, auctionId, isCurrent: () => true });
+    const location = { blockNumber, blockHash, transactionHash, auctionId };
+    const sale = await verifyPairReading(pair, location, urls.map(sequencedRead), readOrdinarySettlement);
+    let result = { sale };
+    if (!readOnly) {
+        pool = new pg.Pool({ connectionString, max: 1, connectionTimeoutMillis: 10000 });
+        result = await persistOrdinarySettlement(pool, { chainId: pair.chainId, contractAddress: pair.coreAddress,
+            nftAddress: pair.nftAddress }, { isCurrent: () => true }, sale);
+    }
     console.log(JSON.stringify(result));
 } catch (error) {
     // SDKs can include a full request, response or credential in an error.
@@ -26,6 +32,4 @@ try {
     process.exitCode = 1;
 } finally {
     await pool?.end();
-    listener?.provider.destroy();
-    for (const provider of listener?.readProviders || []) provider.destroy();
 }

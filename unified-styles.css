@@ -785,8 +785,8 @@ body.future .artwork-page-compact-action {
     pointer-events: none;
 }
 
-.artsoul-aura-frame--genesis::after {
-    border-color: var(--c-aura-gold);
+.artsoul-aura-frame--genesis::after, .artsoul-aura-frame--partner::after {
+    border-color: var(--aura-glow);
 }
 
 .artsoul-aura-caption { display: none; }
@@ -813,6 +813,7 @@ body.future .artwork-page-compact-action {
     overflow: hidden;
     white-space: nowrap;
     pointer-events: none;
+    container-type: size;
 }
 .future .artsoul-aura-caption > span {
     position: absolute; bottom: 1px; left: .5rem;
@@ -825,22 +826,27 @@ body.future .artwork-page-compact-action {
     font-weight: 600;
     line-height: 1.2;
 }
-.artsoul-aura-caption > i { display: none; }
-@supports (offset-path: inset(7px round 10px)) {
+@supports (width: 1cqw) {
     @media (prefers-reduced-motion: no-preference) {
-        .future :is(.artsoul-aura-frame--platform,.artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-still { display: none; }
-        .future :is(.artsoul-aura-frame--platform,.artsoul-aura-frame--partner) > .artsoul-aura-caption > i {
-            display: block; position: absolute; top: 0; left: 0;
-            offset-path: inset(7px round 10px); offset-rotate: auto;
-            font: 700 10px/1 system-ui, sans-serif;
-            background: var(--c-bg); color: var(--c-text); padding-inline: 1px;
+        .future :is(.artsoul-aura-frame--platform,.artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-word {
+            top: 0; left: 0; bottom: auto;
+            transform-origin: 0 0;
             animation: artsoulAuraCaption 18s linear infinite;
         }
     }
 }
+/* Keep the lower edge readable from left to right. Turn the word between
+   edges while transparent, so corners never show it upside down. */
 @keyframes artsoulAuraCaption {
-    from { offset-distance: calc(0% + var(--glyph-offset)); }
-    to { offset-distance: calc(100% + var(--glyph-offset)); }
+    0%, 100% { opacity: 0; transform: translate(8px, 7px) rotate(0deg) translate(0,-50%); }
+    24.99% { opacity: 0; transform: translate(calc(100cqw - 8px), 7px) rotate(0deg) translate(-100%,-50%); }
+    25% { opacity: 0; transform: translate(calc(100cqw - 7px), 8px) rotate(90deg) translate(0,-50%); }
+    49.99% { opacity: 0; transform: translate(calc(100cqw - 7px), calc(100cqh - 8px)) rotate(90deg) translate(-100%,-50%); }
+    50% { opacity: 0; transform: translate(calc(100cqw - 8px), calc(100cqh - 7px)) rotate(0deg) translate(-100%,-50%); }
+    74.99% { opacity: 0; transform: translate(8px, calc(100cqh - 7px)) rotate(0deg) translate(0,-50%); }
+    75% { opacity: 0; transform: translate(7px, calc(100cqh - 8px)) rotate(-90deg) translate(0,-50%); }
+    99.99% { opacity: 0; transform: translate(7px, 8px) rotate(-90deg) translate(-100%,-50%); }
+    1%, 24%, 26%, 49%, 51%, 74%, 76%, 99% { opacity: 1; }
 }
 
 @supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
@@ -848,7 +854,7 @@ body.future .artwork-page-compact-action {
     .future .artsoul-aura-frame--partner::after {
         border: 0;
         padding: 4px;
-        background: linear-gradient(120deg, var(--c-accent), var(--c-aura-blue));
+        background: var(--aura-glow);
         /* Both mask layers need full alpha to leave the artwork pixels untouched. */
         -webkit-mask: linear-gradient(black 0 0) content-box, linear-gradient(black 0 0);
         mask: linear-gradient(black 0 0) content-box, linear-gradient(black 0 0);
@@ -8433,8 +8439,8 @@ body:is(.classic, .future) .artsoul-artwork-card.artsoul-aura-frame,
     box-shadow: var(--artwork-aura-shadow);
 }
 .future .artsoul-aura-frame--platform { --aura-glow: var(--c-accent-2); }
-.artsoul-aura-frame--genesis { --aura-glow: var(--c-aura-gold); }
-.artsoul-aura-frame--partner { --aura-glow: var(--c-aura-blue); }
+.artsoul-aura-frame--genesis { --aura-glow: var(--c-aura-blue); }
+.artsoul-aura-frame--partner { --aura-glow: var(--c-aura-gold); }
 
 /* Contextual guidance uses the existing native-dialog interaction pattern. */
 .context-help-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
