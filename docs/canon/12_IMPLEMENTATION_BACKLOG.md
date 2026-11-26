@@ -331,6 +331,8 @@ Goal: audited, product-grade contracts and production operations.
 
 **C9 evidence, November 26.** Staff can select a publisher by public profile name or wallet address and designate it for the current catalog or the replacement rehearsal Core. Collection applications and curated Partner frame sources use the exact network and contract. Browser fixtures covered choosing the issuer, enabling and revoking a visual source, and independent identity review. The hosted database had zero NFT transfer coverage rows and zero registered visual sources at 19:56 UTC. The then-active catalog contained 39 works, including eight minted entries and zero verified frames. A real indexed mint, its subsequent transfer and its matching public frame on both surfaces remain acceptance evidence.
 
+**C8 / C9, November 26 recording.** The founder chose the regular reviewed profile check for their personal account and a separate ArtSoul logo on proven project NFTs. In Discovery the creator check can appear before mint. In the original Base Sepolia catalog the official mint can be established by two archival nodes agreeing on the finalized mint, transfer from zero and paid settlement. It is bound to the designated publisher, Core, NFT contract, work, token and metadata URI. Holder identity is a separate read. This also covers older works 13 and 14. Genesis remains static gold and Partner retains its blue frame. The short Future perimeter labels respect reduced motion.
+
 The October 3 founder amendment moves the previously deferred passkey/recovery
 ceremony back into current A8 activation. Final mainnet custody and configuration
 still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.

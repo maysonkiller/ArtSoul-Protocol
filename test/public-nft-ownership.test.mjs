@@ -44,6 +44,8 @@ test('public handlers send nothing before the whole-read retry guard completes',
   for (const file of ['artworks.js','artwork-provenance.js']) {
     const source = readFileSync(new URL(`../src/api/routes/public/${file}`, import.meta.url), 'utf8');
     const scope = {
+      process: {env: {ARTSOUL_AURA_SOURCES_ENABLED: 'true'}},
+      withCatalogMintOrigins: async cards => cards,
       allowMethods: () => true, PUBLIC_CHAIN_IDS: new Set([84532]), CANONICAL_PUBLIC_CHAIN_ID: 84532,
       PROJECTION_CACHE_MS: 30000, parseDirectLookup: () => null, protocolId: () => '', validateArtworkId: () => null,
       getProjectionSnapshot: async () => ({ cards: [], bids: new Map(), diagnostics: {}, warnings: [], publicMetrics: null, ownership: null }),

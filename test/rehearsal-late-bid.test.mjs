@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { Interface, ZeroAddress, toQuantity } from 'ethers';
 import { lateBidWindow, rehearsalArtwork, rehearsalLateBid as bid, sameReview, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { finalizedAuctionStatus, firstLateBidReview, inspectFirstBid, prepareFirstBid, readBidExtension, verifyFirstBidReceipt } from '../scripts/review-rehearsal-late-bid.mjs';
+import { checkWinnerSettlement, finalizedAuctionStatus, firstLateBidReview, inspectFirstBid, prepareFirstBid, readBidExtension, verifyFirstBidReceipt } from '../scripts/review-rehearsal-late-bid.mjs';
 
 const start = bid.deadline - bid.window;
 const block = { blockHash: '0x' + '2'.repeat(64), requireCanonical: true };
@@ -13,6 +13,15 @@ const reserve = 1000000000000000n;
 const valid = { artworkId:1n, startPrice:reserve, originalEnd:BigInt(bid.deadline), end:BigInt(bid.deadline),
     deadline:0n, state:1n, highestBidder:ZeroAddress, price:0n, deposit:0n };
 const observedCode = '0x1234';
+test('winner review binds the exact late bid, deposit and both eligible settlement windows', () => {
+    const end = valid.end + BigInt(bid.window);
+    const won = {...valid,end,highestBidder:bid.bidder,price:reserve,deposit:BigInt(bid.deposit)};
+    checkWinnerSettlement(won,end);
+    checkWinnerSettlement({...won,state:2n,deadline:end+100n},end+99n);
+    assert.throws(()=>checkWinnerSettlement(won,end-1n));
+    for (const overrides of [{state:4n},{highestBidder:ZeroAddress},{price:reserve+1n},{deposit:0n},{end:end+600n},
+        {state:2n,deadline:end-1n}]) assert.throws(()=>checkWinnerSettlement({...won,...overrides},end));
+});
 const codeChecks = [rehearsalArtwork.core, rehearsalArtwork.nft].map(address => ({
     address, sha256:createHash('sha256').update(Buffer.from(observedCode.slice(2), 'hex')).digest('hex')
 }));

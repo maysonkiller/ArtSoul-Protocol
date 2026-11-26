@@ -147,6 +147,10 @@ On November 26 at the finalized block timestamp 18:33:40 UTC, both providers con
 
 ## First NFT transfer range on the payout pair
 
+Two Base Sepolia nodes verified the [first late bid](https://sepolia.basescan.org/tx/0xe486f15933f6892b415e4d5c93d174c459f85268e8ee2a56059dbe2e4aee9b89) at finalized block 64,030,831. At 21:20:35 UTC the winner offered 0.001 test ETH and deposited 0.01 test ETH. The Core emitted `BidAccepted` and `AuctionExtended` in sequence, moving the end from 21:28:44 to 21:38:44 UTC.
+
+The winner used the local `--settle` review to [settle auction 1](https://sepolia.basescan.org/tx/0x07cd8c340164096abdf14f3762e0835254023b794ed7e5e2adfd567cf9864dfa). At block 64,039,544 both nodes returned NFT 1 owned by the winner, a zero transaction value, and 0.009 test ETH in withdrawable winner credit. The public catalog still serves the earlier pair.
+
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.
 
 The [ordinary transfer reader](../../scripts/read-ordinary-transfer-range.mjs) checks `Core.nft()`, `NFT.core()`, both runtime hashes and endpoint finality. The first range uses the creation block as its zero-supply predecessor. Both nodes independently returned an empty batch for block 63,494,033. To repeat the read, set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to independent HTTPS endpoints for Base Sepolia and supply the reviewed payout pair register.

@@ -9,6 +9,7 @@ export function AuraSources({ api, wallet, isSessionCurrent }) {
         <label>Frame source <select value={kind} onChange={e => { setKind(e.target.value); setChain('84532'); }}>
             <option value="platform">Platform publisher wallet</option><option value="partner">Partner collection contract</option>
         </select></label>
+        {kind === 'partner' && <p>Enter the NFT collection contract on its issuing network. A personal wallet belongs under Platform publisher.</p>}
         {kind === 'partner' && <label>Network <select value={chain} onChange={e=>setChain(e.target.value)}>
             <option value="84532">Base Sepolia</option><option value="8453">Base</option></select></label>}
         {kind === 'platform' && <label>Publishing contract <select value={deployment} onChange={e => setDeployment(e.target.value)}>

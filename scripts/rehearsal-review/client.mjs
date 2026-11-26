@@ -28,6 +28,8 @@ export const rehearsalLateBid = Object.freeze({
     dataSha256: '10c6ad880f409d520be64832b4ef0463869a2acc64dc461b36a25476304472ac'
 });
 
+export const settlementDigest = 'a09b1de3f18bd79d28c424ef61682f6d73aa7d8c7d33a0b7b24c5ba512db8868';
+
 export function lateBidWindow(blockTime, now = Math.floor(Date.now() / 1000)) {
     const { deadline, window } = rehearsalLateBid;
     check(Number.isSafeInteger(blockTime) && Math.abs(now - blockTime) <= 60, 'Recent chain time and local time disagree. Refresh before reviewing a bid.');
@@ -80,15 +82,18 @@ export async function walletRequest(provider, plan) {
     const artwork = plan.operation === 'registerArtwork';
     const opening = plan.operation === 'createAuction';
     const bid = plan.operation === 'placeBid';
-    if (artwork || opening || bid) {
-        const approved = bid ? rehearsalLateBid : artwork ? rehearsalArtwork : rehearsalOpening;
-        check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === approved.dataSha256 &&
+    const settlement = plan.operation === 'settleAuction';
+    if (artwork || opening || bid || settlement) {
+        const digest = settlement ? settlementDigest : (bid ? rehearsalLateBid : artwork ? rehearsalArtwork : rehearsalOpening).dataSha256;
+        check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === digest &&
             plan.deployments.length === 0 &&
             plan.codeChecks.length === 2 && sameAddress(plan.codeChecks[0].address, rehearsalArtwork.core) &&
             sameAddress(plan.codeChecks[1].address, rehearsalArtwork.nft), 'Unexpected artwork request.');
         if (artwork) check(plan.metadataUri === rehearsalMetadataUri, 'Unexpected registration metadata.');
         if (bid) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === rehearsalLateBid.deposit,
             'Unexpected bidder or deposit.');
+        if (settlement) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === '0x0',
+            'Unexpected settlement wallet or additional payment.');
     } else {
         check(create || ['protocolTreasury', 'ecosystemTreasury'].includes(plan.operation), 'Unknown rehearsal operation.');
         check(create ? plan.target === 'Direct contract creation' :
@@ -109,10 +114,11 @@ export async function walletRequest(provider, plan) {
         })
     ]);
     check(latest === plan.nonce && pending === plan.nonce && payerCode === '0x', 'Payer state changed. Refresh the chain evidence.');
-    if (artwork || opening) {
+    if (artwork || opening || settlement) {
         const simulation = await rpc('eth_call', [{ from: plan.payer, to: rehearsalArtwork.core, data: plan.data, value: '0x0' }, 'pending']);
         check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === 1n,
-            opening ? 'Auction history changed. Refresh the chain evidence.' : 'Work registry changed. Refresh the chain evidence.');
+            settlement ? 'Settlement or token ID changed. Refresh the chain evidence.' :
+                opening ? 'Auction history changed. Refresh the chain evidence.' : 'Work registry changed. Refresh the chain evidence.');
     }
     if (bid) {
         const call = { from: plan.payer, to: rehearsalArtwork.core, value: rehearsalLateBid.deposit, data: plan.data };
@@ -264,15 +270,21 @@ export async function start() {
             const artwork = plan.operation === 'registerArtwork';
             const opening = plan.operation === 'createAuction';
             const bid = plan.operation === 'placeBid';
-            byId('operation').textContent = bid ? 'First late bid · auction 1' : opening ? 'Open the first rehearsal auction' : artwork ? 'Register rehearsal artwork' :
+            const settlement = plan.operation === 'settleAuction';
+            byId('operation').textContent = settlement ? 'Settle auction 1 and mint its NFT' : bid ? 'First late bid · auction 1' : opening ? 'Open the first rehearsal auction' : artwork ? 'Register rehearsal artwork' :
                 create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
             byId('fields').replaceChildren();
             addField('Network', 'Base Sepolia · 84532');
             addField('Sender', plan.payer);
             addField('Value', bid ? '0.01 test ETH deposit plus test gas' : '0 test ETH · wallet estimates gas');
             addField('Nonce', String(BigInt(plan.nonce)));
-            addField(artwork || opening || bid ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
-            if (bid) {
+            addField(artwork || opening || bid || settlement ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
+            if (settlement) {
+                addField('Method', 'settleAuction(1)');
+                addField('Price from deposit', '0.001 test ETH');
+                addField('Surplus credited to winner', '0.009 test ETH');
+                addField('NFT contract', rehearsalArtwork.nft);
+            } else if (bid) {
                 addField('Work and auction', 'Work 1 · Auction 1');
                 addField('Price offered', '0.001 test ETH');
                 addField('Method', 'placeBid(1, 1000000000000000)');

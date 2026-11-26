@@ -10,6 +10,18 @@ const networks = {
 const txHash = /^0x[0-9a-f]{64}$/;
 const blockNumber = value => typeof value === 'string' && /^0x[0-9a-f]{1,13}$/.test(value) ? Number(BigInt(value)) : NaN;
 
+export async function hasPartnerContract(chain, address, readers = createRegistrationReaders(networks[chain])) {
+    const signal = AbortSignal.timeout(4500);
+    const observations = await Promise.all(readers.map(async rpc => {
+        const [network, code] = await Promise.all([rpc('eth_chainId', [], {signal}),
+            rpc('eth_getCode', [address, 'finalized'], {signal})]);
+        if (blockNumber(network) !== chain || typeof code !== 'string' || !/^0x(?:[0-9a-f]{2})*$/i.test(code)) throw new Error('Invalid contract observation');
+        return code.toLowerCase();
+    }));
+    if (observations.length !== 2 || observations[0] !== observations[1]) throw new Error('Contract observations differ');
+    return observations[0] !== '0x' && !/^0xef0100[0-9a-f]{40}$/.test(observations[0]);
+}
+
 export function mintTransactionHint(mint) {
     return txHash.test(mint?.transactionHash) ? {mintTransactionHash:mint.transactionHash} : {};
 }

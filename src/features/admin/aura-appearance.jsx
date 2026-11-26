@@ -1,9 +1,9 @@
 import { React } from '../../entries/react-runtime.js';
-import { auraFrameClassName, auraFrameLabels } from '../../ui/components/aura-frame.js';
+import { auraFrameClassName, auraWords, auraCaption } from '../../ui/components/aura-frame.js';
 import { AuraSources } from './aura-sources.jsx';
 
 const sourceMessages = {
-    awaiting_ownership: 'Public frames are waiting for ownership verification on this deployment.',
+    awaiting_ownership: 'Verified mint receipts can identify official ArtSoul NFTs in the Base Sepolia catalog. Current-owner history is verified separately.',
     awaiting_publisher: 'Public Platform frames are waiting for a designated publisher.',
     unavailable: 'Public frame verification is currently unavailable.'
 };
@@ -64,13 +64,14 @@ export function AuraAppearance({ api, wallet, isSessionCurrent }) {
             </select></label></figcaption>
             <div className={auraFrameClassName(preview)} aria-hidden="true">
                 <img src="/brand/artsoul-audio-cover-384.webp" alt="" width="96" height="96" />
-                {enabled && <span className="artsoul-aura-caption"><span>{auraFrameLabels[preview]}</span></span>}
+                {enabled && auraCaption(React.createElement, auraWords[preview])}
             </div>
             <p aria-live="polite">{eligibility[preview]}</p>
             <p className="admin-aura-classic-note">Classic shows the frame alone. Switch to Future in the header to see its label.</p>
         </figure>}
         {setting && sourceMessages[setting.publicFrameSource] && !(setting.sourcesEnabled && setting.publicFrameSource === 'awaiting_publisher') && <p>{sourceMessages[setting.publicFrameSource]}</p>}
         {setting?.sourcesEnabled && <AuraSources {...{api,wallet,isSessionCurrent}} />}
+        <p>The ArtSoul logo identifies an official NFT. For a blue identity check beside your name, open <a href="/profile">your profile</a>, choose Edit Profile, then Identity verification.</p>
         {!setting && !busy && <button type="button" onClick={() => { setMessage(''); setReload(value => value + 1); }}>Reload setting</button>}
         <p role="status">{pending !== null ? 'Saving frame labels…' : busy ? 'Loading appearance setting…' : message}</p>
     </section>;

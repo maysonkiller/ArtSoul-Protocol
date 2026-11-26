@@ -4,11 +4,12 @@ import { discloseHomePromotion } from '../ui/components/home-banner-card.js';
 import { wrapArtworkMedia } from '../ui/components/artwork-player.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
-import { projectedArtworkAura } from '../ui/components/aura-frame.js';
+import { projectedArtworkAura, auraCaption } from '../ui/components/aura-frame.js';
 import { installPublicContractRuntime } from '../features/discovery/public-contract-runtime.js';
 
 // The homepage uses DOM cards. The inbox loads React when a connected wallet needs it.
 window.ArtSoulArtworkAura = projectedArtworkAura;
+window.ArtSoulAuraCaption = auraCaption;
 installPublicContractRuntime();
 
 let morphActive = false;
@@ -315,6 +316,11 @@ let morphActive = false;
 
             // Create elements safely without innerHTML
             artworks.forEach(art => {
+                if (art.source === 'v41_projection' && window.ArtSoulArtworkCard?.createCardElement) {
+                    const card = window.ArtSoulArtworkCard.createCardElement(art, {minimal: true, surface: 'homepage'});
+                    if (card) container.appendChild(card);
+                    return;
+                }
                 const hasSafeMedia = window.ArtSoulSecurity?.isValidStorageUrl(art.file_url);
 
                 // Validate URL for legacy rows. V4.1 rows may intentionally render a protocol placeholder.

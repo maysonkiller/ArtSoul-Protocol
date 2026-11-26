@@ -38,7 +38,12 @@ test('only the verified minted projection exposes a named frame to the interface
     }
     assert.equal(projectedArtworkAura({ ...nft, chain_id: 8453, aura_kind: 'genesis' }).label, 'Genesis aura');
     assert.equal(projectedArtworkAura({ ...nft, aura_kind: 'partner' }).label, 'Partner collection NFT');
-    assert.equal(projectedArtworkAura({ ...nft, aura_border_text: true }).borderLabel, 'ArtSoul platform NFT');
+    assert.equal(projectedArtworkAura({ ...nft, aura_border_text: true }).borderLabel, 'ArtSoul');
     assert.equal(projectedArtworkAura({ ...nft, aura_border_text: 'yes' }).borderLabel, undefined);
     assert.equal(projectedArtworkAura({ ...nft, minted: false, aura_border_text: true }), null);
+    const historical = {...nft, ownership_status:'unavailable',platform_origin_verified:true};
+    assert.equal(projectedArtworkAura(historical).label,'ArtSoul platform NFT');
+    for (const change of [{minted:false},{source:'wallet'},{chain_id:8453},{aura_kind:'partner'},{platform_origin_verified:1}]) {
+        assert.equal(projectedArtworkAura({...historical,...change}),null);
+    }
 });
