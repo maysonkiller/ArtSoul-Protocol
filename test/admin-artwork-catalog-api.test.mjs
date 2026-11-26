@@ -69,18 +69,19 @@ test('source management binds an explicit switch to the displayed Core and curre
   process.env={...previous,ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:core,ARTSOUL_AURA_SOURCES_ENABLED:'true',ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true'};
   t.after(()=>{process.env=previous;});
   let member=true;
+  let expectedCore=core;
   const calls=fixture(t,(path,options)=>{
     if(path.startsWith('artsoul_staff_roles?'))return json([{role:'team',authorization_version:2}]);
     if(path.startsWith('artsoul_staff_authority_policy?'))return json([{origin:'https://example.com',chain_id:84532,
       version:3,wallet_a:member?STAFF:'0x'+'2'.repeat(40),wallet_b:'0x'+'3'.repeat(40)}]);
     if(path==='rpc/manage_aura_sources'){
       const b=JSON.parse(options.body);
-      assert.equal(b.p_scope,core);assert.equal(b.p_actor,STAFF);assert.equal(b.p_policy_version,'3');
+      assert.equal(b.p_scope,expectedCore);assert.equal(b.p_actor,STAFF);assert.equal(b.p_policy_version,'3');
       return json(b.p_enabled===null?[]:[{address:STAFF,enabled:true,revision:1}]);
     }
   });
-  const call=async body=>{
-    const request=req({method:body?'POST':'GET',body,cookie:cookie(true,2),query:{wallet:STAFF,kind:'platform',chain:'84532',address:STAFF}});
+  const call=async (body,deployment)=>{
+    const request=req({method:body?'POST':'GET',body,cookie:cookie(true,2),query:{wallet:STAFF,kind:'platform',chain:'84532',address:STAFF,deployment}});
     Object.assign(request.headers,{origin:'https://example.com','content-type':'application/json'});
     const out=response();await auraSources(request,out);return out;
   };
@@ -88,8 +89,13 @@ test('source management binds an explicit switch to the displayed Core and curre
   const change={scope:core,reason:'Official artist wallet',enabled:true,revision:0};
   assert.equal((await call({...change,scope:STAFF})).statusCode,409);
   assert.equal((await call(change)).body.sources[0].enabled,true);
+  assert.equal((await call(undefined,'unknown')).statusCode,400);
+  expectedCore=(await import('../scripts/rehearsal-review/deployment.mjs')).rehearsalCore.toLowerCase();
+  assert.equal((await call(undefined,'rehearsal')).body.scope,expectedCore);
+  assert.equal((await call(change,'rehearsal')).statusCode,409);
+  assert.equal((await call({...change,scope:expectedCore},'rehearsal')).body.sources[0].enabled,true);
   member=false;assert.equal((await call(change)).statusCode,403);
-  assert.equal(calls.filter(c=>c.path==='rpc/manage_aura_sources').length,2);
+  assert.equal(calls.filter(c=>c.path==='rpc/manage_aura_sources').length,4);
 });
 
 test('frame settings require verified admin or a team wallet still in the current authority pair', async t => {

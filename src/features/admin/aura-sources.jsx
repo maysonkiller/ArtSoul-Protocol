@@ -3,17 +3,20 @@ import { React } from '../../entries/react-runtime.js';
 export function AuraSources({ api, wallet, isSessionCurrent }) {
     const [kind,setKind] = React.useState('platform');
     const [chain,setChain] = React.useState('84532');
+    const [deployment,setDeployment] = React.useState('catalog');
     return <details className="identity-applications"><summary>Manage frame sources</summary>
         <label>Frame source <select value={kind} onChange={e => { setKind(e.target.value); setChain('84532'); }}>
             <option value="platform">Platform publisher wallet</option><option value="partner">Partner collection contract</option>
         </select></label>
         {kind === 'partner' && <label>Network <select value={chain} onChange={e=>setChain(e.target.value)}>
             <option value="84532">Base Sepolia</option><option value="8453">Base</option></select></label>}
-        <SourceEditor key={wallet + kind + chain} {...{kind,chain,api,wallet,isSessionCurrent}} />
+        {kind === 'platform' && <label>Publishing contract <select value={deployment} onChange={e => setDeployment(e.target.value)}>
+            <option value="catalog">Current website catalog</option><option value="rehearsal">New auction rehearsal</option></select></label>}
+        <SourceEditor key={wallet + kind + chain + deployment} {...{kind,chain,deployment,api,wallet,isSessionCurrent}} />
     </details>;
 }
 
-function SourceEditor({kind,chain,api,wallet,isSessionCurrent}) {
+function SourceEditor({kind,chain,deployment,api,wallet,isSessionCurrent}) {
     const [address,setAddress] = React.useState('');
     const [source,setSource] = React.useState(null);
     const [list,setList] = React.useState(null);
@@ -22,7 +25,8 @@ function SourceEditor({kind,chain,api,wallet,isSessionCurrent}) {
     const [busy,setBusy] = React.useState(false);
     const sequence = React.useRef(0);
     React.useEffect(()=>()=>{sequence.current++;},[]);
-    const path = 'aura-sources?wallet='+encodeURIComponent(wallet.toLowerCase())+'&kind='+kind+'&chain='+chain;
+    const path = 'aura-sources?wallet='+encodeURIComponent(wallet.toLowerCase())+'&kind='+kind+'&chain='+chain+
+        (kind === 'platform' ? '&deployment='+deployment : '');
     const label = kind === 'partner' ? 'Collection contract' : 'Publisher wallet';
     function edit(value) { sequence.current++; setAddress(value); setSource(null); setReason(''); setMessage(''); setBusy(false); }
     async function load(target,after) {
@@ -52,7 +56,7 @@ function SourceEditor({kind,chain,api,wallet,isSessionCurrent}) {
         finally { if (isSessionCurrent() && sequence.current === request) setBusy(false); }
     }
     return <div>
-        <p>{kind === 'platform' ? 'Base Sepolia. The original registration must name this publisher on the active Core. Buying or receiving an NFT does not make the owner a publisher.' :
+        <p>{kind === 'platform' ? 'Base Sepolia. The original registration must name this publisher on the selected contract. Public frames appear when the catalog verifies the minted NFT.' :
             'Use the exact contract of the partner collection. A verified mint identifies each eligible token, including after a transfer.'}</p>
         <label>{label}<input value={address} placeholder="0x…" disabled={busy} onChange={e=>edit(e.target.value)} /></label>
         {kind === 'platform' && <button type="button" disabled={busy} onClick={()=>edit(wallet)}>Use my wallet</button>}

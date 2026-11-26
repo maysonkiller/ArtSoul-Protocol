@@ -3,6 +3,7 @@ import { requireService, serviceError } from '../../launch-services.js';
 import { reviewBody } from '../../identity-applications.js';
 import { verifiedReviewActor } from '../../frame-source-access.js';
 import { platformPublisherFor } from '../../platform-artwork-aura.js';
+import { rehearsalCore } from '../../../../scripts/rehearsal-review/deployment.mjs';
 
 export default async function handler(req,res) {
     res.setHeader('Cache-Control','private, no-store');
@@ -10,14 +11,16 @@ export default async function handler(req,res) {
     try {
         requireService('ARTSOUL_AURA_SOURCES_ENABLED');
         const actor = await verifiedReviewActor(req);
-        const {kind,chain,address,after} = req.query || {};
+        const {kind,chain,address,after,deployment} = req.query || {};
         const invalid = () => serviceError('INVALID_SOURCE','Choose a valid network, wallet or contract.');
         if (!['platform','partner'].includes(kind) || !['8453','84532'].includes(chain) ||
-            (kind === 'platform' && chain !== '84532')) throw invalid();
+            (kind === 'platform' && chain !== '84532') ||
+            (deployment !== undefined && (kind !== 'platform' || !['catalog','rehearsal'].includes(deployment)))) throw invalid();
         const subject = address === undefined ? null : normalizeWallet(address);
         if (address !== undefined && (!subject || /^0x0{40}$/.test(subject)) ||
             after !== undefined && (!normalizeWallet(after) || address !== undefined)) throw invalid();
-        const scope = kind === 'platform' ? normalizeWallet(process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA || '') : '';
+        const publishingCore = deployment === 'rehearsal' ? rehearsalCore : process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA;
+        const scope = kind === 'platform' ? normalizeWallet(publishingCore || '') : '';
         if (kind === 'platform' && (!scope || /^0x0{40}$/.test(scope))) throw serviceError('CORE_UNAVAILABLE','The active publishing contract has not been configured.',503);
         const params = {...actor.params,p_kind:kind,p_chain:Number(chain),p_scope:scope,p_address:subject,p_after:after?.toLowerCase() || '',
             p_revision:null,p_enabled:null,p_reason:null};
