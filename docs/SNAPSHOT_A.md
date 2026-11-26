@@ -151,8 +151,9 @@ health URL defaults to `http://127.0.0.1:3001/health`.
 node scripts/verify-mainnet-catalog.mjs <candidate-origin> <reviewed-core-address> <deployment-block> --database <reviewed-mainnet-pair.json> --worker-health
 ```
 
-The command compares the database cursor with the reviewed Base mainnet Core
-and deployment block, then checks for residual product rows, including retired
+The command checks that the database cursor is running for the reviewed Base
+mainnet Core and has reached both the confirmed and indexed heights just seen
+on the public site. It then checks for residual product rows, including retired
 auction tables, bids, withdrawals, floor history, trust signals, eligibility,
 settlement evidence and the counters backing public metrics. Supply the reviewed
 mainnet custody register or compact pair file used by the settlement intake.

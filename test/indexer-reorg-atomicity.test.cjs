@@ -148,6 +148,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
         VALUES ($1,$2,172,170,now(),now(),'running')`, [chain,address]);
       await seedCursor(8453,CORE);
       assert.ok(await verify() > 20);
+      for (const publicCursor of [{confirmedBlock:171,indexedBlock:172}, {confirmedBlock:170,indexedBlock:173}]) {
+        await assert.rejects(verifyMainnetProjectionRows(reader, pair, 160, publicCursor), /database cursor/);
+      }
+      assert.ok(await verifyMainnetProjectionRows(reader, pair, 160, {confirmedBlock:169,indexedBlock:171}) > 20);
       const journal = await pool.query(`INSERT INTO public.contract_events
         (chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
         VALUES (8453,'MarketplaceAdmissionScheduled',$1,169,$2,0,$3) RETURNING id`,
