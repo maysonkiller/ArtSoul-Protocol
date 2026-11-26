@@ -9,7 +9,34 @@ body[data-as-season="winter"] #as-ambient::after{background:radial-gradient(elli
 body[data-as-season="newyear"] #as-ambient::before{background:radial-gradient(ellipse 55% 42% at 93% 17%,rgba(191,26,68,.30),transparent 71%),radial-gradient(ellipse 55% 50% at 2% 86%,rgba(176,34,75,.25),transparent 70%),radial-gradient(ellipse 47% 32% at 60% 55%,rgba(211,115,61,.13),transparent 71%);animation:as-aurora 21s ease-in-out infinite alternate}
 body[data-as-season="newyear"] #as-ambient::after{background:radial-gradient(ellipse 60% 35% at 24% 16%,rgba(235,183,101,.08),transparent 68%),radial-gradient(ellipse 65% 32% at 95% 94%,rgba(231,66,123,.16),transparent 75%);animation:as-aurora 34s ease-in-out infinite alternate-reverse}
 @keyframes as-aurora{from{transform:translate3d(-2%,1%,0) scale(1)}to{transform:translate3d(3%,-3%,0) scale(1.04)}}
-#as-weather{z-index:27;width:100%;height:100%;opacity:.78}
+#as-weather { z-index:27; overflow:hidden; color:var(--seasonal-control-ink); }
+@media (prefers-reduced-motion:no-preference) {
+  body[data-as-motion="animated"] #as-weather:not([hidden])::before,
+  body[data-as-motion="animated"] #as-weather:not([hidden])::after {
+    --snow-tile:248px;
+    content:"";
+    position:absolute;
+    inset:calc(0px - var(--snow-tile)) -9px 0;
+    background-image:radial-gradient(circle at 7% 19%,currentColor 1px,transparent 2px),
+      radial-gradient(circle at 46% 83%,currentColor .7px,transparent 1.4px),
+      radial-gradient(circle at 84% 42%,currentColor 1.2px,transparent 2px);
+    background-size:var(--snow-tile) var(--snow-tile);
+    opacity:.41;
+    animation:as-snow-drift 12s linear infinite;
+  }
+  body[data-as-motion="animated"] #as-weather:not([hidden])::after {
+    --snow-tile:293px;
+    background-position:51px 77px;
+    opacity:.29;
+    animation-duration:19s;
+    animation-delay:-8s;
+  }
+  @keyframes as-snow-drift {
+    0% { transform:translateY(0); }
+    50% { transform:translate(8px,calc(var(--snow-tile) / 2)); }
+    100% { transform:translateY(var(--snow-tile)); }
+  }
+}
 #as-fireworks{z-index:1500;width:100%;height:100%;opacity:1}
 body[data-as-snow="off"] #as-weather,body[data-as-season="original"] #as-weather{display:none}
 /* Header receives an authored light installation without moving the logo or account controls. */
@@ -605,8 +632,8 @@ body:has(#artsoul-search-dialog[open]) .site-search-button>.as-living-ring,
 body[data-as-ambient-idle] :is(#as-header-ornament .as-bulb,.as-snow-crown,.as-page-halo),
 body[data-as-ambient-idle] :is(h1,h2,h3,.page-context-title,.artsoul-card-audio-avatar:not([data-playing="true"])),
 body[data-as-ambient-idle] :is(#as-ambient,#as-scroll-mist),
-body[data-as-ambient-idle] :is(#as-ambient,#as-scroll-mist)::before,
-body[data-as-ambient-idle] :is(#as-ambient,#as-scroll-mist)::after {
+body[data-as-ambient-idle] :is(#as-ambient,#as-scroll-mist,#as-weather)::before,
+body[data-as-ambient-idle] :is(#as-ambient,#as-scroll-mist,#as-weather)::after {
   animation-play-state:paused!important;
 }
 body[data-as-season][data-as-motion="static"] :is(#as-ambient,#as-scroll-mist,#as-header-ornament .as-bulb,.as-snow-crown,.as-page-halo),

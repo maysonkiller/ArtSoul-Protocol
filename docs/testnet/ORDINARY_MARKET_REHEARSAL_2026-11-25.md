@@ -145,11 +145,13 @@ Use `node scripts/review-rehearsal-late-bid.mjs --status` or **View finalized au
 
 On November 26 at the finalized block timestamp 18:33:40 UTC, both providers confirmed the original bidding end of 21:28:44 UTC, the reserve of 0.001 test ETH and no highest bidder. [Observed Base Sepolia block](https://sepolia.basescan.org/block/0x7886e8697029b70c7a2b64083c2230a9cf171dcc58c40b7b69f73ccd12256d35)
 
-## First NFT transfer range on the payout pair
+## First late bid and settlement
 
 Two Base Sepolia nodes verified the [first late bid](https://sepolia.basescan.org/tx/0xe486f15933f6892b415e4d5c93d174c459f85268e8ee2a56059dbe2e4aee9b89) at finalized block 64,030,831. At 21:20:35 UTC the winner offered 0.001 test ETH and deposited 0.01 test ETH. The Core emitted `BidAccepted` and `AuctionExtended` in sequence, moving the end from 21:28:44 to 21:38:44 UTC.
 
-The winner used the local `--settle` review to [settle auction 1](https://sepolia.basescan.org/tx/0x07cd8c340164096abdf14f3762e0835254023b794ed7e5e2adfd567cf9864dfa). At block 64,039,544 both nodes returned NFT 1 owned by the winner, a zero transaction value, and 0.009 test ETH in withdrawable winner credit. The public catalog still serves the earlier pair.
+The winner used the local `--settle` review to [settle auction 1](https://sepolia.basescan.org/tx/0x07cd8c340164096abdf14f3762e0835254023b794ed7e5e2adfd567cf9864dfa). Both nodes verified the finalized sale and token in block 64,039,544 at 21:49:37 UTC. NFT 1 belongs to the winning bidder. The transaction carried zero test ETH and left 0.009 test ETH in withdrawable winner credit. Replaying the verified receipt twice through the settlement indexer in an isolated PostgreSQL database produced one sale and one credit record: 0.000975 test ETH to the creator and 0.000025 to Protocol Treasury. The public catalog still serves the earlier pair.
+
+## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.
 
@@ -159,7 +161,7 @@ The [ordinary transfer reader](../../scripts/read-ordinary-transfer-range.mjs) c
 node scripts/read-ordinary-transfer-range.mjs <payout-pair-register.json> bootstrap 63494033 0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df 63494033 0x3868ea2419c15a5bf9ee332628da9776f8828ff3f1fc67033c8b2c204a1f79e4
 ```
 
-For a contiguous follow-up, use `continuation` with the next block number, the previous report's endpoint hash, and the new endpoint number and hash. The command returns a read-only observation. Hosted transfer persistence and the first minted token still need independent acceptance.
+For a contiguous follow-up, use `continuation` with the next block number, the previous report's endpoint hash, and the new endpoint number and hash. The command returns a read-only observation. The first mint was verified at its settlement block. Hosted transfer persistence and subsequent owner changes remain open.
 # Participant pilot before mainnet
 
 Use Base Sepolia with the replacement Core, NFT contract and matching public indexer. Confirm all three addresses against the candidate release before inviting participants. Keep the existing catalog readable during rehearsal.
