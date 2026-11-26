@@ -70,7 +70,7 @@ function originFor(hash) {
 export async function withCatalogMintOrigins(cards) {
     if (process.env.ARTSOUL_AURA_SOURCES_ENABLED !== 'true' ||
         normalizeWallet(process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA) !== core ||
-        normalizeWallet(process.env.ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA) !== nft) return cards;
+        normalizeWallet(process.env.ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA ?? nft) !== nft) return cards;
     const candidates = cards.filter(c => c.source === 'v41_projection' && c.chain_id === 84532 && c.minted === true &&
         !c.aura_kind && hashPattern.test(c.mint_transaction_hash) && normalizeWallet(c.creator));
     const addresses = [...new Set(candidates.map(c => normalizeWallet(c.creator)))];

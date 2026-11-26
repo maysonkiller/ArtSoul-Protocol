@@ -37,13 +37,16 @@ async page => {
                 .filter(node => getComputedStyle(node).animationName !== 'none').length;
             const fog = getComputedStyle(document.getElementById('as-scroll-mist'), '::before');
             const snow = document.getElementById('as-snow-toggle');
+            const weather = document.getElementById('as-weather');
+            const flakes = getComputedStyle(weather, '::before');
             return document.getElementById('as-panel-title').textContent === 'Seasonal studio' &&
                 window.ArtSoulSeasonalPreview.getState().locale === 'en' &&
                 snow.disabled === !animated && snow.getAttribute('aria-pressed') === String(animated) &&
                 document.getElementById('as-preview-fireworks').hidden === !animated &&
                 (bulb.animationName !== 'none') === animated && twinkling <= 6 &&
                 (fog.animationName !== 'none') === animated &&
-                frames.includes('weatherFrame') === animated && frames.includes('drawTree') === animated &&
+                weather.hidden === !animated && (flakes.animationName === 'as-snow-drift') === animated &&
+                frames.includes('drawTree') === animated &&
                 frames.includes('fireFrame') === fireworks;
         }, { animated, fireworks }, { timeout: 4000 });
     }
@@ -63,7 +66,8 @@ async page => {
         const frames = [...window.seasonalTestFrames.values()];
         const bulb = document.querySelector('#as-header-ornament .as-bulb');
         return document.body.hasAttribute('data-as-ambient-idle') &&
-            !frames.includes('weatherFrame') && !frames.includes('drawTree') &&
+            getComputedStyle(document.getElementById('as-weather'), '::before').animationPlayState === 'paused' &&
+            !frames.includes('drawTree') &&
             getComputedStyle(bulb).animationPlayState === 'paused' &&
             getComputedStyle(document.querySelector('h1')).animationPlayState === 'paused' &&
             getComputedStyle(document.querySelector('#seasonal-test-covers [data-playing="false"]')).animationPlayState === 'paused' &&
