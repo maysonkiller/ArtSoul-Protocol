@@ -1,4 +1,6 @@
 import { Interface, ZeroAddress } from 'ethers';
+import { createHash } from 'node:crypto';
+import finalizedMints from './catalog-finalized-mints.json' with { type: 'json' };
 import { normalizeWallet, supabaseRest } from './backend.js';
 import { readAuraBorderSetting } from './aura-border-setting.js';
 import { createRegistrationReaders } from './upload-registration-evidence.js';
@@ -39,18 +41,24 @@ export function catalogMintOrigin(receipt, hash) {
     return {artworkId: String(mint.artworkId), tokenId: String(mint.tokenId), creator: mint.creator.toLowerCase(), uri: mint.tokenURI};
 }
 
-async function fetchOrigin(hash) {
-    const signal = AbortSignal.timeout(3200);
-    const results = await Promise.all(readers.map(async rpc => {
+export function catalogOriginDigest(hash, origin) {
+    const fields = [84532, core, nft, hash, origin.artworkId, origin.tokenId, origin.creator, origin.uri];
+    return createHash('sha256').update(JSON.stringify(fields)).digest('hex');
+}
+
+export async function readFinalizedCatalogMint(hash, providers = readers, timeout = 3200) {
+    if (!hashPattern.test(hash)) throw new Error('Expected a public transaction hash.');
+    const signal = AbortSignal.timeout(timeout);
+    const results = await Promise.all(providers.map(async rpc => {
         const [chain, finalized, receipt] = await Promise.all([rpc('eth_chainId',[],{signal}),
             rpc('eth_getBlockByNumber',['finalized',false],{signal}), rpc('eth_getTransactionReceipt',[hash],{signal})]);
         if (chain !== '0x14a34' || !receipt || BigInt(receipt.blockNumber) > BigInt(finalized.number)) return null;
         const block = await rpc('eth_getBlockByNumber',[receipt.blockNumber,false],{signal});
         if (block?.hash !== receipt.blockHash || block.number !== receipt.blockNumber || !block.transactions.includes(hash)) return null;
         const origin = catalogMintOrigin(receipt,hash);
-        return origin && {origin, blockHash:block.hash};
+        return origin && {origin, blockHash:block.hash, blockNumber:Number(BigInt(block.number))};
     }));
-    return results[0] && JSON.stringify(results[0]) === JSON.stringify(results[1]) ? results[0].origin : null;
+    return results[0] && JSON.stringify(results[0]) === JSON.stringify(results[1]) ? results[0] : null;
 }
 
 function originFor(hash) {
@@ -58,7 +66,7 @@ function originFor(hash) {
     if (entry && entry.until > Date.now()) return entry.value;
     if (inFlight.has(hash)) return inFlight.get(hash);
     if (inFlight.size >= 4) return null;
-    const read = fetchOrigin(hash).catch(() => null).then(value => {
+    const read = readFinalizedCatalogMint(hash).then(record => record?.origin).catch(() => null).then(value => {
         cache.set(hash,{value,until: Date.now() + (value ? 86400000 : 15000)});
         if (cache.size > 256) cache.delete(cache.keys().next().value);
         return value;
@@ -82,7 +90,15 @@ export async function withCatalogMintOrigins(cards) {
         const publishers = new Set(states.filter(s=>s.enabled === true && addresses.includes(s.address)).map(s=>s.address));
         const marked = new Set();
         await Promise.all(candidates.filter(c=>publishers.has(normalizeWallet(c.creator))).map(async card=>{
-            const proof = await originFor(card.mint_transaction_hash);
+            const hash = card.mint_transaction_hash;
+            const archived = finalizedMints[hash];
+            if (archived) {
+                const digest = catalogOriginDigest(hash, {artworkId:String(card.artwork_id), tokenId:String(card.token_id),
+                    creator:normalizeWallet(card.creator), uri:card.metadata_uri});
+                if (digest === archived.digest) marked.add(card);
+                return;
+            }
+            const proof = await originFor(hash);
             if (proof?.creator === normalizeWallet(card.creator) && proof.artworkId === String(card.artwork_id) &&
                 proof.tokenId === String(card.token_id) && proof.uri === card.metadata_uri) marked.add(card);
         }));

@@ -43,3 +43,34 @@ test('the original catalog can check its pinned mint issuer before ownership tra
     assert.equal(await withCatalogMintOrigins(cards), cards);
     assert.equal(fetch.mock.callCount(), 1);
 });
+
+test('an archived mint follows the token across owners and still requires a current issuer designation', async t => {
+    const core = '0x43368f7e2d5f11f4b7e11928d66d3f4a5a4e4cef';
+    const creator = '0x6ec8c121043357ac231e36d403edabf90ae6989b';
+    const card = {
+        source:'v41_projection', chain_id:84532, artwork_id:'14', token_id:'8', creator, minted:true,
+        mint_transaction_hash:'0xc3166f53beb86f309469a1a6d74c46cddf32a44884bcd7541cc82f5119813007',
+        metadata_uri:'https://bexigvqrunomwtjsxlej.supabase.co/storage/v1/object/public/artworks/metadata/' +
+            creator + '/1782326793872-1d575c0d-6112-460c-94ec-beb5e0657c9a-base-logo.json'
+    };
+    t.mock.property(process, 'env', { ...process.env, ARTSOUL_AURA_SOURCES_ENABLED:'true',
+        ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:core, ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA:'0xf061f70503c37cf2196a28f4785e524d0fb32538',
+        SUPABASE_URL:'https://fixture.test', SUPABASE_SERVICE_ROLE_KEY:'fixture' });
+    let enabled = true;
+    t.mock.method(globalThis, 'fetch', async url => {
+        if (String(url) === 'https://fixture.test/rest/v1/rpc/aura_source_states') return Response.json([{address:creator,enabled}]);
+        assert.equal(String(url), 'https://fixture.test/rest/v1/rpc/read_aura_border_setting');
+        return Response.json([{enabled:true,revision:1}]);
+    });
+    const [original, transferred, otherToken, otherWork, otherUri] = await withCatalogMintOrigins([
+        card, {...card,current_owner_address:'0x'+'7'.repeat(40)}, {...card,token_id:'9'},
+        {...card,artwork_id:'13'}, {...card,metadata_uri:card.metadata_uri+'?changed'}
+    ]);
+    for (const verified of [original,transferred]) {
+        assert.equal(verified.platform_origin_verified, true);
+        assert.equal(verified.aura_border_text, true);
+    }
+    for (const unmatched of [otherToken, otherWork, otherUri]) assert.equal(unmatched.aura_kind, undefined);
+    enabled = false;
+    assert.equal((await withCatalogMintOrigins([card]))[0].aura_kind, undefined);
+});
