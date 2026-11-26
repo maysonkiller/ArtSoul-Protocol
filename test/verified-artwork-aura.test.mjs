@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Interface, ZeroAddress, ZeroHash } from 'ethers';
 import { verifiedArtworkAura } from '../src/api/verified-artwork-aura.js';
+import { receiptPartnerFrames } from '../src/api/partner-frames.js';
 import { projectedArtworkAura } from '../src/ui/components/aura-frame.js';
 
 const abi = new Interface([
@@ -21,6 +22,18 @@ const mint = log('Transfer', [ZeroAddress, recipient, 9n]);
 const grant = log('GenesisGranted', [9n, recipient, 1, transactionHash]);
 const lock = log('Locked', [9n]);
 const collection = log('CollectionMinted', [2, recipient, recipient, 7, 3, 400n]);
+test('partner inventory requires final canonical mint evidence for each token in the approved collection', async () => {
+  const items = ['9','10'].map(id=>({id,tokenId:id,contractAddress:nftAddress,mintTransactionHash:transactionHash}));
+  const receipt = {status:'0x1',blockNumber:'0xb',blockHash,transactionHash,logs:[mint,collection]};
+  let canonical=blockHash;
+  const readers=[async method=>method==='eth_chainId' ? '0x2105' : receipt,
+    async (method,[tag])=>method==='eth_chainId' ? '0x2105' : tag==='finalized' ? {number:'0xc'} :
+      {number:'0xb',hash:canonical,transactions:[transactionHash]}];
+  assert.deepEqual([...await receiptPartnerFrames(items,8453,readers)],['9']);
+  canonical=ZeroHash;
+  assert.equal((await receiptPartnerFrames(items,8453,readers)).size,0);
+  assert.equal((await receiptPartnerFrames(items,84532,readers)).size,0);
+});
 function evidence(logs = [mint, lock, grant, collection]) {
   return { platformRegistration: {...deployment, tokenId: '9'}, genesisDeployment: deployment,
     partnerReview: {...deployment, approved: true}, canonicalMintBlock: {chainId: 8453, number: 11, hash: blockHash, finalizedThrough: 12},

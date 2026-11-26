@@ -2,6 +2,11 @@ import { allowMethods, requireWallet, sendError } from '../backend.js';
 import { readExternalWalletNfts, readExternalWalletEthQuote } from '../external-wallet-nfts.js';
 import { readMultichainWalletAssets } from '../multichain-wallet-assets.js';
 import { walletGenesisFrames } from '../profile-genesis.js';
+import { walletPartnerFrames } from '../partner-frames.js';
+
+async function walletFrames(page,wallet) {
+  return walletPartnerFrames(await walletGenesisFrames(page,wallet),wallet);
+}
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
@@ -27,10 +32,10 @@ export default async function handler(req, res) {
       const data = await readMultichainWalletAssets(wallet, {
         view, network: req.query.network, cursor: req.query.cursor
       });
-      return res.status(200).json(view === 'multichain-nfts' ? await walletGenesisFrames(data, wallet) : data);
+      return res.status(200).json(view === 'multichain-nfts' ? await walletFrames(data, wallet) : data);
     }
     const data = req.query?.quote === 'eth-usd' ? await readExternalWalletEthQuote(wallet) : await readExternalWalletNfts(wallet, req.query?.cursor);
-    return res.status(200).json(req.query?.quote ? data : await walletGenesisFrames(data, wallet));
+    return res.status(200).json(req.query?.quote ? data : await walletFrames(data, wallet));
   } catch (error) {
     if (!['UNAUTHENTICATED', 'SESSION_WALLET_MISMATCH', 'INVALID_WALLET_NFT_QUERY', 'INVALID_WALLET_NFT_CURSOR',
       'WALLET_NFTS_DISABLED', 'WALLET_NFTS_CONFIG_UNAVAILABLE', 'WALLET_NFTS_UNAVAILABLE', 'WALLET_NFTS_RATE_LIMITED',

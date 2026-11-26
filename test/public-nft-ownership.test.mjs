@@ -9,7 +9,7 @@ const address = n => `0x${String(n).repeat(40)}`;
 const CORE = address('a'), NFT = address('b'), CREATOR = address('1'), FIRST = address('2'), BUYER = address('3'), OWNER = address('4');
 const hash = n => `0x${n.toString(16).padStart(64, '0')}`;
 const env = { SUPABASE_URL: 'https://cards.example.test', SUPABASE_SERVICE_ROLE_KEY: 'offline-card-fixture',
-  ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA: '',
+  ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA: '', ARTSOUL_AURA_SOURCES_ENABLED:'false',
   ARTSOUL_NFT_OWNERSHIP_ENABLED: 'true', ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA: CORE,
   ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA: NFT, ARTSOUL_NFT_OWNERSHIP_CORE_CODE_HASH: hash(1),
   ARTSOUL_NFT_OWNERSHIP_NFT_CODE_HASH: hash(2) };
@@ -70,10 +70,11 @@ const request = (query = {}) => ({ method: 'GET', headers: {}, query });
 
 test('public NFT consumers use one verified history across cards, filters, saved items and timelines', async t => {
   const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]])), originalFetch = globalThis.fetch;
-  let rows, owners, marker, calls, afterRead, history, frameSetting;
+  let rows, owners, marker, calls, afterRead, history, frameSetting, sourceStates;
   t.beforeEach(() => {
     Object.assign(process.env, env); rows = fixture(); owners = [proof()]; marker = boundary(); calls = []; afterRead = null;
     frameSetting = {enabled: true, revision: 1};
+    sourceStates = [];
     history = { transfers: [{ ...transfer(), block_number: 30, log_index: 4, transaction_hash: hash(30), from_address: FIRST, to_address: BUYER }, transfer()], complete: true,
       lifecycle: lifecycle(), lifecycle_available: true, lifecycle_complete: true };
     globalThis.fetch = async (url, options = {}) => {
@@ -83,6 +84,10 @@ test('public NFT consumers use one verified history across cards, filters, saved
       let result;
       if (name === 'rpc/read_verified_nft_boundary') result = [{ ...marker }];
       else if (name === 'rpc/read_aura_border_setting') result = [frameSetting];
+      else if (name === 'rpc/aura_source_states') {
+        assert.deepEqual(body,{p_kind:'platform',p_chain:84532,p_scope:CORE,p_addresses:[CREATOR]});
+        result = sourceStates;
+      }
       else if (name === 'rpc/read_verified_nft_cards') result = body.p_artwork_ids.map(id => ({ ...owners.find(row => row.artwork_id === id), ...marker }));
       else if (name === 'rpc/read_verified_nft_history') result = { ...history, ownership: { ...owners[0], ...marker } };
       else if (name === 'rpc/read_public_search_cards') result = { artworks: rows.v41_artworks, metadata: [{ name: 'Test' }],
@@ -123,6 +128,18 @@ test('public NFT consumers use one verified history across cards, filters, saved
     registration.event_data.metadataURI = rows.v41_artworks[0].metadata_uri;
     rows.contract_events = [registration];
   };
+  await t.test('staff source decisions follow the original publisher across sales and can revoke a configured wallet', async () => {
+    designatePlatform();
+    process.env.ARTSOUL_AURA_SOURCES_ENABLED='true';
+    process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA='';
+    sourceStates=[{address:CREATOR,enabled:true,revision:1}];
+    const card=(await cardRequest({id:'77'})).body.data[0];
+    assert.equal(card.aura_kind,'platform');
+    assert.equal(card.current_owner_address,OWNER);
+    process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA=CORE+':'+CREATOR;
+    sourceStates=[{address:CREATOR,enabled:false,revision:2}];
+    assert.equal((await cardRequest({id:'77'})).body.data[0].aura_kind,undefined);
+  });
   await t.test('only the designated, registered and minted work receives the platform frame across public readers', async () => {
     designatePlatform();
     const cards = [(await cardRequest({})).body.data[0], (await cardRequest({id:'77'})).body.data[0],

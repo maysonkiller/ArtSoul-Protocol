@@ -96,6 +96,8 @@ test('Base preview and dialog and the multichain card with expanded details use 
     item.aura_border_text = false;
     assert.match(render(), /artsoul-aura-frame--genesis/);
     assert.doesNotMatch(render(), /artsoul-aura-caption/);
+    item.aura_kind = 'partner';
+    assert.match(render(), /artsoul-aura-frame--partner/);
     delete item.aura_kind;
     assert.doesNotMatch(render(), /artsoul-aura-/);
   }

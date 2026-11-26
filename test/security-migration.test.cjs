@@ -224,7 +224,7 @@ test('Phase 18.7b classifies tracked public tables while private tables have the
   assert.deepEqual(missing, []);
   // New private tables require an explicit independent hardening test; they
   // must never acquire the historical public-table service grants by accident.
-  assert.deepEqual([...privateTables].sort(), ['artsoul_private.aura_border_history', 'artsoul_private.banner_schedule_revisions',
+  assert.deepEqual([...privateTables].sort(), ['artsoul_private.aura_border_history', 'artsoul_private.aura_sources', 'artsoul_private.banner_schedule_revisions',
     'artsoul_private.genesis_grant_batches', 'artsoul_private.genesis_grants', 'artsoul_private.genesis_issuers', 'artsoul_private.identity_applications', 'artsoul_private.notification_reorg_identities',
     'artsoul_private.ordinary_issuers', 'artsoul_private.ordinary_primary_credits', 'artsoul_private.ordinary_registrations', 'artsoul_private.ordinary_resale_purchases',
     'artsoul_private.ordinary_runner_up_observations', 'artsoul_private.ordinary_settlements']);

@@ -2,10 +2,11 @@ import { React } from '../../entries/react-runtime.js';
 import { auraFrameClassName, auraFrameLabels } from '../../ui/components/aura-frame.js';
 
 export function WalletNftMedia({ item, className, children }) {
-  const verified = item.aura_kind === 'genesis';
-  return <div className={verified ? className + ' ' + auraFrameClassName('genesis') : className}
-    role={verified ? 'group' : undefined} aria-label={verified ? auraFrameLabels.genesis : undefined}>
+  const kind = item.aura_kind;
+  const verified = kind === 'genesis' || kind === 'partner';
+  return <div className={verified ? className + ' ' + auraFrameClassName(kind) : className}
+    role={verified ? 'group' : undefined} aria-label={verified ? auraFrameLabels[kind] : undefined}>
     {children}
-    {verified && item.aura_border_text === true && <span className="artsoul-aura-caption" aria-hidden="true"><span>{auraFrameLabels.genesis}</span></span>}
+    {verified && item.aura_border_text === true && <span className="artsoul-aura-caption" aria-hidden="true"><span>{auraFrameLabels[kind]}</span></span>}
   </div>;
 }
