@@ -53,7 +53,7 @@ Open [NFT appearance](/admin#nft-appearance) with a verified administrator walle
 
 ### Evidence for each frame
 
-In **Manage frame sources**, a Platform publisher can be designated for the current Base Sepolia catalog or for the new auction rehearsal before the catalog switches. Each choice uses its exact issuing Core. A reviewer checks that address before saving. The selection prepares a visual designation without changing the public catalog or its on-chain contracts.
+In **Manage frame sources**, a Platform publisher can be designated for the current Base Sepolia catalog or for the new auction rehearsal before the catalog switches. Each choice uses its exact issuing Core. Reviewers can enter a wallet, select their connected wallet or search public profiles by name and check the resulting full address before saving. The selection prepares a visual designation without changing the public catalog or its on-chain contracts.
 
 The artwork API can supply Platform status when ownership verification is active and a verified Base Sepolia NFT's original registration matches the designated Core and publisher. Gallery, profile, Saved and detail consume the same projected status. The admin panel previews the label on a sample frame as soon as the checkbox changes, confirms persistence after the server responds and identifies missing verification or publisher configuration. Previewing leaves every artwork's eligibility unchanged. Historical Ethereum Sepolia cards have no aura.
 

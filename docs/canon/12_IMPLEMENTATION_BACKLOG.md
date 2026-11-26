@@ -329,6 +329,8 @@ Eleven active C items remain. C2, C3, C4, C6 and C11 have implementation accepta
 
 Goal: audited, product-grade contracts and production operations.
 
+**C9 evidence, November 26.** Staff can select a publisher by public profile name or wallet address and designate it for the current catalog or the replacement rehearsal Core. Collection applications and curated Partner frame sources use the exact network and contract. Browser fixtures covered choosing the issuer, enabling and revoking a visual source, and independent identity review. The hosted database had zero NFT transfer coverage rows and zero registered visual sources at 19:56 UTC. The then-active catalog contained 39 works, including eight minted entries and zero verified frames. A real indexed mint, its subsequent transfer and its matching public frame on both surfaces remain acceptance evidence.
+
 The October 3 founder amendment moves the previously deferred passkey/recovery
 ceremony back into current A8 activation. Final mainnet custody and configuration
 still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
