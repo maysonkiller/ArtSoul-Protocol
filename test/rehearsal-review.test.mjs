@@ -255,6 +255,7 @@ test('loopback server serves only token-bound read routes on the exact origin', 
     assert.equal(server.address().address, '127.0.0.1');
     assert.equal((await get('')).statusCode, 200);
     assert.equal((await get('client.mjs')).statusCode, 200);
+    assert.equal((await get('deployment.mjs')).statusCode, 200);
     assert.equal((await get('review.css')).statusCode, 200);
     assert.equal((await get('plan.json')).headers['cache-control'], 'no-store');
     assert.equal((await get('plan.json', { headers: { Host: 'evil.example' } })).statusCode, 403);

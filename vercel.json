@@ -139,6 +139,10 @@
       "destination": "/api/[...route]?route=profile/layout"
     },
     {
+      "source": "/api/profile/verification",
+      "destination": "/api/[...route]?route=profile/verification"
+    },
+    {
       "source": "/api/profile/email",
       "destination": "/api/[...route]?route=profile/email"
     },

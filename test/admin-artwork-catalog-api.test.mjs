@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import auraBorder from '../src/api/routes/moderation/aura-border.js';
 import identityReviews from '../src/api/routes/moderation/identity-reviews.js';
 import identityApplication from '../src/api/routes/identity-application.js';
+import auraSources from '../src/api/routes/moderation/aura-sources.js';
 Object.assign(process.env,{
   NODE_ENV:'test',SESSION_SECRET:'catalog-wallet-test',SUPABASE_URL:'https://example.supabase.co',
   SUPABASE_SERVICE_ROLE_KEY:'catalog-test-only',ARTSOUL_PROTOCOL_ADMIN_ENABLED:'true',
@@ -60,6 +61,41 @@ test('identity applications bind both sessions and expose decisions only to veri
   role='moderator';assert.equal((await check(cookie(true,2))).statusCode,403);
   assert.equal(calls.filter(c=>c.path==='rpc/request_identity_review').length,1);
   assert.equal(calls.filter(c=>c.path==='rpc/manage_identity_reviews').length,2);
+});
+
+test('source management binds an explicit switch to the displayed Core and current staff wallet',async t=>{
+  const previous=process.env;
+  const core='0x'+'a'.repeat(40);
+  process.env={...previous,ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:core,ARTSOUL_AURA_SOURCES_ENABLED:'true',ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true'};
+  t.after(()=>{process.env=previous;});
+  let member=true;
+  let expectedCore=core;
+  const calls=fixture(t,(path,options)=>{
+    if(path.startsWith('artsoul_staff_roles?'))return json([{role:'team',authorization_version:2}]);
+    if(path.startsWith('artsoul_staff_authority_policy?'))return json([{origin:'https://example.com',chain_id:84532,
+      version:3,wallet_a:member?STAFF:'0x'+'2'.repeat(40),wallet_b:'0x'+'3'.repeat(40)}]);
+    if(path==='rpc/manage_aura_sources'){
+      const b=JSON.parse(options.body);
+      assert.equal(b.p_scope,expectedCore);assert.equal(b.p_actor,STAFF);assert.equal(b.p_policy_version,'3');
+      return json(b.p_enabled===null?[]:[{address:STAFF,enabled:true,revision:1}]);
+    }
+  });
+  const call=async (body,deployment)=>{
+    const request=req({method:body?'POST':'GET',body,cookie:cookie(true,2),query:{wallet:STAFF,kind:'platform',chain:'84532',address:STAFF,deployment}});
+    Object.assign(request.headers,{origin:'https://example.com','content-type':'application/json'});
+    const out=response();await auraSources(request,out);return out;
+  };
+  assert.equal((await call()).body.sources[0].revision,0);
+  const change={scope:core,reason:'Official artist wallet',enabled:true,revision:0};
+  assert.equal((await call({...change,scope:STAFF})).statusCode,409);
+  assert.equal((await call(change)).body.sources[0].enabled,true);
+  assert.equal((await call(undefined,'unknown')).statusCode,400);
+  expectedCore=(await import('../scripts/rehearsal-review/deployment.mjs')).rehearsalCore.toLowerCase();
+  assert.equal((await call(undefined,'rehearsal')).body.scope,expectedCore);
+  assert.equal((await call(change,'rehearsal')).statusCode,409);
+  assert.equal((await call({...change,scope:expectedCore},'rehearsal')).body.sources[0].enabled,true);
+  member=false;assert.equal((await call(change)).statusCode,403);
+  assert.equal(calls.filter(c=>c.path==='rpc/manage_aura_sources').length,4);
 });
 
 test('frame settings require verified admin or a team wallet still in the current authority pair', async t => {

@@ -18,16 +18,30 @@ export function platformPublisherFor(config) {
 
 export async function readArtworkAuraKinds(artworks, ownership) {
   const qualified = new Map();
+  if (!ownership?.config || !artworks.length) return qualified;
   const publisher = platformPublisherFor(ownership?.config);
-  if (!publisher) return qualified;
+  const publishers = new Set(publisher ? [publisher] : []);
   const core = ownership.config.coreAddress;
-  const confirmed = Number(ownership.confirmed_through);
   const proven = new Map(ownership.rows.map(row => [row.artwork_id, row]));
+  if (process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true') {
+    const addresses = [...new Set(artworks.filter(a => a.minted === true && proven.get(a.artwork_id)?.verified)
+      .map(a => normalizeWallet(a.creator)).filter(Boolean))];
+    if (!addresses.length || addresses.length > 200) return qualified;
+    try {
+      const states = await supabaseRest('rpc/aura_source_states',{method:'POST',body:{
+        p_kind:'platform',p_chain:ownership.config.chainId,p_scope:core,p_addresses:addresses
+      },signal:AbortSignal.timeout(2000)});
+      if (!Array.isArray(states) || states.length > addresses.length || states.some(s=>!addresses.includes(s.address) || typeof s.enabled !== 'boolean')) return qualified;
+      for (const s of states) { if (s.enabled) publishers.add(s.address); else publishers.delete(s.address); }
+    } catch { return qualified; }
+  }
+  if (!publishers.size) return qualified;
+  const confirmed = Number(ownership.confirmed_through);
   const candidates = artworks.filter(artwork => {
     const proof = proven.get(artwork.artwork_id);
     return Number(artwork.chain_id) === ownership.config.chainId && artwork.minted === true &&
       proof?.verified === true && proof.token_id === artwork.token_id && proof.latest_transfer.block_number <= confirmed &&
-      typeof artwork.creator === 'string' && artwork.creator.toLowerCase() === publisher &&
+      typeof artwork.creator === 'string' && publishers.has(artwork.creator.toLowerCase()) &&
       typeof artwork.metadata_uri === 'string' && Number.isSafeInteger(artwork.block_number) &&
       artwork.block_number > 0 && artwork.block_number <= confirmed && Number.isSafeInteger(artwork.log_index) &&
       artwork.log_index >= 0 && /^0x[0-9a-f]{64}$/.test(artwork.transaction_hash);
@@ -54,7 +68,7 @@ export async function readArtworkAuraKinds(artworks, ownership) {
         event.event_name === 'ArtworkRegistered' && event.transaction_hash === artwork.transaction_hash &&
         event.log_index === artwork.log_index && event.block_number === artwork.block_number &&
         event.artwork_id === artwork.artwork_id && matchesRegistrationId(event.event_data?.artworkId, artwork.artwork_id) &&
-        typeof event.event_data.creator === 'string' && event.event_data.creator.toLowerCase() === publisher &&
+        typeof event.event_data.creator === 'string' && event.event_data.creator.toLowerCase() === artwork.creator.toLowerCase() &&
         event.event_data.metadataURI === artwork.metadata_uri);
       if (matches.length === 1) {
         const { chainId, nftAddress } = ownership.config;

@@ -69,18 +69,27 @@ function harness(t) {
   return state;
 }
 
-test('the deployed email URL reaches the private handler through the hosting rewrite', async t => {
+test('private profile URLs reach the expected sign-in guards through their hosting rewrites', async t => {
   const state = harness(t);
+  const prior = process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED;
+  process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED = 'true';
+  t.after(() => {
+    if (prior === undefined) delete process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED;
+    else process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED = prior;
+  });
   const config = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
-  const rewrite = config.rewrites.find(row => row.source === '/api/profile/email');
-  assert.ok(rewrite, 'the dispatcher alone does not publish a nested profile endpoint');
-  const destination = new URL(rewrite.destination, 'https://artsoul.example');
-  assert.equal(destination.pathname, '/api/[...route]');
-  const res = response();
-  await dispatch({method: 'GET', headers: {}, query: Object.fromEntries(destination.searchParams)}, res);
-  assert.equal(res.statusCode, 401);
-  assert.equal(res.body.error, 'UNAUTHENTICATED');
-  assert.equal(res.headers['Cache-Control'], 'private, no-store');
+  for (const route of ['profile/email', 'profile/verification']) {
+    const rewrite = config.rewrites.find(row => row.source === '/api/' + route);
+    assert.ok(rewrite, 'missing hosting rewrite for ' + route);
+    const destination = new URL(rewrite.destination, 'https://artsoul.example');
+    assert.equal(destination.pathname, '/api/[...route]');
+    assert.equal(destination.searchParams.get('route'), route);
+    const res = response();
+    await dispatch({method: 'GET', headers: {}, query: Object.fromEntries(destination.searchParams)}, res);
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.body.error, 'UNAUTHENTICATED');
+    assert.equal(res.headers['Cache-Control'], 'private, no-store');
+  }
   assert.deepEqual(state.calls, []);
 });
 

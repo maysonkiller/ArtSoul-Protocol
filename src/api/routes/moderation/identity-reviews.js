@@ -1,28 +1,17 @@
 import { allowMethods, sendError } from '../../backend.js';
 import { reviewBody, reviewRpc } from '../../identity-applications.js';
 import { requireService, serviceError } from '../../launch-services.js';
-import { getModerationAccess, readAuthorityPolicy } from '../../moderation-access.js';
-import { getWebAuthnConfig, roleBoundSessionsEnabled, readModerationSession } from '../../moderation-passkey.js';
-import { requireProtocolAdminEnabled } from '../../protocol-admin-config.js';
+import { verifiedReviewActor } from '../../frame-source-access.js';
 
 export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'private, no-store');
     if (!allowMethods(req, res, ['GET','POST'])) return;
     try {
         requireService('ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED');
-        requireProtocolAdminEnabled();
-        const access = await getModerationAccess(req, { strict: true });
-        const session = roleBoundSessionsEnabled() && readModerationSession(req);
-        const denied = () => serviceError('REVIEWER_REQUIRED','Verify an authorized staff wallet to review requests.',403);
-        if (!session?.authorizationVersion || !access?.stepUpActive || !['admin','team'].includes(access.role) ||
-            session.wallet !== access.wallet || session.wallet !== req.query?.wallet) throw denied();
-        const origin = getWebAuthnConfig().origin;
-        const policy = access.role === 'team' ? await readAuthorityPolicy(origin) : null;
-        if (access.role === 'team' && !policy?.authorities?.includes(session.wallet)) throw denied();
-        const params = { p_actor: session.wallet, p_version: session.authorizationVersion, p_origin: policy?.origin ?? null,
-            p_policy_version: policy?.version ?? null, p_action: null, p_note: null, p_id: null, p_status: null, p_after: null };
+        const actor = await verifiedReviewActor(req);
+        const params = { ...actor.params, p_action:null, p_note:null, p_id:null, p_status:null, p_after:null };
         if (req.method === 'POST') {
-            const body = await reviewBody(req, 'action,id,note', origin);
+            const body = await reviewBody(req, 'action,id,note', actor.origin);
             if (typeof body.id !== 'string' || !/^[1-9]\d{0,17}$/.test(body.id) || !['approve','decline','revoke'].includes(body.action) ||
                 typeof body.note !== 'string' || body.note.trim().length < 5 || body.note.trim().length > 500) {
                 throw serviceError('INVALID_DECISION','Choose a request and enter a reason between 5 and 500 characters.');

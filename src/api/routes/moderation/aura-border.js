@@ -57,7 +57,8 @@ export default async function handler(req, res) {
         if (data && (saved.enabled !== data.enabled || (saved.revision !== data.revision && saved.revision !== data.revision + 1))) {
             throw fail(503, 'AURA_SETTING_UNCONFIRMED', 'Reload the current appearance setting to verify the change.');
         }
-        return res.status(200).json({ ...saved, publicFrameSource: publicFrameSource() });
+        return res.status(200).json({ ...saved, publicFrameSource: publicFrameSource(),
+            ...(process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true' ? { sourcesEnabled:true } : {}) });
     } catch (error) {
         const detail = String(error?.details?.message || error.message || '');
         if (detail.includes('AURA_REVISION_CONFLICT')) error = fail(409, 'AURA_REVISION_CONFLICT', 'The setting changed. Reload it before saving.');

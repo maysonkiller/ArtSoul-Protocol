@@ -3,6 +3,7 @@
 // Alchemy Portfolio API is a display source, not a proof of current ownership.
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizeWallet } from './backend.js';
+import { mintTransactionHint } from './partner-frames.js';
 import { collectionAssetKey } from '../config/collection-networks.js';
 
 export const WALLET_ASSET_NETWORKS = Object.freeze({
@@ -143,7 +144,7 @@ function nftItem(item, wallet) {
     if (traits.length >= 8) break;
   }
   return { id: collectionAssetKey(chain.chainId, contract, tokenId), network: item.network, chainId: chain.chainId,
-    networkName: chain.name, networkShort: chain.short, contractAddress: contract, tokenId, tokenType: type, quantity,
+    networkName: chain.name, networkShort: chain.short, contractAddress: contract, tokenId, tokenType: type, quantity, ...mintTransactionHint(item.mint),
     name: safeText(item.name), collection: safeText(item.collection?.name || item.contract?.name),
     description: safeText(item.description, 600), imageUrl: cachedImage(item.image), traits,
     // External links open exact NFT pages for inspection only: not listings or sale confirmations.

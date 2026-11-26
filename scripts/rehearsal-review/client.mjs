@@ -1,6 +1,8 @@
+import { rehearsalCore } from './deployment.mjs';
+
 // The local test fixture is shared with the read-only planner. It accepts no caller-supplied metadata.
 export const rehearsalArtwork = Object.freeze({
-    core: '0xC4b756B6E3714E4BaB6E7dd4965400F390403CD2',
+    core: rehearsalCore,
     nft: '0x810DD5459c9cC5d82f13F8D52545a654Ec0bbe4c',
     coreHash: '0x4d18f0243cff1ef906a07a3517949045c6fe3a9e8b584e60bcbe7ad021bef54e',
     nftHash: '0xcbff8b3bb46c10d150d5812846d5d8c990c0156215d5978b44e238a86d141bac',

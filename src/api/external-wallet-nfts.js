@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { normalizeWallet } from './backend.js';
 import { collectionAssetKey } from '../config/collection-networks.js';
+import { mintTransactionHint } from './partner-frames.js';
 import { readEthUsdQuote } from './eth-usd-quote.js';
 
 const PAGE_SIZE = 12;
@@ -126,7 +127,7 @@ function normalizeItem(value) {
       if (traits.length === 8) break;
     }
   }
-  return { id: collectionAssetKey(8453, contractAddress, tokenId), contractAddress, tokenId, tokenType, quantity,
+  return { id: collectionAssetKey(8453, contractAddress, tokenId), contractAddress, tokenId, tokenType, quantity, ...mintTransactionHint(value.mint),
     name: text(value.name, 160), collection: text(value.contract?.name, 160), imageUrl: imageUrl(value.image), traits };
 }
 function normalizePage(data, now) {

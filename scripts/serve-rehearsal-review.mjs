@@ -149,7 +149,7 @@ export async function listenForReview(loadPlan, { loadRegistration, loadAuction 
     const token = randomBytes(24).toString('hex');
     const prefix = '/' + token + '/';
     const files = new Map([['', ['index.html', 'text/html']], ['client.mjs', ['client.mjs', 'text/javascript']],
-        ['review.css', ['review.css', 'text/css']]]);
+        ['deployment.mjs', ['deployment.mjs', 'text/javascript']], ['review.css', ['review.css', 'text/css']]]);
     const evidence = new Map();
     if (loadRegistration) evidence.set('registration', { load: loadRegistration, render: registrationPage, label: 'View verified work registration' });
     if (loadAuction) evidence.set('auction', { load: loadAuction, render: auctionPage, label: 'View finalized auction status' });

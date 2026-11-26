@@ -1,5 +1,6 @@
 import { React } from '../../entries/react-runtime.js';
 import { auraFrameClassName, auraFrameLabels } from '../../ui/components/aura-frame.js';
+import { AuraSources } from './aura-sources.jsx';
 
 const sourceMessages = {
     awaiting_ownership: 'Public frames are waiting for ownership verification on this deployment.',
@@ -68,7 +69,8 @@ export function AuraAppearance({ api, wallet, isSessionCurrent }) {
             <p aria-live="polite">{eligibility[preview]}</p>
             <p className="admin-aura-classic-note">Classic shows the frame alone. Switch to Future in the header to see its label.</p>
         </figure>}
-        {setting && sourceMessages[setting.publicFrameSource] && <p>{sourceMessages[setting.publicFrameSource]}</p>}
+        {setting && sourceMessages[setting.publicFrameSource] && !(setting.sourcesEnabled && setting.publicFrameSource === 'awaiting_publisher') && <p>{sourceMessages[setting.publicFrameSource]}</p>}
+        {setting?.sourcesEnabled && <AuraSources {...{api,wallet,isSessionCurrent}} />}
         {!setting && !busy && <button type="button" onClick={() => { setMessage(''); setReload(value => value + 1); }}>Reload setting</button>}
         <p role="status">{pending !== null ? 'Saving frame labels…' : busy ? 'Loading appearance setting…' : message}</p>
     </section>;
