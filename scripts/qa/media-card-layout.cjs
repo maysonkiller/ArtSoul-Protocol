@@ -139,15 +139,22 @@ async function run(engine, name, screenshots, origin) {
                                 assert(await media.evaluate(m => m.paused), 'Changing mute must not start playback');
                                 await press(play);
                                 await page.waitForFunction(m => !m.paused && m.currentTime > .1, await media.elementHandle());
-                                const audioLabel = card.locator('.artsoul-card-audio-label');
-                                if (await audioLabel.count()) {
-                                    await page.waitForFunction(el => /^\d+:\d{2}$/.test(el.textContent), await audioLabel.elementHandle());
-                                }
+                                const clock = card.locator('.artsoul-card-audio-label,.artsoul-card-media-badge');
+                                await page.waitForFunction(el => /^\d+:\d{2}$/.test(el.textContent), await clock.elementHandle());
+                                const playBounds = await play.boundingBox();
                                 await press(play);
                                 assert(await media.evaluate(m => m.paused), where);
-                                if (await audioLabel.count()) {
-                                    await page.waitForFunction(el => el.textContent === 'Paused', await audioLabel.elementHandle());
-                                }
+                                const stopped = await media.evaluate(m => m.currentTime);
+                                const frozen = await clock.innerText();
+                                await press(mute);
+                                assert(await media.evaluate(m => m.paused), 'Changing volume while paused must keep the position');
+                                assert.equal(await clock.innerText(), frozen);
+                                await press(play);
+                                await page.waitForFunction(({element, from}) => !element.paused && element.currentTime > from + .1,
+                                    {element: await media.elementHandle(), from: stopped});
+                                await press(play);
+                                const after = await play.boundingBox();
+                                assert(Math.abs(after.x - playBounds.x) < 1, 'The Play target cannot move as the clock changes');
                                 assert.equal(page.url(), origin + '/', 'Playback controls must leave the artwork link untouched');
                             }
                             completed++;

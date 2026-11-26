@@ -121,6 +121,23 @@ test('only an active connected soundtrack interrupted by the mute gesture resume
     }
 });
 
+test('Unmute renews a running track in its gesture and leaves an intentionally paused track alone', () => {
+    const { media, control, fire } = fixture('AUDIO');
+    let plays = 0;
+    media.play = async () => { plays++; media.paused = false; };
+    media.currentTime = 7;
+    for (const paused of [true, false]) {
+        media.paused = paused;
+        media.muted = true;
+        fire(control('.artsoul-media-mute'), 'click');
+        assert.equal(media.muted, false);
+        assert.equal(plays, paused ? 0 : 1);
+        assert.equal(media.currentTime, 7);
+        fire(media, 'volumechange');
+        assert.equal(plays, paused ? 0 : 1);
+    }
+});
+
 test('audio offers a direct storage download and omits video-only controls', () => {
     const {media, control, fire, dialog} = fixture('audio');
     const options = control('.ap-options'), file = control('.ap-file');

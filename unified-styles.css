@@ -790,6 +790,24 @@ body.future .artwork-page-compact-action {
 }
 
 .artsoul-aura-caption { display: none; }
+.future .artsoul-aura-frame:has(> .artsoul-aura-caption) {
+    --aura-band: .8125rem;
+    --aura-corner: 1.125rem;
+    --aura-lap: 18s;
+    box-sizing: border-box;
+    padding: var(--aura-band);
+}
+.future .artsoul-artwork-card:has(> .artsoul-aura-caption) :is(.artsoul-card-menu, .artsoul-card-countdown, .artsoul-card-status) {
+    margin: var(--aura-band);
+}
+.future .artwork-detail-frame:has(> .artsoul-aura-caption) {
+    --aura-band: clamp(1rem, 1.35vw, 1.375rem);
+    --aura-corner: 1.625rem;
+    --aura-lap: 32s;
+}
+.future .artsoul-aura-frame:has(> .artsoul-aura-caption)::after {
+    border-width: var(--aura-band);
+}
 .artsoul-card-identity-check, .artsoul-official-nft {
     display: inline-block; vertical-align: -.1em; width: 1.08em; height: 1.08em;
     margin-inline-start: .35em; border-radius: 50%;
@@ -814,38 +832,55 @@ body.future .artwork-page-compact-action {
     white-space: nowrap;
     pointer-events: none;
     container-type: size;
+    container-name: aura;
+}
+.future .artsoul-aura-caption::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: calc(var(--aura-band) - 2px) solid color-mix(in srgb, var(--c-bg) 74%, transparent);
+    border-radius: inherit;
 }
 .future .artsoul-aura-caption > span {
-    position: absolute; bottom: 1px; left: .5rem;
-    display: inline-block;
-    padding-inline: .35rem;
-    border-radius: .2rem;
-    background: var(--c-bg);
-    color: var(--aura-glow, var(--c-accent));
-    font-size: .625rem;
-    font-weight: 600;
-    line-height: 1.2;
+    position: absolute;
+    bottom: calc((var(--aura-band) - 1em) / 2);
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--c-brand-mark-background);
+    font-size: calc(var(--aura-band) - .1875rem);
+    font-weight: 750;
+    line-height: 1;
+    --aura-axis: calc(var(--aura-band) / 2);
+}
+@container aura (min-width: 440px) {
+    .artwork-detail-frame > .artsoul-aura-caption > .aura-word { --aura-lap: 48s; }
+}
+@container aura (min-width: 700px) {
+    .artwork-detail-frame > .artsoul-aura-caption > .aura-word { --aura-lap: 64s; }
+}
+@container aura (min-width: 960px) {
+    .artwork-detail-frame > .artsoul-aura-caption > .aura-word { --aura-lap: 80s; }
 }
 @supports (width: 1cqw) {
     @media (prefers-reduced-motion: no-preference) {
         .future :is(.artsoul-aura-frame--platform,.artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-word {
             top: 0; left: 0; bottom: auto;
             transform-origin: 0 0;
-            animation: artsoulAuraCaption 18s linear infinite;
+            animation: artsoulAuraCaption var(--aura-lap) linear infinite;
         }
     }
 }
 /* Keep the lower edge readable from left to right. Turn the word between
    edges while transparent, so corners never show it upside down. */
 @keyframes artsoulAuraCaption {
-    0%, 100% { opacity: 0; transform: translate(8px, 7px) rotate(0deg) translate(0,-50%); }
-    24.99% { opacity: 0; transform: translate(calc(100cqw - 8px), 7px) rotate(0deg) translate(-100%,-50%); }
-    25% { opacity: 0; transform: translate(calc(100cqw - 7px), 8px) rotate(90deg) translate(0,-50%); }
-    49.99% { opacity: 0; transform: translate(calc(100cqw - 7px), calc(100cqh - 8px)) rotate(90deg) translate(-100%,-50%); }
-    50% { opacity: 0; transform: translate(calc(100cqw - 8px), calc(100cqh - 7px)) rotate(0deg) translate(-100%,-50%); }
-    74.99% { opacity: 0; transform: translate(8px, calc(100cqh - 7px)) rotate(0deg) translate(0,-50%); }
-    75% { opacity: 0; transform: translate(7px, calc(100cqh - 8px)) rotate(-90deg) translate(0,-50%); }
-    99.99% { opacity: 0; transform: translate(7px, 8px) rotate(-90deg) translate(-100%,-50%); }
+    0%, 100% { opacity: 0; transform: translate(var(--aura-corner), var(--aura-axis)) rotate(0deg) translate(0,-50%); }
+    24.99% { opacity: 0; transform: translate(calc(100cqw - var(--aura-corner)), var(--aura-axis)) rotate(0deg) translate(-100%,-50%); }
+    25% { opacity: 0; transform: translate(calc(100cqw - var(--aura-axis)), var(--aura-corner)) rotate(90deg) translate(0,-50%); }
+    49.99% { opacity: 0; transform: translate(calc(100cqw - var(--aura-axis)), calc(100cqh - var(--aura-corner))) rotate(90deg) translate(-100%,-50%); }
+    50% { opacity: 0; transform: translate(calc(100cqw - var(--aura-corner)), calc(100cqh - var(--aura-axis))) rotate(0deg) translate(-100%,-50%); }
+    74.99% { opacity: 0; transform: translate(var(--aura-corner), calc(100cqh - var(--aura-axis))) rotate(0deg) translate(0,-50%); }
+    75% { opacity: 0; transform: translate(var(--aura-axis), calc(100cqh - var(--aura-corner))) rotate(-90deg) translate(0,-50%); }
+    99.99% { opacity: 0; transform: translate(var(--aura-axis), var(--aura-corner)) rotate(-90deg) translate(-100%,-50%); }
     1%, 24%, 26%, 49%, 51%, 74%, 76%, 99% { opacity: 1; }
 }
 
@@ -853,7 +888,7 @@ body.future .artwork-page-compact-action {
     .future .artsoul-aura-frame--platform::after,
     .future .artsoul-aura-frame--partner::after {
         border: 0;
-        padding: 4px;
+        padding: var(--aura-band, 4px);
         background: var(--aura-glow);
         /* Both mask layers need full alpha to leave the artwork pixels untouched. */
         -webkit-mask: linear-gradient(black 0 0) content-box, linear-gradient(black 0 0);
@@ -997,6 +1032,7 @@ body.future .artsoul-artwork-card:focus-visible {
 
 .artsoul-media-toggle,
 .artsoul-media-mute {
+    touch-action: manipulation;
     position: relative;
     flex: 0 0 32px;
     width: 32px;
@@ -1086,8 +1122,7 @@ body.future .artsoul-artwork-card:focus-visible {
 }
 
 @media (hover: hover) and (pointer: fine) and (min-width: 769px) {
-    .artsoul-artwork-card:not(:hover) .artsoul-card-media-video[data-playing="true"] .artsoul-card-media-controls,
-    .artsoul-artwork-card:not(:hover) .artsoul-card-media-video[data-playing="true"] .artsoul-card-media-badge {
+    .artsoul-artwork-card:not(:hover):not(:focus-within) .artsoul-card-media-video[data-playing="true"] .artsoul-card-media-controls {
         opacity: 0;
         pointer-events: none;
     }
@@ -10520,6 +10555,9 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media-controls {
         grid-column: 1;
         padding: 3px 4px !important;
         margin-inline-start: 2px;
+        min-inline-size: 5.25ch;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
     }
     body:is(.classic, .future) .artsoul-card-preview:has(.artsoul-card-media-controls) .artsoul-card-media-controls {
         grid-column: 2;
