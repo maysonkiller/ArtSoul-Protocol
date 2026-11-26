@@ -5663,10 +5663,6 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     box-shadow: 0 0 24px rgba(var(--c-accent-rgb), 0.1);
 }
 .profile-display-name { font-size: clamp(1.25rem, 2vw, 1.5rem); line-height: 1.25; overflow-wrap: anywhere; }
-.artsoul-verification-mark { display: inline-block; vertical-align: -.15em; flex: none; }
-.artsoul-verification-mark circle { fill: var(--c-verification-blue); stroke: var(--c-brand-mark-background); }
-.artsoul-verification-mark path { stroke: var(--c-brand-mark-background); }
-.profile-display-name .artsoul-verification-mark { width: .95em; height: .95em; margin-inline-start: .3em; }
 .profile-display-bio { max-width: 65ch; margin: 0 0 0.75rem; color: var(--c-text-muted); font-size: 0.9375rem; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
 @media (prefers-reduced-motion: reduce) {
     .profile-detail-field .profile-detail-input { transition: none; }

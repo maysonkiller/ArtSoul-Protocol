@@ -1,4 +1,5 @@
 import { React } from '../../entries/react-runtime.js';
+import './verification-mark.css';
 
 export function VerificationMark({ label }) {
     return <svg className="artsoul-verification-mark" width="24" height="24" viewBox="0 0 24 24"
