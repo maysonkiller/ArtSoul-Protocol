@@ -141,6 +141,10 @@ At block 63,602,202 both providers reported no bid, an open round, a minimum bid
 
 For this auction, `node scripts/review-rehearsal-late-bid.mjs --plan` checks the finalized opening and returns the availability of the first late bid. Use `--serve` to open the private wallet review on the same computer. It becomes available from November 26 at 21:18:44 UTC until 21:28:44 UTC if no other bid has arrived. The request is limited to the reviewed bidder, Core and auction, a bid of 0.001 test ETH and a deposit of 0.01 test ETH. Only the wallet holder submits the transaction. The inclusion block determines whether an extension occurs. After inclusion and finality, `node scripts/review-rehearsal-late-bid.mjs --verify-receipt HASH` checks the submitted bid and the resulting auction deadline.
 
+Use `node scripts/review-rehearsal-late-bid.mjs --status` or **View finalized auction status** on the local bid review page to read the current evidence without a wallet. Both providers must agree on the same finalized block, Core/NFT runtimes and auction state. The page shows the block time and deadlines in Warsaw and UTC, including a winner payment deadline or runner-up offer when applicable. Finality may lag a recent bid. The wallet planner checks fresh heads separately before offering the fixed first-bid request.
+
+On November 26 at the finalized block timestamp 18:33:40 UTC, both providers confirmed the original bidding end of 21:28:44 UTC, the reserve of 0.001 test ETH and no highest bidder. [Observed Base Sepolia block](https://sepolia.basescan.org/block/0x7886e8697029b70c7a2b64083c2230a9cf171dcc58c40b7b69f73ccd12256d35)
+
 ## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.

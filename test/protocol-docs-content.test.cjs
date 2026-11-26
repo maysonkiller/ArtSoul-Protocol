@@ -29,7 +29,8 @@ async function components(runtime = React, bindings = {}) {
   const [{transformWithOxc}, {PROTOCOL_DOC_SECTIONS: sections}, {auraFrameClassName}] = await Promise.all([
     import('vite'), import('../src/content/protocol-docs.js'), import('../src/ui/components/aura-frame.js')
   ]);
-  const source = fs.readFileSync('src/entries/docs-protocol.jsx', 'utf8')
+  const source = [fs.readFileSync('src/ui/components/verification-mark.jsx','utf8').replace('export function', 'function'),
+    fs.readFileSync('src/entries/docs-protocol.jsx', 'utf8')].join('\n')
     .replace(/^import .*;\r?$/gm, '')
     .replace(/createRoot\(document.getElementById\('app'\)\).render\(<ProtocolDocsApp \/>\);/, '');
   compiled ||= (await transformWithOxc(source, 'docs-content-fixture.jsx', {jsx: {runtime: 'classic'}})).code;
@@ -125,10 +126,11 @@ test('the collection gallery links to a readable key for the origin mark', async
   const {sections, Section} = await components();
   const section = sections.find(item => item.id === 'collection-verification');
   const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
-  assert.match(html, /<svg[^>]*aria-hidden="true"/);
+  assert.match(html, /<svg[^>]*class="artsoul-verification-mark"[^>]*aria-hidden="true"/);
   assert.match(html, /Example blue check for a verified collection origin/);
-  assert.match(html, /Public collection covers are in development/);
-  assert.match(section.text, /specific blockchain and collection contract/);
+  assert.match(html, /Collection covers are in development/);
+  assert.match(section.text, /one collection contract on one network/);
+  assert.match(section.text, /profile name and wallet/);
   assert.match(section.text, /revoked/);
   assert.match(section.text, /Sales volume plays no part/);
   assert.match(section.text, /Any artist or project team.*without a blue check or Partner status/);

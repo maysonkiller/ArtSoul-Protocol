@@ -48,7 +48,7 @@ test('profile edits cannot forge, erase or overwrite linked provider identity', 
       bio: '  Artist biography  ', avatar_url: 'https://media.example/avatar.png',
       discord_username: providerValue, discord_id: '123456789',
       twitter_handle: providerValue, twitter_username: providerValue, twitter_id: '987654321',
-      verified: true, is_partner: true, role: 'admin', wallet_address: '0x2222222222222222222222222222222222222222'
+      verified: true, profile_identity_verified: true, is_partner: true, role: 'admin', wallet_address: '0x2222222222222222222222222222222222222222'
       , twitter_connected: true, discord_connected: true
     }}, result);
     assert.equal(result.statusCode, 200);

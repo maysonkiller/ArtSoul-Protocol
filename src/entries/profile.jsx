@@ -7,6 +7,7 @@ import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { EmailConnection } from '../features/profile/email-connection.jsx';
 import { GenesisStatus } from '../features/profile/genesis-status.jsx';
+import { VerificationMark } from '../ui/components/verification-mark.jsx';
 import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
 import { WalletNfts, useWalletNftsEnabled } from '../features/profile/wallet-nfts.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
@@ -1692,6 +1693,8 @@ const { useState, useEffect, useRef } = React;
                                                 isClassic ? 'text-gray-100' : ''
                                             }`}>
                                                 {resolvedProfileName}
+                                                {profile?.profile_identity_verified === true && resolvedProfileName === profile.username &&
+                                                    <VerificationMark label="Verified profile identity" />}
                                             </h1>
                                             {profile?.wallet_address && (
                                                 <div className="flex items-center gap-2 mb-3 flex-wrap">

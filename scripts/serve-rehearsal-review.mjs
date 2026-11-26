@@ -7,7 +7,7 @@ import { getAddress, keccak256, toQuantity } from 'ethers';
 import { prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
 import { expectedRehearsalPairRegister, loadReviewedPair } from './prepare-rehearsal-core.mjs';
 import { prepareRehearsalSafes, rehearsalSafeRelease as release } from './prepare-rehearsal-safes.mjs';
-import { registrationPage } from './rehearsal-review/registration.mjs';
+import { auctionPage, registrationPage } from './rehearsal-review/registration.mjs';
 import { readRpc, requireIndependentProviders, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
 const asset = name => new URL('./rehearsal-review/' + name, import.meta.url);
@@ -145,12 +145,15 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, tre
     return { ...base, operation, target, deployments, codeChecks, nonce, dataHash, data: tx.data, dataSha256: sha256Hex(tx.data) };
 }
 
-export async function listenForReview(loadPlan, { loadRegistration } = {}) {
+export async function listenForReview(loadPlan, { loadRegistration, loadAuction } = {}) {
     const token = randomBytes(24).toString('hex');
     const prefix = '/' + token + '/';
     const files = new Map([['', ['index.html', 'text/html']], ['client.mjs', ['client.mjs', 'text/javascript']],
         ['review.css', ['review.css', 'text/css']]]);
-    let inflight, registrationInFlight;
+    const evidence = new Map();
+    if (loadRegistration) evidence.set('registration', { load: loadRegistration, render: registrationPage, label: 'View verified work registration' });
+    if (loadAuction) evidence.set('auction', { load: loadAuction, render: auctionPage, label: 'View finalized auction status' });
+    let inflight;
     const server = createServer(async (req, res) => {
         const host = '127.0.0.1:' + server.address().port;
         res.setHeader('Cache-Control', 'no-store');
@@ -170,17 +173,18 @@ export async function listenForReview(loadPlan, { loadRegistration } = {}) {
                 inflight ??= Promise.resolve().then(loadPlan).finally(() => { inflight = undefined; });
                 const result = await inflight;
                 res.writeHead(200, { 'Content-Type': 'application/json' }).end(req.method === 'HEAD' ? undefined : JSON.stringify(result));
-            } else if (name === 'registration' && loadRegistration) {
-                registrationInFlight ??= Promise.resolve().then(loadRegistration).finally(() => { registrationInFlight = undefined; });
-                const html = registrationPage(await registrationInFlight);
+            } else if (evidence.has(name)) {
+                const page = evidence.get(name);
+                page.inflight ??= Promise.resolve().then(page.load).finally(() => { page.inflight = undefined; });
+                const html = page.render(await page.inflight);
                 res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
                 res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(req.method === 'HEAD' ? undefined : html);
             } else if (files.has(name)) {
                 const [file, mime] = files.get(name);
                 let content = await readFile(asset(file));
-                if (name === '' && loadRegistration) {
-                    content = content.toString('utf8').replace('<!-- verified-registration -->',
-                        '<p><a href="./registration">View verified work registration</a></p>');
+                if (name === '' && evidence.size) {
+                    content = content.toString('utf8').replace('<!-- evidence-link -->',
+                        [...evidence].map(([route, page]) => '<p><a href="./' + route + '">' + page.label + '</a></p>').join(''));
                 }
                 res.writeHead(200, { 'Content-Type': mime + '; charset=utf-8' }).end(req.method === 'HEAD' ? undefined : content);
             } else {

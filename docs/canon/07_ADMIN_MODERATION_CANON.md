@@ -106,7 +106,22 @@ projection before badges can appear on profiles. A verified social login,
 collection review, Partner frame or Safe signature is insufficient evidence on
 its own. Badge decisions belong to application review. The Admin Security Safe
 governs admission of external trading operators for the new ordinary NFTs.
-The reviewer's grant authority and public badge publication remain open.
+The [profile review migration](../../sql/migrations/20261126185730_profile_identity_reviews.sql)
+and public profile heading implement a separate mark for the reviewed wallet,
+profile record and exact displayed name. Each lookup reads the latest decision;
+a renamed, hidden or replaced profile has no mark. The hosted reviewer workflow,
+its grant authority and the first genuine public decisions remain open.
+
+For the first review, record the requested public name, profile wallet and
+profile ID. A collection application also identifies its network, contract
+and claimed creator. Check current wallet control and corroborate the identity
+through an independently established artist or project channel. For a collection,
+check the creator's link to that exact deployment. A reviewer records the
+decision, its reason and a private evidence reference. Publish only the mark.
+Append a revocation on impersonation, lost control or incorrect attribution.
+An automated assistant can collect material and flag a missing field. Before
+accepting real applications, designate the human reviewer authorized to grant
+or revoke the mark. The appearance toggle manages frame labels only.
 
 ## October 8 factor setup and recovery amendment
 

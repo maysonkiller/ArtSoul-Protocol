@@ -22,11 +22,18 @@ WITH sales AS (
         sum(protocol_wei) FILTER (WHERE is_primary) AS primary_protocol_credit,
         sum(protocol_wei) FILTER (WHERE NOT is_primary) AS resale_protocol_credit, sum(ecosystem_wei) AS resale_ecosystem_credit
     FROM sales GROUP BY buyer
+), prior_buyers AS (
+    SELECT first_collector AS buyer FROM artsoul_private.ordinary_settlements
+    WHERE chain_id = $1 AND core_address = $2 AND block_number < $3
+    UNION
+    SELECT buyer FROM artsoul_private.ordinary_resale_purchases
+    WHERE chain_id = $1 AND core_address = $2 AND block_number < $3
 )
 SELECT EXISTS (SELECT 1 FROM artsoul_private.ordinary_issuers WHERE chain_id = $1 AND core_address = $2) AS registered,
     row_security_active('artsoul_private.ordinary_issuers') OR row_security_active('artsoul_private.ordinary_settlements')
         OR row_security_active('artsoul_private.ordinary_resale_purchases') OR row_security_active('artsoul_private.ordinary_primary_credits') AS filtered,
     count(*)::text AS paying_wallets, (count(*) FILTER (WHERE purchases > 1))::text AS repeat_paying_wallets,
+    count(prior_buyers.buyer)::text AS returning_paying_wallets,
     coalesce(sum(primary_sales), 0)::text AS primary_sales, coalesce(sum(resales), 0)::text AS resales,
     coalesce(sum(primary_volume), 0)::text AS primary_volume_wei, coalesce(sum(resale_volume), 0)::text AS resale_volume_wei,
     (coalesce(sum(primary_volume), 0) + coalesce(sum(resale_volume), 0))::text AS total_volume_wei,
@@ -34,7 +41,7 @@ SELECT EXISTS (SELECT 1 FROM artsoul_private.ordinary_issuers WHERE chain_id = $
     CASE WHEN coalesce(sum(missing_primary_credits), 0) = 0 THEN coalesce(sum(primary_protocol_credit), 0)::text END AS primary_protocol_credit_wei,
     coalesce(sum(resale_protocol_credit), 0)::text AS resale_protocol_credit_wei,
     coalesce(sum(resale_ecosystem_credit), 0)::text AS resale_ecosystem_credit_wei
-FROM wallets`;
+FROM wallets LEFT JOIN prior_buyers USING (buyer)`;
 
 export async function reportOrdinaryDemand(client, chain, core, fromBlock, toBlock) {
     if (!['8453', '84532'].includes(chain) || !isAddress(core) || core.toLowerCase() === ZeroAddress) {

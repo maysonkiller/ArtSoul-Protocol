@@ -58,6 +58,15 @@ test('profile complaints preserve content, privacy and atomic review (PostgreSQL
     return (await pool.query('SELECT * FROM submit_profile_content_report($1,$2,$3,$4,NULL,TRUE,$5)',
       [owner,reporter,category,'Evidence for review.',limit])).rows[0];
   }
+  await pool.query(migration('20261126185730_profile_identity_reviews.sql'));
+  await t.test('public profile identity checks are scoped to the reviewed wallet, profile and name and can be revoked', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('UPDATE profiles SET username=$1 WHERE wallet_address=$2', ['Identity fixture', OWNER]);
+      await client.query(fs.readFileSync(path.join(ROOT, 'test/fixtures/profile-identity-reviews.sql'), 'utf8'));
+    } finally { await client.query('ROLLBACK'); client.release(); }
+  });
   async function row(id) { return (await pool.query('SELECT *,updated_at::TEXT AS version FROM artwork_reports WHERE id=$1',[id])).rows[0]; }
   async function review(id,action,version) { return (await pool.query('SELECT * FROM review_profile_content_report($1,$2,$3,$4,$5)',
     [id,version || (await row(id)).version,action,'Reviewed the captured content.',STAFF])).rows[0]; }

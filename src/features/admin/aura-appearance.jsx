@@ -6,6 +6,11 @@ const sourceMessages = {
     awaiting_publisher: 'Public Platform frames are waiting for a designated publisher.',
     unavailable: 'Public frame verification is currently unavailable.'
 };
+const eligibility = {
+    platform: 'The NFT comes from a verified ArtSoul publication by the designated publisher.',
+    genesis: 'The NFT itself has a verified grant from the designated Genesis contract on Base mainnet.',
+    partner: 'The NFT belongs to the specific collection approved as an ArtSoul Partner.'
+};
 
 export function AuraAppearance({ api, wallet, isSessionCurrent }) {
     const [setting, setSetting] = React.useState(null);
@@ -13,6 +18,7 @@ export function AuraAppearance({ api, wallet, isSessionCurrent }) {
     const [message, setMessage] = React.useState('');
     const [pending, setPending] = React.useState(null);
     const [reload, setReload] = React.useState(0);
+    const [preview, setPreview] = React.useState('platform');
     const path = 'aura-border?wallet=' + encodeURIComponent(wallet.toLowerCase());
     React.useEffect(() => {
         const controller = new AbortController();
@@ -50,13 +56,16 @@ export function AuraAppearance({ api, wallet, isSessionCurrent }) {
         <h2 id="aura-appearance-heading">NFT appearance</h2>
         <label><input type="checkbox" checked={enabled === true} disabled={busy || !setting}
             onChange={event => change(event.currentTarget.checked)} /> Show labels on verified NFT frames in Future</label>
-        <p>Labels appear on NFT cards and artwork pages that have a verified Platform, Genesis or Partner frame.</p>
+        <p>Cards and artwork pages show one eligible frame. Platform takes priority, followed by Genesis and Partner.</p>
         {setting && <figure className="admin-aura-preview">
-            <figcaption>Platform frame preview</figcaption>
-            <div className={auraFrameClassName('platform')} aria-hidden="true">
+            <figcaption><label>Frame preview <select value={preview} onChange={event => setPreview(event.currentTarget.value)}>
+                <option value="platform">Platform</option><option value="genesis">Genesis</option><option value="partner">Partner</option>
+            </select></label></figcaption>
+            <div className={auraFrameClassName(preview)} aria-hidden="true">
                 <img src="/brand/artsoul-audio-cover-384.webp" alt="" width="96" height="96" />
-                {enabled && <span className="artsoul-aura-caption">{auraFrameLabels.platform}</span>}
+                {enabled && <span className="artsoul-aura-caption">{auraFrameLabels[preview]}</span>}
             </div>
+            <p aria-live="polite">{eligibility[preview]}</p>
             <p className="admin-aura-classic-note">Classic shows the frame alone. Switch to Future in the header to see its label.</p>
         </figure>}
         {setting && sourceMessages[setting.publicFrameSource] && <p>{sourceMessages[setting.publicFrameSource]}</p>}
