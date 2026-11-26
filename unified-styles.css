@@ -780,7 +780,7 @@ body.future .artwork-page-compact-action {
     position: absolute;
     inset: 0;
     z-index: 1;
-    border: 2px solid var(--c-accent);
+    border: 3px solid var(--c-accent);
     border-radius: inherit;
     pointer-events: none;
 }
@@ -790,17 +790,25 @@ body.future .artwork-page-compact-action {
 }
 
 .artsoul-aura-caption { display: none; }
+.identity-applications { overflow-wrap: anywhere; }
+.identity-applications label { display: grid; gap: .35rem; margin-block: .65rem; }
+.identity-applications summary { cursor: pointer; }
+.identity-applications :is(select,input,textarea) { max-width: 100%; }
+.identity-applications article { margin-block: 1rem; }
 .future .artsoul-aura-frame > .artsoul-aura-caption {
     display: block;
     position: absolute;
-    inset-inline-start: .85rem;
+    inset-inline: .5rem;
     inset-block-end: 1px;
     z-index: 2;
-    max-inline-size: calc(100% - 1.7rem);
+    container-type: inline-size;
     overflow: hidden;
     white-space: nowrap;
     pointer-events: none;
-    padding-inline: .3rem;
+}
+.future .artsoul-aura-caption > span {
+    display: inline-block;
+    padding-inline: .35rem;
     border-radius: .2rem;
     background: var(--c-bg);
     color: var(--aura-glow, var(--c-accent));
@@ -809,21 +817,21 @@ body.future .artwork-page-compact-action {
     line-height: 1.2;
 }
 @media (prefers-reduced-motion: no-preference) {
-    .future .artsoul-aura-frame--platform > .artsoul-aura-caption,
-    .future .artsoul-aura-frame--partner > .artsoul-aura-caption {
-        animation: artsoulAuraCaption 12s ease-in-out infinite alternate;
+    .future .artsoul-aura-frame--platform > .artsoul-aura-caption > span,
+    .future .artsoul-aura-frame--partner > .artsoul-aura-caption > span {
+        animation: artsoulAuraCaption 12s linear -6s infinite;
     }
 }
 @keyframes artsoulAuraCaption {
-    from { left: .85rem; transform: translateX(0); }
-    to { left: calc(100% - .85rem); transform: translateX(-100%); }
+    from { transform: translateX(100cqw); }
+    to { transform: translateX(-100%); }
 }
 
 @supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
     .future .artsoul-aura-frame--platform::after,
     .future .artsoul-aura-frame--partner::after {
         border: 0;
-        padding: 2px;
+        padding: 3px;
         background: linear-gradient(120deg, var(--c-accent), var(--c-aura-blue));
         /* Both mask layers need full alpha to leave the artwork pixels untouched. */
         -webkit-mask: linear-gradient(black 0 0) content-box, linear-gradient(black 0 0);

@@ -6,6 +6,6 @@ export function WalletNftMedia({ item, className, children }) {
   return <div className={verified ? className + ' ' + auraFrameClassName('genesis') : className}
     role={verified ? 'group' : undefined} aria-label={verified ? auraFrameLabels.genesis : undefined}>
     {children}
-    {verified && item.aura_border_text === true && <span className="artsoul-aura-caption" aria-hidden="true">{auraFrameLabels.genesis}</span>}
+    {verified && item.aura_border_text === true && <span className="artsoul-aura-caption" aria-hidden="true"><span>{auraFrameLabels.genesis}</span></span>}
   </div>;
 }

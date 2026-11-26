@@ -63,7 +63,7 @@ test('new table migrations must join the no-default-grant rehearsal', async () =
     'sql/migrations/stabilization_layer.sql'
   ]);
   const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services', '20261125210000_banner_schedule_revisions',
-    '20261119150000_collection_origin_reviews', '20261126185730_profile_identity_reviews', ...features]
+    '20261119150000_collection_origin_reviews', '20261126185730_profile_identity_reviews', '20261126192603_identity_verification_applications', ...features]
     .map(name => `sql/migrations/${name}.sql`));
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
   for (const migration of listIndexerMigrations()) covered.add(migration.sourcePath);
@@ -270,6 +270,10 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     query(fs.readFileSync('sql/migrations/20261126185730_profile_identity_reviews.sql', 'utf8'));
     query("INSERT INTO profiles (wallet_address,username) VALUES ('0x' || repeat('1',40),'Identity fixture')");
     query(fs.readFileSync('test/fixtures/profile-identity-reviews.sql', 'utf8'));
+  });
+  await t.test('profile and collection requests require independent role-bound decisions and support revocation', () => {
+    query(fs.readFileSync('sql/migrations/20261126192603_identity_verification_applications.sql', 'utf8'));
+    query(fs.readFileSync('test/fixtures/identity-applications.sql', 'utf8'));
   });
   await t.test('read-only verification accepts explicit grants and detects drift in review column permissions', () => {
     const report = fs.readFileSync('sql/verification/phase_a_security_verification.sql', 'utf8');

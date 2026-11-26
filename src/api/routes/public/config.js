@@ -21,6 +21,7 @@ function readPublicConfig() {
     supabaseUrl,
     supabaseAnonKey,
     emailVerificationEnabled: process.env.ARTSOUL_PROFILE_EMAIL_ENABLED === 'true',
+    ...(process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED === 'true' ? { identityVerificationEnabled: true } : {}),
     reportingEnabled: readReportingConfig().enabled,
     profileReportingEnabled: readReportingConfig().profileEnabled,
     donations: readDonationConfig(),

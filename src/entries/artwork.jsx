@@ -3074,7 +3074,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const mediaPanel = (
                 <section key="media" className="artwork-detail-stage artwork-mobile-media" aria-label="Artwork media">
                 <div className={`artwork-detail-frame artwork-detail-frame-${resolvedMedia.type} relative w-full h-full rounded-xl overflow-hidden${aura ? ' ' + aura.className : ''}`}>
-                    {aura?.borderLabel && <span className="artsoul-aura-caption" aria-hidden="true">{aura.borderLabel}</span>}
+                    {aura?.borderLabel && <span className="artsoul-aura-caption" aria-hidden="true"><span>{aura.borderLabel}</span></span>}
                     {safeMediaUrl ? (
                         <MediaViewer
                             media={{ ...resolvedMedia, url: safeMediaUrl }}

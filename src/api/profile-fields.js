@@ -7,13 +7,17 @@ export const PUBLIC_PROFILE_FIELDS = ['id', 'created_at', 'wallet_address', 'use
 const reviewed = process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED === 'true';
 export const PUBLIC_PROFILE_SOURCE = reviewed ? 'reviewed_profile_content' : 'public_profile_content';
 export const PUBLIC_PROFILE_SELECT = [...PUBLIC_PROFILE_FIELDS, 'twitter_id', 'discord_id', 'profile_content_hidden',
-  ...(reviewed ? ['profile_identity_verified'] : [])].join(',');
+  ...(reviewed ? ['profile_identity_verified','verified_collections'] : [])].join(',');
 
 export function publicProfile(row) {
   if (!row) return null;
   const profile = Object.fromEntries(PUBLIC_PROFILE_FIELDS.filter(key => key in row).map(key => [key, row[key]]));
   if ('profile_content_hidden' in row) profile.profile_content_hidden = row.profile_content_hidden === true;
   if (reviewed && row.profile_identity_verified === true && row.profile_content_hidden === false && row.username) profile.profile_identity_verified = true;
+  if (reviewed && row.profile_content_hidden === false && Array.isArray(row.verified_collections)) {
+    profile.verified_collections = row.verified_collections.filter(c => [8453,84532].includes(c?.chain_id) &&
+      /^0x[0-9a-f]{40}$/.test(c.collection_address)).map(({chain_id,collection_address}) => ({chain_id,collection_address}));
+  }
   profile.twitter_connected = typeof row.twitter_id === 'string' && row.twitter_id.trim().length > 0;
   profile.discord_connected = typeof row.discord_id === 'string' && row.discord_id.trim().length > 0;
   profile.discord_profile_url = typeof row.discord_id === 'string' && /^\d{1,20}$/.test(row.discord_id)
