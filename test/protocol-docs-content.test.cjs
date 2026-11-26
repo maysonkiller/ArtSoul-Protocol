@@ -144,11 +144,11 @@ test('the NFT frame guide names each example in priority order using the actual 
   const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
   assert.match(html, /<figcaption>Frame examples<\/figcaption><dl>/);
   assert.deepEqual([...html.matchAll(/<dt class="([^"]+)">([^<]+)<\/dt><dd>/g)].map(([, classes, name]) => [classes, name]), [
-    ['platform', 'Platform'], ['genesis', 'Genesis'], ['partner', 'Partner collection']
+    ['platform', 'Platform'], ['genesis', 'Genesis'], ['partner', 'ArtSoul Partner']
   ].map(([kind, name]) => ['protocol-frame-example ' + auraFrameClassName(kind), name]));
   assert.match(section.text, /Base mainnet/);
   assert.match(section.text, /without a confirmed match keep their standard frame/);
-  assert.match(section.text, /small screens and reduced motion keep every frame still/i);
+  assert.match(section.text, /reduced motion keeps the labels still/i);
 });
 
 test('searchable text comes from the same visible paragraphs, table cells, lists and FAQ', async () => {

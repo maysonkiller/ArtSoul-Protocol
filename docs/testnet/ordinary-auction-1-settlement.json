@@ -1,0 +1,11 @@
+{
+  "chainId": 84532,
+  "coreAddress": "0xc4b756b6e3714e4bab6e7dd4965400f390403cd2",
+  "nftAddress": "0x810dd5459c9cc5d82f13f8d52545a654ec0bbe4c",
+  "expectedCoreCodeHash": "0x4d18f0243cff1ef906a07a3517949045c6fe3a9e8b584e60bcbe7ad021bef54e",
+  "expectedNftCodeHash": "0xcbff8b3bb46c10d150d5812846d5d8c990c0156215d5978b44e238a86d141bac",
+  "auctionId": "1",
+  "blockNumber": 64039544,
+  "blockHash": "0x6c4c76884da84b0af1db729a67e20d55ba6580814f1634e4788d5ee5d062cf90",
+  "transactionHash": "0x07cd8c340164096abdf14f3762e0835254023b794ed7e5e2adfd567cf9864dfa"
+}

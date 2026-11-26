@@ -1,6 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { auraFrameClassName, projectedArtworkAura } from '../src/ui/components/aura-frame.js';
+import { auraFrameClassName, projectedArtworkAura, auraCaption, auraWords } from '../src/ui/components/aura-frame.js';
+
+test('a perimeter label keeps the complete designation together in reading order', () => {
+    const create = (tag, props, ...children) => ({tag, props, children});
+    for (const name of ['ArtSoul', 'Genesis', 'ArtSoul Partner']) {
+        const label = auraCaption(create, name);
+        assert.equal(label.props['aria-hidden'], 'true');
+        assert.deepEqual(label.children.map(node => node.children), [[name]]);
+    }
+    assert.equal(auraWords.partner, 'ArtSoul Partner');
+    assert.equal(auraCaption(create, 'unreviewed'), null);
+});
 
 test('aura presentation is absent unless the caller supplies one supported kind', () => {
     const unsafeClaim = {

@@ -20,6 +20,10 @@ export async function withOrdinaryIssuer(pool, listener, options, proof, write) 
 
 export async function ingestOrdinarySettlement(pool, listener, options) {
     const sale = await listener.readOrdinarySettlement(options);
+    return persistOrdinarySettlement(pool, listener, options, sale);
+}
+
+export async function persistOrdinarySettlement(pool, listener, options, sale) {
     const inserted = await withOrdinaryIssuer(pool, listener, options, sale, async client => {
         const key = { chain_id: sale.chainId, core_address: sale.coreAddress, auction_id: sale.auctionId };
         const created = await appendExact(client, 'ordinary_settlements', {

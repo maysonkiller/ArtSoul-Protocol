@@ -9,7 +9,7 @@ const home = fs.readFileSync('index.html','utf8');
 test('all product screens load the same shared geometry stylesheet', () => {
   for (const path of pages) {
     const html = fs.readFileSync(path,'utf8');
-    assert.equal((html.match(/unified-styles\.css\?v=104/g) || []).length, 1, path);
+    assert.equal((html.match(/unified-styles\.css\?v=105/g) || []).length, 1, path);
   }
 });
 

@@ -60,7 +60,7 @@ export function AuraAppearance({ api, wallet, isSessionCurrent }) {
         <p>Cards and artwork pages show one eligible frame. Platform takes priority, followed by Genesis and Partner.</p>
         {setting && <figure className="admin-aura-preview">
             <figcaption><label>Frame preview <select value={preview} onChange={event => setPreview(event.currentTarget.value)}>
-                <option value="platform">Platform</option><option value="genesis">Genesis</option><option value="partner">Partner</option>
+                <option value="platform">ArtSoul</option><option value="genesis">Genesis</option><option value="partner">ArtSoul Partner</option>
             </select></label></figcaption>
             <div className={auraFrameClassName(preview)} aria-hidden="true">
                 <img src="/brand/artsoul-audio-cover-384.webp" alt="" width="96" height="96" />
