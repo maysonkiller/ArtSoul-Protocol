@@ -21,7 +21,7 @@ const RUNTIME = {
   'src/features/discovery/discovery-service.js': { version: 2, sha256: 'c9a152e266934f4f' },
   'src/features/discovery/gallery-contract-runtime.js': { version: 3, sha256: '5f1e3a95ef176761' },
   'src/features/discovery/public-contract-runtime.js': { version: 1, sha256: '16ace3baeafdae78' },
-  'unified-styles.css': { version: 106, sha256: 'd0671403d5d87ecd' },
+  'unified-styles.css': { version: 106, sha256: '84d8c8c1bc590ce8' },
   'mobile-no-motion.css': { version: 7, sha256: 'aa97ee46cf5ec1a3' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
