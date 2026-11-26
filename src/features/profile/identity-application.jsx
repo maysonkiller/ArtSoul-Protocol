@@ -70,7 +70,7 @@ export function IdentityApplication({ wallet, profile, connectedX }) {
         <label>{isProfile ? 'Official account or website' : 'Official collection announcement or website'}
             <input className="profile-detail-input" type="url" maxLength={512} value={evidence}
             placeholder="https://" onChange={e => (isProfile ? setProfileLink : setCollectionLink)(e.target.value)} /></label>
-        {name ? <p>Applicant: {name} · {wallet}</p> : <p>Save a profile name before applying.</p>}
+        {name ? <p>Applying as {name}<br />{wallet}</p> : <p>Save a profile name before applying.</p>}
         <button type="button" className="btn-main" disabled={!name || busy || pending || verified || !evidence.trim() || (kind === 'collection' && !contract.trim())}
             onClick={submit}>{busy ? 'Submitting…' : pending ? 'Awaiting review' : verified ? 'Verified' : 'Request verification'}</button>
         <p role="status">{message}</p>

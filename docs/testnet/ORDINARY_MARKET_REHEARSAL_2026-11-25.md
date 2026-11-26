@@ -157,6 +157,10 @@ The same sale was then imported into the private ArtSoul Supabase schema after m
 node scripts/index-ordinary-settlement.mjs docs/testnet/ordinary-auction-1-settlement.json docs/testnet/ordinary-auction-1-settlement.json --read-only
 ```
 
+### Restoring the first hosted sale
+
+A read-only, data-only PostgreSQL export included just the three private issuer, sale and credit tables. Its archive contained three table-data entries and occupied 2,540 bytes. Restoring into an empty local database with migrations 018 and 023 reproduced every field of the hosted issuer, finalized sale and allocations. The source and restored tables each had one row. The temporary database and local export were removed after comparison. This drill covers that sale. A full catalog and indexer recovery still requires its own release rehearsal.
+
 ## First NFT transfer range on the payout pair
 
 Base and PublicNode returned empty code at both payout addresses in block 63,494,031. The creation block 63,494,032 contained the reviewed runtime pair, zero NFT supply and zero NFT `Transfer` events. At finalized block 63,527,445, both providers returned one registered work, zero auctions and zero tokens.
