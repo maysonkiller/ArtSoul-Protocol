@@ -42,6 +42,39 @@
         return String(displayName || shortId(address) || 'Unknown creator');
     }
 
+    // Build the same small decorative elements for the DOM homepage and React cards.
+    function cardElement(tag, props, ...children) {
+        const el = document.createElement(tag);
+        for (const [key, value] of Object.entries(props || {})) {
+            if (key === 'className') el.className = value;
+            else if (key === 'style') Object.entries(value).forEach(([name, length]) => el.style.setProperty(name, length));
+            else if (key !== 'key') el.setAttribute(key, value);
+        }
+        for (const child of children) {
+            if (typeof child === 'string') el.textContent = child;
+            else if (child) el.appendChild(child);
+        }
+        return el;
+    }
+
+    function creatorMark(h, artwork) {
+        return artwork.source === 'v41_projection' && artwork.creator_name && artwork.creator_identity_verified === true
+            ? h('span', {className: 'artsoul-card-identity-check', role: 'img', 'aria-label': 'Verified profile identity',
+                title: 'Verified profile identity'}, '✓') : null;
+    }
+
+    function officialMark(h, artwork, aura) {
+        return aura && artwork.aura_kind === 'platform' ? h('img', {className: 'artsoul-official-nft',
+            src: '/favicon.jpg', alt: 'Official ArtSoul NFT', title: 'Official ArtSoul NFT'}) : null;
+    }
+
+    function decorateIdentity(title, creator, artwork, aura) {
+        const official = officialMark(cardElement, artwork, aura);
+        const check = creatorMark(cardElement, artwork);
+        if (official) title.appendChild(official);
+        if (check) creator.appendChild(check);
+    }
+
     function identityKeys(artwork = {}) {
         const keys = new Set();
         [
@@ -1000,6 +1033,7 @@
         const creator = document.createElement('p');
         creator.className = 'artsoul-card-creator';
         creator.textContent = `Creator: ${creatorLabel(artwork)}`;
+        decorateIdentity(title, creator, artwork, aura);
 
         const meta = document.createElement('div');
         meta.className = 'artsoul-card-meta';
@@ -1047,13 +1081,8 @@
         card.appendChild(preview);
         card.appendChild(body);
         if (aura?.borderLabel) {
-            const caption = document.createElement('span');
-            caption.className = 'artsoul-aura-caption';
-            caption.setAttribute('aria-hidden', 'true');
-            const label = document.createElement('span');
-            label.textContent = aura.borderLabel;
-            caption.appendChild(label);
-            card.appendChild(caption);
+            const caption = window.ArtSoulAuraCaption?.(cardElement, aura.borderLabel);
+            if (caption) card.appendChild(caption);
         }
         if (menu) card.appendChild(menu);
         let link = null;
@@ -1329,9 +1358,9 @@
             ),
             h('div', { className: 'artsoul-card-body' },
                 h('div', { className: 'artsoul-card-title-row' },
-                    h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
+                    h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork', officialMark(h, artwork, aura)),
                     reactNetworkMarker(h, artwork)),
-                h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
+                h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`, creatorMark(h, artwork)),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     h('span', { className: 'artsoul-card-price-label' }, summary.label),
@@ -1348,7 +1377,7 @@
             h(ReactCountdown, { artwork, onEnd: refreshAuctionState }),
             href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
                 'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null,
-            aura?.borderLabel && h('span', { className: 'artsoul-aura-caption', 'aria-hidden': true }, h('span', null, aura.borderLabel))
+            aura?.borderLabel && window.ArtSoulAuraCaption?.(h, aura.borderLabel)
         );
     }
 
@@ -1379,6 +1408,8 @@
     });
 
     window.ArtSoulArtworkCard = {
+        decorateIdentity,
+        createAuraCaption: word => window.ArtSoulAuraCaption?.(cardElement, word),
         createCardElement,
         createMediaElement,
         createNetworkMarker,

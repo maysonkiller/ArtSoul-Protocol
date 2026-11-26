@@ -9,7 +9,8 @@ import '../features/artwork/artwork-dialogs.css';
 import '../ui/components/artwork-player.js';
 import { artworkShareIntent } from '../features/artwork/artwork-sharing.js';
 import { readRecordedNftSale } from '../features/artwork/nft-sale-record.js';
-import { projectedArtworkAura } from '../ui/components/aura-frame.js';
+import { projectedArtworkAura, auraCaption } from '../ui/components/aura-frame.js';
+import { VerificationMark } from '../ui/components/verification-mark.jsx';
 
 import { getOwnerResaleEligibility, validateResalePrice } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
@@ -50,7 +51,7 @@ function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevi
         ? prepared : { url: '', failed: false };
 }
 
-function OwnershipIdentity({ source, label, name, className, style, nameStyle, isClassic }) {
+function OwnershipIdentity({ source, label, name, verified, className, style, nameStyle, isClassic }) {
     // This component is keyed by wallet: keep the same person's decoded avatar
     // visible while a newer profile image is prepared, never across identities.
     const image = useDecodedImage(source, '/default-avatar.png', prepareAvatar, true, readPreparedAvatar);
@@ -61,7 +62,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             )}
             <div className="min-w-0 flex-1">
                 <div className={`text-xs ${isClassic ? 'opacity-70' : 'opacity-90'}`}>{label}</div>
-                {image.url ? <div className="font-semibold truncate" style={nameStyle}>{name}</div> : (
+                {image.url ? <div className="font-semibold truncate" style={nameStyle}>{name}{verified && <VerificationMark label="Verified profile identity" />}</div> : (
                     <div className="text-sm" role="status">Loading profile…</div>
                 )}
             </div>
@@ -1006,6 +1007,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 source={identityResolved ? getProfileAvatarUrl(resolvedProfile, address) : ''}
                                 label={currentOwner ? `${label} / Owner` : label}
                                 name={getProfileDisplayName(resolvedProfile, address)}
+                                verified={projected && resolvedProfile?.profile_identity_verified === true}
                                 nameStyle={nameStyle}
                                 isClassic={isClassic}
                                 className={`w-12 h-12 rounded-full border-2 flex-shrink-0 ${
@@ -3074,7 +3076,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const mediaPanel = (
                 <section key="media" className="artwork-detail-stage artwork-mobile-media" aria-label="Artwork media">
                 <div className={`artwork-detail-frame artwork-detail-frame-${resolvedMedia.type} relative w-full h-full rounded-xl overflow-hidden${aura ? ' ' + aura.className : ''}`}>
-                    {aura?.borderLabel && <span className="artsoul-aura-caption" aria-hidden="true"><span>{aura.borderLabel}</span></span>}
+                    {aura?.borderLabel && auraCaption(React.createElement, aura.borderLabel)}
                     {safeMediaUrl ? (
                         <MediaViewer
                             media={{ ...resolvedMedia, url: safeMediaUrl }}
@@ -3117,7 +3119,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const contextPanel = (
                 <section key="context" className="artwork-page-panel artwork-page-context artwork-mobile-context">
                     <header className="artwork-page-header">
-                        <h1 className="artwork-detail-title">{artwork.title}</h1>
+                        <h1 className="artwork-detail-title">{artwork.title}{aura && artwork.aura_kind === 'platform' &&
+                            <img className="artsoul-official-nft" src="/favicon.jpg" alt="Official ArtSoul NFT" title="Official ArtSoul NFT" />}</h1>
                         {window.ArtSoulArtworkCard?.ReactSavedControl && React.createElement(window.ArtSoulArtworkCard.ReactSavedControl, { artwork, detail: true })}
                     </header>
                     <div className="artwork-page-description">

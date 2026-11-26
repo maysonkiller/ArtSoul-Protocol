@@ -790,6 +790,15 @@ body.future .artwork-page-compact-action {
 }
 
 .artsoul-aura-caption { display: none; }
+.artsoul-card-identity-check, .artsoul-official-nft {
+    display: inline-block; vertical-align: -.1em; width: 1.08em; height: 1.08em;
+    margin-inline-start: .35em; border-radius: 50%;
+}
+.artsoul-card-identity-check {
+    background: var(--c-verification-blue); color: var(--c-brand-mark-background);
+    text-align: center; line-height: 1.08; font-weight: 800;
+}
+.artsoul-official-nft { object-fit: cover; }
 .identity-applications { overflow-wrap: anywhere; }
 .identity-applications label { display: grid; gap: .35rem; margin-block: .65rem; }
 .identity-applications summary { cursor: pointer; }
@@ -798,15 +807,15 @@ body.future .artwork-page-compact-action {
 .future .artsoul-aura-frame > .artsoul-aura-caption {
     display: block;
     position: absolute;
-    inset-inline: .5rem;
-    inset-block-end: 1px;
+    inset: 0;
     z-index: 2;
-    container-type: inline-size;
+    border-radius: inherit;
     overflow: hidden;
     white-space: nowrap;
     pointer-events: none;
 }
 .future .artsoul-aura-caption > span {
+    position: absolute; bottom: 1px; left: .5rem;
     display: inline-block;
     padding-inline: .35rem;
     border-radius: .2rem;
@@ -816,22 +825,29 @@ body.future .artwork-page-compact-action {
     font-weight: 600;
     line-height: 1.2;
 }
-@media (prefers-reduced-motion: no-preference) {
-    .future .artsoul-aura-frame--platform > .artsoul-aura-caption > span,
-    .future .artsoul-aura-frame--partner > .artsoul-aura-caption > span {
-        animation: artsoulAuraCaption 12s linear -6s infinite;
+.artsoul-aura-caption > i { display: none; }
+@supports (offset-path: inset(7px round 10px)) {
+    @media (prefers-reduced-motion: no-preference) {
+        .future :is(.artsoul-aura-frame--platform,.artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-still { display: none; }
+        .future :is(.artsoul-aura-frame--platform,.artsoul-aura-frame--partner) > .artsoul-aura-caption > i {
+            display: block; position: absolute; top: 0; left: 0;
+            offset-path: inset(7px round 10px); offset-rotate: auto;
+            font: 700 10px/1 system-ui, sans-serif;
+            background: var(--c-bg); color: var(--c-text); padding-inline: 1px;
+            animation: artsoulAuraCaption 18s linear infinite;
+        }
     }
 }
 @keyframes artsoulAuraCaption {
-    from { transform: translateX(100cqw); }
-    to { transform: translateX(-100%); }
+    from { offset-distance: calc(0% + var(--glyph-offset)); }
+    to { offset-distance: calc(100% + var(--glyph-offset)); }
 }
 
 @supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
     .future .artsoul-aura-frame--platform::after,
     .future .artsoul-aura-frame--partner::after {
         border: 0;
-        padding: 3px;
+        padding: 4px;
         background: linear-gradient(120deg, var(--c-accent), var(--c-aura-blue));
         /* Both mask layers need full alpha to leave the artwork pixels untouched. */
         -webkit-mask: linear-gradient(black 0 0) content-box, linear-gradient(black 0 0);
@@ -7173,9 +7189,9 @@ body:is(.classic, .future) .site-primary-nav a {
 }
 body:is(.classic, .future) .site-primary-nav a:hover { background: var(--c-surface-muted); }
 body:is(.classic, .future) .site-primary-nav a:is([aria-current="page"], [aria-current="location"]) {
-    color: var(--c-accent);
+    color: var(--seasonal-control-ink, var(--c-accent));
     background: transparent;
-    box-shadow: inset 0 -2px var(--c-accent);
+    box-shadow: inset 0 -2px var(--seasonal-control-ink, var(--c-accent));
 }
 body:is(.classic, .future) .site-primary-nav a:focus-visible {
     outline: 2px solid var(--c-accent);

@@ -7,12 +7,12 @@ const css = fs.readFileSync('unified-styles.css', 'utf8');
 const vm = require('node:vm');
 const { staffEntryHint } = require('../src/features/admin/staff-entry.js');
 
-test('Admin access shortcut is in the own Profile, never in the account popover', () => {
+test('the owner profile and wallet menu both reach server-checked staff access', () => {
     assert.match(profile, /function ProfileAdminShortcut\(\{ walletAddress \}\)/);
     assert.match(profile, /\{isOwnProfile && \([\s\S]*?<ProfileAdminShortcut walletAddress=\{connectedWalletAddress\}/);
     assert.match(profile, /href="\/admin" className="profile-admin-shortcut"/);
-    assert.doesNotMatch(menu, /<a href="\/admin"/);
-    assert.match(menu, /data-protocol-admin-slot hidden/);
+    assert.match(menu, /protocolAdminWallet === wallet/);
+    assert.match(menu, /current && this.protocolAdminEligible \? 'Admin panel' : 'Staff sign-in'/);
     assert.match(css, /\.profile-admin-shortcut \{[\s\S]*?min-height: 44px/);
 });
 

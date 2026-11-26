@@ -47,6 +47,7 @@ export function pickHomeShowcaseSlides(slots, {
 
         seen.add(id.toLowerCase());
         selected.push({
+            artwork,
             href,
             image,
             title: artwork.title.trim(),
@@ -134,8 +135,15 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
         const detail = document.createElement('span');
         detail.className = 'home-showcase-creator';
         detail.textContent = item.creator ? `By ${item.creator}` : item.reason;
+        const aura = window.ArtSoulArtworkAura?.(item.artwork);
+        window.ArtSoulArtworkCard?.decorateIdentity?.(title, detail, item.artwork, aura);
         caption.append(label, title, detail);
         link.append(picture, caption);
+        if (aura) {
+            link.classList.add(...aura.className.split(' '));
+            const frameCaption = aura.borderLabel && window.ArtSoulArtworkCard?.createAuraCaption?.(aura.borderLabel);
+            if (frameCaption) link.appendChild(frameCaption);
+        }
 
         picture.addEventListener('error', () => {
             mediaUnavailable = true;

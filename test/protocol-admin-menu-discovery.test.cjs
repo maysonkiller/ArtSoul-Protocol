@@ -29,7 +29,9 @@ test('connected header render performs no Protocol Admin access request', async 
   // The reserved slot keeps header geometry stable while staying empty.
   const menu = harness.context.document.getElementById('avatarDropdownMenu');
   assert.match(menu.innerHTML, /data-protocol-admin-slot/);
-  assert.doesNotMatch(menu.innerHTML, /href="\/admin"/);
+  assert.match(menu.innerHTML, /Staff sign-in/);
+  assert.doesNotMatch(menu.innerHTML, />Admin panel</);
+  assert.match(menu.innerHTML, /href="\/admin"/);
 });
 
 test('first dropdown opening performs exactly one access request; reopening reuses it', async () => {
@@ -50,7 +52,7 @@ test('first dropdown opening performs exactly one access request; reopening reus
   assert.equal(harness.accessCalls.length, 1);
 });
 
-test('admin server eligibility is retained, but menu never exposes the Profile-only shortcut', async () => {
+test('the current verified staff wallet gets the Admin shortcut', async () => {
   const harness = createHarness();
   harness.context.window.currentWalletAddress = WALLET_A;
   await harness.dropdown.renderWalletInfo(WALLET_A);
@@ -81,7 +83,7 @@ test('admin server eligibility is retained, but menu never exposes the Profile-o
   harness.dropdown.toggle();
   await harness.flush();
   assert.equal(harness.dropdown.protocolAdminEligible, true);
-  assert.doesNotMatch(harness.dropdown.renderProtocolAdminSlot('/'), /href="\/admin"/);
+  assert.match(harness.dropdown.renderProtocolAdminSlot('/'), /href="\/admin"/);
   // The slot never renders the link on the admin page itself.
   assert.doesNotMatch(harness.dropdown.renderProtocolAdminSlot('/admin'), /href="\/admin"/);
 });
@@ -198,7 +200,7 @@ test('server-confirmed staff can reach Admin panel for setup without enabling th
   harness.setAccessResponse(() => accessResponse());
   await harness.dropdown.requestProtocolAdminAccessOnce();
   assert.equal(harness.dropdown.protocolAdminEligible, true);
-  assert.doesNotMatch(harness.dropdown.renderProtocolAdminSlot('/'), />Admin panel</);
+  assert.match(harness.dropdown.renderProtocolAdminSlot('/'), />Admin panel</);
   assert.equal(harness.accessCalls[0].options.cache, 'no-store');
   assert.equal(new URL(harness.accessCalls[0].url, 'https://example.com').searchParams.get('expectedWallet'), WALLET_A);
   for (const override of [{ authenticated: false }, { eligible: false }, { setupEnabled: false }]) {
@@ -284,7 +286,7 @@ test('authority-only discovery requires an authenticated gated server response',
   }
 });
 
-test('Profile-only Admin placement never leaks a server role into a global wallet menu', () => {
+test('an unbound role hint never exposes a staff shortcut', () => {
     const h = createHarness();
     h.dropdown.protocolAdminEligible = true;
     const text = h.dropdown.renderMenuContent({

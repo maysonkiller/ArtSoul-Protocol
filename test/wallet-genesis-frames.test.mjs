@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { transformWithOxc } from 'vite';
 import { setWalletSession } from '../src/api/backend.js';
 import handler from '../src/api/routes/wallet-nfts.js';
-import { auraFrameClassName, auraFrameLabels } from '../src/ui/components/aura-frame.js';
+import { auraFrameClassName, auraFrameLabels, auraWords, auraCaption } from '../src/ui/components/aura-frame.js';
 
 const wallet = '0x' + '1'.repeat(40);
 const collection = '0x' + '2'.repeat(40);
@@ -83,7 +83,7 @@ test('Base preview and dialog and the multichain card with expanded details use 
     const compiled = await transformWithOxc(source, name + '.jsx', { jsx:{runtime:'classic'} });
     return vm.runInNewContext(compiled.code + '\n({' + symbols.join(',') + '})', { React, ...context });
   }
-  const frame = await components('wallet-nft-media',['WalletNftMedia'],{ auraFrameClassName, auraFrameLabels });
+  const frame = await components('wallet-nft-media',['WalletNftMedia'],{ auraFrameClassName, auraFrameLabels, auraWords, auraCaption });
   const { NftPreview, NftDetails } = await components('wallet-nfts',['NftPreview','NftDetails'], {
     ...frame, document:{body:{}}, createPortal:child=>child
   });

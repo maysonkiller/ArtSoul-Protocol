@@ -2,8 +2,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Interface, ZeroAddress, ZeroHash } from 'ethers';
 import { verifiedArtworkAura } from '../src/api/verified-artwork-aura.js';
-import { receiptPartnerFrames } from '../src/api/partner-frames.js';
+import { receiptPartnerFrames, hasPartnerContract } from '../src/api/partner-frames.js';
 import { projectedArtworkAura } from '../src/ui/components/aura-frame.js';
+
+test('Partner designation requires contract code on the selected network', async () => {
+    const rpc = (chain, code) => async method => method === 'eth_chainId' ? chain : code;
+    const code = rpc('0x14a34','0x1234');
+    const empty = rpc('0x14a34','0x');
+    const delegated = rpc('0x14a34','0xef0100' + '12'.repeat(20));
+    assert.equal(await hasPartnerContract(84532, 'collection', [code, code]), true);
+    for (const reader of [empty,delegated]) assert.equal(await hasPartnerContract(84532,'wallet',[reader,reader]),false);
+    await assert.rejects(hasPartnerContract(84532,'collection',[empty,code]));
+    await assert.rejects(hasPartnerContract(8453,'collection',[code,code]));
+});
 
 const abi = new Interface([
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',

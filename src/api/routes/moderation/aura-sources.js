@@ -3,6 +3,7 @@ import { requireService, serviceError } from '../../launch-services.js';
 import { reviewBody } from '../../identity-applications.js';
 import { verifiedReviewActor } from '../../frame-source-access.js';
 import { platformPublisherFor } from '../../platform-artwork-aura.js';
+import { hasPartnerContract } from '../../partner-frames.js';
 import { rehearsalCore } from '../../../../scripts/rehearsal-review/deployment.mjs';
 
 export default async function handler(req,res) {
@@ -31,6 +32,12 @@ export default async function handler(req,res) {
                 body.revision >= 2147483647 || typeof body.reason !== 'string' || body.reason.trim().length < 5 ||
                 body.reason.trim().length > 500) throw invalid();
             Object.assign(params,{p_enabled:body.enabled,p_revision:body.revision,p_reason:body.reason.trim()});
+            if (kind === 'partner' && body.enabled) {
+                const hasCode = await hasPartnerContract(Number(chain),subject).catch(() => {
+                    throw serviceError('SOURCE_UNAVAILABLE','Could not check the collection contract. Try again.',503);
+                });
+                if (!hasCode) throw serviceError('INVALID_SOURCE','Enter the deployed collection contract address on the selected network.');
+            }
         }
         const rows = await supabaseRest('rpc/manage_aura_sources',{method:'POST',body:params});
         if (!Array.isArray(rows) || rows.length > (subject ? 1 : 26) ||

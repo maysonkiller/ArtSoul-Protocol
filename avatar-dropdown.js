@@ -733,19 +733,26 @@
                 .join('');
         }
 
-        // The compact account popover handles wallet and profile navigation.
-        // Admin access now lives on the owner's Profile page, not in this menu.
-        // Keep the existing server-only eligibility/cache logic intact; do not
-        // ever infer privileges from an address, profile name or browser cache.
-        renderProtocolAdminSlot() {
-            return '<div class="protocol-admin-menu-slot" data-protocol-admin-slot hidden></div>';
+        adminEntry(path) {
+            const wallet = String(window.currentWalletAddress || window.artsoulSettledWalletState?.address || '').toLowerCase();
+            if (!/^0x[a-f0-9]{40}$/.test(wallet) || this.isPage(path, 'admin')) return '';
+            const current = this.protocolAdminWallet === wallet;
+            if (current && this.protocolAdminRoleChecked && !this.protocolAdminEligible) return '';
+            const label = current && this.protocolAdminEligible ? 'Admin panel' : 'Staff sign-in';
+            return '<a class="dropdown-item" href="/admin">' + label + '</a>';
+        }
+
+        renderProtocolAdminSlot(path = window.location.pathname) {
+            const link = this.adminEntry(path);
+            return '<div class="protocol-admin-menu-slot" data-protocol-admin-slot' + (link ? '' : ' hidden') + '>' + link + '</div>';
         }
 
         updateProtocolAdminSlot() {
             const slot = this.getNavContainer()?.querySelector('[data-protocol-admin-slot]');
             if (slot) {
-                slot.innerHTML = '';
-                slot.hidden = true;
+                const link = this.adminEntry(window.location.pathname);
+                if (slot.innerHTML !== link) slot.innerHTML = link;
+                slot.hidden = !link;
             }
         }
 

@@ -2,6 +2,7 @@ import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../
 import { getModerationAccess } from '../../moderation-access.js';
 import { PUBLIC_PROFILE_SOURCE } from '../../profile-fields.js';
 import { readArtworkAuraKinds } from '../../platform-artwork-aura.js';
+import { withCatalogMintOrigins } from '../../catalog-mint-origin.js';
 import { readAuraBorderSetting } from '../../aura-border-setting.js';
 import { allowedArtworkUrl, readArtworkMetadata } from '../../safe-artwork-fetch.js';
 import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
@@ -468,9 +469,10 @@ async function publicIdentitiesByAddress(wallets = [], warnings, { includeAvatar
   if (!addresses.length) return new Map();
 
   const profileWarnings = [];
+  const reviewed = PUBLIC_PROFILE_SOURCE === 'reviewed_profile_content';
   const rows = await queryTable(
     PUBLIC_PROFILE_SOURCE,
-    `select=wallet_address,username${includeAvatar ? ',avatar_url' : ''}&wallet_address=in.(${addresses.map(encodeURIComponent).join(',')})&limit=${addresses.length}`,
+    `select=wallet_address,username${includeAvatar ? ',avatar_url' : ''}${reviewed ? ',profile_content_hidden,profile_identity_verified' : ''}&wallet_address=in.(${addresses.map(encodeURIComponent).join(',')})&limit=${addresses.length}`,
     profileWarnings
   );
   warnings.push(...profileWarnings);
@@ -484,6 +486,8 @@ async function publicIdentitiesByAddress(wallets = [], warnings, { includeAvatar
     map.set(wallet, {
       wallet_address: wallet,
       username: username && !GENERATED_PROFILE_USERNAME.test(username) ? username : null,
+      ...(reviewed && username && !GENERATED_PROFILE_USERNAME.test(username) &&
+        row.profile_identity_verified === true && row.profile_content_hidden === false ? {profile_identity_verified: true} : {}),
       avatar_url: includeAvatar ? normalizeText(row.avatar_url) || null : null
     });
   }
@@ -598,6 +602,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     creator: artwork.creator,
     creator_id: artwork.creator,
     creator_name: creatorIdentity?.username || null,
+    ...(creatorIdentity?.profile_identity_verified === true ? {creator_identity_verified: true} : {}),
     ...(maps.includeOwnershipProfiles ? {
       creator_avatar_url: creatorIdentity?.avatar_url || null,
       ...(maps.publicIdentities ? {
@@ -627,6 +632,8 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     canonical_floor: canonicalFloor,
     floor_price: canonicalFloor,
     minted: Boolean(artwork.minted),
+    ...(artwork.minted && maps.settlements.get(keyFor(chain, artworkId))?.transaction_hash ?
+      {mint_transaction_hash: maps.settlements.get(keyFor(chain, artworkId)).transaction_hash} : {}),
     active_auction_id: protocolId(artwork.active_auction_id),
     auction_end_time: auction?.end_time || null,
     auction_original_end_time: auction?.original_end_time || null,
@@ -823,7 +830,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }, initialBounda
     );
   const v41SettlementsPromise = queryTable(
       'v41_settlements',
-      'select=chain_id,artwork_id::text,settlement_status,winner,token_id::text,block_number,log_index,indexed_at' +
+      'select=chain_id,artwork_id::text,settlement_status,winner,token_id::text,transaction_hash,block_number,log_index,indexed_at' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=100`,
       warnings
     );
@@ -981,7 +988,7 @@ async function buildProjectionSnapshot() {
     ),
     queryTable(
       'v41_settlements',
-      `select=chain_id,artwork_id::text,settlement_status,winner,token_id::text,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=200`,
+      `select=chain_id,artwork_id::text,settlement_status,winner,token_id::text,transaction_hash,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=200`,
       warnings
     ),
     queryTable(
@@ -1048,10 +1055,11 @@ async function refreshCachedProfileIdentities(snapshotPromise, includeAvatar = f
     const creator = identities?.get(normalizeText(card.creator).toLowerCase());
     // Drop old identities even if the current public projection is unavailable.
     // Never use a cached/unmasked name or avatar as a failure fallback.
-    const { ownership_profiles, ...publicCard } = card;
+    const { ownership_profiles, creator_identity_verified, ...publicCard } = card;
     return {
       ...publicCard,
       creator_name: creator?.username || null,
+      ...(creator?.profile_identity_verified === true ? {creator_identity_verified: true} : {}),
       ...(includeAvatar ? {
         creator_avatar_url: creator?.avatar_url || null,
         ...(identities ? { ownership_profiles: Object.fromEntries(roles[index].map(address => [address, identities.get(address) ?? null])) } : {})
@@ -1124,7 +1132,8 @@ export async function readVisibleArtworkCard(chain, artworkId, responseScope) {
     if (responseScope) responseScope.retain(snapshot.ownership);
     else await recheckNftOwnership(snapshot.ownership);
   }
-  return card && card.moderation_hidden !== true ? card : null;
+  if (!card || card.moderation_hidden === true) return null;
+  return process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true' ? (await withCatalogMintOrigins([card]))[0] : card;
   };
   return responseScope ? read() : readWithNftOwnershipRetry(read);
 }
@@ -1171,7 +1180,8 @@ export async function readVisibleArtworkCards(chain, artworkIds, coreAddress, re
     current.get(card.artwork_id)?.transaction_hash === card.transaction_hash).map(card => [card.artwork_id, card]));
   if (responseScope) responseScope.retain(snapshot.ownership);
   else await recheckNftOwnership(snapshot.ownership);
-  return ids.map(id => cards.get(id)).filter(Boolean);
+  const visible = ids.map(id => cards.get(id)).filter(Boolean);
+  return process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true' ? withCatalogMintOrigins(visible) : visible;
   };
   return responseScope ? read() : readWithNftOwnershipRetry(read);
 }
@@ -1207,7 +1217,8 @@ export default async function handler(req, res) {
     if (ownership && requestQuery.owner && (cards.length >= 200 || warnings.length || visibleCards.some(card => card.ownership_status === 'unavailable'))) {
       throw Object.assign(new Error('The complete collection is temporarily unavailable. Please retry.'), { code: 'NFT_OWNERSHIP_UNAVAILABLE', statusCode: 503 });
     }
-    const filteredCards = filterCards(visibleCards, requestQuery);
+    let filteredCards = filterCards(visibleCards, requestQuery);
+    if (process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true') filteredCards = await withCatalogMintOrigins(filteredCards);
     const data = isDirectArtworkLookup
       ? filteredCards.map(card => ({
           ...card,

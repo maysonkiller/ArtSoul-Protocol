@@ -345,14 +345,15 @@
     if(mode==='original'||!el||!el.isConnected||el.closest('[hidden]')){removeAccount();return;}
     const host=el.closest('.avatar-plaque')||el.parentElement;if(!host)return;
     if(host!==accountHost||el!==accountButton){removeAccount();accountHost=host;accountButton=el;host.classList.add('as-living-account-host');if(getComputedStyle(host).position==='static')host.classList.add('as-living-account-position');if(typeof ResizeObserver==='function'){accountSizeObserver=new ResizeObserver(scheduleDecoration);accountSizeObserver.observe(host);accountSizeObserver.observe(el);}}
-    const r=el.getBoundingClientRect(),p=host.getBoundingClientRect();if(r.width<20||r.height<20){host.querySelectorAll(':scope > [data-as-living-account]').forEach(n=>n.remove());return;}
+    const portrait=el.querySelector('[data-avatar-image]')?.getBoundingClientRect();
+    const r=portrait?.width>=20&&portrait.height>=20?portrait:el.getBoundingClientRect(),p=host.getBoundingClientRect();if(r.width<20||r.height<20){host.querySelectorAll(':scope > [data-as-living-account]').forEach(n=>n.remove());return;}
     const holiday=mode==='newyear',cls=holiday?'as-santa-hat':'as-winter-crest';
     let ornament=host.querySelector(':scope > [data-as-living-account]');
     if(!ornament||!ornament.classList.contains(cls)){
       ornament?.remove();ornament=elt('span',{'class':cls+' as-living-account','data-as-living-account':'true','data-as-living-decor':'true','aria-hidden':'true'});ornament.innerHTML=accountMarkup(holiday,'as-wearable-'+(++svgSerial));host.appendChild(ornament);
     }
     const centerX=r.left+r.width/2;
-    const width=Math.min(clamp(r.width*(holiday?1.28:1.15),36,76),Math.max(r.width,2*Math.min(centerX-2,innerWidth-centerX-2))),height=width*(holiday?.86:.50);
+    const width=Math.min(clamp(r.width*(holiday?1.12:1.15),30,holiday?52:76),Math.max(r.width,2*Math.min(centerX-2,innerWidth-centerX-2))),height=width*(holiday?.86:.50);
     // The brim's centre y=73 or ice crest y=17 is seated on the circle tangent.
     const x=r.left+r.width/2-p.left-(parseFloat(getComputedStyle(host).borderLeftWidth)||0),y=r.top-p.top-(parseFloat(getComputedStyle(host).borderTopWidth)||0)-height*(holiday?.82:.34)+1.5;
     ornament.style.setProperty('--as-wear-x',x.toFixed(2)+'px');ornament.style.setProperty('--as-wear-y',y.toFixed(2)+'px');ornament.style.setProperty('--as-wear-w',width.toFixed(2)+'px');ornament.style.setProperty('--as-wear-h',height.toFixed(2)+'px');
