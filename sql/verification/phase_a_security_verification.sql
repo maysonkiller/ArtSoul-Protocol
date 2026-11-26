@@ -214,12 +214,15 @@ SELECT c.relname AS missing_service_read
 FROM pg_class c
 WHERE c.relnamespace = 'public'::regnamespace
   AND c.relkind IN ('r', 'p', 'v', 'm')
-  AND CASE WHEN c.relname = 'collection_origin_reviews' THEN
+  AND CASE WHEN c.relname IN ('collection_origin_reviews','profile_identity_reviews') THEN
         EXISTS (
           SELECT 1 FROM pg_attribute a
           WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
             AND has_column_privilege('service_role', c.oid, a.attnum, 'SELECT')
-                <> (a.attname IN ('chain_id', 'collection_address', 'revision', 'creator_address', 'verified'))
+                <> CASE WHEN c.relname = 'collection_origin_reviews'
+                     THEN a.attname IN ('chain_id', 'collection_address', 'revision', 'creator_address', 'verified')
+                     ELSE a.attname IN ('wallet_address', 'revision', 'profile_id', 'reviewed_name', 'verified')
+                   END
         )
       ELSE NOT has_table_privilege('service_role', c.oid, 'SELECT') END
 ORDER BY c.relname;
