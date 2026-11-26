@@ -161,7 +161,19 @@ node scripts/index-ordinary-settlement.mjs docs/testnet/ordinary-auction-1-settl
 
 The two-provider plan reads the signed primary sale, both contract runtimes, the current creditor balance and a pending-state simulation of `withdraw()`. The November 27 read returned exactly 0.009 test ETH for the winner. This is the remaining deposit from a paid sale. Testing delivery to a losing bidder needs a different auction with competing bidders.
 
+The [winner's withdrawal](https://sepolia.basescan.org/tx/0x6a6701e0b37ca8a861b442a6bb5affc4b42020eccbd1237303ab81e4ccdb61cb) finalized in Base Sepolia block 64,064,023. Base and PublicNode agreed on log index 0, the Core, the winner's address and a payment of 9,000,000,000,000,000 wei. A second read of the withdrawal plan reported zero remaining credit. The wallet sent 0 test ETH, used 32,426 execution gas and paid 199,243,612,937 wei including the L1 data fee.
+
 From the project directory, `node scripts/review-rehearsal-late-bid.mjs --withdraw-plan` checks eligibility without a wallet. Use `--withdraw` to open the private wallet review. The only destination for this zero-value call is the reviewed Core, and the only recipient of credit is the connected winner. A zero credit closes the request. A changed amount requires a fresh review. After the winner submits, `--verify-withdrawal HASH` verifies the actual payment event and finalized transaction position on both providers.
+
+### Checking a displaced bidder's deposit
+
+For an auction with competing bids, keep the hash of the bid that displaced the participant and the hash of the refund batch. The queued event identifies the auction and its zero-based entry index. With the two independent RPC endpoints configured as above, run:
+
+```sh
+node scripts/read-ordinary-outbid-refund.mjs docs/testnet/ordinary-auction-1-settlement.json AUCTION_ID QUEUE_INDEX OUTBIDDING_TX PROCESSING_TX
+```
+
+The JSON file supplies the reviewed issuer addresses and runtime hashes. The command reads the specified auction. It matches the creditor, amount and entry number in both finalized receipts, including their block positions and the published queue cursor. A successful ETH payment returns `delivered`. A rejected payment returns `credited-for-withdrawal`, which still requires a creditor withdrawal for delivery. The [isolated EVM rehearsal](../../scripts/rehearse-ordinary-settlement-receipts.cjs) exercised both outcomes in a single batch. Public participant evidence requires the two corresponding Base Sepolia receipts.
 
 ### Restoring the first hosted sale
 

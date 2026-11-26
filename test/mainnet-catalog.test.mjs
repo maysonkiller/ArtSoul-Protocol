@@ -54,7 +54,7 @@ test('pre-smoke check reads the ordinary public catalog after verifying its main
     const origin = `http://127.0.0.1:${server.address().port}`;
     const verify = () => verifyMainnetCatalog(origin, core, deployed);
 
-    assert.deepEqual(await verify(), {chainId: 8453, core, confirmedBlock: 171});
+    assert.deepEqual(await verify(), {chainId: 8453, core, confirmedBlock: 171, indexedBlock: 173});
     assert.deepEqual(calls.splice(0), [['GET', '/api/public/indexer-status'], ['GET', '/api/public/artworks']]);
 
     await t.test('the cutover CLI reads fresh worker health for the reviewed Core and public checkpoint', async () => {

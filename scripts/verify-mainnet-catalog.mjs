@@ -26,7 +26,7 @@ const emptyIndexerTables = [
     'artsoul_private.genesis_grant_batches', 'artsoul_private.genesis_grants'
 ];
 
-export async function verifyMainnetProjectionRows(client, pair, deploymentBlock) {
+export async function verifyMainnetProjectionRows(client, pair, deploymentBlock, publicCursor) {
     assert.equal(pair.chainId, mainnet, 'Supply a reviewed Base mainnet pair for the database check');
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     try {
@@ -35,9 +35,11 @@ export async function verifyMainnetProjectionRows(client, pair, deploymentBlock)
         await client.query("SET LOCAL statement_timeout = '10s'");
         const {rows: [state]} = await client.query(`
             SELECT count(*) = 1 AND count(*) FILTER (WHERE chain_id = 8453 AND lower(contract_address) = lower($1)
-                AND last_confirmed_block >= $2 AND last_indexed_block >= last_confirmed_block) = 1 AS valid
-            FROM public.indexer_state`, [pair.coreAddress, deploymentBlock]);
-        assert.equal(state.valid, true, 'The database cursor must identify the same reviewed Base mainnet deployment');
+                AND status = 'running' AND last_confirmed_block >= $2 AND last_indexed_block >= $3
+                AND last_indexed_block >= last_confirmed_block) = 1 AS valid
+            FROM public.indexer_state`, [pair.coreAddress, Math.max(deploymentBlock, publicCursor?.confirmedBlock ?? deploymentBlock),
+            Math.max(deploymentBlock, publicCursor?.indexedBlock ?? deploymentBlock)]);
+        assert.equal(state.valid, true, 'The running database cursor must cover the same Base mainnet deployment and the observed public progress');
         const conditions = emptyIndexerTables.map(table => [table, 'true']);
         // Withdrawals can prove prior economic activity without carrying an artwork, auction or token ID.
         // ERC-721 portfolio approval, however, is possible before an owner has ever received an NFT.
@@ -118,7 +120,7 @@ export async function verifyMainnetCatalog(site, expectedCore, deploymentBlock, 
         assert.equal(metrics[name], 0, `Expected zero ${name}`);
     }
     assert.match(String(metrics.settled_volume_eth), /^0(?:\.0+)?$/, 'Expected zero settled volume');
-    const result = {chainId: mainnet, core: expectedCore, confirmedBlock: chain.last_confirmed_block};
+    const result = {chainId: mainnet, core: expectedCore, confirmedBlock: chain.last_confirmed_block, indexedBlock: chain.last_indexed_block};
     if (workerMonitor) {
         assert.equal(workerMonitor.expectedChainId, mainnet, 'The worker monitor must expect Base mainnet');
         assert.ok(!workerMonitor.expectedCoreAddress || workerMonitor.expectedCoreAddress.toLowerCase() === expectedCore.toLowerCase(),
@@ -171,7 +173,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             const client = new Client({connectionString: process.env.ARTSOUL_CUTOVER_DATABASE_URL, connectionTimeoutMillis: 10000});
             try {
                 await client.connect();
-                checked.databaseRelationsChecked = await verifyMainnetProjectionRows(client, pair, Number(block));
+                checked.databaseRelationsChecked = await verifyMainnetProjectionRows(client, pair, Number(block), checked);
             } catch (error) {
                 if (error instanceof assert.AssertionError) throw error;
                 throw new Error('Could not verify the cutover database. Check access, schema, and unfiltered read permissions.');

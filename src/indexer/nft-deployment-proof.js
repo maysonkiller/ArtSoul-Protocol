@@ -1,6 +1,6 @@
 import { AbiCoder, Interface, keccak256 } from 'ethers';
 import { parseOrdinaryResale, parseOrdinarySettlement } from './ordinary-settlement.js';
-import { checkReceipt, receiptLogIndex, verifyTransactionPosition } from './settlement-receipt.js';
+import { checkReceipt, decodeReceiptLog, receiptLogIndex, verifyTransactionPosition } from './settlement-receipt.js';
 
 const getters = new Interface([
     'function nftContract() view returns (address)',
@@ -9,6 +9,9 @@ const getters = new Interface([
     'function totalSupply() view returns (uint256)',
     'function protocolTreasury() view returns (address)',
     'function ecosystemTreasury() view returns (address)',
+    'function refundProgress(uint256) view returns (uint256 cursor,uint256 total)',
+    'event OutbidRefundQueued(uint256 indexed auctionId,uint256 indexed index,address indexed creditor,uint256 amount)',
+    'event OutbidRefundProcessed(uint256 indexed auctionId,uint256 indexed index,address indexed creditor,uint256 amount,bool paid)',
     // Solidity strings use the same ABI representation as bytes.
     'function works(uint256) view returns (address creator, bytes metadata, uint256 activeAuction, uint256 floor)',
     'event ArtworkRegistered(uint256 indexed artworkId,address indexed creator,string metadataURI)',
@@ -181,6 +184,31 @@ async function readField(send, address, block, abi, name, args) {
     const result = abi.decodeFunctionResult(name, raw);
     if (abi.encodeFunctionResult(name, result) !== raw.toLowerCase()) throw new Error('Invalid ordinary token encoding');
     return result;
+}
+
+export async function readOrdinaryRefundEntry(listener, options) {
+    const { event, auctionId, entry, transactionHash } = options;
+    const processed = event === 'OutbidRefundProcessed';
+    if ((!processed && event !== 'OutbidRefundQueued') || !positiveUint256(auctionId) ||
+        (entry !== '0' && !positiveUint256(entry)) || !matches(hashPattern, transactionHash) || !nonzero(transactionHash)) {
+        throw new Error('Invalid ordinary refund entry request');
+    }
+    const hash = transactionHash.toLowerCase();
+    return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
+        const receipt = await send('eth_getTransactionReceipt', [hash]);
+        checkReceipt(receipt, proof, hash, event);
+        verifyTransactionPosition(receipt, header, hash);
+        const topics = getters.encodeFilterTopics(event, [auctionId, entry]);
+        const logs = receipt.logs.filter(log => log.address?.toLowerCase() === proof.coreAddress &&
+            topics.every((topic, index) => log.topics?.[index]?.toLowerCase() === topic));
+        if (logs.length !== 1) throw new Error('Expected one matching ordinary refund event');
+        const {args, index} = decodeReceiptLog(getters, event, logs[0], receipt);
+        const [cursor, total] = await readOrdinaryAuctionField(send, proof, block, auctionId, 'refundProgress');
+        if (!nonzero(args.creditor) || args.amount === 0n || cursor > total || BigInt(entry) >= total ||
+            (processed && BigInt(entry) >= cursor)) throw new Error('Refund event disagrees with finalized queue');
+        return { ...proof, transactionHash: hash, logIndex: index, auctionId, entry, creditor: args.creditor.toLowerCase(),
+            amountWei: args.amount.toString(), ...(processed && { paid: args.paid }) };
+    }, 'nft');
 }
 
 export async function readOrdinaryRegistration(listener, options) {

@@ -9,7 +9,7 @@ const { artifacts, config } = require('hardhat');
 const { createProvider } = require('hardhat/internal/core/providers/construction');
 
 async function main() {
-    const { readOrdinarySettlement, readOrdinaryToken, readOrdinaryResaleQuote, readOrdinaryResalePurchase } =
+    const { readOrdinarySettlement, readOrdinaryToken, readOrdinaryResaleQuote, readOrdinaryResalePurchase, readOrdinaryRefundEntry } =
         await import('../src/indexer/nft-deployment-proof.js');
     const { readBidExtension } = await import('./review-rehearsal-late-bid.mjs');
     const chainId = 84532;
@@ -98,6 +98,33 @@ async function main() {
                 ...location(other), transactionHash: other.hash, auctionId: '1' }), /Expected one AuctionSettled/);
         }
         console.log('PASS: two issuer pairs, two paid primary sales, two resales and four rejected receipt substitutions on an isolated EVM.');
+        const { market, listener, review } = pairs[0];
+        const receiver = await deploy('OrdinaryBidderFixture');
+        await mine(market.connect(creator).registerArtwork('ipfs://refund-rehearsal'));
+        await mine(market.connect(creator).createAuction(2, ethers.parseEther('0.001'), 86400));
+        const bidPrice = await market.minimumBid(2);
+        await mine(receiver.bid(market.target, 2, bidPrice, {value:await market.requiredDepositForBid(bidPrice)}));
+        const queuedReceipts = [];
+        for (const bidder of [first, second]) {
+            const price = await market.minimumBid(2);
+            queuedReceipts.push(await mine(market.connect(bidder).placeBid(2, price, {value:await market.requiredDepositForBid(price)})));
+        }
+        await rpc.send('evm_setNextBlockTimestamp', [Number((await market.auctions(2)).end)]);
+        await mine(market.closeAuction(2));
+        const batch = await mine(market.processRefunds(2, 2));
+        await finalize();
+        for (const [i, queued] of queuedReceipts.entries()) {
+            const options = {...review, auctionId:'2', entry:String(i)};
+            const obligation = await readOrdinaryRefundEntry(listener, {...options, ...location(queued),
+                transactionHash:queued.hash, event:'OutbidRefundQueued'});
+            const payment = await readOrdinaryRefundEntry(listener, {...options, ...location(batch),
+                transactionHash:batch.hash, event:'OutbidRefundProcessed'});
+            assert.equal(payment.creditor, [receiver.target, first.address][i].toLowerCase());
+            assert.equal(payment.creditor, obligation.creditor);
+            assert.equal(payment.amountWei, obligation.amountWei);
+            assert.equal(payment.paid, i === 1);
+        }
+        console.log('PASS: finalized local outbid receipts matched both wallet delivery and fallback credit in one batch.');
     } finally {
         provider.destroy();
     }

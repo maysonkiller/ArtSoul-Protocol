@@ -67,7 +67,17 @@ On November 21 both providers returned the following figures for the existing pr
 | [Close, auction 75](https://sepolia.basescan.org/tx/0x39c751169641602b88a7362fe282f821b14f1b9721f1ad8a5a8b82713bf1c331) | 59,937 | 359,622,000,000 | 88 | 359,622,000,088 |
 | [Settle, auction 75](https://sepolia.basescan.org/tx/0xc3166f53beb86f309469a1a6d74c46cddf32a44884bcd7541cc82f5119813007) | 502,928 | 3,017,568,000,000 | 88 | 3,017,568,000,088 |
 
-Use the replacement Core address and its own keeper and refund transaction hashes for C13 measurements.
+Two providers also verified the following costs for the [replacement Core's auction 1](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md#first-late-bid-and-settlement). The creator registered and opened the work. The buyer submitted the late bid and settled. The figures are measured Base Sepolia fees.
+
+| Operation | Execution gas | Execution fee (wei) | L1 data (wei) | Network fee (wei) |
+| --- | ---: | ---: | ---: | ---: |
+| Register work | 306,949 | 1,841,694,000,000 | 4,039,169,342,341 | 5,880,863,342,341 |
+| Open auction | 197,791 | 1,186,746,000,000 | 3,201,216,210 | 1,189,947,216,210 |
+| Late bid | 113,561 | 685,488,377,861 | 3,621,624,050 | 689,110,001,911 |
+| Winner settlement and mint | 598,028 | 3,605,262,032,352 | 5,363,049,092 | 3,610,625,081,444 |
+| Winner withdraws remaining deposit | 32,426 | 194,556,000,000 | 4,687,612,937 | 199,243,612,937 |
+
+The keeper execution and losing-bidder refund each need their own receipt on this Core.
 
 ## Verification
 
