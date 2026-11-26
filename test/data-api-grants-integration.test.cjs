@@ -63,7 +63,7 @@ test('new table migrations must join the no-default-grant rehearsal', async () =
     'sql/migrations/stabilization_layer.sql'
   ]);
   const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services', '20261125210000_banner_schedule_revisions',
-    '20261119150000_collection_origin_reviews', ...features]
+    '20261119150000_collection_origin_reviews', '20261126185730_profile_identity_reviews', ...features]
     .map(name => `sql/migrations/${name}.sql`));
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
   for (const migration of listIndexerMigrations()) covered.add(migration.sourcePath);
@@ -264,6 +264,13 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
         'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')`), 'f');
     }
   });
+  await t.test('profile identity reviews expose only decision columns with default grants removed', () => {
+    query(noImplicitGrants);
+    query(fs.readFileSync('sql/migrations/profile_content_moderation.sql', 'utf8'));
+    query(fs.readFileSync('sql/migrations/20261126185730_profile_identity_reviews.sql', 'utf8'));
+    query("INSERT INTO profiles (wallet_address,username) VALUES ('0x' || repeat('1',40),'Identity fixture')");
+    query(fs.readFileSync('test/fixtures/profile-identity-reviews.sql', 'utf8'));
+  });
   await t.test('read-only verification accepts explicit grants and detects drift in review column permissions', () => {
     const report = fs.readFileSync('sql/verification/phase_a_security_verification.sql', 'utf8');
     assert.ok(report.includes('-- 9.'));
@@ -273,5 +280,9 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
       'REVOKE SELECT (verified) ON public.collection_origin_reviews FROM service_role',
       'GRANT SELECT (reason) ON public.collection_origin_reviews TO service_role'
     ]) assert.equal(query(`BEGIN; ${change};\n${checks}\nROLLBACK;`), 'collection_origin_reviews');
+    for (const change of [
+      'REVOKE SELECT (verified) ON public.profile_identity_reviews FROM service_role',
+      'GRANT SELECT (evidence_ref) ON public.profile_identity_reviews TO service_role'
+    ]) assert.equal(query(`BEGIN; ${change};\n${checks}\nROLLBACK;`), 'profile_identity_reviews');
   });
 });

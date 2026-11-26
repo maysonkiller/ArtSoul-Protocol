@@ -67,6 +67,22 @@ test('public profile exposes exactly the fields used by the public page', async 
   assert.ok(!('discord_id' in res.body.profile));
 });
 
+test('only the enabled review projection can publish a profile identity mark', async t => {
+  const old = process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED;
+  t.after(() => { if (old === undefined) delete process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED; else process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED = old; });
+  const row = { wallet_address: WALLET, username: 'Artist', profile_content_hidden: false, profile_identity_verified: true };
+  for (const enabled of ['false', 'true']) {
+    process.env.ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED = enabled;
+    const fields = await import('../src/api/profile-fields.js?review=' + enabled);
+    assert.equal(fields.PUBLIC_PROFILE_SOURCE, enabled === 'true' ? 'reviewed_profile_content' : 'public_profile_content');
+    assert.equal(fields.PUBLIC_PROFILE_SELECT.includes('profile_identity_verified'), enabled === 'true');
+    assert.equal(fields.publicProfile(row).profile_identity_verified, enabled === 'true' ? true : undefined);
+    for (const change of [{profile_content_hidden:true}, {username:null}, {profile_identity_verified:'true'}, {profile_identity_verified:false}]) {
+      assert.equal(fields.publicProfile({...row, ...change}).profile_identity_verified, undefined);
+    }
+  }
+});
+
 test('public profile rejects an invalid address before querying the database', async () => {
   let fetched = false;
   const originalFetch = globalThis.fetch;

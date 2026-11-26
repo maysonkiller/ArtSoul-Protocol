@@ -2,6 +2,7 @@ import { React, createRoot } from './react-runtime.js';
 import '../../docs-protocol.css';
 import { PROTOCOL_DOC_SECTIONS as sections } from '../content/protocol-docs.js';
 import { auraFrameClassName } from '../ui/components/aura-frame.js';
+import { VerificationMark } from '../ui/components/verification-mark.jsx';
 
 const { useEffect, useLayoutEffect, useState } = React;
 
@@ -28,10 +29,7 @@ function ProtocolBlock({ block }) {
     );
     if (block.type === 'verification-mark') return (
         <p className="protocol-verification-key">
-            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <circle className="protocol-verification-face" cx="12" cy="12" r="10.5" />
-                <path d="m7.5 12.2 3 3 6-6.3" fill="none" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <VerificationMark />
             {block.text}
         </p>
     );

@@ -41,6 +41,7 @@ export async function checkOrdinaryDemand(pool) {
         await primary(8453, core, 3, cara, 99, large);
         await resale(8453, core, 4, bob, cara, 106, [93, 6, 1, 1]);
         for (const [chain, issuer] of [[8453, other], [84532, core]]) {
+            await primary(chain, issuer, 2, alice, 98, large);
             await primary(chain, issuer, 1, alice, 100, large);
             await resale(chain, issuer, 1, alice, bob, 102, [93, 6, 1, 1]);
         }
@@ -56,7 +57,7 @@ export async function checkOrdinaryDemand(pool) {
         await credit(2, 7n, 0n);
         assert.deepEqual(await report('100', '105'), {
             chainId: 8453, coreAddress: core, fromBlock: '100', toBlock: '105', issuerRegistered: true,
-            coverage: 'indexed_receipts_only', totals: { paying_wallets: '3', repeat_paying_wallets: '2', primary_sales: '2', resales: '3',
+            coverage: 'indexed_receipts_only', totals: { paying_wallets: '3', repeat_paying_wallets: '2', returning_paying_wallets: '1', primary_sales: '2', resales: '3',
                 primary_volume_wei: (large + 7n).toString(), resale_volume_wei: '300', total_volume_wei: (large + 307n).toString(),
                 primary_sales_missing_credit: '0', primary_protocol_credit_wei: largeShare.toString(),
                 resale_protocol_credit_wei: '4', resale_ecosystem_credit_wei: '2' }
@@ -65,6 +66,9 @@ export async function checkOrdinaryDemand(pool) {
         assert.equal(single.resales, '1');
         assert.equal(single.paying_wallets, '1');
         assert.equal(single.repeat_paying_wallets, '0');
+        assert.equal(single.returning_paying_wallets, '1');
+        assert.equal((await report('103', '105')).totals.returning_paying_wallets, '2');
+        assert.equal((await report('99', '99')).totals.returning_paying_wallets, '0');
         assert.equal(single.resale_protocol_credit_wei, '1');
         assert.equal(single.resale_ecosystem_credit_wei, '0');
         const empty = await report('107', '108');

@@ -47,6 +47,7 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-overview strong { fo
 .admin-aura-setting > label input { flex: none; inline-size: 1.125rem; block-size: 1.125rem; margin: 0; }
 .admin-aura-preview { margin: 1rem 0; }
 .admin-aura-preview figcaption { margin-bottom: .5rem; font-weight: 600; }
+.admin-aura-preview select { min-height: 44px; max-width: 100%; margin-inline-start: .35rem; }
 .admin-aura-preview .artsoul-aura-frame {
     display: grid;
     place-items: center;

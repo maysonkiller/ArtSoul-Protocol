@@ -15,6 +15,8 @@ const market = new Interface([
     'function auctions(uint256) view returns(uint256 artworkId,uint256 startPrice,uint256 originalEnd,uint256 end,uint256 deadline,address highestBidder,uint256 price,uint256 deposit,uint8 state,address firstCollector)',
     'function minimumBid(uint256) view returns(uint256)',
     'function requiredDepositForBid(uint256) view returns(uint256)',
+    'function dueAuctionAction(uint256) view returns(uint8)',
+    'function runnerUpOffers(uint256) view returns(address bidder,uint256 price,uint256 deadline)',
     'function placeBid(uint256,uint256) payable',
     'event BidAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price,uint256 deposit)',
     'event AuctionExtended(uint256 indexed auctionId,uint256 oldEnd,uint256 newEnd)'
@@ -31,22 +33,59 @@ async function view(rpc, name, args, at) {
     return result;
 }
 
-export async function inspectFirstBid(rpc, now) {
-    const head = await rpc('eth_getBlockByNumber', ['latest', false]);
-    assert(isHexString(head?.hash, 32), 'A canonical recent head is required');
-    const at = { blockHash: head.hash, requireCanonical: true };
+async function readAuction(rpc, at) {
     const [auction, ...codeChecks] = await Promise.all([view(rpc, 'auctions', [1n], at),
         ...['core', 'nft'].map(async role => {
             const runtime = await rpc('eth_getCode', [pair[role], at]);
             assert.equal(keccak256(runtime), pair[role + 'Hash'], 'Unexpected live ' + role + ' runtime');
             return { address: pair[role], sha256: sha256(runtime) };
         })]);
+    return { auction, codeChecks };
+}
+
+function checkOpening(auction) {
+    assert(auction.artworkId === 1n && auction.startPrice === price && auction.originalEnd === BigInt(bid.deadline),
+        'The auction does not match its recorded opening');
+}
+
+export async function inspectFirstBid(rpc, now) {
+    const head = await rpc('eth_getBlockByNumber', ['latest', false]);
+    assert(isHexString(head?.hash, 32), 'A canonical recent head is required');
+    const at = { blockHash: head.hash, requireCanonical: true };
+    const { auction, codeChecks } = await readAuction(rpc, at);
     return prepareFirstBid(rpc, at, Number(BigInt(head.timestamp)), auction, codeChecks, now);
 }
 
+// Historical evidence only. The wallet planner still checks each provider's recent head and pending state.
+export async function finalizedAuctionStatus(providers) {
+    requireIndependentProviders(providers);
+    const heads = await Promise.all(providers.map(rpc => finalizedBlock(84532, rpc)));
+    const block = BigInt(heads[0].number) <= BigInt(heads[1].number) ? heads[0] : heads[1];
+    const at = { blockHash: block.hash, requireCanonical: true };
+    const iso = seconds => new Date(Number(seconds) * 1000).toISOString();
+    const observations = await Promise.all(providers.map(async (rpc, index) => {
+        const header = await confirmFinalizedBlock(rpc, heads[index], block);
+        const { auction } = await readAuction(rpc, at);
+        checkOpening(auction);
+        const states = ['None', 'Open', 'Payment', 'No bids', 'Settled', 'Defaulted', 'Runner-up offer'];
+        const actions = ['None', 'Close auction', 'Finalize default', 'Expire runner-up offer'];
+        const [action] = await view(rpc, 'dueAuctionAction', [1n], at);
+        assert(states[auction.state] && auction.state !== 0n && actions[action], 'Unknown auction lifecycle state');
+        const offer = auction.state === 6n ? await view(rpc, 'runnerUpOffers', [1n], at) : null;
+        return { chainId: 84532, core: pair.core, nft: pair.nft, artworkId: '1', auctionId: '1', block,
+            observedAt: iso(BigInt(header.timestamp)), state: states[auction.state], dueAction: actions[action],
+            reserveWei: String(auction.startPrice), highestBidWei: String(auction.price),
+            highestBidder: auction.highestBidder === ZeroAddress ? null : auction.highestBidder,
+            originalBiddingEnd: iso(auction.originalEnd), biddingEnd: iso(auction.end),
+            winnerPaymentEnd: auction.state === 2n ? iso(auction.deadline) : null,
+            runnerUpOffer: offer ? { bidder: offer.bidder, priceWei: String(offer.price), end: iso(offer.deadline) } : null };
+    }));
+    assert.deepEqual(observations[0], observations[1], 'Providers disagree on finalized auction evidence');
+    return { ...observations[0], rpcReadings: 2 };
+}
+
 export async function prepareFirstBid(rpc, at, timestamp, auction, codeChecks, now) {
-    assert(auction.artworkId === 1n && auction.startPrice === price && auction.originalEnd === BigInt(bid.deadline),
-        'The auction does not match its recorded opening');
+    checkOpening(auction);
     if (auction.state !== 1n || auction.end !== auction.originalEnd || auction.highestBidder !== ZeroAddress ||
         auction.price !== 0n || auction.deposit !== 0n || auction.deadline !== 0n) {
         return { complete: true, lateBidStatus: 'changed' };
@@ -139,11 +178,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
         const [mode, hash, ...extra] = process.argv.slice(2);
         assert(!extra.length && ((mode === '--verify-receipt' && isHexString(hash,32)) ||
-            (!hash && ['--plan','--serve'].includes(mode))), 'Usage: node scripts/review-rehearsal-late-bid.mjs --plan | --serve | --verify-receipt HASH');
+            (!hash && ['--plan','--serve','--status'].includes(mode))), 'Usage: node scripts/review-rehearsal-late-bid.mjs --status | --plan | --serve | --verify-receipt HASH');
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
         const load = () => firstLateBidReview(providers);
         if (mode === '--verify-receipt') console.log(JSON.stringify(await verifyFirstBidReceipt(hash,providers),null,2));
         else if (mode === '--plan') console.log(JSON.stringify(await load(), null, 2));
-        else console.log('Open the private Base Sepolia bid review on this computer:\n' + (await listenForReview(load)).url);
+        else if (mode === '--status') console.log(JSON.stringify(await finalizedAuctionStatus(providers), null, 2));
+        else console.log('Open the private Base Sepolia bid review on this computer:\n' + (await listenForReview(load, {
+            loadAuction: () => finalizedAuctionStatus(providers)
+        })).url);
     } catch (error) { console.error(error.shortMessage ?? error.message); process.exitCode = 1; }
 }

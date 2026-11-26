@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { Interface, ZeroAddress, toQuantity } from 'ethers';
 import { lateBidWindow, rehearsalArtwork, rehearsalLateBid as bid, sameReview, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { firstLateBidReview, inspectFirstBid, prepareFirstBid, readBidExtension, verifyFirstBidReceipt } from '../scripts/review-rehearsal-late-bid.mjs';
+import { finalizedAuctionStatus, firstLateBidReview, inspectFirstBid, prepareFirstBid, readBidExtension, verifyFirstBidReceipt } from '../scripts/review-rehearsal-late-bid.mjs';
 
 const start = bid.deadline - bid.window;
 const block = { blockHash: '0x' + '2'.repeat(64), requireCanonical: true };
@@ -45,6 +45,23 @@ function nodeRead(overrides = {}) {
 function plan(read = nodeRead(), auction = valid, time = start) {
     return prepareFirstBid(read, block, time, auction, codeChecks, time);
 }
+
+test('finalized auction status checks the chain and shared canonical block before reading a review', async () => {
+    const node = (chain, headerHash) => async (method, params) => {
+        if (method === 'eth_chainId') return chain;
+        if (method === 'eth_getBlockByNumber') return {number: '0x42', hash: headerHash, timestamp: toQuantity(start)};
+        if (method === 'eth_getCode') { assert.deepEqual(params[1], block); return observedCode; }
+        assert.equal(method, 'eth_call');
+        assert.deepEqual(params[1], block);
+        return new Interface(['function auctions(uint256) view returns(uint256,uint256,uint256,uint256,uint256,address,uint256,uint256,uint8,address)'])
+            .encodeFunctionResult('auctions', [1n,reserve,bid.deadline,bid.deadline,0n,ZeroAddress,0n,0n,1n,ZeroAddress]);
+    };
+    const first = node('0x14a34', block.blockHash);
+    await assert.rejects(finalizedAuctionStatus([first, first]), /independent/);
+    await assert.rejects(finalizedAuctionStatus([first, node('0x2105', block.blockHash)]), /Wrong RPC chain/);
+    await assert.rejects(finalizedAuctionStatus([first, node('0x14a34', '0x' + 'f'.repeat(64))]), /finalized block/);
+    await assert.rejects(finalizedAuctionStatus([first, node('0x14a34', block.blockHash)]), /runtime/);
+});
 
 test('a first bid can be reviewed only from the inclusive opening second to the exclusive deadline', async () => {
     assert.equal(lateBidWindow(start-1, start), 'early');

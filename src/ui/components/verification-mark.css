@@ -1,0 +1,4 @@
+.artsoul-verification-mark { display: inline-block; vertical-align: -.15em; flex: none; }
+.artsoul-verification-mark circle { fill: var(--c-verification-blue); stroke: var(--c-brand-mark-background); }
+.artsoul-verification-mark path { stroke: var(--c-brand-mark-background); }
+.profile-display-name .artsoul-verification-mark { width: .95em; height: .95em; margin-inline-start: .3em; }
