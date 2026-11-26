@@ -157,6 +157,12 @@ The same sale was then imported into the private ArtSoul Supabase schema after m
 node scripts/index-ordinary-settlement.mjs docs/testnet/ordinary-auction-1-settlement.json docs/testnet/ordinary-auction-1-settlement.json --read-only
 ```
 
+### Winner credit after settlement
+
+The two-provider plan reads the signed primary sale, both contract runtimes, the current creditor balance and a pending-state simulation of `withdraw()`. The November 27 read returned exactly 0.009 test ETH for the winner. This is the remaining deposit from a paid sale. Testing delivery to a losing bidder needs a different auction with competing bidders.
+
+From the project directory, `node scripts/review-rehearsal-late-bid.mjs --withdraw-plan` checks eligibility without a wallet. Use `--withdraw` to open the private wallet review. The only destination for this zero-value call is the reviewed Core, and the only recipient of credit is the connected winner. A zero credit closes the request. A changed amount requires a fresh review. After the winner submits, `--verify-withdrawal HASH` verifies the actual payment event and finalized transaction position on both providers.
+
 ### Restoring the first hosted sale
 
 A read-only, data-only PostgreSQL export included just the three private issuer, sale and credit tables. Its archive contained three table-data entries and occupied 2,540 bytes. Restoring into an empty local database with migrations 018 and 023 reproduced every field of the hosted issuer, finalized sale and allocations. The source and restored tables each had one row. The temporary database and local export were removed after comparison. This drill covers that sale. A full catalog and indexer recovery still requires its own release rehearsal.

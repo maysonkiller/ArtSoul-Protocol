@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { Interface, ZeroAddress, toQuantity } from 'ethers';
-import { lateBidWindow, rehearsalArtwork, rehearsalLateBid as bid, sameReview, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { checkWinnerSettlement, finalizedAuctionStatus, firstLateBidReview, inspectFirstBid, prepareFirstBid, readBidExtension, verifyFirstBidReceipt } from '../scripts/review-rehearsal-late-bid.mjs';
+import { lateBidWindow, rehearsalArtwork, rehearsalLateBid as bid, sameReview, walletRequest, withdrawalDigest } from '../scripts/rehearsal-review/client.mjs';
+import { checkWinnerSettlement, finalizedAuctionStatus, firstLateBidReview, inspectFirstBid, prepareFirstBid, readBidExtension, readWinnerWithdrawal, verifyFirstBidReceipt } from '../scripts/review-rehearsal-late-bid.mjs';
 
 const start = bid.deadline - bid.window;
 const block = { blockHash: '0x' + '2'.repeat(64), requireCanonical: true };
@@ -130,6 +130,46 @@ test('the wallet constructs one exact payable call after checking chain, sender,
     assert.equal(sameReview(prepared,{...prepared,value:'0x1'}),false);
     t.mock.timers.setTime(bid.deadline*1000);
     await assert.rejects(walletRequest(wallet({eth_getBlockByNumber: () => ({timestamp:toQuantity(bid.deadline)})}),prepared), /first late bid is unavailable/);
+});
+
+test('winner credit review accepts only the recorded surplus and a zero-value withdrawal to self', async () => {
+    const abi = new Interface(['function withdraw()', 'function credits(address) view returns(uint256)']);
+    const data = abi.encodeFunctionData('withdraw');
+    const review = {chainId:'0x14a34',payer:bid.bidder,target:rehearsalArtwork.core,operation:'withdraw',
+        value:'0x0',data,dataSha256:withdrawalDigest,codeChecks,deployments:[],nonce:'0x1'};
+    const wallet = (credit, result = '0x') => ({request:({method,params}) => nodeRead({
+        eth_chainId:()=>'0x14a34', eth_accounts:()=>[bid.bidder],
+        eth_getCode:([address])=>address===bid.bidder?'0x':observedCode,
+        eth_call:([call,at])=>{
+            assert.equal(at,'pending');
+            assert.equal(call.to,rehearsalArtwork.core);
+            if (call.data === abi.encodeFunctionData('credits',[bid.bidder])) return abi.encodeFunctionResult('credits',[credit]);
+            assert.deepEqual(call,{from:bid.bidder,to:rehearsalArtwork.core,data,value:'0x0'});
+            return result;
+        }
+    })(method,params)});
+    const amount = 9000000000000000n;
+    assert.deepEqual(await walletRequest(wallet(amount),review),{chainId:'0x14a34',from:bid.bidder,to:rehearsalArtwork.core,value:'0x0',nonce:'0x1',data});
+    for(const credit of [0n,amount-1n,amount+1n]) await assert.rejects(walletRequest(wallet(credit),review),/no longer available/);
+    await assert.rejects(walletRequest(wallet(amount,'0x01'),review),/no longer available/);
+    await assert.rejects(walletRequest(wallet(amount),{...review,value:'0x1'}),/additional payment/);
+    await assert.rejects(walletRequest(wallet(amount),{...review,data:data+'00'}),/data changed/);
+});
+
+test('a winner withdrawal receipt binds the canonical log, creditor, amount, and call', () => {
+    const abi=new Interface(['function withdraw()', 'event CreditWithdrawn(address indexed creditor,uint256 amount)']);
+    const hash='0x'+'a'.repeat(64),amount=9000000000000000n;
+    const location={blockNumber:'0x42',blockHash:block.blockHash,transactionHash:hash,transactionIndex:'0x0'};
+    const header={hash:block.blockHash,number:'0x42',transactions:[hash]};
+    const tx={...location,hash,chainId:'0x14a34',from:bid.bidder,to:rehearsalArtwork.core,input:abi.encodeFunctionData('withdraw'),value:'0x0'};
+    const log={...location,address:tx.to,logIndex:'0x7',...abi.encodeEventLog('CreditWithdrawn',[bid.bidder,amount])};
+    const receipt={...location,from:tx.from,to:tx.to,status:'0x1',gasUsed:'0x8ca0',logs:[log]};
+    assert.equal(readWinnerWithdrawal(tx,receipt,header,hash).amountWei,String(amount));
+    for(const update of [{status:'0x0'},{from:ZeroAddress},{logs:[{...log,removed:true}]},
+        {logs:[{...log,...abi.encodeEventLog('CreditWithdrawn',[bid.bidder,amount+1n])}]}])
+        assert.throws(()=>readWinnerWithdrawal(tx,{...receipt,...update},header,hash));
+    assert.throws(()=>readWinnerWithdrawal({...tx,input:'0x'},receipt,header,hash));
+    assert.throws(()=>readWinnerWithdrawal(tx,receipt,{...header,transactions:[]},hash));
 });
 
 test('the receipt establishes the exact new deadline from the included bid and its immediately following canonical event', async () => {

@@ -29,6 +29,9 @@ export const rehearsalLateBid = Object.freeze({
 });
 
 export const settlementDigest = 'a09b1de3f18bd79d28c424ef61682f6d73aa7d8c7d33a0b7b24c5ba512db8868';
+// withdraw() takes no recipient. The contract sends the credit to msg.sender.
+export const withdrawalDigest = 'bb7e04450d4c3f0ba3aab864e93d63ad748c791d6ced0630abd37e71e9a5c135';
+export const surplusWei = BigInt(rehearsalLateBid.deposit) - BigInt(rehearsalOpening.reserveWei);
 
 export function lateBidWindow(blockTime, now = Math.floor(Date.now() / 1000)) {
     const { deadline, window } = rehearsalLateBid;
@@ -83,8 +86,9 @@ export async function walletRequest(provider, plan) {
     const opening = plan.operation === 'createAuction';
     const bid = plan.operation === 'placeBid';
     const settlement = plan.operation === 'settleAuction';
-    if (artwork || opening || bid || settlement) {
-        const digest = settlement ? settlementDigest : (bid ? rehearsalLateBid : artwork ? rehearsalArtwork : rehearsalOpening).dataSha256;
+    const withdrawal = plan.operation === 'withdraw';
+    if (artwork || opening || bid || settlement || withdrawal) {
+        const digest = withdrawal ? withdrawalDigest : settlement ? settlementDigest : (bid ? rehearsalLateBid : artwork ? rehearsalArtwork : rehearsalOpening).dataSha256;
         check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === digest &&
             plan.deployments.length === 0 &&
             plan.codeChecks.length === 2 && sameAddress(plan.codeChecks[0].address, rehearsalArtwork.core) &&
@@ -92,8 +96,8 @@ export async function walletRequest(provider, plan) {
         if (artwork) check(plan.metadataUri === rehearsalMetadataUri, 'Unexpected registration metadata.');
         if (bid) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === rehearsalLateBid.deposit,
             'Unexpected bidder or deposit.');
-        if (settlement) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === '0x0',
-            'Unexpected settlement wallet or additional payment.');
+        if (settlement || withdrawal) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === '0x0',
+            'Unexpected winner wallet or additional payment.');
     } else {
         check(create || ['protocolTreasury', 'ecosystemTreasury'].includes(plan.operation), 'Unknown rehearsal operation.');
         check(create ? plan.target === 'Direct contract creation' :
@@ -114,6 +118,16 @@ export async function walletRequest(provider, plan) {
         })
     ]);
     check(latest === plan.nonce && pending === plan.nonce && payerCode === '0x', 'Payer state changed. Refresh the chain evidence.');
+    if (withdrawal) {
+        const target = rehearsalArtwork.core;
+        const creditData = '0xfe5ff468' + rehearsalLateBid.bidder.slice(2).toLowerCase().padStart(64, '0');
+        const [credit, simulated] = await Promise.all([
+            rpc('eth_call', [{ to: target, data: creditData }, 'pending']),
+            rpc('eth_call', [{ from: plan.payer, to: target, data: plan.data, value: '0x0' }, 'pending'])
+        ]);
+        check(/^0x[0-9a-f]{64}$/i.test(credit) && BigInt(credit) === surplusWei && simulated === '0x',
+            'The reviewed winner credit is no longer available.');
+    }
     if (artwork || opening || settlement) {
         const simulation = await rpc('eth_call', [{ from: plan.payer, to: rehearsalArtwork.core, data: plan.data, value: '0x0' }, 'pending']);
         check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === 1n,
@@ -233,6 +247,8 @@ export async function start() {
                 changed: 'The first bid or auction state has changed. This rehearsal request is closed.'
             };
             status(messages[current.lateBidStatus]);
+        } else if (current.emptyWinnerCredit) {
+            status('This wallet has no remaining winner credit on the reviewed Core.');
         } else if (current.existingAuctionHistory) {
             status('The reviewed Core already has finalized auction history. This first-auction request is closed. Use the opening receipt to verify the work and its terms.');
         } else if (current.finalizedArtwork) {
@@ -271,15 +287,20 @@ export async function start() {
             const opening = plan.operation === 'createAuction';
             const bid = plan.operation === 'placeBid';
             const settlement = plan.operation === 'settleAuction';
-            byId('operation').textContent = settlement ? 'Settle auction 1 and mint its NFT' : bid ? 'First late bid · auction 1' : opening ? 'Open the first rehearsal auction' : artwork ? 'Register rehearsal artwork' :
+            const withdrawal = plan.operation === 'withdraw';
+            byId('operation').textContent = withdrawal ? 'Withdraw the winner’s surplus' : settlement ? 'Settle auction 1 and mint its NFT' : bid ? 'First late bid · auction 1' : opening ? 'Open the first rehearsal auction' : artwork ? 'Register rehearsal artwork' :
                 create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
             byId('fields').replaceChildren();
             addField('Network', 'Base Sepolia · 84532');
             addField('Sender', plan.payer);
             addField('Value', bid ? '0.01 test ETH deposit plus test gas' : '0 test ETH · wallet estimates gas');
             addField('Nonce', String(BigInt(plan.nonce)));
-            addField(artwork || opening || bid || settlement ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
-            if (settlement) {
+            addField(artwork || opening || bid || settlement || withdrawal ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
+            if (withdrawal) {
+                addField('Method', 'withdraw()');
+                addField('Credit to receive', '0.009 test ETH');
+                addField('Receiving wallet', rehearsalLateBid.bidder);
+            } else if (settlement) {
                 addField('Method', 'settleAuction(1)');
                 addField('Price from deposit', '0.001 test ETH');
                 addField('Surplus credited to winner', '0.009 test ETH');
