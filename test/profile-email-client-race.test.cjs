@@ -164,18 +164,20 @@ test('profile email gate remains disabled without a true public flag and ignores
   const effectStart = profileSource.lastIndexOf('useEffect(() => {', marker);
   const effectEnd = profileSource.indexOf('}, []);', marker) + '}, []);'.length;
   const effect = profileSource.slice(effectStart, effectEnd);
-  for (const config of [undefined, {}, {emailVerificationEnabled: false}, {emailVerificationEnabled: 'true', genesisProfileEnabled: 'true'}, {emailVerificationEnabled: true, genesisProfileEnabled: true}]) {
-    const changes = [], genesis = [];
+  for (const config of [undefined, {}, {emailVerificationEnabled: false}, {emailVerificationEnabled: 'true', genesisProfileEnabled: 'true', identityVerificationEnabled:'true'}, {emailVerificationEnabled: true, genesisProfileEnabled: true, identityVerificationEnabled:true}]) {
+    const changes = [], genesis = [], identity = [];
     vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: async () => config}},
-      useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}, setGenesisProfileEnabled: value => genesis.push(value)});
+      useEffect: fn => fn(), setEmailVerificationEnabled: value => changes.push(value), setIdentityVerificationEnabled:value=>identity.push(value),
+      setProfileReportingEnabled() {}, setGenesisProfileEnabled: value => genesis.push(value)});
     await tick();
     assert.deepEqual(changes, [config?.emailVerificationEnabled === true]);
     assert.deepEqual(genesis, [config?.genesisProfileEnabled === true]);
+    assert.deepEqual(identity, [config?.identityVerificationEnabled === true]);
   }
   let release, retire;
   const changes = [];
   vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: () => new Promise(resolve => {release = resolve;})}},
-    useEffect: fn => {retire = fn();}, setEmailVerificationEnabled: value => changes.push(value), setProfileReportingEnabled() {}, setGenesisProfileEnabled: value => changes.push(value)});
+    useEffect: fn => {retire = fn();}, setEmailVerificationEnabled: value => changes.push(value), setIdentityVerificationEnabled:value=>changes.push(value), setProfileReportingEnabled() {}, setGenesisProfileEnabled: value => changes.push(value)});
   retire(); release({emailVerificationEnabled: true}); await tick();
   assert.deepEqual(changes, []);
   vm.runInNewContext(effect, {Promise, window: {ArtSoulPublicConfig: {load: async () => {throw new Error('config unavailable');}}},
