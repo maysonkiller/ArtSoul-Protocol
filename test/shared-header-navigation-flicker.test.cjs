@@ -572,7 +572,7 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=102">/, `${page} stylesheet pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=103">/, `${page} stylesheet pin`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=12"><\/script>/, `${page} prepaint pin`);
     assert.match(html, /<script src="\/avatar-dropdown\.js\?v=75" defer><\/script>/, `${page} component pin`);
 

@@ -28,7 +28,7 @@ export function IdentityReviews({ api, wallet, isSessionCurrent }) {
     }
     return <section className="protocol-admin-setup identity-applications"><h2>Identity reviews</h2>
         <p>Confirm that an independent official source identifies the applicant wallet. For a collection, also verify the network, contract and creator. Your decision note is visible to the applicant.</p>
-        <label>Requests <select value={status} disabled={busy} onChange={e => {setStatus(e.target.value); setAfter('0'); setMessage('');}}>
+        <label>Requests <select aria-label="Requests" value={status} disabled={busy} onChange={e => {setStatus(e.target.value); setAfter('0'); setMessage('');}}>
             {['pending','approved','declined','revoked'].map(s => <option key={s} value={s}>{s[0].toUpperCase()+s.slice(1)}</option>)}</select></label>
         <button type="button" disabled={busy} onClick={() => { setMessage(''); setReload(n => n+1); }}>Refresh requests</button>
         <p role="status">{message || (!result ? 'Loading requests…' : '')}</p>
