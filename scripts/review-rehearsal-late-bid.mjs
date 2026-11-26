@@ -1,11 +1,14 @@
 // A fixed, user-reviewed Base Sepolia bid. The CLI only issues read RPCs.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { Interface, ZeroAddress, getAddress, isHexString, keccak256, toQuantity } from 'ethers';
 import { checkReceipt, decodeReceiptLog, verifyTransactionPosition } from '../src/indexer/settlement-receipt.js';
 import { inspectOpeningReceipt } from './review-rehearsal-artwork.mjs';
-import { rehearsalArtwork as pair, rehearsalLateBid as bid, rehearsalOpening, lateBidWindow, settlementDigest } from './rehearsal-review/client.mjs';
+import { rehearsalArtwork as pair, rehearsalLateBid as bid, rehearsalOpening, lateBidWindow, settlementDigest, withdrawalDigest, surplusWei } from './rehearsal-review/client.mjs';
+import { verifyPairReading } from './read-reviewed-ordinary-pair.mjs';
+import { readOrdinarySettlement } from '../src/indexer/nft-deployment-proof.js';
 import { listenForReview, sequencedRead } from './serve-rehearsal-review.mjs';
 import { confirmFinalizedBlock, finalizedBlock, requireIndependentProviders } from './verify-treasury-safes.mjs';
 
@@ -20,6 +23,9 @@ const market = new Interface([
     'function runnerUpOffers(uint256) view returns(address bidder,uint256 price,uint256 deadline)',
     'function placeBid(uint256,uint256) payable',
     'function settleAuction(uint256) payable returns(uint256)',
+    'function credits(address) view returns(uint256)',
+    'function withdraw()',
+    'event CreditWithdrawn(address indexed creditor,uint256 amount)',
     'event BidAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price,uint256 deposit)',
     'event AuctionExtended(uint256 indexed auctionId,uint256 oldEnd,uint256 newEnd)'
 ]);
@@ -152,6 +158,36 @@ async function winnerSettlementReview(providers) {
 }
 
 // Validate exactly what the first transaction did, even if another bidder took the lead in the same block.
+export async function winnerCreditReview(providers) {
+    const receipt = JSON.parse(await readFile(new URL('../docs/testnet/ordinary-auction-1-settlement.json', import.meta.url), 'utf8'));
+    const issuer = { chainId:84532, coreAddress:pair.core, nftAddress:pair.nft,
+        expectedCoreCodeHash:pair.coreHash, expectedNftCodeHash:pair.nftHash };
+    const sale = await verifyPairReading(issuer, receipt, providers, readOrdinarySettlement);
+    assert.equal(getAddress(sale.firstCollector), bid.bidder);
+    assert.equal(BigInt(sale.priceWei), price);
+    const data = market.encodeFunctionData('withdraw');
+    assert.equal(sha256(data), withdrawalDigest);
+    const plans = await Promise.all(providers.map(async rpc => {
+        const [last, pending] = await Promise.all([rpc('eth_getTransactionCount',[bid.bidder,'latest']),
+            rpc('eth_getTransactionCount',[bid.bidder,'pending'])]);
+        assert.equal(last, pending, 'Winner has a pending transaction.');
+        const head = await rpc('eth_getBlockByNumber',['latest',false]);
+        const at = {blockHash:head.hash,requireCanonical:true};
+        const [{auction,codeChecks}, [credit]] = await Promise.all([readAuction(rpc,at), view(rpc,'credits',[bid.bidder],at)]);
+        assert(auction.state === 4n && getAddress(auction.firstCollector) === bid.bidder && auction.artworkId === 1n,
+            'The reviewed sale is not settled.');
+        if (credit === 0n) return {complete:true,emptyWinnerCredit:true};
+        assert.equal(credit, surplusWei, 'Current credit differs from the surplus of auction 1.');
+        const tx = {from:bid.bidder,to:pair.core,value:'0x0',data};
+        assert.equal(await rpc('eth_call',[tx,'pending']), '0x', 'The winner cannot currently receive this credit.');
+        return {chainId:'0x14a34',operation:'withdraw',payer:bid.bidder,target:pair.core,
+            block:{number:toQuantity(sale.blockNumber),hash:sale.blockHash},nonce:last,value:tx.value,
+            data,dataHash:keccak256(data),dataSha256:withdrawalDigest,codeChecks,deployments:[]};
+    }));
+    assert.deepEqual(plans[0],plans[1],'RPC providers disagree on winner credit.');
+    return plans[0];
+}
+
 export function readBidExtension(tx, receipt, header, hash, {core, bidder, deadline}) {
     assert.equal(tx?.hash?.toLowerCase(), hash, 'Unexpected bid transaction');
     assert.equal(tx.chainId, '0x14a34', 'Wrong bid network');
@@ -182,38 +218,62 @@ export function readBidExtension(tx, receipt, header, hash, {core, bidder, deadl
         previousDeadline:time(deadline), deadlineAfterThisBid:time(deadline+bid.window), gasUsed:String(BigInt(receipt.gasUsed)) };
 }
 
-export async function verifyFirstBidReceipt(hash, providers) {
+export function readWinnerWithdrawal(tx, receipt, header, hash) {
+    checkReceipt(receipt,{blockNumber:header.number,blockHash:header.hash},hash,'withdrawal');
+    verifyTransactionPosition(receipt,header,hash);
+    assert(tx.hash.toLowerCase() === hash && tx.chainId === '0x14a34' && tx.blockHash === header.hash &&
+        tx.blockNumber === header.number && tx.transactionIndex === receipt.transactionIndex &&
+        tx.input === market.encodeFunctionData('withdraw') && BigInt(tx.value) === 0n, 'Unexpected withdrawal transaction');
+    for (const item of [tx,receipt]) assert(getAddress(item.from) === bid.bidder && getAddress(item.to) === pair.core,
+        'Unexpected withdrawal sender or destination');
+    assert(receipt.logs.length === 1 && getAddress(receipt.logs[0].address) === pair.core, 'Unexpected withdrawal events');
+    const {args,index} = decodeReceiptLog(market,'CreditWithdrawn',receipt.logs[0],receipt);
+    assert.deepEqual([...args],[bid.bidder,surplusWei], 'Unexpected withdrawal recipient or amount');
+    return {transactionHash:hash,blockNumber:String(BigInt(header.number)),blockHash:header.hash,logIndex:index,
+        creditor:bid.bidder,amountWei:String(surplusWei),gasUsed:String(BigInt(receipt.gasUsed))};
+}
+
+async function verifyRehearsalReceipt(hash, providers, withdrawal) {
     assert(isHexString(hash,32), 'Supply a public transaction hash');
     requireIndependentProviders(providers);
     hash = hash.toLowerCase();
     const results = await Promise.all(providers.map(async rpc => {
         const [head,tx,receipt] = await Promise.all([finalizedBlock(84532,rpc),
             rpc('eth_getTransactionByHash',[hash]),rpc('eth_getTransactionReceipt',[hash])]);
-        assert(receipt && tx, 'Bid is not yet included');
+        assert(receipt && tx, 'Transaction is not yet included');
         const block = await confirmFinalizedBlock(rpc,head,{number:receipt.blockNumber,hash:receipt.blockHash});
-        const proof = readBidExtension(tx,receipt,block,hash,{core:pair.core,bidder:bid.bidder,deadline:bid.deadline});
         const at = {blockHash:block.hash,requireCanonical:true};
-        const [auction] = await Promise.all([view(rpc,'auctions',[1n],at), ...['core','nft'].map(async role => {
-            assert.equal(keccak256(await rpc('eth_getCode',[pair[role],at])),pair[role+'Hash'],'Unexpected runtime at bid inclusion');
-        })]);
+        const {auction} = await readAuction(rpc,at);
+        if (withdrawal) {
+            assert(auction.state === 4n && auction.artworkId === 1n && getAddress(auction.firstCollector) === bid.bidder,
+                'Unexpected settled auction at withdrawal');
+            return readWinnerWithdrawal(tx,receipt,block,hash);
+        }
+        const proof = readBidExtension(tx,receipt,block,hash,{core:pair.core,bidder:bid.bidder,deadline:bid.deadline});
         assert(auction.artworkId === 1n && auction.startPrice === price && auction.originalEnd === BigInt(bid.deadline) &&
             auction.state === 1n && auction.end === BigInt(bid.deadline+bid.window) && auction.price >= price,
             'Stored auction differs from the bid receipt');
         return {...proof, highestBidderAtBlock:auction.highestBidder, highestBidWeiAtBlock:String(auction.price)};
     }));
-    assert.deepEqual(results[0],results[1],'RPC providers disagree on the finalized first bid');
+    assert.deepEqual(results[0],results[1],'RPC providers disagree on the finalized transaction');
     return {...results[0],rpcReadings:2};
+}
+
+export function verifyFirstBidReceipt(hash, providers) {
+    return verifyRehearsalReceipt(hash, providers, false);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     try {
         const [mode, hash, ...extra] = process.argv.slice(2);
-        assert(!extra.length && ((mode === '--verify-receipt' && isHexString(hash,32)) ||
-            (!hash && ['--plan','--serve','--status','--settle-plan','--settle'].includes(mode))), 'Expected --status, --plan, --serve, --settle-plan, --settle or --verify-receipt HASH');
+        const receiptMode = mode === '--verify-receipt' || mode === '--verify-withdrawal';
+        assert(!extra.length && ((receiptMode && isHexString(hash,32)) ||
+            (!hash && ['--plan','--serve','--status','--settle-plan','--settle','--withdraw-plan','--withdraw'].includes(mode))), 'Expected --status, --plan, --serve, --settle-plan, --settle, --withdraw-plan, --withdraw, --verify-receipt HASH or --verify-withdrawal HASH');
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
-        const load = () => mode.startsWith('--settle') ? winnerSettlementReview(providers) : firstLateBidReview(providers);
-        if (mode === '--verify-receipt') console.log(JSON.stringify(await verifyFirstBidReceipt(hash,providers),null,2));
-        else if (mode === '--plan' || mode === '--settle-plan') console.log(JSON.stringify(await load(), null, 2));
+        const review = mode.startsWith('--withdraw') ? winnerCreditReview : mode.startsWith('--settle') ? winnerSettlementReview : firstLateBidReview;
+        const load = () => review(providers);
+        if (receiptMode) console.log(JSON.stringify(await verifyRehearsalReceipt(hash,providers,mode==='--verify-withdrawal'),null,2));
+        else if (mode.endsWith('-plan') || mode === '--plan') console.log(JSON.stringify(await load(), null, 2));
         else if (mode === '--status') console.log(JSON.stringify(await finalizedAuctionStatus(providers), null, 2));
         else console.log('Open the private Base Sepolia auction review on this computer:\n' + (await listenForReview(load, {
             loadAuction: () => finalizedAuctionStatus(providers)
