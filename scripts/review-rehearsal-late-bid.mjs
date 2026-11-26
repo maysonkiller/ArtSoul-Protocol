@@ -5,12 +5,13 @@ import { pathToFileURL } from 'node:url';
 import { Interface, ZeroAddress, getAddress, isHexString, keccak256, toQuantity } from 'ethers';
 import { checkReceipt, decodeReceiptLog, verifyTransactionPosition } from '../src/indexer/settlement-receipt.js';
 import { inspectOpeningReceipt } from './review-rehearsal-artwork.mjs';
-import { rehearsalArtwork as pair, rehearsalLateBid as bid, rehearsalOpening, lateBidWindow } from './rehearsal-review/client.mjs';
+import { rehearsalArtwork as pair, rehearsalLateBid as bid, rehearsalOpening, lateBidWindow, settlementDigest } from './rehearsal-review/client.mjs';
 import { listenForReview, sequencedRead } from './serve-rehearsal-review.mjs';
 import { confirmFinalizedBlock, finalizedBlock, requireIndependentProviders } from './verify-treasury-safes.mjs';
 
 const creator = '0xE6d6658DD5013B30Ab8cA9CBD667D0b5a5A1b215';
 const openingHash = '0x9c13f650612551c6a13d0be018ce0cdc44036ba43de0e36e7a8b74f29e45d42d';
+const firstBidHash = '0xe486f15933f6892b415e4d5c93d174c459f85268e8ee2a56059dbe2e4aee9b89';
 const market = new Interface([
     'function auctions(uint256) view returns(uint256 artworkId,uint256 startPrice,uint256 originalEnd,uint256 end,uint256 deadline,address highestBidder,uint256 price,uint256 deposit,uint8 state,address firstCollector)',
     'function minimumBid(uint256) view returns(uint256)',
@@ -18,6 +19,7 @@ const market = new Interface([
     'function dueAuctionAction(uint256) view returns(uint8)',
     'function runnerUpOffers(uint256) view returns(address bidder,uint256 price,uint256 deadline)',
     'function placeBid(uint256,uint256) payable',
+    'function settleAuction(uint256) payable returns(uint256)',
     'event BidAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price,uint256 deposit)',
     'event AuctionExtended(uint256 indexed auctionId,uint256 oldEnd,uint256 newEnd)'
 ]);
@@ -120,6 +122,35 @@ export async function firstLateBidReview(providers) {
     return { chainId: '0x14a34', payer: bid.bidder, block: opening.block, ...plans[0] };
 }
 
+export function checkWinnerSettlement(auction, timestamp) {
+    checkOpening(auction);
+    assert(auction.highestBidder === bid.bidder && auction.price === price && auction.deposit === BigInt(bid.deposit) &&
+        auction.end === BigInt(bid.deadline + bid.window), 'The winning bid or deposit changed, or settlement is complete.');
+    assert((auction.state === 1n && timestamp >= auction.end) ||
+        (auction.state === 2n && timestamp < auction.deadline), 'Auction is outside the winner settlement window.');
+}
+
+async function winnerSettlementReview(providers) {
+    const proof = await verifyFirstBidReceipt(firstBidHash, providers);
+    const data = market.encodeFunctionData('settleAuction', [1n]);
+    assert.equal(sha256(data), settlementDigest);
+    const tx = { from: bid.bidder, to: pair.core, value: '0x0', data };
+    const plans = await Promise.all(providers.map(async rpc => {
+        const head = await rpc('eth_getBlockByNumber', ['latest', false]);
+        const { auction, codeChecks } = await readAuction(rpc, { blockHash: head.hash, requireCanonical: true });
+        checkWinnerSettlement(auction, BigInt(head.timestamp));
+        const [nonce, pending, simulation] = await Promise.all([rpc('eth_getTransactionCount', [bid.bidder, 'latest']),
+            rpc('eth_getTransactionCount', [bid.bidder, 'pending']), rpc('eth_call', [tx, 'pending'])]);
+        assert.equal(nonce, pending, 'Winner has a pending transaction.');
+        assert.equal(simulation, market.encodeFunctionResult('settleAuction', [1n]), 'Unexpected minted token ID.');
+        return {chainId: '0x14a34', operation: 'settleAuction', payer: bid.bidder, target: pair.core,
+            block: {number: toQuantity(BigInt(proof.blockNumber)), hash: proof.blockHash}, nonce, value: tx.value,
+            data, dataHash: keccak256(data), dataSha256: settlementDigest, codeChecks, deployments: []};
+    }));
+    assert.deepEqual(plans[0], plans[1], 'RPC providers disagree on winner settlement.');
+    return plans[0];
+}
+
 // Validate exactly what the first transaction did, even if another bidder took the lead in the same block.
 export function readBidExtension(tx, receipt, header, hash, {core, bidder, deadline}) {
     assert.equal(tx?.hash?.toLowerCase(), hash, 'Unexpected bid transaction');
@@ -178,13 +209,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
         const [mode, hash, ...extra] = process.argv.slice(2);
         assert(!extra.length && ((mode === '--verify-receipt' && isHexString(hash,32)) ||
-            (!hash && ['--plan','--serve','--status'].includes(mode))), 'Usage: node scripts/review-rehearsal-late-bid.mjs --status | --plan | --serve | --verify-receipt HASH');
+            (!hash && ['--plan','--serve','--status','--settle-plan','--settle'].includes(mode))), 'Expected --status, --plan, --serve, --settle-plan, --settle or --verify-receipt HASH');
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
-        const load = () => firstLateBidReview(providers);
+        const load = () => mode.startsWith('--settle') ? winnerSettlementReview(providers) : firstLateBidReview(providers);
         if (mode === '--verify-receipt') console.log(JSON.stringify(await verifyFirstBidReceipt(hash,providers),null,2));
-        else if (mode === '--plan') console.log(JSON.stringify(await load(), null, 2));
+        else if (mode === '--plan' || mode === '--settle-plan') console.log(JSON.stringify(await load(), null, 2));
         else if (mode === '--status') console.log(JSON.stringify(await finalizedAuctionStatus(providers), null, 2));
-        else console.log('Open the private Base Sepolia bid review on this computer:\n' + (await listenForReview(load, {
+        else console.log('Open the private Base Sepolia auction review on this computer:\n' + (await listenForReview(load, {
             loadAuction: () => finalizedAuctionStatus(providers)
         })).url);
     } catch (error) { console.error(error.shortMessage ?? error.message); process.exitCode = 1; }
