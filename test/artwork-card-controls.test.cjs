@@ -214,6 +214,16 @@ test('decorative disc rotation is limited to Future when the reader allows motio
     }
 });
 
+test('the mobile motion guard permits Future publisher and Partner captions when motion is allowed', () => {
+    const touchCss = fs.readFileSync(path.join(root, 'mobile-no-motion.css'), 'utf8');
+    const permitted = touchCss.slice(touchCss.indexOf('@media (prefers-reduced-motion: no-preference)'));
+    const selector = 'body.future :is(.artsoul-aura-frame--platform, .artsoul-aura-frame--partner) > .artsoul-aura-caption > span';
+    assert.ok(permitted.includes(selector));
+    const rule = permitted.slice(permitted.indexOf(selector)).split('}')[0];
+    assert.match(rule, /animation: artsoulAuraCaption [^;]*infinite !important;/);
+    assert.equal(touchCss.match(/animation: artsoulAuraCaption/g)?.length, 1);
+});
+
 test('React card still opens when the card itself receives Enter or Space', () => {
     const { api, window } = loadDomCardRuntime();
     window.React = {

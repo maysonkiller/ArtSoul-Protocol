@@ -22,7 +22,7 @@ const RUNTIME = {
   'src/features/discovery/gallery-contract-runtime.js': { version: 3, sha256: '5f1e3a95ef176761' },
   'src/features/discovery/public-contract-runtime.js': { version: 1, sha256: '16ace3baeafdae78' },
   'unified-styles.css': { version: 103, sha256: '87a8b10d3f1d7a40' },
-  'mobile-no-motion.css': { version: 3, sha256: '88eb61864da7f616' },
+  'mobile-no-motion.css': { version: 4, sha256: '6eef2c400efe3a46' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 8, sha256: '618e006edefcf241' },
