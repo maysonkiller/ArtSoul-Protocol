@@ -61,6 +61,38 @@ Run `node scripts/read-banner-terms.mjs REVISION PLACEMENT_ID` with the same dat
 
 The output uses an explicit list of public fields. It excludes reviewer, proposer, internal affiliation identifiers and database login names. Missing public sponsor details, filtered reads, duplicate records, late recording and records above the 16 KiB preview limit stop the export. `recorded_terms_preview` identifies a private rehearsal. Publication still needs an authenticated approval and an externally retrievable, timestamped copy. An auction award still needs evidence of payment. [Read-only command](../../scripts/read-banner-terms.mjs)
 
+## Authenticate terms in an isolated rehearsal
+
+Apply [the review ledger migration](../../sql/migrations/20261127031000_banner_terms_reviews.sql) after the schedule migration in an isolated database. The operator sets `ARTSOUL_BANNER_DATABASE_URL` for that database and `ARTSOUL_BANNER_REVIEW_DIRECTORY` for an independently maintained, private JSON file. The directory contains a unique 32-byte hexadecimal `ledgerId` and a `members` array. Each member has a public EOA `wallet`, a private stable `person` identifier, a `role` of `proposer` or `reviewer`, and a `groups` array with every known affiliation. Group and person identifiers use lowercase letters, digits and hyphens. Keep the directory, its historical versions and the confirmation files outside the public repository. A real person must establish independence and keep this roster current. A solo operator may rehearse with fixture identities.
+
+```sh
+node scripts/review-banner-terms.mjs --prepare REVISION PLACEMENT_ID
+node scripts/review-banner-terms.mjs --record REVISION PLACEMENT_ID confirmations.json
+node scripts/review-banner-terms.mjs --read REVISION PLACEMENT_ID
+node scripts/review-banner-terms.mjs --serve REVISION PLACEMENT_ID
+```
+
+The first command prepares two readable EIP-712 messages from the original database terms. Each signer reviews the sponsor, consideration, dates, reference and decision role and returns their own typed-message signature off chain. The private confirmations file contains the two 65-byte hexadecimal signatures under `proposer` and `reviewer`. The record command verifies the exact revision, terms, identities, groups, directory and Base Sepolia signing domain. A reviewer affiliated with the sponsor must recuse themselves. An auction winner cannot be affiliated with either operator. Distinct wallets belonging to one identified person cannot approve together. [Typed structured data](https://eips.ethereum.org/EIPS/eip-712)
+
+PostgreSQL records the approval time before bidding or direct delivery starts. An auction award requires an authenticated earlier revision of its original terms and approval by the scheduled start. Concurrent retries preserve a single entry. The read command emits only visitor-facing terms, the revision and review time. The review authorizes rehearsal of the disclosure. Live publication, real payment/refund evidence, approval of the creative and homepage delivery still require acceptance. [Review command](../../scripts/review-banner-terms.mjs) · [Signature regressions](../../test/banner-terms-review.test.mjs) · [Isolated database and CLI tests](../../test/helpers/banner-schedule-postgres.mjs)
+
+The serve command opens one read-only URL on the operator's loopback interface for that exact revision and placement. It closes the database connection after loading the authenticated copy. A reviewer can request the URL again with its ETag to compare the same disclosure. Stop the command to end the preview.
+
+## Verify a testnet sponsor payment or refund
+
+A negotiated placement with a positive cash fee, or a positive auction award, can include optional private `cashTerms` when the review is prepared. Supply `sponsorWallet`, `protocolTreasury` (both lowercase EVM addresses) and the sponsor's `paymentNonce` as a decimal string. For a specifically agreed refund include both an explicit `refundWei` and `refundSafeNonce`. The refundable amount must be positive and at most the cash consideration. An omitted amount leaves the refund unverifiable. Historical schedules and free placements have no cash instruction. The two human confirmations cover these fields. The visitor's reviewed terms include the expressly agreed refund amount, while wallet addresses and nonces remain in the private review. The database reserves the sponsor-wallet/nonce and Safe/nonce combinations once across all placement reviews.
+
+The [receipt command](../../scripts/read-banner-cash-receipt.mjs) takes the private rehearsal database, the two independent HTTPS RPC endpoints used for custody verification, and the independently retained Base Sepolia custody register. The optional last argument is the hash of a refund that has already executed.
+
+```sh
+node scripts/read-banner-cash-receipt.mjs REVISION PLACEMENT_ID CUSTODY_FILE PAYMENT_HASH [REFUND_HASH]
+node scripts/rehearse-safe-marketplace-admission.cjs SAFE_CONTRACTS_1_4_1_TARBALL --banner-cash-evidence
+```
+
+The command reads a successful finalized direct sponsor transfer and the Safe's matching receive event. It checks the exact payer, nonce, amount and treasury at the canonical transaction position. An included refund must follow that payment and match the approved amount, recipient and Safe execution hash at the reviewed Safe nonce. The supported refund is one successful native-ETH CALL with no Safe gas reimbursement. The timestamp must establish that the transfer followed the review. The result is receipt evidence and initiates no transfer, placement or cancellation.
+
+Two isolated EVMs with the Base Sepolia chain ID independently mined the same sponsor payment and two-owner Safe 1.4.1 refund from the pinned package. Both reported 501 fixture wei paid, 101 returned and 400 left in the treasury. The payer received the exact refund. The rehearsal rejected wrong parties, either wrong nonce, a missing refund amount, a late review and reuse of the payment as a refund. These amounts belong to the test fixture. Production sponsor terms, human affiliation review, real receipts, approved creative and public delivery remain separate acceptance work.
+
 ## Industry references
 
 Google Ad Manager uses publisher pricing rules to filter bids below a configured floor and describes separate treatment for direct sponsorships. This is the relevant precedent for keeping a public auction reserve distinct from an agreed direct placement. [Google Ad Manager pricing rules](https://support.google.com/admanager/answer/9298008?hl=en)

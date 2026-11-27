@@ -174,6 +174,24 @@ test('requires finite ordered UTC terms and one exact wei value per published pr
     assert.throws(() => checkBannerSchedule({}, empty, at(2)), /fields/);
 });
 
+test('optional sponsor cash evidence binds exact payer and treasury nonces and only an expressly reviewed refund', () => {
+    const cashTerms = { sponsorWallet:'0x'+'1'.repeat(40), protocolTreasury:'0x'+'2'.repeat(40),
+        paymentNonce:'3', refundSafeNonce:'8', refundWei:'4' };
+    assert.doesNotThrow(() => checkBannerSchedule(empty,plan([{...deal,cashTerms}]),at(2)));
+    const later = { ...award,cashTerms };
+    assert.doesNotThrow(() => checkBannerSchedule(plan([auction]),plan([auction],[later]),at(8)));
+    for (const delta of [{refundWei:'0'}, {refundWei:'13'}, {refundSafeNonce:'-1'}, {paymentNonce:'3.1'},
+        { sponsorWallet:cashTerms.protocolTreasury }, {protocolTreasury:'0x'+'0'.repeat(40)}]) {
+        assert.throws(() => checkBannerSchedule(empty,plan([{...deal,cashTerms:{...cashTerms,...delta}}]),at(2)));
+    }
+    const paymentOnly = { ...cashTerms };
+    delete paymentOnly.refundWei;
+    assert.throws(() => checkBannerSchedule(empty,plan([{...deal,cashTerms:paymentOnly}]),at(2)), /fields/);
+    delete paymentOnly.refundSafeNonce;
+    assert.doesNotThrow(() => checkBannerSchedule(empty,plan([{...deal,cashTerms:paymentOnly}]),at(2)));
+    assert.throws(() => checkBannerSchedule(empty,plan([{...free,cashTerms}]),at(2)));
+});
+
 test('operator CLI reads retained files without changing them and returns an error for a bad successor', async t => {
     const dir = await mkdtemp(join(tmpdir(), 'artsoul-banner-schedule-'));
     t.after(() => rm(dir, { recursive: true, force: true }));
