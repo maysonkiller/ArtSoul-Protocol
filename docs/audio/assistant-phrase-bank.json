@@ -850,7 +850,7 @@
     {
       "lang": "ru",
       "id": "r2CannotHear",
-      "text": "Не удалось расслышать. Повторите или исправьте текст.",
+      "text": "Пожалуйста, повторите вопрос или исправьте текст.",
       "url": "/audio/assistant/v1/phrases/ru-r2CannotHear.wav"
     },
     {

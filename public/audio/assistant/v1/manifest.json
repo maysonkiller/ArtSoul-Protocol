@@ -459,6 +459,3372 @@
         "pcm_bytes": 76800
       },
       "source_commit": "60cb70d78eecba79e2778780c2654e7f9a1f4d50"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Greeting",
+      "text": "Привет! Что хотите посмотреть в ArtSoul?",
+      "url": "/audio/assistant/v1/phrases/ru-r2Greeting.wav",
+      "transcript": "Привет! Что хотите посмотреть в ArtSoul?",
+      "sha256": "7dc3e6b663c4f9b91a3bb4d3c952fca6b453afdb810a7cb8ba02abfdbe47834c",
+      "bytes": 141644,
+      "duration_seconds": 2.95,
+      "generated_at": "2026-11-27T22:54:28.261Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 115
+      },
+      "estimated_usd": 0.0023312
+    },
+    {
+      "lang": "en",
+      "id": "r2Ready",
+      "text": "I'm ready. You can ask me naturally about ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/en-r2Ready.wav",
+      "transcript": "I'm ready. You can ask me naturally about ArtSoul.",
+      "sha256": "3f87e47d0a2c0629b1cd19b958f2befde08d74166bf50a1fe5de6625ee77820c",
+      "bytes": 144044,
+      "duration_seconds": 3,
+      "generated_at": "2026-11-27T22:55:06.904Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 104
+      },
+      "estimated_usd": 0.0021124
+    },
+    {
+      "lang": "ru",
+      "id": "r2Ready",
+      "text": "Я готова. Можете задавать обычные вопросы об ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Ready.wav",
+      "transcript": "Я готова. Можете задавать обычные вопросы об ArtSoul.",
+      "sha256": "dbbbee22a23b871d699e56395109ba0fafebcf8c2d5b89651ec2f690955a5e25",
+      "bytes": 182444,
+      "duration_seconds": 3.8,
+      "generated_at": "2026-11-27T22:55:10.319Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 57,
+        "output_tokens": 116
+      },
+      "estimated_usd": 0.0023542
+    },
+    {
+      "lang": "en",
+      "id": "r2HowCanHelp",
+      "text": "I can help with artworks, auctions, profiles, and safe wallet preparation.",
+      "url": "/audio/assistant/v1/phrases/en-r2HowCanHelp.wav",
+      "transcript": "I can help with artworks, auctions, profiles, and safe wallet preparation.",
+      "sha256": "cff5632813b90e77faae7e98532bc94997d4bc97fc461009a01cbf34449950be",
+      "bytes": 252044,
+      "duration_seconds": 5.25,
+      "generated_at": "2026-11-27T22:55:13.068Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 57,
+        "output_tokens": 151
+      },
+      "estimated_usd": 0.0030542
+    },
+    {
+      "lang": "ru",
+      "id": "r2HowCanHelp",
+      "text": "Могу помочь с работами, аукционами, профилями и безопасной подготовкой действий с кошельком.",
+      "url": "/audio/assistant/v1/phrases/ru-r2HowCanHelp.wav",
+      "transcript": "Могу помочь с работами, аукционами, профилями и безопасной подготовкой действий с кошельком.",
+      "sha256": "ed56ee89e192fc7a9367a8a15d7e3c38d2358b429440521de32b988182d39b4b",
+      "bytes": 312044,
+      "duration_seconds": 6.5,
+      "generated_at": "2026-11-27T22:55:16.647Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 69,
+        "output_tokens": 195
+      },
+      "estimated_usd": 0.0039414
+    },
+    {
+      "lang": "en",
+      "id": "r2PleaseContinue",
+      "text": "Of course. What would you like to know next?",
+      "url": "/audio/assistant/v1/phrases/en-r2PleaseContinue.wav",
+      "transcript": "Of course. What would you like to know next?",
+      "sha256": "9c756ea064232faaa22e45954832bc50d7cee5ba9d120fbacf4cbe9f59ab2482",
+      "bytes": 117644,
+      "duration_seconds": 2.45,
+      "generated_at": "2026-11-27T22:55:19.798Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 92
+      },
+      "estimated_usd": 0.0018717999999999999
+    },
+    {
+      "lang": "ru",
+      "id": "r2PleaseContinue",
+      "text": "Конечно. Что хотите узнать дальше?",
+      "url": "/audio/assistant/v1/phrases/ru-r2PleaseContinue.wav",
+      "transcript": "Конечно. Что хотите узнать дальше?",
+      "sha256": "a5ae092fc9ddbf1fb7184497f36c2360a774d4ea33cc3889bb1af69d17962483",
+      "bytes": 120044,
+      "duration_seconds": 2.5,
+      "generated_at": "2026-11-27T22:55:22.611Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 50,
+        "output_tokens": 93
+      },
+      "estimated_usd": 0.00189
+    },
+    {
+      "lang": "en",
+      "id": "r2OneMoment",
+      "text": "I'll check what ArtSoul can verify.",
+      "url": "/audio/assistant/v1/phrases/en-r2OneMoment.wav",
+      "transcript": "I'll check what ArtSoul can verify.",
+      "sha256": "16f199bbfb48156a07f54981ed3b1817742452a2d1096038cbe6d3777c7ebf2e",
+      "bytes": 112844,
+      "duration_seconds": 2.35,
+      "generated_at": "2026-11-27T22:55:25.360Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 50,
+        "output_tokens": 82
+      },
+      "estimated_usd": 0.00167
+    },
+    {
+      "lang": "ru",
+      "id": "r2OneMoment",
+      "text": "Проверю, какие сведения доступны в ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OneMoment.wav",
+      "transcript": "Проверю, какие сведения доступны в ArtSoul.",
+      "sha256": "73f626c4d80b66274a19164c5f2eb7cd09859779c559bed0e54c0a67a87a8d4c",
+      "bytes": 129644,
+      "duration_seconds": 2.7,
+      "generated_at": "2026-11-27T22:55:27.979Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 95
+      },
+      "estimated_usd": 0.0019318
+    },
+    {
+      "lang": "en",
+      "id": "r2NeedClarification",
+      "text": "Could you clarify what you mean?",
+      "url": "/audio/assistant/v1/phrases/en-r2NeedClarification.wav",
+      "transcript": "Could you clarify what you mean?",
+      "sha256": "971118a421d7d8e6e6117273eb67aec157651fd9c927998e5978ace40e46fe0a",
+      "bytes": 120044,
+      "duration_seconds": 2.5,
+      "generated_at": "2026-11-27T22:55:30.915Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 49,
+        "output_tokens": 100
+      },
+      "estimated_usd": 0.0020294
+    },
+    {
+      "lang": "ru",
+      "id": "r2NeedClarification",
+      "text": "Можете уточнить, что имеете в виду?",
+      "url": "/audio/assistant/v1/phrases/ru-r2NeedClarification.wav",
+      "transcript": "Можете уточнить, что имеете в виду?",
+      "sha256": "3e29cb834ea7ee18765ce2fc6e3372f146fd94f3814f0ff2dda115149c33269c",
+      "bytes": 124844,
+      "duration_seconds": 2.6,
+      "generated_at": "2026-11-27T22:55:33.714Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 114
+      },
+      "estimated_usd": 0.0023118
+    },
+    {
+      "lang": "en",
+      "id": "r2WhichArtwork",
+      "text": "Which artwork? Please tell me its number.",
+      "url": "/audio/assistant/v1/phrases/en-r2WhichArtwork.wav",
+      "transcript": "Which artwork? Please tell me its number.",
+      "sha256": "ae87117970bb336cb238f57fb9b1f0a1e6741588e4f258512dc32fc69cf1ee20",
+      "bytes": 117644,
+      "duration_seconds": 2.45,
+      "generated_at": "2026-11-27T22:55:36.712Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 146
+      },
+      "estimated_usd": 0.0029506
+    },
+    {
+      "lang": "ru",
+      "id": "r2WhichArtwork",
+      "text": "О какой работе речь? Назовите её номер.",
+      "url": "/audio/assistant/v1/phrases/ru-r2WhichArtwork.wav",
+      "transcript": "О какой работе речь? Назовите её номер.",
+      "sha256": "da02d71b36baa5423c17a321d944ad687dfb727437dc085e97bc9eb1cad22914",
+      "bytes": 141644,
+      "duration_seconds": 2.95,
+      "generated_at": "2026-11-27T22:55:39.765Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 122
+      },
+      "estimated_usd": 0.0024718
+    },
+    {
+      "lang": "en",
+      "id": "r2ArtworkNumber",
+      "text": "Please give the artwork number from its page.",
+      "url": "/audio/assistant/v1/phrases/en-r2ArtworkNumber.wav",
+      "transcript": "Please give the artwork number from its page.",
+      "sha256": "18d0cce02b42e4bd36feb00b530d056d8d590186f9fc541c8431c5dcb08bc538",
+      "bytes": 132044,
+      "duration_seconds": 2.75,
+      "generated_at": "2026-11-27T22:55:42.599Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 110
+      },
+      "estimated_usd": 0.0022306
+    },
+    {
+      "lang": "ru",
+      "id": "r2ArtworkNumber",
+      "text": "Назовите номер произведения с его страницы.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ArtworkNumber.wav",
+      "transcript": "Назовите номер произведения с его страницы.",
+      "sha256": "686fde85a71a6adbb951a98e1633d90a9868db20446c998dae3a9cc297a1977c",
+      "bytes": 160844,
+      "duration_seconds": 3.35,
+      "generated_at": "2026-11-27T22:55:45.349Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 111
+      },
+      "estimated_usd": 0.0022511999999999996
+    },
+    {
+      "lang": "en",
+      "id": "r2WhichPage",
+      "text": "Which section would you like to open?",
+      "url": "/audio/assistant/v1/phrases/en-r2WhichPage.wav",
+      "transcript": "Which section would you like to open?",
+      "sha256": "160b595d242e002ef64046ba82b7e5499f2504fdee0c585da05c5439562163b0",
+      "bytes": 120044,
+      "duration_seconds": 2.5,
+      "generated_at": "2026-11-27T22:55:48.149Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 50,
+        "output_tokens": 119
+      },
+      "estimated_usd": 0.00241
+    },
+    {
+      "lang": "ru",
+      "id": "r2WhichPage",
+      "text": "Какой раздел хотите открыть?",
+      "url": "/audio/assistant/v1/phrases/ru-r2WhichPage.wav",
+      "transcript": "Какой раздел хотите открыть?",
+      "sha256": "432a634182a769c4d0157706049af8d33a6f060a8ca858ca65c2a6b1a5440a40",
+      "bytes": 93644,
+      "duration_seconds": 1.95,
+      "generated_at": "2026-11-27T22:55:51.037Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 48,
+        "output_tokens": 75
+      },
+      "estimated_usd": 0.0015287999999999999
+    },
+    {
+      "lang": "en",
+      "id": "r2ChooseGallery",
+      "text": "Would you like the gallery, marketplace, or your collection?",
+      "url": "/audio/assistant/v1/phrases/en-r2ChooseGallery.wav",
+      "transcript": "Would you like the gallery, marketplace, or your collection?",
+      "sha256": "b5cafc7a37dec126a3048f5ac0194e5b852f9e30f10fb6a1a9ecc8f7bea25da8",
+      "bytes": 168044,
+      "duration_seconds": 3.5,
+      "generated_at": "2026-11-27T22:55:53.787Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 117
+      },
+      "estimated_usd": 0.0023724
+    },
+    {
+      "lang": "ru",
+      "id": "r2ChooseGallery",
+      "text": "Открыть галерею, маркетплейс или вашу коллекцию?",
+      "url": "/audio/assistant/v1/phrases/ru-r2ChooseGallery.wav",
+      "transcript": "Открыть галерею, маркетплейс или вашу коллекцию?",
+      "sha256": "1e4bba8368dbea74c2ad66132ecd9a2886d3dd0fad9ea62735d3372c8cb19b83",
+      "bytes": 175244,
+      "duration_seconds": 3.65,
+      "generated_at": "2026-11-27T22:55:56.592Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 117
+      },
+      "estimated_usd": 0.0023748000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2CanOpenPage",
+      "text": "I can open the page for you without touching your wallet.",
+      "url": "/audio/assistant/v1/phrases/en-r2CanOpenPage.wav",
+      "transcript": "I can open the page for you without touching your wallet.",
+      "sha256": "3ab7d414e50f1dcfc4716c1d310ae34f872f923818c8d5ed39e85b76d80d6295",
+      "bytes": 168044,
+      "duration_seconds": 3.5,
+      "generated_at": "2026-11-27T22:55:59.544Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 110
+      },
+      "estimated_usd": 0.0022324000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2CanOpenPage",
+      "text": "Могу открыть страницу без действий с вашим кошельком.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CanOpenPage.wav",
+      "transcript": "Могу открыть страницу без действий с вашим кошельком.",
+      "sha256": "c2943e8eb61e92d4b2e512165f89a7093f821a880bc4cc35b952609076184bb3",
+      "bytes": 180044,
+      "duration_seconds": 3.75,
+      "generated_at": "2026-11-27T22:56:02.351Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 118
+      },
+      "estimated_usd": 0.0023924000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2PageOpened",
+      "text": "The ArtSoul page has opened. What next?",
+      "url": "/audio/assistant/v1/phrases/en-r2PageOpened.wav",
+      "transcript": "The ArtSoul page has opened. What next?",
+      "sha256": "31ebdc5f712d4adbfbb239e08cab809664b15be1e2812eb134a41aced4f65d74",
+      "bytes": 144044,
+      "duration_seconds": 3,
+      "generated_at": "2026-11-27T22:56:05.294Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 106
+      },
+      "estimated_usd": 0.0021512
+    },
+    {
+      "lang": "ru",
+      "id": "r2PageOpened",
+      "text": "Страница ArtSoul открыта. Что дальше?",
+      "url": "/audio/assistant/v1/phrases/ru-r2PageOpened.wav",
+      "transcript": "Страница ArtSoul открыта. Что дальше?",
+      "sha256": "76bd8310fde67b9dd008a82449fd9af804716b95200376b29db486fabce472f9",
+      "bytes": 163244,
+      "duration_seconds": 3.4,
+      "generated_at": "2026-11-27T22:56:08.250Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 109
+      },
+      "estimated_usd": 0.0022112
+    },
+    {
+      "lang": "en",
+      "id": "r2FoundNoData",
+      "text": "I do not have verified information for that request.",
+      "url": "/audio/assistant/v1/phrases/en-r2FoundNoData.wav",
+      "transcript": "I do not have verified information for that request.",
+      "sha256": "dd74b6caa0f121cc71e7361833e8de9adbd6f2f34f89a178a7fd65f56eabd4fb",
+      "bytes": 146444,
+      "duration_seconds": 3.05,
+      "generated_at": "2026-11-27T22:56:11.070Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 85
+      },
+      "estimated_usd": 0.0017312
+    },
+    {
+      "lang": "ru",
+      "id": "r2FoundNoData",
+      "text": "У меня нет проверенных данных по этому запросу.",
+      "url": "/audio/assistant/v1/phrases/ru-r2FoundNoData.wav",
+      "transcript": "У меня нет проверенных данных по этому запросу.",
+      "sha256": "dcc4c1ffd9efd1f1c85609d8281fa8090f4b7babeda1851248e635266e77976e",
+      "bytes": 141644,
+      "duration_seconds": 2.95,
+      "generated_at": "2026-11-27T22:56:13.750Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 99
+      },
+      "estimated_usd": 0.0020118
+    },
+    {
+      "lang": "en",
+      "id": "r2NotFound",
+      "text": "That artwork was not found in the available ArtSoul results.",
+      "url": "/audio/assistant/v1/phrases/en-r2NotFound.wav",
+      "transcript": "That artwork was not found in the available ArtSoul results.",
+      "sha256": "993acd1397c152d5ffc76320391897f89acb7f522fe9a1c0b81a7141b0ff89ae",
+      "bytes": 192044,
+      "duration_seconds": 4,
+      "generated_at": "2026-11-27T22:56:16.613Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 122
+      },
+      "estimated_usd": 0.0024724
+    },
+    {
+      "lang": "ru",
+      "id": "r2NotFound",
+      "text": "В доступных результатах ArtSoul такая работа не найдена.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NotFound.wav",
+      "transcript": "В доступных результатах ArtSoul такая работа не найдена.",
+      "sha256": "cbd6b3d35e59ffe4c921842f77fee269bc531a3a981bda3c36ada184c50ada97",
+      "bytes": 235244,
+      "duration_seconds": 4.9,
+      "generated_at": "2026-11-27T22:56:19.612Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 155
+      },
+      "estimated_usd": 0.003133
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchAgain",
+      "text": "Would you like to try another title or artwork number?",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchAgain.wav",
+      "transcript": "Would you like to try another title or artwork number?",
+      "sha256": "5a5c4beb0b1abaa238342730633b3b89ae206906dc61bdc4a36295c9830028d0",
+      "bytes": 153644,
+      "duration_seconds": 3.2,
+      "generated_at": "2026-11-27T22:56:22.551Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 103
+      },
+      "estimated_usd": 0.0020918
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchAgain",
+      "text": "Попробуем другое название или номер работы?",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchAgain.wav",
+      "transcript": "Попробуем другое название или номер работы?",
+      "sha256": "7b0e653dd44cd439deb7a8a22ec29d059c611d59bc1f393d9222afce37280461",
+      "bytes": 156044,
+      "duration_seconds": 3.25,
+      "generated_at": "2026-11-27T23:08:11.968Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 83,
+        "output_tokens": 113
+      },
+      "estimated_usd": 0.0023098000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchPrompt",
+      "text": "What should I search for? A title, artist, or artwork number?",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchPrompt.wav",
+      "transcript": "What should I search for? A title, artist, or artwork number?",
+      "sha256": "0942df69a1830cf16d9b162c373f385a03bca7e0234332146db4aba0e82cb5ff",
+      "bytes": 206444,
+      "duration_seconds": 4.3,
+      "generated_at": "2026-11-27T22:56:28.113Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 57,
+        "output_tokens": 129
+      },
+      "estimated_usd": 0.0026141999999999997
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchPrompt",
+      "text": "Что искать: название, автора или номер работы?",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchPrompt.wav",
+      "transcript": "Что искать: название, автора или номер работы?",
+      "sha256": "e05d9c0d0ceb41524a39cc092a58cd6fc45f94e3ec694d8fa9f1028fdfcf12b6",
+      "bytes": 172844,
+      "duration_seconds": 3.6,
+      "generated_at": "2026-11-27T22:56:30.947Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 113
+      },
+      "estimated_usd": 0.0022911999999999997
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchWorking",
+      "text": "I'll look for that in the ArtSoul catalog.",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchWorking.wav",
+      "transcript": "I'll look for that in the ArtSoul catalog.",
+      "sha256": "c645fd7e325cba42b2de1b9f7bbc10e6a4116dbafcaf72e43f7a6cb742a8eae1",
+      "bytes": 115244,
+      "duration_seconds": 2.4,
+      "generated_at": "2026-11-27T22:56:34.087Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 81
+      },
+      "estimated_usd": 0.0016512
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchWorking",
+      "text": "Поищу это в каталоге ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchWorking.wav",
+      "transcript": "Поищу это в каталоге ArtSoul.",
+      "sha256": "9859a8ba8ab1885a78dd239b2f54558ed0b0c47072454445a04dcc9538d225b4",
+      "bytes": 132044,
+      "duration_seconds": 2.75,
+      "generated_at": "2026-11-27T22:56:36.871Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 99
+      },
+      "estimated_usd": 0.0020112
+    },
+    {
+      "lang": "en",
+      "id": "r2ShowOpenAuctions",
+      "text": "I'll check the auctions that are currently open.",
+      "url": "/audio/assistant/v1/phrases/en-r2ShowOpenAuctions.wav",
+      "transcript": "I'll check the auctions that are currently open.",
+      "sha256": "2c952b670409afb9fc2a545252e648ab55f31463b5504be745c6f9d90fee6f3a",
+      "bytes": 122444,
+      "duration_seconds": 2.55,
+      "generated_at": "2026-11-27T22:56:39.614Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 102
+      },
+      "estimated_usd": 0.0020705999999999997
+    },
+    {
+      "lang": "ru",
+      "id": "r2ShowOpenAuctions",
+      "text": "Проверю аукционы, которые сейчас открыты.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ShowOpenAuctions.wav",
+      "transcript": "Проверю аукционы, которые сейчас открыты.",
+      "sha256": "fb5b1fedd82ab2918dfa738091aeb5fee486b05db0a015ddcd751c1100a0037d",
+      "bytes": 136844,
+      "duration_seconds": 2.85,
+      "generated_at": "2026-11-27T22:56:42.552Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 99
+      },
+      "estimated_usd": 0.002013
+    },
+    {
+      "lang": "en",
+      "id": "r2CompareDeadlines",
+      "text": "I'll compare their published auction deadlines.",
+      "url": "/audio/assistant/v1/phrases/en-r2CompareDeadlines.wav",
+      "transcript": "I'll compare their published auction deadlines.",
+      "sha256": "bc0c7084b1e7c69647fcf4e40a58dde43999a989e8777a0fb0c4a65df2097c6f",
+      "bytes": 129644,
+      "duration_seconds": 2.7,
+      "generated_at": "2026-11-27T22:56:45.398Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 49,
+        "output_tokens": 94
+      },
+      "estimated_usd": 0.0019094000000000001
+    },
+    {
+      "lang": "ru",
+      "id": "r2CompareDeadlines",
+      "text": "Сравню указанные сроки завершения этих аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CompareDeadlines.wav",
+      "transcript": "Сравню указанные сроки завершения этих аукционов.",
+      "sha256": "01c1dad21b734ae0b8ea40f995bab70ae2cec2b48a438f378d80e2e545c21c70",
+      "bytes": 175244,
+      "duration_seconds": 3.65,
+      "generated_at": "2026-11-27T22:56:48.203Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 114
+      },
+      "estimated_usd": 0.0023136
+    },
+    {
+      "lang": "en",
+      "id": "r2NeedAuctionList",
+      "text": "First ask for the current list of open auctions.",
+      "url": "/audio/assistant/v1/phrases/en-r2NeedAuctionList.wav",
+      "transcript": "First ask for the current list of open auctions.",
+      "sha256": "e47059e77721a662eb680be57afbe105365272aab533d6f950a3b36dd0ba397f",
+      "bytes": 151244,
+      "duration_seconds": 3.15,
+      "generated_at": "2026-11-27T22:56:51.113Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 121
+      },
+      "estimated_usd": 0.0024511999999999997
+    },
+    {
+      "lang": "ru",
+      "id": "r2NeedAuctionList",
+      "text": "Сначала получите текущий список аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NeedAuctionList.wav",
+      "transcript": "Сначала получите текущий список аукционов.",
+      "sha256": "1d18a42e1358066f67ddd8255093da4bd36cf6f853b4cee03f10eb78fdbb10c3",
+      "bytes": 163244,
+      "duration_seconds": 3.4,
+      "generated_at": "2026-11-27T22:56:53.960Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 115
+      },
+      "estimated_usd": 0.0023318
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionStatus",
+      "text": "I'll check the current auction status from ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionStatus.wav",
+      "transcript": "I'll check the current auction status from ArtSoul.",
+      "sha256": "e6d59328118c00f327b6c659bee3f69baf761f5f969b3170267c71ce8f20e92d",
+      "bytes": 136844,
+      "duration_seconds": 2.85,
+      "generated_at": "2026-11-27T22:56:56.793Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 102
+      },
+      "estimated_usd": 0.0020711999999999996
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionStatus",
+      "text": "Проверю текущий статус аукциона по данным ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionStatus.wav",
+      "transcript": "Проверю текущий статус аукциона по данным ArtSoul.",
+      "sha256": "3fe7c8c9c09b1aee93725c5c0348fa1080a3ae11521835c745f4e74fc5e1c99c",
+      "bytes": 175244,
+      "duration_seconds": 3.65,
+      "generated_at": "2026-11-27T22:56:59.508Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 57,
+        "output_tokens": 123
+      },
+      "estimated_usd": 0.0024942
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionEnded",
+      "text": "An ended auction does not automatically mean the NFT has been minted.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionEnded.wav",
+      "transcript": "An ended auction does not automatically mean the NFT has been minted.",
+      "sha256": "10906d47139994cb062e34718c9aa7f665d22447f720ddaf00db0917f43d5608",
+      "bytes": 196844,
+      "duration_seconds": 4.1,
+      "generated_at": "2026-11-27T22:57:02.611Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 125
+      },
+      "estimated_usd": 0.002533
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionEnded",
+      "text": "Завершение аукциона не означает, что NFT уже создан.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionEnded.wav",
+      "transcript": "Завершение аукциона не означает, что NFT уже создан.",
+      "sha256": "e9df8aff16b8e4884b8d31400c97357465dab61d59b7f44efc0164be30011832",
+      "bytes": 223244,
+      "duration_seconds": 4.65,
+      "generated_at": "2026-11-27T22:57:05.585Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 146
+      },
+      "estimated_usd": 0.0029548
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionSettle",
+      "text": "The winner must complete settlement under the contract rules before an NFT is minted.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionSettle.wav",
+      "transcript": "The winner must complete settlement under the contract rules before an NFT is minted.",
+      "sha256": "2b2463d96e9cf33985645f9973a74b20dc3c2366bcf7cd0d01b0e677db47f434",
+      "bytes": 288044,
+      "duration_seconds": 6,
+      "generated_at": "2026-11-27T22:57:08.799Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 57,
+        "output_tokens": 167
+      },
+      "estimated_usd": 0.0033742
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionSettle",
+      "text": "Победитель должен завершить расчёт по правилам контракта, прежде чем будет создан NFT.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionSettle.wav",
+      "transcript": "Победитель должен завершить расчёт по правилам контракта, прежде чем будет создан NFT.",
+      "sha256": "ef128f6db996368fd69a2ccf7f1e1cdb3cb57d5a44dcb027a4d270bde9019dd1",
+      "bytes": 285644,
+      "duration_seconds": 5.95,
+      "generated_at": "2026-11-27T22:57:11.918Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 64,
+        "output_tokens": 173
+      },
+      "estimated_usd": 0.0034984
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAuctionAssumption",
+      "text": "I cannot assume an auction is live without checking the source.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAuctionAssumption.wav",
+      "transcript": "I cannot assume an auction is live without checking the source.",
+      "sha256": "9ae8125ad00b1284ac7a247bd6a31a5aadd016a34cedb402cbd21597206964a6",
+      "bytes": 213644,
+      "duration_seconds": 4.45,
+      "generated_at": "2026-11-27T22:57:14.966Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 145
+      },
+      "estimated_usd": 0.0029324
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAuctionAssumption",
+      "text": "Не могу считать аукцион открытым, пока не проверю источник данных.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAuctionAssumption.wav",
+      "transcript": "Не могу считать аукцион открытым, пока не проверю источник данных.",
+      "sha256": "4e7dc929bdf5f965bad82f42d2da4d542ad319c592e63962ac5c0f0feeef4d1f",
+      "bytes": 194444,
+      "duration_seconds": 4.05,
+      "generated_at": "2026-11-27T22:57:17.815Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 127
+      },
+      "estimated_usd": 0.0025748000000000004
+    },
+    {
+      "lang": "en",
+      "id": "r2OwnerCheck",
+      "text": "I'll check creator, first collector, and current owner separately.",
+      "url": "/audio/assistant/v1/phrases/en-r2OwnerCheck.wav",
+      "transcript": "I'll check creator, first collector, and current owner separately.",
+      "sha256": "3113126d183ee93962cea2f96d84307a241d3eb5a72ecfde4ba69613d76bb069",
+      "bytes": 192044,
+      "duration_seconds": 4,
+      "generated_at": "2026-11-27T22:57:20.633Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 126
+      },
+      "estimated_usd": 0.0025524000000000002
+    },
+    {
+      "lang": "ru",
+      "id": "r2OwnerCheck",
+      "text": "Проверю отдельно автора, первого коллекционера и текущего владельца.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OwnerCheck.wav",
+      "transcript": "Проверю отдельно автора, первого коллекционера и текущего владельца.",
+      "sha256": "e0d35e2a547c941b0d3a676b65cc949ede73c33b00a8175530ec177d321f1ef6",
+      "bytes": 213644,
+      "duration_seconds": 4.45,
+      "generated_at": "2026-11-27T22:57:23.536Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 134
+      },
+      "estimated_usd": 0.0027148000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2OwnerNumber",
+      "text": "Please give the artwork number to check ownership.",
+      "url": "/audio/assistant/v1/phrases/en-r2OwnerNumber.wav",
+      "transcript": "Please give the artwork number to check ownership.",
+      "sha256": "73191a42d04b41a8ff3c924a244d7c985a981e29d662c98201e0d3ed62606a39",
+      "bytes": 144044,
+      "duration_seconds": 3,
+      "generated_at": "2026-11-27T22:57:26.856Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 104
+      },
+      "estimated_usd": 0.0021106
+    },
+    {
+      "lang": "ru",
+      "id": "r2OwnerNumber",
+      "text": "Назовите номер работы, чтобы проверить владельца.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OwnerNumber.wav",
+      "transcript": "Назовите номер работы, чтобы проверить владельца.",
+      "sha256": "691514dd8ee83de6ea496c69779ea030d4d5cdf6f321451b237a85958e9fb217",
+      "bytes": 175244,
+      "duration_seconds": 3.65,
+      "generated_at": "2026-11-27T22:57:29.781Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 113
+      },
+      "estimated_usd": 0.0022918
+    },
+    {
+      "lang": "en",
+      "id": "r2OwnerUnknown",
+      "text": "ArtSoul has not confirmed an owner for this item.",
+      "url": "/audio/assistant/v1/phrases/en-r2OwnerUnknown.wav",
+      "transcript": "ArtSoul has not confirmed an owner for this item.",
+      "sha256": "c77da4d5e35ef3b0c35e358c62e49b41b10fc7c2feaf91075e502a84927572b9",
+      "bytes": 134444,
+      "duration_seconds": 2.8,
+      "generated_at": "2026-11-27T22:57:32.766Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 94
+      },
+      "estimated_usd": 0.0019118
+    },
+    {
+      "lang": "ru",
+      "id": "r2OwnerUnknown",
+      "text": "ArtSoul пока не подтвердил владельца этой работы.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OwnerUnknown.wav",
+      "transcript": "ArtSoul пока не подтвердил владельца этой работы.",
+      "sha256": "a3978715673d805c12a7e2c56cefdfa414fa3d65e6cbd5ae1b7d562088147ca9",
+      "bytes": 168044,
+      "duration_seconds": 3.5,
+      "generated_at": "2026-11-27T22:57:35.664Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 116
+      },
+      "estimated_usd": 0.0023518000000000002
+    },
+    {
+      "lang": "en",
+      "id": "r2Provenance",
+      "text": "Creator, First Collector, and current Owner are distinct roles.",
+      "url": "/audio/assistant/v1/phrases/en-r2Provenance.wav",
+      "transcript": "Creator, First Collector, and current Owner are distinct roles.",
+      "sha256": "0103efd8e9bd07797df7d67903d5c094b7b962450eda6675786cd5f35bcd97d4",
+      "bytes": 235244,
+      "duration_seconds": 4.9,
+      "generated_at": "2026-11-27T22:57:38.747Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 139
+      },
+      "estimated_usd": 0.0028124
+    },
+    {
+      "lang": "ru",
+      "id": "r2Provenance",
+      "text": "Автор, первый коллекционер и текущий владелец — разные роли.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Provenance.wav",
+      "transcript": "Автор, первый коллекционер и текущий владелец — разные роли.",
+      "sha256": "f183e3e47240f309dc21e414d25ed446aeb3db0fecca0c74e562726f54194d6a",
+      "bytes": 256844,
+      "duration_seconds": 5.35,
+      "generated_at": "2026-11-27T23:08:10.121Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 89,
+        "output_tokens": 185
+      },
+      "estimated_usd": 0.0037534
+    },
+    {
+      "lang": "en",
+      "id": "r2Details",
+      "text": "I'll retrieve the published artwork details.",
+      "url": "/audio/assistant/v1/phrases/en-r2Details.wav",
+      "transcript": "I'll retrieve the published artwork details.",
+      "sha256": "d764f1f63bbf9640de25502f157ccd23b4852f48224cab58cbbc42de4828d984",
+      "bytes": 134444,
+      "duration_seconds": 2.8,
+      "generated_at": "2026-11-27T22:57:44.888Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 49,
+        "output_tokens": 94
+      },
+      "estimated_usd": 0.0019094000000000001
+    },
+    {
+      "lang": "ru",
+      "id": "r2Details",
+      "text": "Получу опубликованные сведения о произведении.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Details.wav",
+      "transcript": "Получу опубликованные сведения о произведении.",
+      "sha256": "769d99a5473beb812efe8a1edbd23c551d4c90d4b0f9e667eaaf064236f77fea",
+      "bytes": 146444,
+      "duration_seconds": 3.05,
+      "generated_at": "2026-11-27T22:57:47.629Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 104
+      },
+      "estimated_usd": 0.0021106
+    },
+    {
+      "lang": "en",
+      "id": "r2NoInvention",
+      "text": "I will not invent prices, balances, owners, or transactions.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoInvention.wav",
+      "transcript": "I will not invent prices, balances, owners, or transactions.",
+      "sha256": "a1a7d1c131a4f7fd69d5c7bc2fa67aea03f09015324356bd8a6907936bc01c8c",
+      "bytes": 261644,
+      "duration_seconds": 5.45,
+      "generated_at": "2026-11-27T22:57:50.465Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 160
+      },
+      "estimated_usd": 0.003233
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoInvention",
+      "text": "Я не буду придумывать цены, балансы, владельцев или транзакции.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoInvention.wav",
+      "transcript": "Я не буду придумывать цены, балансы, владельцев или транзакции.",
+      "sha256": "95d806247e42ac4a6f5125a20e6b20aec983635381109bfadd87133bfdc4fdfa",
+      "bytes": 264044,
+      "duration_seconds": 5.5,
+      "generated_at": "2026-11-27T22:57:53.513Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 60,
+        "output_tokens": 159
+      },
+      "estimated_usd": 0.003216
+    },
+    {
+      "lang": "en",
+      "id": "r2BidPreview",
+      "text": "I can help prepare a bid preview, but not sign it.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidPreview.wav",
+      "transcript": "I can help prepare a bid preview, but not sign it.",
+      "sha256": "ac497e06d3faafe3ab3c3d583a44b4d468f52ff10af6891b4787f66153996073",
+      "bytes": 134444,
+      "duration_seconds": 2.8,
+      "generated_at": "2026-11-27T22:57:56.645Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 102
+      },
+      "estimated_usd": 0.002073
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidPreview",
+      "text": "Могу помочь подготовить ставку к просмотру, но не подписывать её.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidPreview.wav",
+      "transcript": "Могу помочь подготовить ставку к просмотру, но не подписывать её.",
+      "sha256": "53c1e2a1330104cebe0679b8964540ca37e488b891a430b055a2de5b0c953764",
+      "bytes": 206444,
+      "duration_seconds": 4.3,
+      "generated_at": "2026-11-27T22:57:59.846Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 59,
+        "output_tokens": 136
+      },
+      "estimated_usd": 0.0027554000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2BidNumber",
+      "text": "Please name the artwork. Nothing will be signed.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidNumber.wav",
+      "transcript": "Please name the artwork. Nothing will be signed.",
+      "sha256": "311904a680477e846ab343ba484f3448451e14583eb93dfb2849909c9d3daeb4",
+      "bytes": 168044,
+      "duration_seconds": 3.5,
+      "generated_at": "2026-11-27T22:58:03.006Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 109
+      },
+      "estimated_usd": 0.0022112
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidNumber",
+      "text": "Назовите номер работы. Подписывать ничего не нужно.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidNumber.wav",
+      "transcript": "Назовите номер работы. Подписывать ничего не нужно.",
+      "sha256": "f0c9beb9a21fec8374b617efdab4003dcc954bc2de7d577a07242692f5b8d472",
+      "bytes": 168044,
+      "duration_seconds": 3.5,
+      "generated_at": "2026-11-27T22:58:05.920Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 113
+      },
+      "estimated_usd": 0.002293
+    },
+    {
+      "lang": "en",
+      "id": "r2BidReview",
+      "text": "The final amount must be reviewed by you on the ArtSoul page.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidReview.wav",
+      "transcript": "The final amount must be reviewed by you on the ArtSoul page.",
+      "sha256": "85067867e3a5597aa91ecc320612d154fba7aafe752b05ad9432ea0474b99343",
+      "bytes": 199244,
+      "duration_seconds": 4.15,
+      "generated_at": "2026-11-27T22:58:08.801Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 122
+      },
+      "estimated_usd": 0.0024736
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidReview",
+      "text": "Итоговую сумму нужно лично проверить на странице ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidReview.wav",
+      "transcript": "Итоговую сумму нужно лично проверить на странице ArtSoul.",
+      "sha256": "3fd57a09fcd57cd77de8cf2f12ff292595aac0f3cd870885588b1c4eec9c742a",
+      "bytes": 204044,
+      "duration_seconds": 4.25,
+      "generated_at": "2026-11-27T22:58:11.641Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 128
+      },
+      "estimated_usd": 0.002593
+    },
+    {
+      "lang": "en",
+      "id": "r2BidWallet",
+      "text": "Only your connected wallet can request your signature.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidWallet.wav",
+      "transcript": "Only your connected wallet can request your signature.",
+      "sha256": "59bb327e9d19bfe5262731c0001258e8879914d4362498d8371edc5bb1bce558",
+      "bytes": 139244,
+      "duration_seconds": 2.9,
+      "generated_at": "2026-11-27T22:58:14.484Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 97
+      },
+      "estimated_usd": 0.0019706
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidWallet",
+      "text": "Только подключённый кошелёк может запросить у вас подпись.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidWallet.wav",
+      "transcript": "Только подключённый кошелёк может запросить у вас подпись.",
+      "sha256": "e93bd3d247c3815a1dd99d5b230d034a349af4cd54de876654cc1a4a890c3e91",
+      "bytes": 182444,
+      "duration_seconds": 3.8,
+      "generated_at": "2026-11-27T22:58:17.301Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 59,
+        "output_tokens": 128
+      },
+      "estimated_usd": 0.0025954
+    },
+    {
+      "lang": "en",
+      "id": "r2BidNoConfirm",
+      "text": "I will not confirm or sign a transaction for you.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidNoConfirm.wav",
+      "transcript": "I will not confirm or sign a transaction for you.",
+      "sha256": "b5db3820c1c2aca2be812ee98e047518ea24307b0c0f9631609994135c005237",
+      "bytes": 153644,
+      "duration_seconds": 3.2,
+      "generated_at": "2026-11-27T22:58:20.246Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 101
+      },
+      "estimated_usd": 0.0020518000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidNoConfirm",
+      "text": "Я не буду подтверждать или подписывать за вас транзакцию.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidNoConfirm.wav",
+      "transcript": "Я не буду подтверждать или подписывать за вас транзакцию.",
+      "sha256": "1de2f6fe4972e352eb0978ab6c0a93487b50ead5685d60896702b9d4514695a6",
+      "bytes": 165644,
+      "duration_seconds": 3.45,
+      "generated_at": "2026-11-27T22:58:23.115Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 118
+      },
+      "estimated_usd": 0.0023936
+    },
+    {
+      "lang": "en",
+      "id": "r2NeedAmount",
+      "text": "Please say the exact amount and artwork number before reviewing a bid.",
+      "url": "/audio/assistant/v1/phrases/en-r2NeedAmount.wav",
+      "transcript": "Please say the exact amount and artwork number before reviewing a bid.",
+      "sha256": "0b6b49acfcf935965dbba50672ed352f960f9bf98afe89c56fad549fd2c3aadb",
+      "bytes": 230444,
+      "duration_seconds": 4.8,
+      "generated_at": "2026-11-27T22:58:26.160Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 146
+      },
+      "estimated_usd": 0.002953
+    },
+    {
+      "lang": "ru",
+      "id": "r2NeedAmount",
+      "text": "Назовите точную сумму и номер работы перед просмотром ставки.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NeedAmount.wav",
+      "transcript": "Назовите точную сумму и номер работы перед просмотром ставки.",
+      "sha256": "5cca8349bb44ac53a406045f989246030a71f7a719750e1870a78b33c1c7fc69",
+      "bytes": 216044,
+      "duration_seconds": 4.5,
+      "generated_at": "2026-11-27T22:58:29.185Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 134
+      },
+      "estimated_usd": 0.0027136
+    },
+    {
+      "lang": "en",
+      "id": "r2ChangedWallet",
+      "text": "Your wallet changed, so the previous action is no longer valid.",
+      "url": "/audio/assistant/v1/phrases/en-r2ChangedWallet.wav",
+      "transcript": "Your wallet changed, so the previous action is no longer valid.",
+      "sha256": "bb7b4ec7a5758c5f56c23a725a7c6442ffb858f2f6f59129cc1d74b5f2a0f8ae",
+      "bytes": 180044,
+      "duration_seconds": 3.75,
+      "generated_at": "2026-11-27T22:58:32.400Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 114
+      },
+      "estimated_usd": 0.002313
+    },
+    {
+      "lang": "ru",
+      "id": "r2ChangedWallet",
+      "text": "Кошелёк изменился, поэтому прежнее действие больше не действует.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ChangedWallet.wav",
+      "transcript": "Кошелёк изменился, поэтому прежнее действие больше не действует.",
+      "sha256": "8ffcd78684688f258ee52d30c0c8b53a6fb574767ed7a4cc34be1ea78572ec71",
+      "bytes": 216044,
+      "duration_seconds": 4.5,
+      "generated_at": "2026-11-27T22:58:35.351Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 136
+      },
+      "estimated_usd": 0.0027548000000000004
+    },
+    {
+      "lang": "en",
+      "id": "r2WalletDisconnected",
+      "text": "No wallet is connected. Read-only features are still available.",
+      "url": "/audio/assistant/v1/phrases/en-r2WalletDisconnected.wav",
+      "transcript": "No wallet is connected. Read-only features are still available.",
+      "sha256": "d0c8a7efcf2efd99a1c60c6226e951e9f10dacef13cf2bfa1e482498fd0627fd",
+      "bytes": 206444,
+      "duration_seconds": 4.3,
+      "generated_at": "2026-11-27T22:58:38.357Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 127
+      },
+      "estimated_usd": 0.0025724000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2WalletDisconnected",
+      "text": "Кошелёк не подключён. Просмотр данных по-прежнему доступен.",
+      "url": "/audio/assistant/v1/phrases/ru-r2WalletDisconnected.wav",
+      "transcript": "Кошелёк не подключён. Просмотр данных по-прежнему доступен.",
+      "sha256": "b46bed76ab1e94d9612afde978a3cc32f7cda6cf478978850dc42db109d190f8",
+      "bytes": 213644,
+      "duration_seconds": 4.45,
+      "generated_at": "2026-11-27T22:58:41.351Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 61,
+        "output_tokens": 140
+      },
+      "estimated_usd": 0.0028366
+    },
+    {
+      "lang": "en",
+      "id": "r2NoWalletKeys",
+      "text": "I never need your seed phrase or private key.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoWalletKeys.wav",
+      "transcript": "I never need your seed phrase or private key.",
+      "sha256": "d66e388d7b40a8f86f12fbe840c31029b24b1665143f41ed3115486951d80f64",
+      "bytes": 134444,
+      "duration_seconds": 2.8,
+      "generated_at": "2026-11-27T22:58:44.404Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 97
+      },
+      "estimated_usd": 0.0019712
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoWalletKeys",
+      "text": "Мне никогда не нужны ваша сид-фраза или приватный ключ.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoWalletKeys.wav",
+      "transcript": "Мне никогда не нужны ваша сид-фраза или приватный ключ.",
+      "sha256": "c85cdfb4f7ae8d694704fa22df048f935be8dd82227c57a9b23a8443b7652c94",
+      "bytes": 180044,
+      "duration_seconds": 3.75,
+      "generated_at": "2026-11-27T22:58:47.232Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 122
+      },
+      "estimated_usd": 0.0024736
+    },
+    {
+      "lang": "en",
+      "id": "r2ReviewRequired",
+      "text": "This action needs your explicit review and your wallet's confirmation.",
+      "url": "/audio/assistant/v1/phrases/en-r2ReviewRequired.wav",
+      "transcript": "This action needs your explicit review and your wallet's confirmation.",
+      "sha256": "9487e1f36810d9c34e1b8237dc625aced356f7e96988fe12858c57cae2f04eb6",
+      "bytes": 201644,
+      "duration_seconds": 4.2,
+      "generated_at": "2026-11-27T22:58:50.426Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 125
+      },
+      "estimated_usd": 0.0025324
+    },
+    {
+      "lang": "ru",
+      "id": "r2ReviewRequired",
+      "text": "Для этого действия требуются ваша проверка и подтверждение в кошельке.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ReviewRequired.wav",
+      "transcript": "Для этого действия требуются ваша проверка и подтверждение в кошельке.",
+      "sha256": "1e9b2cf838744329c1b654ee5eb5fe8f547e7e9196dec1b3badfd82eadb06575",
+      "bytes": 184844,
+      "duration_seconds": 3.85,
+      "generated_at": "2026-11-27T22:58:53.404Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 129
+      },
+      "estimated_usd": 0.0026148
+    },
+    {
+      "lang": "en",
+      "id": "r2ApprovalDeclined",
+      "text": "The action was not approved. Nothing has been submitted.",
+      "url": "/audio/assistant/v1/phrases/en-r2ApprovalDeclined.wav",
+      "transcript": "The action was not approved. Nothing has been submitted.",
+      "sha256": "feaffc127bfeb3bc42de68d1d3673d420d4163776495d9bd65a8c67009c6689c",
+      "bytes": 165644,
+      "duration_seconds": 3.45,
+      "generated_at": "2026-11-27T22:58:56.238Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 109
+      },
+      "estimated_usd": 0.0022118000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2ApprovalDeclined",
+      "text": "Действие не одобрено. Ничего не отправлено.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ApprovalDeclined.wav",
+      "transcript": "Действие не одобрено. Ничего не отправлено.",
+      "sha256": "1f19c473faa7f2aab980d71852b941183c7107578accaf679215c692de28ef64",
+      "bytes": 165644,
+      "duration_seconds": 3.45,
+      "generated_at": "2026-11-27T22:58:59.052Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 57,
+        "output_tokens": 118
+      },
+      "estimated_usd": 0.0023942
+    },
+    {
+      "lang": "en",
+      "id": "r2NotFinalized",
+      "text": "This is a preview, not a completed blockchain transaction.",
+      "url": "/audio/assistant/v1/phrases/en-r2NotFinalized.wav",
+      "transcript": "This is a preview, not a completed blockchain transaction.",
+      "sha256": "01f47c390758855ef3dd61be8aba735d1deb0f788f837adb2ba09cace0237c1c",
+      "bytes": 170444,
+      "duration_seconds": 3.55,
+      "generated_at": "2026-11-27T22:59:02.100Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 108
+      },
+      "estimated_usd": 0.0021918000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2NotFinalized",
+      "text": "Это предварительный просмотр, а не выполненная блокчейн-транзакция.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NotFinalized.wav",
+      "transcript": "Это предварительный просмотр, а не выполненная блокчейн-транзакция.",
+      "sha256": "51d32b1a59172711fc42beb39655c0a48793c0a651869a5f9e56a919dfcf64d7",
+      "bytes": 223244,
+      "duration_seconds": 4.65,
+      "generated_at": "2026-11-27T22:59:05.114Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 59,
+        "output_tokens": 143
+      },
+      "estimated_usd": 0.0028954000000000002
+    },
+    {
+      "lang": "en",
+      "id": "r2CheckReceipt",
+      "text": "A transaction is only confirmed after a verifiable receipt.",
+      "url": "/audio/assistant/v1/phrases/en-r2CheckReceipt.wav",
+      "transcript": "A transaction is only confirmed after a verifiable receipt.",
+      "sha256": "b442566a44010e992b33c60d05789dfba7f843bb604096425236379e4565ec47",
+      "bytes": 192044,
+      "duration_seconds": 4,
+      "generated_at": "2026-11-27T22:59:08.085Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 122
+      },
+      "estimated_usd": 0.0024718
+    },
+    {
+      "lang": "ru",
+      "id": "r2CheckReceipt",
+      "text": "Транзакция подтверждена только после проверяемого подтверждения.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CheckReceipt.wav",
+      "transcript": "Транзакция подтверждена только после проверяемого подтверждения.",
+      "sha256": "fae649ba91dfa546a99dc7825a2540e27a452386111566c7a9895a7df72bb7a3",
+      "bytes": 208844,
+      "duration_seconds": 4.35,
+      "generated_at": "2026-11-27T22:59:11.048Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 57,
+        "output_tokens": 140
+      },
+      "estimated_usd": 0.0028342
+    },
+    {
+      "lang": "en",
+      "id": "r2Publishing",
+      "text": "I can help prepare an artwork draft for your review.",
+      "url": "/audio/assistant/v1/phrases/en-r2Publishing.wav",
+      "transcript": "I can help prepare an artwork draft for your review.",
+      "sha256": "84bbb517aec065222043d9afd75c701340da8fdbf8672a8c7d4d3082af761683",
+      "bytes": 136844,
+      "duration_seconds": 2.85,
+      "generated_at": "2026-11-27T22:59:14.149Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 99
+      },
+      "estimated_usd": 0.0020118
+    },
+    {
+      "lang": "ru",
+      "id": "r2Publishing",
+      "text": "Могу помочь подготовить черновик публикации работы.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Publishing.wav",
+      "transcript": "Могу помочь подготовить черновик публикации работы.",
+      "sha256": "e7e04c9d3638067a5cb3f76a5e0ea9531ed6d7bc2e74c6f910f5ff390436e332",
+      "bytes": 160844,
+      "duration_seconds": 3.35,
+      "generated_at": "2026-11-27T22:59:17.057Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 119
+      },
+      "estimated_usd": 0.0024124
+    },
+    {
+      "lang": "en",
+      "id": "r2DraftOnly",
+      "text": "Preparing a draft does not publish or mint an NFT.",
+      "url": "/audio/assistant/v1/phrases/en-r2DraftOnly.wav",
+      "transcript": "Preparing a draft does not publish or mint an NFT.",
+      "sha256": "0fc835a8cb11fe7a5549c27b7d1da5e6c21a7d90f2c6f89fd3a0693a3710048b",
+      "bytes": 201644,
+      "duration_seconds": 4.2,
+      "generated_at": "2026-11-27T22:59:19.988Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 122
+      },
+      "estimated_usd": 0.0024718
+    },
+    {
+      "lang": "ru",
+      "id": "r2DraftOnly",
+      "text": "Подготовка черновика не публикует работу и не создаёт NFT.",
+      "url": "/audio/assistant/v1/phrases/ru-r2DraftOnly.wav",
+      "transcript": "Подготовка черновика не публикует работу и не создаёт NFT.",
+      "sha256": "d105a67fa55800112b0e7c69bdc4b22fef47f0a95c1cd2643b694be88de835e5",
+      "bytes": 194444,
+      "duration_seconds": 4.05,
+      "generated_at": "2026-11-27T22:59:22.982Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 59,
+        "output_tokens": 139
+      },
+      "estimated_usd": 0.0028154
+    },
+    {
+      "lang": "en",
+      "id": "r2DraftTitle",
+      "text": "What title would you like to use for the artwork?",
+      "url": "/audio/assistant/v1/phrases/en-r2DraftTitle.wav",
+      "transcript": "What title would you like to use for the artwork?",
+      "sha256": "7536fea82ede562d1fd4676c521e09c891f4d5421fdc97c28d8f779f8e4fa8ab",
+      "bytes": 127244,
+      "duration_seconds": 2.65,
+      "generated_at": "2026-11-27T22:59:26.133Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 110
+      },
+      "estimated_usd": 0.0022318000000000004
+    },
+    {
+      "lang": "ru",
+      "id": "r2DraftTitle",
+      "text": "Какое название вы хотите дать работе?",
+      "url": "/audio/assistant/v1/phrases/ru-r2DraftTitle.wav",
+      "transcript": "Какое название вы хотите дать работе?",
+      "sha256": "9a38067d0e9dae718bb7458a2b5903979acb277a4e376513851e918bbcbcb0ed",
+      "bytes": 115244,
+      "duration_seconds": 2.4,
+      "generated_at": "2026-11-27T22:59:28.968Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 50,
+        "output_tokens": 94
+      },
+      "estimated_usd": 0.00191
+    },
+    {
+      "lang": "en",
+      "id": "r2CheckDraft",
+      "text": "Please review the details on the publication page.",
+      "url": "/audio/assistant/v1/phrases/en-r2CheckDraft.wav",
+      "transcript": "Please review the details on the publication page.",
+      "sha256": "9243a6310f37a5376bf14bde8c9f21d392306626c9a93c07c6b8e076faed7037",
+      "bytes": 144044,
+      "duration_seconds": 3,
+      "generated_at": "2026-11-27T22:59:32.088Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 94
+      },
+      "estimated_usd": 0.0019106
+    },
+    {
+      "lang": "ru",
+      "id": "r2CheckDraft",
+      "text": "Проверьте сведения на странице публикации.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CheckDraft.wav",
+      "transcript": "Проверьте сведения на странице публикации.",
+      "sha256": "a0f5d24d42dae45f8d318156a29f7de4eee86ba4958ed79f52cd8e96b7e63b86",
+      "bytes": 122444,
+      "duration_seconds": 2.55,
+      "generated_at": "2026-11-27T22:59:34.984Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 92
+      },
+      "estimated_usd": 0.0018712
+    },
+    {
+      "lang": "en",
+      "id": "r2Favorites",
+      "text": "I can help you manage Favorites using the existing ArtSoul controls.",
+      "url": "/audio/assistant/v1/phrases/en-r2Favorites.wav",
+      "transcript": "I can help you manage Favorites using the existing ArtSoul controls.",
+      "sha256": "135dd1c14a6810a0aef37ac03eb732557e87fae9ebad394dd0ab82037fc6c8bb",
+      "bytes": 194444,
+      "duration_seconds": 4.05,
+      "generated_at": "2026-11-27T22:59:37.906Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 123
+      },
+      "estimated_usd": 0.002493
+    },
+    {
+      "lang": "ru",
+      "id": "r2Favorites",
+      "text": "Могу помочь с избранным через существующие функции ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Favorites.wav",
+      "transcript": "Могу помочь с избранным через существующие функции ArtSoul.",
+      "sha256": "3d8056b9ac16ce8015795ab05ff1f3b175eff4a190e154a8859718552aa401e3",
+      "bytes": 225644,
+      "duration_seconds": 4.7,
+      "generated_at": "2026-11-27T22:59:40.886Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 140
+      },
+      "estimated_usd": 0.0028336
+    },
+    {
+      "lang": "en",
+      "id": "r2NeedExactChoice",
+      "text": "Please choose one specific artwork before making changes.",
+      "url": "/audio/assistant/v1/phrases/en-r2NeedExactChoice.wav",
+      "transcript": "Please choose one specific artwork before making changes.",
+      "sha256": "1b5073f4e22bda41906c1a994faa8eaf4e47dc303216277524c55f5acfc74010",
+      "bytes": 172844,
+      "duration_seconds": 3.6,
+      "generated_at": "2026-11-27T22:59:43.852Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 105
+      },
+      "estimated_usd": 0.0021306
+    },
+    {
+      "lang": "ru",
+      "id": "r2NeedExactChoice",
+      "text": "Выберите одну конкретную работу перед изменением.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NeedExactChoice.wav",
+      "transcript": "Выберите одну конкретную работу перед изменением.",
+      "sha256": "7e6ef424054ff1b92299cf8a78fc5ed2e890beca6ec8c773b084b971f0b21fea",
+      "bytes": 177644,
+      "duration_seconds": 3.7,
+      "generated_at": "2026-11-27T22:59:46.760Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 112
+      },
+      "estimated_usd": 0.0022711999999999997
+    },
+    {
+      "lang": "en",
+      "id": "r2NoPermission",
+      "text": "I do not have permission to perform that action.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoPermission.wav",
+      "transcript": "I do not have permission to perform that action.",
+      "sha256": "2d4deda4d5c22211335be3e08f998c506407a8a005444bcd4d224a1c5d05734f",
+      "bytes": 117644,
+      "duration_seconds": 2.45,
+      "generated_at": "2026-11-27T22:59:49.788Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 85
+      },
+      "estimated_usd": 0.0017312
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoPermission",
+      "text": "У меня нет разрешения выполнить это действие.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoPermission.wav",
+      "transcript": "У меня нет разрешения выполнить это действие.",
+      "sha256": "3c6530ba6cae0354d13196f3c95ff8c0f430606734978bb1b434587a367bc144",
+      "bytes": 144044,
+      "duration_seconds": 3,
+      "generated_at": "2026-11-27T22:59:52.676Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 98
+      },
+      "estimated_usd": 0.0019906
+    },
+    {
+      "lang": "en",
+      "id": "r2OutOfScope",
+      "text": "That is outside the available ArtSoul assistant tools.",
+      "url": "/audio/assistant/v1/phrases/en-r2OutOfScope.wav",
+      "transcript": "That is outside the available ArtSoul assistant tools.",
+      "sha256": "fde257b283abcb0cfc9c470e9b46ec695083d3eeac92f09cb3f16ee8de7cb631",
+      "bytes": 156044,
+      "duration_seconds": 3.25,
+      "generated_at": "2026-11-27T22:59:55.628Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 103
+      },
+      "estimated_usd": 0.0020911999999999997
+    },
+    {
+      "lang": "ru",
+      "id": "r2OutOfScope",
+      "text": "Это вне возможностей доступных инструментов ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OutOfScope.wav",
+      "transcript": "Это вне возможностей доступных инструментов ArtSoul.",
+      "sha256": "457cb6ee9d48f3abd1c6f47a601dac4ae46650e1c4f0d6affafce8cfd414ae75",
+      "bytes": 184844,
+      "duration_seconds": 3.85,
+      "generated_at": "2026-11-27T22:59:58.511Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 118
+      },
+      "estimated_usd": 0.0023912
+    },
+    {
+      "lang": "en",
+      "id": "r2TryText",
+      "text": "You can type your request if the microphone is unavailable.",
+      "url": "/audio/assistant/v1/phrases/en-r2TryText.wav",
+      "transcript": "You can type your request if the microphone is unavailable.",
+      "sha256": "3ae922d41042564c61864938d65c78957a5cba6871ef3a8d5de3dae7244b8995",
+      "bytes": 170444,
+      "duration_seconds": 3.55,
+      "generated_at": "2026-11-27T23:00:01.559Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 107
+      },
+      "estimated_usd": 0.0021718
+    },
+    {
+      "lang": "ru",
+      "id": "r2TryText",
+      "text": "Если микрофон недоступен, запрос можно написать текстом.",
+      "url": "/audio/assistant/v1/phrases/ru-r2TryText.wav",
+      "transcript": "Если микрофон недоступен, запрос можно написать текстом.",
+      "sha256": "2714ca162aa3016c04512f44bc91647c131f1e513ade8e951c3a8f89f83e4ef3",
+      "bytes": 168044,
+      "duration_seconds": 3.5,
+      "generated_at": "2026-11-27T23:00:04.420Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 114
+      },
+      "estimated_usd": 0.0023136
+    },
+    {
+      "lang": "en",
+      "id": "r2LowConfidence",
+      "text": "Low recognition confidence. Correct the transcript before submitting.",
+      "url": "/audio/assistant/v1/phrases/en-r2LowConfidence.wav",
+      "transcript": "Low recognition confidence. Correct the transcript before submitting.",
+      "sha256": "a5e3fa19dc66fecdb9fcfaa81ced52b9da46217910e3403ae2c22ba7590aa8a4",
+      "bytes": 211244,
+      "duration_seconds": 4.4,
+      "generated_at": "2026-11-27T23:00:07.586Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 172
+      },
+      "estimated_usd": 0.0034712
+    },
+    {
+      "lang": "ru",
+      "id": "r2LowConfidence",
+      "text": "Не уверена, что правильно расслышала. Исправьте текст перед отправкой.",
+      "url": "/audio/assistant/v1/phrases/ru-r2LowConfidence.wav",
+      "transcript": "Не уверена, что правильно расслышала. Исправьте текст перед отправкой.",
+      "sha256": "59df438c3a1f8df3fc99fcb8fff2e8df1505ac30bcfdf0c53f27c0cfb5164fef",
+      "bytes": 232844,
+      "duration_seconds": 4.85,
+      "generated_at": "2026-11-27T23:00:10.799Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 60,
+        "output_tokens": 173
+      },
+      "estimated_usd": 0.003496
+    },
+    {
+      "lang": "en",
+      "id": "r2Misheard",
+      "text": "That may be misheard. Please name a section or artwork number.",
+      "url": "/audio/assistant/v1/phrases/en-r2Misheard.wav",
+      "transcript": "That may be misheard. Please name a section or artwork number.",
+      "sha256": "2b1c780affa4077bd5f55a10398750d21a24b37f7fa31a3d67df8847fe1536bb",
+      "bytes": 220844,
+      "duration_seconds": 4.6,
+      "generated_at": "2026-11-27T23:08:15.962Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 88,
+        "output_tokens": 171
+      },
+      "estimated_usd": 0.0034728000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2Misheard",
+      "text": "Похоже, фраза распознана неправильно. Уточните раздел или номер работы.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Misheard.wav",
+      "transcript": "Похоже, фраза распознана неправильно. Уточните раздел или номер работы.",
+      "sha256": "295653a984e1126568bb6bf94eb87f419e293588318531b10d4cab825e164740",
+      "bytes": 268844,
+      "duration_seconds": 5.6,
+      "generated_at": "2026-11-27T23:00:17.687Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 63,
+        "output_tokens": 168
+      },
+      "estimated_usd": 0.0033978000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAction",
+      "text": "Nothing was opened or confirmed.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAction.wav",
+      "transcript": "Nothing was opened or confirmed.",
+      "sha256": "564cde1d0e1d8d186d042c34df593c9609af4e7ab1917c8f9136847d948b1408",
+      "bytes": 134444,
+      "duration_seconds": 2.8,
+      "generated_at": "2026-11-27T23:00:20.891Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 48,
+        "output_tokens": 88
+      },
+      "estimated_usd": 0.0017888
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAction",
+      "text": "Ничего не открываю и не подтверждаю.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAction.wav",
+      "transcript": "Ничего не открываю и не подтверждаю.",
+      "sha256": "09b3be678d15edad42a752eff251e22709841a3d3ca86be0c163c5dbe64ea0e7",
+      "bytes": 141644,
+      "duration_seconds": 2.95,
+      "generated_at": "2026-11-27T23:00:23.871Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 102
+      },
+      "estimated_usd": 0.0020724000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2WrongArtwork",
+      "text": "Please give the other artwork number so I do not guess.",
+      "url": "/audio/assistant/v1/phrases/en-r2WrongArtwork.wav",
+      "transcript": "Please give the other artwork number so I do not guess.",
+      "sha256": "98f610e7511bb7e6ec4a0cf3998e186529580492ab3efcad50b036bdea8303b4",
+      "bytes": 172844,
+      "duration_seconds": 3.6,
+      "generated_at": "2026-11-27T23:00:26.852Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 127
+      },
+      "estimated_usd": 0.0025724000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2WrongArtwork",
+      "text": "Назовите номер другой работы, чтобы не выбирать случайную.",
+      "url": "/audio/assistant/v1/phrases/ru-r2WrongArtwork.wav",
+      "transcript": "Назовите номер другой работы, чтобы не выбирать случайную.",
+      "sha256": "db2dfda76774646c38d43ef17155122ac44bc2e3380373345e5f9426b70363da",
+      "bytes": 175244,
+      "duration_seconds": 3.65,
+      "generated_at": "2026-11-27T23:00:29.996Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 136
+      },
+      "estimated_usd": 0.002753
+    },
+    {
+      "lang": "en",
+      "id": "r2NoDeadline",
+      "text": "I cannot compare deadlines without a current auction list.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoDeadline.wav",
+      "transcript": "I cannot compare deadlines without a current auction list.",
+      "sha256": "69140a57f2cd23b97467229c5241fa36a39587824e08d41dd217b5d32d8f8f97",
+      "bytes": 163244,
+      "duration_seconds": 3.4,
+      "generated_at": "2026-11-27T23:00:33.234Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 107
+      },
+      "estimated_usd": 0.0021712
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoDeadline",
+      "text": "Не могу сравнить сроки без актуального списка аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoDeadline.wav",
+      "transcript": "Не могу сравнить сроки без актуального списка аукционов.",
+      "sha256": "337ca806a8be7f43f6b8b89f64de31390d1a7125d8ca57320b07d6d651719bda",
+      "bytes": 175244,
+      "duration_seconds": 3.65,
+      "generated_at": "2026-11-27T23:00:36.732Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 127
+      },
+      "estimated_usd": 0.0025736
+    },
+    {
+      "lang": "ru",
+      "id": "r2CannotHear",
+      "text": "Пожалуйста, повторите вопрос или исправьте текст.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CannotHear.wav",
+      "transcript": "Пожалуйста, повторите вопрос или исправьте текст.",
+      "sha256": "e67444826d11387dcd2174634611b9ac3191a22a42b187c29dc5bba8d9fa2a95",
+      "bytes": 201644,
+      "duration_seconds": 4.2,
+      "generated_at": "2026-11-27T23:10:07.046Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 86,
+        "output_tokens": 177
+      },
+      "estimated_usd": 0.0035916
+    },
+    {
+      "lang": "en",
+      "id": "r2VoiceBusy",
+      "text": "I'm still answering. You can interrupt playback.",
+      "url": "/audio/assistant/v1/phrases/en-r2VoiceBusy.wav",
+      "transcript": "I'm still answering. You can interrupt playback.",
+      "sha256": "b0ac0ac0905159445e1fad4e8a4b0b2c2488145d88c954840e7ad171e22369e4",
+      "bytes": 127244,
+      "duration_seconds": 2.65,
+      "generated_at": "2026-11-27T23:00:45.674Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 120
+      },
+      "estimated_usd": 0.0024305999999999998
+    },
+    {
+      "lang": "ru",
+      "id": "r2VoiceBusy",
+      "text": "Я ещё отвечаю. Вы можете остановить воспроизведение.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VoiceBusy.wav",
+      "transcript": "Я ещё отвечаю. Вы можете остановить воспроизведение.",
+      "sha256": "0fd595430d040a19f75d162447ece7415450ec84a33054d2ead91381b4082d51",
+      "bytes": 165644,
+      "duration_seconds": 3.45,
+      "generated_at": "2026-11-27T23:00:48.591Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 114
+      },
+      "estimated_usd": 0.0023136
+    },
+    {
+      "lang": "en",
+      "id": "r2TextOnly",
+      "text": "This reply is currently available as text.",
+      "url": "/audio/assistant/v1/phrases/en-r2TextOnly.wav",
+      "transcript": "This reply is currently available as text.",
+      "sha256": "ee4a9f27443967fec9921a1d19829677303793f33611666800a1da888eba380c",
+      "bytes": 156044,
+      "duration_seconds": 3.25,
+      "generated_at": "2026-11-27T23:00:51.593Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 50,
+        "output_tokens": 117
+      },
+      "estimated_usd": 0.00237
+    },
+    {
+      "lang": "ru",
+      "id": "r2TextOnly",
+      "text": "Этот ответ сейчас доступен в текстовом виде.",
+      "url": "/audio/assistant/v1/phrases/ru-r2TextOnly.wav",
+      "transcript": "Этот ответ сейчас доступен в текстовом виде.",
+      "sha256": "632ee3363a709ee47cd6b89e543fa22175fbccf1821dd959bf5096a03f9c9df0",
+      "bytes": 134444,
+      "duration_seconds": 2.8,
+      "generated_at": "2026-11-27T23:00:54.741Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 113
+      },
+      "estimated_usd": 0.0022911999999999997
+    },
+    {
+      "lang": "en",
+      "id": "r2SpeechBlocked",
+      "text": "Your browser blocked playback. Tap Listen to answer.",
+      "url": "/audio/assistant/v1/phrases/en-r2SpeechBlocked.wav",
+      "transcript": "Your browser blocked playback. Tap Listen to answer.",
+      "sha256": "5d1af6341239bd591c8e00fea6ec95dd1b26542117ff631ebb098bdae565ec9b",
+      "bytes": 189644,
+      "duration_seconds": 3.95,
+      "generated_at": "2026-11-27T23:00:57.692Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 113
+      },
+      "estimated_usd": 0.0022911999999999997
+    },
+    {
+      "lang": "ru",
+      "id": "r2SpeechBlocked",
+      "text": "Браузер заблокировал воспроизведение. Нажмите кнопку прослушивания.",
+      "url": "/audio/assistant/v1/phrases/ru-r2SpeechBlocked.wav",
+      "transcript": "Браузер заблокировал воспроизведение. Нажмите кнопку прослушивания.",
+      "sha256": "f6841a8341b8474a8e9ae852b339eef794606dc87367d0e97734eaf0a12b351a",
+      "bytes": 211244,
+      "duration_seconds": 4.4,
+      "generated_at": "2026-11-27T23:01:00.603Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 62,
+        "output_tokens": 142
+      },
+      "estimated_usd": 0.0028772
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAnotherVoice",
+      "text": "I will not switch to an unverified voice.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAnotherVoice.wav",
+      "transcript": "I will not switch to an unverified voice.",
+      "sha256": "09f8c01c3d2de7db10e46e0b982ef2613e44fa8d13f77f29dd75422adb18fc7f",
+      "bytes": 136844,
+      "duration_seconds": 2.85,
+      "generated_at": "2026-11-27T23:01:03.612Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 98
+      },
+      "estimated_usd": 0.0019912000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAnotherVoice",
+      "text": "Я не буду переключаться на непроверенный голос.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAnotherVoice.wav",
+      "transcript": "Я не буду переключаться на непроверенный голос.",
+      "sha256": "a498003e06c5f168a18f58ccfe619ce43eae4f59ffea2b4e5a507e65d731969c",
+      "bytes": 151244,
+      "duration_seconds": 3.15,
+      "generated_at": "2026-11-27T23:01:06.454Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 106
+      },
+      "estimated_usd": 0.0021518
+    },
+    {
+      "lang": "en",
+      "id": "r2Stop",
+      "text": "Voice chat has stopped.",
+      "url": "/audio/assistant/v1/phrases/en-r2Stop.wav",
+      "transcript": "Voice chat has stopped.",
+      "sha256": "30b71ad87daa36328a35a95b3fb395cea3a9abd66b2b59611541ac6540781fae",
+      "bytes": 98444,
+      "duration_seconds": 2.05,
+      "generated_at": "2026-11-27T23:01:09.383Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 47,
+        "output_tokens": 77
+      },
+      "estimated_usd": 0.0015682
+    },
+    {
+      "lang": "ru",
+      "id": "r2Stop",
+      "text": "Голосовой диалог остановлен.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Stop.wav",
+      "transcript": "Голосовой диалог остановлен.",
+      "sha256": "178f5fa4011563d11b615d55847295b4dafe7a46e496a33e0210e8076d0c878e",
+      "bytes": 96044,
+      "duration_seconds": 2,
+      "generated_at": "2026-11-27T23:01:12.630Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 50,
+        "output_tokens": 77
+      },
+      "estimated_usd": 0.00157
+    },
+    {
+      "lang": "en",
+      "id": "r2Privacy",
+      "text": "Your browser may send microphone audio to its recognition service.",
+      "url": "/audio/assistant/v1/phrases/en-r2Privacy.wav",
+      "transcript": "Your browser may send microphone audio to its recognition service.",
+      "sha256": "f98979c4f3fa6ac69bcf5026c4861bc83a3503e50c56ddde8bc0861c2a3e95ab",
+      "bytes": 230444,
+      "duration_seconds": 4.8,
+      "generated_at": "2026-11-27T23:01:15.664Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 139
+      },
+      "estimated_usd": 0.0028118
+    },
+    {
+      "lang": "ru",
+      "id": "r2Privacy",
+      "text": "Браузер может отправлять звук микрофона в службу распознавания речи.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Privacy.wav",
+      "transcript": "Браузер может отправлять звук микрофона в службу распознавания речи.",
+      "sha256": "b86b5ef19fe4e15d91c759ca572d2777e3e48307d414481377efa26ef8d1bae6",
+      "bytes": 204044,
+      "duration_seconds": 4.25,
+      "generated_at": "2026-11-27T23:01:18.996Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 60,
+        "output_tokens": 137
+      },
+      "estimated_usd": 0.002776
+    },
+    {
+      "lang": "en",
+      "id": "r2VerifiedSource",
+      "text": "I'll use ArtSoul's tool results, not guesses.",
+      "url": "/audio/assistant/v1/phrases/en-r2VerifiedSource.wav",
+      "transcript": "I'll use ArtSoul's tool results, not guesses.",
+      "sha256": "6990c1cdc3c67cb35426602af6babb23356eb10fbfc9cea5866ddb3683cadfa3",
+      "bytes": 141644,
+      "duration_seconds": 2.95,
+      "generated_at": "2026-11-27T23:01:21.933Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 103
+      },
+      "estimated_usd": 0.0020918
+    },
+    {
+      "lang": "ru",
+      "id": "r2VerifiedSource",
+      "text": "Буду использовать ответы инструментов ArtSoul, а не догадки.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VerifiedSource.wav",
+      "transcript": "Буду использовать ответы инструментов ArtSoul, а не догадки.",
+      "sha256": "6fd947de2481a574a20dd7372b9e9de760863d20fc15daeb6e6476a4021ce35b",
+      "bytes": 170444,
+      "duration_seconds": 3.55,
+      "generated_at": "2026-11-27T23:01:25.018Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 118
+      },
+      "estimated_usd": 0.0023936
+    },
+    {
+      "lang": "en",
+      "id": "r2PleaseRepeat",
+      "text": "Please repeat the question in Russian or English.",
+      "url": "/audio/assistant/v1/phrases/en-r2PleaseRepeat.wav",
+      "transcript": "Please repeat the question in Russian or English.",
+      "sha256": "832319803f43123e6732879c683179c36c12e2cefbd65b3ce42633849d833c3c",
+      "bytes": 141644,
+      "duration_seconds": 2.95,
+      "generated_at": "2026-11-27T23:01:28.018Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 82
+      },
+      "estimated_usd": 0.0016706
+    },
+    {
+      "lang": "ru",
+      "id": "r2PleaseRepeat",
+      "text": "Повторите вопрос на русском или английском.",
+      "url": "/audio/assistant/v1/phrases/ru-r2PleaseRepeat.wav",
+      "transcript": "Повторите вопрос на русском или английском.",
+      "sha256": "92cb4cd2b4c8771dcf66b1e2583a00d63016b8076efb870b63d998cf9ee704a3",
+      "bytes": 136844,
+      "duration_seconds": 2.85,
+      "generated_at": "2026-11-27T23:01:30.843Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 98
+      },
+      "estimated_usd": 0.0019912000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2AnotherQuestion",
+      "text": "Would you like to ask anything else about this artwork?",
+      "url": "/audio/assistant/v1/phrases/en-r2AnotherQuestion.wav",
+      "transcript": "Would you like to ask anything else about this artwork?",
+      "sha256": "e2125b93936fed393c0a66d356d6dc47896f49c4d9188f9d7a401a1ca54c4d0e",
+      "bytes": 120044,
+      "duration_seconds": 2.5,
+      "generated_at": "2026-11-27T23:01:33.785Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 92
+      },
+      "estimated_usd": 0.0018717999999999999
+    },
+    {
+      "lang": "ru",
+      "id": "r2AnotherQuestion",
+      "text": "Хотите узнать ещё что-нибудь об этой работе?",
+      "url": "/audio/assistant/v1/phrases/ru-r2AnotherQuestion.wav",
+      "transcript": "Хотите узнать ещё что-нибудь об этой работе?",
+      "sha256": "aebf789bff768dfd845f56c4f2e120e0ef15665c0c9f56d194260fbbf696fe40",
+      "bytes": 158444,
+      "duration_seconds": 3.3,
+      "generated_at": "2026-11-27T23:01:36.659Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 109
+      },
+      "estimated_usd": 0.0022112
+    },
+    {
+      "lang": "en",
+      "id": "r2QuickSummary",
+      "text": "I can give a short summary or open the full artwork page.",
+      "url": "/audio/assistant/v1/phrases/en-r2QuickSummary.wav",
+      "transcript": "I can give a short summary or open the full artwork page.",
+      "sha256": "7f6b1ca00405a8c45e2ee872effd372c72e12c3902fdd50e57bc1cc5d5e1637e",
+      "bytes": 165644,
+      "duration_seconds": 3.45,
+      "generated_at": "2026-11-27T23:01:39.711Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 106
+      },
+      "estimated_usd": 0.002153
+    },
+    {
+      "lang": "ru",
+      "id": "r2QuickSummary",
+      "text": "Могу кратко рассказать о работе или открыть её полную страницу.",
+      "url": "/audio/assistant/v1/phrases/ru-r2QuickSummary.wav",
+      "transcript": "Могу кратко рассказать о работе или открыть её полную страницу.",
+      "sha256": "d20dac8604ff9daa31d11f5aed21b5b0a02d04fea02d2c7e67bedcc8f4c53867",
+      "bytes": 208844,
+      "duration_seconds": 4.35,
+      "generated_at": "2026-11-27T23:01:42.941Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 57,
+        "output_tokens": 137
+      },
+      "estimated_usd": 0.0027741999999999997
+    },
+    {
+      "lang": "en",
+      "id": "r2Goodbye",
+      "text": "Goodbye! You can open the assistant whenever you need it.",
+      "url": "/audio/assistant/v1/phrases/en-r2Goodbye.wav",
+      "transcript": "Goodbye! You can open the assistant whenever you need it.",
+      "sha256": "c9e21257f75eac6beb23b963d6ce55c386ddd92a5e838245a4cdc970aaf60970",
+      "bytes": 139244,
+      "duration_seconds": 2.9,
+      "generated_at": "2026-11-27T23:01:46.265Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 129
+      },
+      "estimated_usd": 0.002613
+    },
+    {
+      "lang": "ru",
+      "id": "r2Goodbye",
+      "text": "До встречи! Можете снова открыть помощника, когда потребуется.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Goodbye.wav",
+      "transcript": "До встречи! Можете снова открыть помощника, когда потребуется.",
+      "sha256": "43d5546081929a2b7eecbd70b10550eda05928bceac482209aa3d43ebc9158c5",
+      "bytes": 261644,
+      "duration_seconds": 5.45,
+      "generated_at": "2026-11-27T23:09:12.805Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 87,
+        "output_tokens": 196
+      },
+      "estimated_usd": 0.0039721999999999995
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionResults",
+      "text": "The current auction results are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionResults.wav",
+      "transcript": "The current auction results are shown on screen.",
+      "sha256": "24d5433d4b9effc24af1d31c8226909b31b08db53c3bfc5d57b80a6b1285b3ba",
+      "bytes": 129644,
+      "duration_seconds": 2.7,
+      "generated_at": "2026-11-27T23:01:52.503Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 93
+      },
+      "estimated_usd": 0.0018905999999999999
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionResults",
+      "text": "Текущие данные об аукционах показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionResults.wav",
+      "transcript": "Текущие данные об аукционах показаны на экране.",
+      "sha256": "113b3e33bedceab373eca8c6f7e7dfe98af3d96810d5c32b0db56891c0a3f5e8",
+      "bytes": 177644,
+      "duration_seconds": 3.7,
+      "generated_at": "2026-11-27T23:01:55.883Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 118
+      },
+      "estimated_usd": 0.0023948000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2ArtworkResults",
+      "text": "The verified artwork details are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ArtworkResults.wav",
+      "transcript": "The verified artwork details are shown on screen.",
+      "sha256": "365932aef396934585d1096f17ce688a0940c4cc452f65b98b8565e6ef6db728",
+      "bytes": 141644,
+      "duration_seconds": 2.95,
+      "generated_at": "2026-11-27T23:01:59.084Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 96
+      },
+      "estimated_usd": 0.0019505999999999998
+    },
+    {
+      "lang": "ru",
+      "id": "r2ArtworkResults",
+      "text": "Проверенные сведения о работе показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ArtworkResults.wav",
+      "transcript": "Проверенные сведения о работе показаны на экране.",
+      "sha256": "b769c4fa6d03a270f4e4dbebe0b600c8b7df86eebe0ef826f09c3b4dc2673463",
+      "bytes": 175244,
+      "duration_seconds": 3.65,
+      "generated_at": "2026-11-27T23:02:02.017Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 115
+      },
+      "estimated_usd": 0.0023324
+    },
+    {
+      "lang": "en",
+      "id": "r2ProvenanceResults",
+      "text": "Creator, First Collector, and Owner are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ProvenanceResults.wav",
+      "transcript": "Creator, First Collector, and Owner are shown on screen.",
+      "sha256": "d620f96a8acceebdebd0fc71b6308ca331dd1089e3d1a79f184a51a16f4de531",
+      "bytes": 218444,
+      "duration_seconds": 4.55,
+      "generated_at": "2026-11-27T23:02:05.047Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 134
+      },
+      "estimated_usd": 0.0027124000000000002
+    },
+    {
+      "lang": "ru",
+      "id": "r2ProvenanceResults",
+      "text": "Автор, первый коллекционер и текущий владелец показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ProvenanceResults.wav",
+      "transcript": "Автор, первый коллекционер и текущий владелец показаны на экране.",
+      "sha256": "4eccff33bb757c89e58ab2d09552d5fce1432b4ef5565af115575f5027720336",
+      "bytes": 213644,
+      "duration_seconds": 4.45,
+      "generated_at": "2026-11-27T23:02:08.047Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 59,
+        "output_tokens": 148
+      },
+      "estimated_usd": 0.0029954
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchResults",
+      "text": "The ArtSoul search results are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchResults.wav",
+      "transcript": "The ArtSoul search results are shown on screen.",
+      "sha256": "dfa45d7f8cc594055db5c946e9dacae1ab4e4fd68264c3e0786d9c71f433a431",
+      "bytes": 151244,
+      "duration_seconds": 3.15,
+      "generated_at": "2026-11-27T23:02:11.119Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 52,
+        "output_tokens": 103
+      },
+      "estimated_usd": 0.0020911999999999997
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchResults",
+      "text": "Результаты поиска ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchResults.wav",
+      "transcript": "Результаты поиска ArtSoul показаны на экране.",
+      "sha256": "85e6d32027eb57724e6d61d81724872414c45a871addf089f1fd25fe72b32173",
+      "bytes": 184844,
+      "duration_seconds": 3.85,
+      "generated_at": "2026-11-27T23:02:14.627Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 125
+      },
+      "estimated_usd": 0.0025324
+    },
+    {
+      "lang": "en",
+      "id": "r2ActivityResults",
+      "text": "Your ArtSoul activity is shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ActivityResults.wav",
+      "transcript": "Your ArtSoul activity is shown on screen.",
+      "sha256": "b5f705de8ff2eb1840c651476bf770bef4ccf18f51b32e67eaf2450aa619c4a0",
+      "bytes": 127244,
+      "duration_seconds": 2.65,
+      "generated_at": "2026-11-27T23:02:17.823Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 89
+      },
+      "estimated_usd": 0.0018105999999999999
+    },
+    {
+      "lang": "ru",
+      "id": "r2ActivityResults",
+      "text": "Сведения о вашей активности в ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ActivityResults.wav",
+      "transcript": "Сведения о вашей активности в ArtSoul показаны на экране.",
+      "sha256": "9ec5aed2b18ae33e84a1807df9a152c7b3f364b8c6f698248f4a2f4c73c6432f",
+      "bytes": 184844,
+      "duration_seconds": 3.85,
+      "generated_at": "2026-11-27T23:02:20.733Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 121
+      },
+      "estimated_usd": 0.0024536
+    },
+    {
+      "lang": "en",
+      "id": "r2BidPreparedResult",
+      "text": "Your bid preview is ready for review. Nothing has been signed.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidPreparedResult.wav",
+      "transcript": "Your bid preview is ready for review. Nothing has been signed.",
+      "sha256": "7b164ec1dd5e453930f20c8246e75e81af025d5dd684107e62fd54cd64f752b6",
+      "bytes": 192044,
+      "duration_seconds": 4,
+      "generated_at": "2026-11-27T23:02:23.825Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 119
+      },
+      "estimated_usd": 0.002413
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidPreparedResult",
+      "text": "Предварительный просмотр ставки готов. Ничего не подписано.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidPreparedResult.wav",
+      "transcript": "Предварительный просмотр ставки готов. Ничего не подписано.",
+      "sha256": "a2417f7a9fe23a3248a6969aef076604a37579564d593eefc1e003df5e486872",
+      "bytes": 259244,
+      "duration_seconds": 5.4,
+      "generated_at": "2026-11-27T23:08:17.821Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 88,
+        "output_tokens": 166
+      },
+      "estimated_usd": 0.0033728
+    },
+    {
+      "lang": "en",
+      "id": "r2ReviewResult",
+      "text": "You must review this action and approve it in your own wallet.",
+      "url": "/audio/assistant/v1/phrases/en-r2ReviewResult.wav",
+      "transcript": "You must review this action and approve it in your own wallet.",
+      "sha256": "bd52a19f67a67298c15a42c3a3f9db4766c1b950f516dc74b289b69686ce78a8",
+      "bytes": 189644,
+      "duration_seconds": 3.95,
+      "generated_at": "2026-11-27T23:02:29.915Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 55,
+        "output_tokens": 123
+      },
+      "estimated_usd": 0.002493
+    },
+    {
+      "lang": "ru",
+      "id": "r2ReviewResult",
+      "text": "Вы должны сами проверить действие и подтвердить его в своём кошельке.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ReviewResult.wav",
+      "transcript": "Вы должны сами проверить действие и подтвердить его в своём кошельке.",
+      "sha256": "8740d7a3c7c99d6af58bd9b5f212d90b3e4c7dc47bc031e80e25e87ce05b9b60",
+      "bytes": 240044,
+      "duration_seconds": 5,
+      "generated_at": "2026-11-27T23:02:32.961Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 147
+      },
+      "estimated_usd": 0.0029748
+    },
+    {
+      "lang": "en",
+      "id": "r2InfoResults",
+      "text": "Verified ArtSoul details are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2InfoResults.wav",
+      "transcript": "Verified ArtSoul details are shown on screen.",
+      "sha256": "eb8887e3af41987ba39f2d8dcce87b4f5c8f596b002d251551f32a8e0ec3c4f1",
+      "bytes": 146444,
+      "duration_seconds": 3.05,
+      "generated_at": "2026-11-27T23:02:36.305Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 98
+      },
+      "estimated_usd": 0.0019906
+    },
+    {
+      "lang": "ru",
+      "id": "r2InfoResults",
+      "text": "Проверенные сведения ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2InfoResults.wav",
+      "transcript": "Проверенные сведения ArtSoul показаны на экране.",
+      "sha256": "ad854c50f8a47595cfd025798dc5b931f91c15089b7793b68a78ffca4f4329d4",
+      "bytes": 165644,
+      "duration_seconds": 3.45,
+      "generated_at": "2026-11-27T23:02:39.340Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 110
+      },
+      "estimated_usd": 0.0022324000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2ActionNotCompleted",
+      "text": "The action was not completed. Check the reason on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ActionNotCompleted.wav",
+      "transcript": "The action was not completed. Check the reason on screen.",
+      "sha256": "7c2b7d6778a747caff2b2a7bdf14c5887438bf9ee7163120fc285b5bf078734e",
+      "bytes": 172844,
+      "duration_seconds": 3.6,
+      "generated_at": "2026-11-27T23:02:42.361Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 111
+      },
+      "estimated_usd": 0.0022524
+    },
+    {
+      "lang": "ru",
+      "id": "r2ActionNotCompleted",
+      "text": "Действие не выполнено. Проверьте причину на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ActionNotCompleted.wav",
+      "transcript": "Действие не выполнено. Проверьте причину на экране.",
+      "sha256": "865b0d6b087d65b9500bc734f9d9f6463085e9e484e518888dab056545925789",
+      "bytes": 172844,
+      "duration_seconds": 3.6,
+      "generated_at": "2026-11-27T23:02:45.778Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 117
+      },
+      "estimated_usd": 0.0023748000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2ToolError",
+      "text": "ArtSoul could not complete this request. Check the details on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ToolError.wav",
+      "transcript": "ArtSoul could not complete this request. Check the details on screen.",
+      "sha256": "e7a720be57c1f36c05ede731a16fceb26b421c5db64f92e8466dba1696836519",
+      "bytes": 259244,
+      "duration_seconds": 5.4,
+      "generated_at": "2026-11-27T23:02:49.346Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 151
+      },
+      "estimated_usd": 0.0030536
+    },
+    {
+      "lang": "ru",
+      "id": "r2ToolError",
+      "text": "ArtSoul не смог выполнить запрос. Подробности показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ToolError.wav",
+      "transcript": "ArtSoul не смог выполнить запрос. Подробности показаны на экране.",
+      "sha256": "0575dd6a0de202a3a18e0f4d82dbbb837cebfef94cd8716ed69e137a59a5a48f",
+      "bytes": 237644,
+      "duration_seconds": 4.95,
+      "generated_at": "2026-11-27T23:02:52.597Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 149
+      },
+      "estimated_usd": 0.0030148
+    },
+    {
+      "lang": "en",
+      "id": "r2NoMatches",
+      "text": "No matching items were returned. Try another title or number.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoMatches.wav",
+      "transcript": "No matching items were returned. Try another title or number.",
+      "sha256": "ae1d08a2f26cf590244b7d7fcd7b4c265e8facc4b5e4dfd361979ddf37b57f18",
+      "bytes": 204044,
+      "duration_seconds": 4.25,
+      "generated_at": "2026-11-27T23:02:55.906Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 122
+      },
+      "estimated_usd": 0.0024724
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoMatches",
+      "text": "Совпадений не найдено. Попробуйте другое название или номер.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoMatches.wav",
+      "transcript": "Совпадений не найдено. Попробуйте другое название или номер.",
+      "sha256": "249dacf89c65aea0ef6cb3127105d4b3114ba4e65ee37f023dfa1536c9f32c5f",
+      "bytes": 211244,
+      "duration_seconds": 4.4,
+      "generated_at": "2026-11-27T23:02:59.163Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 58,
+        "output_tokens": 134
+      },
+      "estimated_usd": 0.0027148000000000003
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAuctions",
+      "text": "No open auctions were returned by ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAuctions.wav",
+      "transcript": "No open auctions were returned by ArtSoul.",
+      "sha256": "0a90b29967d22760ea5c7501fd54f3ef0c6093ad8a40f8573d3b454c00cb6143",
+      "bytes": 158444,
+      "duration_seconds": 3.3,
+      "generated_at": "2026-11-27T23:03:02.554Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 103
+      },
+      "estimated_usd": 0.0020905999999999998
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAuctions",
+      "text": "ArtSoul не вернул открытых аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAuctions.wav",
+      "transcript": "ArtSoul не вернул открытых аукционов.",
+      "sha256": "bf839d4d98dfb1266c6f09e6a1f282c198c8a826f8e1ee99ad0f89834a029829",
+      "bytes": 244844,
+      "duration_seconds": 5.1,
+      "generated_at": "2026-11-27T23:09:10.539Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 86,
+        "output_tokens": 162
+      },
+      "estimated_usd": 0.0032916
+    },
+    {
+      "lang": "en",
+      "id": "r2LifecycleResults",
+      "text": "The ArtSoul auction and settlement stages are explained on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2LifecycleResults.wav",
+      "transcript": "The ArtSoul auction and settlement stages are explained on screen.",
+      "sha256": "6c666c19a8dd1877c2c1a8e8dc45fb0b921c393098c8037aa9ea2a3859c3b60a",
+      "bytes": 182444,
+      "duration_seconds": 3.8,
+      "generated_at": "2026-11-27T23:03:08.914Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 117
+      },
+      "estimated_usd": 0.0023724
+    },
+    {
+      "lang": "ru",
+      "id": "r2LifecycleResults",
+      "text": "Этапы аукциона и расчёта ArtSoul объяснены на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2LifecycleResults.wav",
+      "transcript": "Этапы аукциона и расчёта ArtSoul объяснены на экране.",
+      "sha256": "8a17fb5284080643bd48d0dfb9f0c434c42471d89a03e5d344f637cd5151836a",
+      "bytes": 208844,
+      "duration_seconds": 4.35,
+      "generated_at": "2026-11-27T23:03:11.976Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 62,
+        "output_tokens": 140
+      },
+      "estimated_usd": 0.0028372
+    },
+    {
+      "lang": "en",
+      "id": "r2PageNavigation",
+      "text": "Opening the requested ArtSoul page.",
+      "url": "/audio/assistant/v1/phrases/en-r2PageNavigation.wav",
+      "transcript": "Opening the requested ArtSoul page.",
+      "sha256": "ba6b875110e539cddbaedb5fe4ca737f4f6c7392dfd4acabeab4663fbfaeabc5",
+      "bytes": 139244,
+      "duration_seconds": 2.9,
+      "generated_at": "2026-11-27T23:03:15.010Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 49,
+        "output_tokens": 101
+      },
+      "estimated_usd": 0.0020494000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2PageNavigation",
+      "text": "Открываю выбранную страницу ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2PageNavigation.wav",
+      "transcript": "Открываю выбранную страницу ArtSoul.",
+      "sha256": "eb6417577cc3dc8c7ae2c569154f17e87067ce8f0aaafa511c4838ce8f5cfc17",
+      "bytes": 156044,
+      "duration_seconds": 3.25,
+      "generated_at": "2026-11-27T23:03:18.323Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 101
+      },
+      "estimated_usd": 0.0020506
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoLanguageHelp",
+      "text": "Select RU for Russian commands and Marin recordings. On-screen replies stay English. Unrecorded answers remain text-only.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoLanguageHelp.wav",
+      "transcript": "Select RU for Russian commands and Marin recordings. On-screen replies stay English. Unrecorded answers remain text-only.",
+      "sha256": "03cfcf5aba8e407527e09eff81e4dadd7b991680e4b6c9d578147f360f50cca5",
+      "bytes": 429644,
+      "duration_seconds": 8.95,
+      "generated_at": "2026-11-27T23:03:21.309Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 65,
+        "output_tokens": 253
+      },
+      "estimated_usd": 0.005099
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoLanguageHelp",
+      "text": "Выберите RU для русских команд и записанных ответов голосом Marin. Ответы на экране останутся на английском. Ответы без записи доступны только текстом.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoLanguageHelp.wav",
+      "transcript": "Выберите RU для русских команд и записанных ответов голосом Marin. Ответы на экране останутся на английском. Ответы без записи доступны только текстом.",
+      "sha256": "160f7673e253e3db9df47fec0ac7cdaa94f22a56ff14c8bdab637b7114ae6280",
+      "bytes": 552044,
+      "duration_seconds": 11.5,
+      "generated_at": "2026-11-27T23:03:25.087Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 78,
+        "output_tokens": 307
+      },
+      "estimated_usd": 0.0061868
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoDidIt",
+      "text": "Which action would you like me to check? I do not perform wallet operations without your approval.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoDidIt.wav",
+      "transcript": "Which action would you like me to check? I do not perform wallet operations without your approval.",
+      "sha256": "37113089a7d98fbea9b39546d83a98343d91b0be80859c4022f91442cfd368e0",
+      "bytes": 252044,
+      "duration_seconds": 5.25,
+      "generated_at": "2026-11-27T23:03:29.594Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 61,
+        "output_tokens": 160
+      },
+      "estimated_usd": 0.0032366
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoDidIt",
+      "text": "Уточните, какое действие нужно проверить. Я не выполняю операции с кошельком без вашего подтверждения.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoDidIt.wav",
+      "transcript": "Уточните, какое действие нужно проверить. Я не выполняю операции с кошельком без вашего подтверждения.",
+      "sha256": "919c010eafe349991e3464c748937fd4317cfaf59a912733462dacdb41da5383",
+      "bytes": 348044,
+      "duration_seconds": 7.25,
+      "generated_at": "2026-11-27T23:03:32.902Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 65,
+        "output_tokens": 213
+      },
+      "estimated_usd": 0.004299
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoWalletMenu",
+      "text": "Account menu opened. Select a wallet and approve the connection yourself. Nothing was signed.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoWalletMenu.wav",
+      "transcript": "Account menu opened. Select a wallet and approve the connection yourself. Nothing was signed.",
+      "sha256": "990d3fa7de34a0c4aa8a7152e538d0da038347290ed5183e85aeee339133c50b",
+      "bytes": 280844,
+      "duration_seconds": 5.85,
+      "generated_at": "2026-11-27T23:03:36.574Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 59,
+        "output_tokens": 165
+      },
+      "estimated_usd": 0.0033354
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNotifications",
+      "text": "Opening notifications. If no wallet is connected, the panel will show a connection prompt.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNotifications.wav",
+      "transcript": "Opening notifications. If no wallet is connected, the panel will show a connection prompt.",
+      "sha256": "09205a94578a87cfa29a858ca7e46624c063ba44d7b714f6c647213de1adc14c",
+      "bytes": 283244,
+      "duration_seconds": 5.9,
+      "generated_at": "2026-11-27T23:03:42.266Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 59,
+        "output_tokens": 174
+      },
+      "estimated_usd": 0.0035154
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNotifications",
+      "text": "Открываю панель уведомлений. Если кошелёк не подключён, появится подсказка.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNotifications.wav",
+      "transcript": "Открываю панель уведомлений. Если кошелёк не подключён, появится подсказка.",
+      "sha256": "13c116ce6a47a12dd9284b0a77f35756fcd533da1ad9ed4d8004fc04789b2c61",
+      "bytes": 252044,
+      "duration_seconds": 5.25,
+      "generated_at": "2026-11-27T23:03:45.563Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 65,
+        "output_tokens": 162
+      },
+      "estimated_usd": 0.003279
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkLoading",
+      "text": "Wallet state is still loading. Check the network in your wallet menu.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkLoading.wav",
+      "transcript": "Wallet state is still loading. Check the network in your wallet menu.",
+      "sha256": "5a71bd77fd47c6727aeb22d02cfc06aaad20a0132405e1e29613c3223aecb518",
+      "bytes": 208844,
+      "duration_seconds": 4.35,
+      "generated_at": "2026-11-27T23:03:49.220Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 131
+      },
+      "estimated_usd": 0.0026536
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkLoading",
+      "text": "Состояние кошелька ещё загружается. Проверьте сеть в меню кошелька.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkLoading.wav",
+      "transcript": "Состояние кошелька ещё загружается. Проверьте сеть в меню кошелька.",
+      "sha256": "28b2235be57c5f5c283c1d256a4807c9a82f8f22495295534eb1ad070eddbfc5",
+      "bytes": 232844,
+      "duration_seconds": 4.85,
+      "generated_at": "2026-11-27T23:03:52.679Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 63,
+        "output_tokens": 149
+      },
+      "estimated_usd": 0.0030178
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkDisconnected",
+      "text": "No wallet is connected. Its selected network is unknown.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkDisconnected.wav",
+      "transcript": "No wallet is connected. Its selected network is unknown.",
+      "sha256": "1f10c273ed7016faad89382944180232ba18bee072ad88aff69642fa47aa5edb",
+      "bytes": 189644,
+      "duration_seconds": 3.95,
+      "generated_at": "2026-11-27T23:03:55.895Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 53,
+        "output_tokens": 116
+      },
+      "estimated_usd": 0.0023518000000000002
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkDisconnected",
+      "text": "Кошелёк не подключён. Сеть кошелька сейчас неизвестна.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkDisconnected.wav",
+      "transcript": "Кошелёк не подключён. Сеть кошелька сейчас неизвестна.",
+      "sha256": "836db67b0792ce82b46de4e143f88d674a61fb2b5aef9c5afe6982e353864f02",
+      "bytes": 189644,
+      "duration_seconds": 3.95,
+      "generated_at": "2026-11-27T23:03:59.144Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 60,
+        "output_tokens": 122
+      },
+      "estimated_usd": 0.002476
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkUnknown",
+      "text": "Wallet connected, but the network is not verified by available state. Check it in your wallet.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkUnknown.wav",
+      "transcript": "Wallet connected, but the network is not verified by available state. Check it in your wallet.",
+      "sha256": "be1e785323c6dd5ba8be405b76adabe72cf84bd79cce055b2a06480d990ee825",
+      "bytes": 292844,
+      "duration_seconds": 6.1,
+      "generated_at": "2026-11-27T23:04:02.170Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 61,
+        "output_tokens": 181
+      },
+      "estimated_usd": 0.0036566
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkUnknown",
+      "text": "Кошелёк подключён, но сеть не подтверждена доступными данными. Проверьте её в кошельке.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkUnknown.wav",
+      "transcript": "Кошелёк подключён, но сеть не подтверждена доступными данными. Проверьте её в кошельке.",
+      "sha256": "4d888926294f2faa08b28861aeefd9ec9c44f66d679675cd5f82c63e3f7d4e50",
+      "bytes": 290444,
+      "duration_seconds": 6.05,
+      "generated_at": "2026-11-27T23:04:05.582Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 70,
+        "output_tokens": 180
+      },
+      "estimated_usd": 0.003642
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoThemeClassic",
+      "text": "ArtSoul Classic appearance is enabled.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoThemeClassic.wav",
+      "transcript": "ArtSoul Classic appearance is enabled.",
+      "sha256": "23ea0f7b624ee10aa97187f8eb5151e59208a369981c9dc3da7fdb3ec3efb8b6",
+      "bytes": 110444,
+      "duration_seconds": 2.3,
+      "generated_at": "2026-11-27T23:04:09.035Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 49,
+        "output_tokens": 76
+      },
+      "estimated_usd": 0.0015494
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoThemeClassic",
+      "text": "Включила классический вид ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoThemeClassic.wav",
+      "transcript": "Включила классический вид ArtSoul.",
+      "sha256": "1cb259027c1d745843226b108791d500d1666d6a5a9457a8244d77c4ae262901",
+      "bytes": 124844,
+      "duration_seconds": 2.6,
+      "generated_at": "2026-11-27T23:04:12.071Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 51,
+        "output_tokens": 89
+      },
+      "estimated_usd": 0.0018105999999999999
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoThemeFuture",
+      "text": "ArtSoul Future appearance is enabled.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoThemeFuture.wav",
+      "transcript": "ArtSoul Future appearance is enabled.",
+      "sha256": "fe097fadceba969328d7b294d31f52107f86cf3f052803ee42761a9ad63bfc43",
+      "bytes": 134444,
+      "duration_seconds": 2.8,
+      "generated_at": "2026-11-27T23:04:15.297Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 49,
+        "output_tokens": 97
+      },
+      "estimated_usd": 0.0019694
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoThemeFuture",
+      "text": "Включила оформление Future.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoThemeFuture.wav",
+      "transcript": "Включила оформление Future.",
+      "sha256": "97a0b805531621789a0fc634b151527718b6f19e9a033ce02c91726bdf4695ed",
+      "bytes": 93644,
+      "duration_seconds": 1.95,
+      "generated_at": "2026-11-27T23:04:18.390Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 48,
+        "output_tokens": 74
+      },
+      "estimated_usd": 0.0015088
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoModeClarify",
+      "text": "Which appearance do you want: Classic or Future? Or do you mean voice chat?",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoModeClarify.wav",
+      "transcript": "Which appearance do you want: Classic or Future? Or do you mean voice chat?",
+      "sha256": "c888ec4d95ddb3489adf311c6a21d9aa2ab95a056d881ba4ed83646d5a320563",
+      "bytes": 271244,
+      "duration_seconds": 5.65,
+      "generated_at": "2026-11-27T23:04:21.520Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 59,
+        "output_tokens": 160
+      },
+      "estimated_usd": 0.0032354000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoModeClarify",
+      "text": "Какой режим нужен: Classic или Future? Или вы хотите включить голосовой чат?",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoModeClarify.wav",
+      "transcript": "Какой режим нужен: Classic или Future? Или вы хотите включить голосовой чат?",
+      "sha256": "1caf5c3bd9afd05492a3505b4482e91b9e5e53f4656448355107ff8332b5aba5",
+      "bytes": 261644,
+      "duration_seconds": 5.45,
+      "generated_at": "2026-11-27T23:04:24.866Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 60,
+        "output_tokens": 161
+      },
+      "estimated_usd": 0.003256
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoSearchChoice",
+      "text": "Choose a specific result: first, second, or third.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoSearchChoice.wav",
+      "transcript": "Choose a specific result: first, second, or third.",
+      "sha256": "b98c924c86709ae9ea1e3357fc24fca815c7bf1d05dddeb79c8e93e232f27d79",
+      "bytes": 180044,
+      "duration_seconds": 3.75,
+      "generated_at": "2026-11-27T23:04:28.233Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 133
+      },
+      "estimated_usd": 0.0026924
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoSearchChoice",
+      "text": "Выберите номер результата: первый, второй или третий.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoSearchChoice.wav",
+      "transcript": "Выберите номер результата: первый, второй или третий.",
+      "sha256": "01094f42dd195069574de04214a6c36db41c7a0862913c99e9411404be607b7c",
+      "bytes": 208844,
+      "duration_seconds": 4.35,
+      "generated_at": "2026-11-27T23:04:31.501Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 54,
+        "output_tokens": 130
+      },
+      "estimated_usd": 0.0026324
+    },
+    {
+      "lang": "en",
+      "id": "r2CannotHear",
+      "text": "I could not hear that. Please try again or correct the text.",
+      "url": "/audio/assistant/v1/phrases/en-r2CannotHear.wav",
+      "transcript": "I could not hear that. Please try again or correct the text.",
+      "sha256": "2f8d28bbabcddad1a529735fc61938c6136125ef234259696682fe5122144a0c",
+      "bytes": 218444,
+      "duration_seconds": 4.55,
+      "generated_at": "2026-11-27T23:05:53.333Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 56,
+        "output_tokens": 189
+      },
+      "estimated_usd": 0.0038136
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoWalletMenu",
+      "text": "Открыла меню аккаунта. Для подключения выберите кошелёк и подтвердите действие сами. Ничего не подписано.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoWalletMenu.wav",
+      "transcript": "Открыла меню аккаунта. Для подключения выберите кошелёк и подтвердите действие сами. Ничего не подписано.",
+      "sha256": "cbc15188b632471162bcd822ad9d19799403b173db958c888d0439d6e665a289",
+      "bytes": 458444,
+      "duration_seconds": 9.55,
+      "generated_at": "2026-11-27T23:05:57.414Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 70,
+        "output_tokens": 256
+      },
+      "estimated_usd": 0.005162
     }
   ]
 }

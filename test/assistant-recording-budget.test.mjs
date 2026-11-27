@@ -33,6 +33,15 @@ test('new recording requests require the receiving organization and time for a c
   }
 });
 
+test('a reviewed single failure gets one budgeted retry and both attempts remain reserved', () => {
+  const failed = {...earlier, id:'ru-r2Greeting', status:'failed'};
+  assert.doesNotThrow(() => checkRecordingBudget([failed], [phrase], 0.05, true));
+  assert.throws(() => checkRecordingBudget([failed], [phrase], 0.025, true), /budget_exceeded/);
+  for (const history of [[], [failed, failed], [{...failed,status:'started'}], [{...failed,status:'completed'}]]) {
+    assert.throws(() => checkRecordingBudget(history, [phrase], 1, true), /reviewed_failure_required/);
+  }
+});
+
 test('offline recovery installs the received bytes once and rebuilds the matching voice index', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'artsoul-voice-recovery-'));
   t.after(() => fs.rm(root, {recursive:true, force:true}));

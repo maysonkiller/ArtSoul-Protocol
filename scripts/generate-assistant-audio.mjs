@@ -122,15 +122,18 @@ async function generateClip(clip, apiKey, organization) {
   });
 }
 
-export function checkRecordingBudget(attempts, pending, budgetUsd) {
+export function checkRecordingBudget(attempts, pending, budgetUsd, retryFailed = false) {
   if (!Array.isArray(attempts) || !Number.isFinite(budgetUsd) || budgetUsd <= 0 || budgetUsd > 100)
     throw new Error('invalid_recording_budget');
   let reserved = 0;
   const ids = new Set(pending.map(clip => clip.lang + '-' + clip.id));
+  const retryAllowed = retryFailed && ids.size === 1 && attempts.filter(a => ids.has(a?.id)).length === 1;
+  if (retryFailed && (!retryAllowed || !attempts.some(a => ids.has(a?.id) && a.status === 'failed')))
+    throw new Error('reviewed_failure_required');
   for (const attempt of attempts) {
     if (!attempt || typeof attempt.id !== 'string' || !['started','failed','completed','received'].includes(attempt.status) ||
         !Number.isFinite(attempt.reservedUsd) || attempt.reservedUsd <= 0) throw new Error('invalid_ledger');
-    if (ids.has(attempt.id)) throw new Error('previous_attempt_requires_review');
+    if (ids.has(attempt.id) && !retryAllowed) throw new Error('previous_attempt_requires_review');
     reserved += Math.round(attempt.reservedUsd * 1000000);
   }
   if (reserved + pending.length * Math.round(reserveUsd * 1000000) > Math.round(budgetUsd * 1000000)) throw new Error('generation_budget_exceeded');
@@ -182,17 +185,19 @@ async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help')) {
     console.log('node scripts/generate-assistant-audio.mjs [--only en-r2Greeting,ru-r2Greeting] [--generate --budget-usd AMOUNT]');
-    console.log('Default: dry run, no credentials read or API calls. Use --recover to finish a received recording without any API request.');
+    console.log('Default: dry run. Use --recover to finish publishing without an API call, or --retry-failed for one explicitly reviewed failed clip.');
     return;
   }
-  let generate = false, recover = false, only = null, budgetUsd;
+  let generate = false, recover = false, retryFailed = false, only = null, budgetUsd;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--generate') generate = true;
+    else if (args[i] === '--retry-failed') retryFailed = true;
     else if (args[i] === '--recover' && args.length === 1) recover = true;
     else if (args[i] === '--only' && args[i + 1]) only = new Set(args[++i].split(','));
     else if (args[i] === '--budget-usd' && args[i + 1]) budgetUsd = Number(args[++i]);
     else throw new Error('unknown_argument');
   }
+  if (retryFailed && (!generate || only?.size !== 1)) throw new Error('reviewed_failure_required');
   if (generate && (!only || only.size > 10 || !Number.isFinite(budgetUsd) || budgetUsd <= 0 || budgetUsd > 100))
     throw new Error('explicit_batch_and_budget_required');
   const bank = await readJson(bankPath, null);
@@ -222,7 +227,7 @@ async function main() {
     const pending = clips.filter(clip => !recorded.has(clip.url));
     console.log(JSON.stringify({mode: generate ? 'generate' : 'dry_run', model, pending: pending.map(clip => `${clip.lang}-${clip.id}`), reservedUsd: pending.length * reserveUsd}));
     if (!generate || !pending.length) return;
-    checkRecordingBudget(ledger.attempts, pending, budgetUsd);
+    checkRecordingBudget(ledger.attempts, pending, budgetUsd, retryFailed);
     const local = await fs.readFile(path.join(root, '.env.local'), 'utf8').then(parseEnv, error => {
       if (error.code === 'ENOENT') return {};
       throw new Error('credential_unavailable');
@@ -246,7 +251,10 @@ async function main() {
         await publishReceived(bank, manifest, ledger, buildVoicePhraseIndex);
         console.log(JSON.stringify({id: attempt.id, status: 'generated', bytes: result.wav.length, estimatedUsd: result.estimatedUsd}));
       } catch (error) {
-        if (!await readJson(receivedPath, null) && attempt.status !== 'completed') attempt.status = 'failed';
+        if (!await readJson(receivedPath, null) && attempt.status !== 'completed') {
+          attempt.status = 'failed';
+          if (/^[a-z_]+$/.test(error.message)) attempt.reason = error.message;
+        }
         await writeJson(ledgerPath, ledger);
         throw error;
       }

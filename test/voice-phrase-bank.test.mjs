@@ -110,7 +110,7 @@ test('missing files, malformed PCM with matching hashes, and orphan recordings a
 test('all product pages load the verified phrase bank before the command handler', async () => {
     for (const page of ['index', 'gallery', 'artwork', 'profile', 'upload', 'collection-builder', 'admin', 'docs-protocol']) {
         const html = await fs.readFile(`${page}.html`, 'utf8');
-        assert.equal((html.match(/voice-phrase-bank\.js\?v=1/g) || []).length, 1, page);
+        assert.equal((html.match(/voice-phrase-bank\.js\?v=\d+"/g) || []).length, 1, page);
         assert.ok(html.indexOf('/voice-phrase-bank.js') < html.indexOf('/voice-commands.js'), page);
     }
     const source = await fs.readFile('voice-commands.js', 'utf8');

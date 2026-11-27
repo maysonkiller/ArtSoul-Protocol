@@ -53,7 +53,7 @@ test('server fixes model, Marin, language, PCM and response settings; wrong prov
   const config = run.provider.sent[0].session;
   assert.equal(run.organization, 'org-offline-test'); assert.equal(run.reservations, 1);
   assert.match(config.instructions, /Russian/); assert.equal(config.audio.output.voice, 'marin');
-  assert.equal(config.max_output_tokens, 384); assert.equal(config.audio.input.turn_detection.create_response, false);
+  assert.equal(config.max_output_tokens, 1024); assert.equal(config.audio.input.turn_detection.create_response, false);
   run.provider.receive({type: 'session.updated', session: {...config, audio: {...config.audio, output: {...config.audio.output, voice: 'alloy'}}}});
   assert.equal(ended(run), 'provider_configuration_mismatch'); assert.equal(run.provider.terminated, 1);
 });
@@ -75,18 +75,28 @@ test('PCM is bounded and the browser cannot send arbitrary billable provider eve
 test('at most four responses and one active response are possible; extra speech cannot queue requests', () => {
   const run = setup(); run.ready();
   for (let i = 0; i < 4; i++) {
-    run.provider.receive({type: 'input_audio_buffer.speech_stopped'});
-    run.provider.receive({type: 'input_audio_buffer.speech_stopped'});
+    run.provider.receive({type: 'input_audio_buffer.committed'});
+    run.provider.receive({type: 'input_audio_buffer.committed'});
     responseDone(run.provider);
   }
   assert.equal(run.provider.sent.filter(item => item.type === 'response.create').length, 4);
-  run.provider.receive({type: 'input_audio_buffer.speech_stopped'});
+  run.provider.receive({type: 'input_audio_buffer.committed'});
   assert.equal(ended(run), 'response_limit'); assert.equal(run.opens, 1);
+});
+
+test('the pilot waits for committed input and reports a bounded provider failure reason', () => {
+  const run = setup(); run.ready();
+  run.provider.receive({type: 'input_audio_buffer.speech_stopped'});
+  assert.equal(run.provider.sent.filter(item => item.type === 'response.create').length, 0);
+  run.provider.receive({type: 'input_audio_buffer.committed'});
+  assert.equal(run.provider.sent.filter(item => item.type === 'response.create').length, 1);
+  run.provider.receive({type: 'response.done', response: {status: 'incomplete', status_details: {reason: 'max_output_tokens'}}});
+  assert.equal(ended(run), 'response_max_output_tokens');
 });
 
 test('tool continuation requires matching reviewed output and consumes the same response budget', () => {
   const run = setup(); run.ready();
-  run.provider.receive({type: 'input_audio_buffer.speech_stopped'});
+  run.provider.receive({type: 'input_audio_buffer.committed'});
   run.provider.receive({type: 'response.done', response: {status: 'completed', output: [{type: 'function_call', name: 'artsoul_command', call_id: 'call_1', arguments: '{"command":"open gallery"}'}]}});
   assert.equal(run.client.sent.at(-1).command, 'open gallery');
   run.client.receive({type: 'tool_result', callId: 'call_1', result: '{"approved":false}'});
@@ -97,7 +107,7 @@ test('tool continuation requires matching reviewed output and consumes the same 
 
 test('response audio is returned, and stop, expiry or transport failure terminates without retry', () => {
   for (const trigger of ['stop', 'timer', 'disconnect', 'provider']) {
-    const run = setup(); run.ready(); run.provider.receive({type: 'input_audio_buffer.speech_stopped'});
+    const run = setup(); run.ready(); run.provider.receive({type: 'input_audio_buffer.committed'});
     run.provider.receive({type: 'response.output_audio.delta', delta: Buffer.alloc(960).toString('base64')});
     run.provider.receive({type: 'response.output_audio_transcript.done', transcript: 'Hello'});
     assert.equal(run.client.sent.at(-2).type, 'audio'); assert.equal(run.client.sent.at(-1).text, 'Hello');
@@ -106,7 +116,7 @@ test('response audio is returned, and stop, expiry or transport failure terminat
     if (trigger === 'disconnect') run.client.close();
     if (trigger === 'provider') run.provider.emit('error', new Error('offline'));
     assert.equal(run.provider.terminated, 1); assert.equal(run.opens, 1);
-    const count = run.provider.sent.length; run.provider.receive({type: 'input_audio_buffer.speech_stopped'});
+    const count = run.provider.sent.length; run.provider.receive({type: 'input_audio_buffer.committed'});
     assert.equal(run.provider.sent.length, count);
   }
 });
