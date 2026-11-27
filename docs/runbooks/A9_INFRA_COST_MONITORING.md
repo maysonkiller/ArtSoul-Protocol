@@ -58,6 +58,53 @@ the RPC head minus the indexed block equals the reported lag. The result
 includes these watermarks and the observation time. Keep successive results
 for the duration approved at go/no-go. A single observation covers one instant.
 
+### Review a complete series of worker observations
+
+Set the approved chain, Core, confirmation depth and alert thresholds in the
+monitor environment. Record its JSON output in a private append-only journal
+at the normal sampling cadence, including failed observations. Retain the
+original journal with the release evidence. The following first command
+records one observation. The second reads the journal locally with the same
+environment and the boundaries and maximum gap agreed for the review.
+
+```sh
+node scripts/check-indexer-health.mjs >> "$JOURNAL" 2>&1
+node scripts/check-indexer-health.mjs --window "$JOURNAL" "$START_UTC" "$END_UTC" "$MAX_GAP_SECONDS"
+```
+
+Use UTC timestamps ending in `Z`. Collect a sample on or before the start
+and another on or after the end. The checker re-evaluates each participating
+sample, including both bracketing ones. It checks response age, deployment,
+database health, RPC errors, lag, chronology, spacing and progress of both
+cursors. A missed check appears as a gap. A failed sample prevents acceptance
+even when later samples recover. Older monitor output without the underlying
+database and synchronization fields cannot establish a passing window.
+The output describes sampled worker health. Symptoms between probes,
+customer journeys, receipts and provider charges have their own evidence.
+
+On November 27 the public-catalogue Base Sepolia worker was read through its
+loopback health endpoint at 00:26:10.936 and 00:31:22.876 UTC. The
+[two redacted observations](../../test/fixtures/base-sepolia-health-window-2026-11-27.ndjson)
+bracket 00:26:15–00:31:15 UTC. Both the confirmed and indexed cursor advanced
+from 64,086,499 to 64,088,060. The lag was 12 and 11 blocks. Both observations
+had zero unresolved errors and zero RPC errors in the preceding minute.
+The gap was 311.940 seconds. The command below passes with a 330-second
+limit and reports a gap with a 300-second limit. These bounds exercise the
+testnet checker. Choose the production window and cadence at release review.
+
+```sh
+ARTSOUL_MONITOR_EXPECTED_CORE_ADDRESS=0x43368f7E2d5f11f4B7E11928D66d3f4A5a4E4ceF ARTSOUL_MONITOR_MAX_BLOCKS_BEHIND=50 \
+node scripts/check-indexer-health.mjs --window test/fixtures/base-sepolia-health-window-2026-11-27.ndjson 2026-11-27T00:26:15Z 2026-11-27T00:31:15Z 330
+```
+
+During a November 27 replay of the November 9 Base Sepolia cutover, the worker
+returned an overall healthy status at 13:21:27 and 13:21:55 UTC. The first
+sample reported 27 blocks of lag and `isSynced: false`; the second reported
+17 blocks and `isSynced: true`. The window checker rejected that interval.
+The worker was still configured with a 20-block boundary at that time.
+The [subsequent cutover observations](../audits/B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md#freshness-policy-and-observed-health)
+record the change to the current testnet threshold.
+
 Production values are Base Sepolia, depth `3`, lag strictly below `50`, at most
 `5` RPC errors per minute, response age at most `120000` ms and request timeout
 `10000` ms. After Denim's 200-ms canonical blocks, the explicit lag target is

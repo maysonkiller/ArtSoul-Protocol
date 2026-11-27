@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { Interface, getAddress, isHexString, keccak256, toQuantity } from 'ethers';
 import { verifyArtworkRegistration as readPublicationEvidence } from '../src/api/upload-registration-evidence.js';
-import { rehearsalArtwork as fixture, rehearsalMetadataUri as uri, rehearsalOpening } from './rehearsal-review/client.mjs';
+import { rehearsalArtwork as fixture, rehearsalMetadataUri as uri, rehearsalOpening, rehearsalLateBid, refundWork } from './rehearsal-review/client.mjs';
 import { listenForReview, sequencedRead } from './serve-rehearsal-review.mjs';
 import { confirmFinalizedBlock, finalizedBlock, requireIndependentProviders, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
@@ -20,11 +20,13 @@ const market = new Interface([
     'event AuctionOpened(uint256 indexed auctionId,uint256 indexed artworkId,uint256 startPrice,uint256 end)'
 ]);
 const data = market.encodeFunctionData('registerArtwork', [uri]);
+const refundData = market.encodeFunctionData('registerArtwork', [refundWork.metadataUri]);
 const openingData = market.encodeFunctionData('createAuction', [1n, rehearsalOpening.reserveWei, Number(rehearsalOpening.hours) * 3600]);
 const chain = '0x14a34';
 const signedRegistration = '0xe6e6f19235b714814c40bb1ab20aebd4ff2408f17c9e8bc4f15e1e7ee391eacf';
 const sha = bytes => createHash('sha256').update(Buffer.from(bytes.slice(2), 'hex')).digest('hex');
 assert.equal(sha(data), fixture.dataSha256, 'Unsigned fixture differs from the browser review');
+assert.equal(sha(refundData), refundWork.dataSha256, 'Refund fixture differs from the browser review');
 assert.equal(sha(openingData), rehearsalOpening.dataSha256, 'Unsigned auction differs from the browser review');
 
 function checkedPayer(review, register) {
@@ -45,29 +47,40 @@ async function view(rpc, name, params, at, to = fixture.core) {
     return result;
 }
 
-async function checkWork(rpc, id, payer, at) {
+async function checkWork(rpc, id, payer, at, metadata = uri) {
     const work = await view(rpc, 'works', [id], at);
     assert.equal(work.creator, payer, 'Another account registered this work. Check your receipt before retrying.');
-    assert.equal(work.metadataURI, uri, 'A different work occupies this ID. Check your receipt before retrying.');
+    assert.equal(work.metadataURI, metadata, 'A different work occupies this ID. Check your receipt before retrying.');
     return work;
 }
 
-export async function registrationAtHead(rpc, payer, block) {
+export async function registrationAtHead(rpc, payer, block, secondWork = false) {
     const at = { blockHash: block.hash, requireCanonical: true };
+    const expectedId = secondWork ? 2n : 1n, metadata = secondWork ? refundWork.metadataUri : uri;
+    if (secondWork) {
+        const [first, auction, [tokenId]] = await Promise.all([checkWork(rpc, 1n, payer, at), view(rpc, 'auctions', [1n], at),
+            view(rpc, 'artworkToToken', [1n], at, fixture.nft)]);
+        const price = BigInt(rehearsalOpening.reserveWei);
+        assert(first.activeAuction === 0n && first.floor === price && tokenId === 1n &&
+            auction.artworkId === 1n && auction.state === 4n && auction.price === price &&
+            auction.firstCollector === rehearsalLateBid.bidder, 'Auction 1 must have its reviewed finalized settlement first');
+    }
     const [finalized] = await view(rpc, 'workCount', [], at);
-    if (finalized > 0n) {
-        await checkWork(rpc, 1n, payer, at);
-        return { complete: true, finalizedArtwork: { id: '1' } };
+    if (finalized >= expectedId) {
+        await checkWork(rpc, expectedId, payer, at, metadata);
+        return { complete: true, finalizedArtwork: { id: String(expectedId) } };
     }
     const [latest] = await view(rpc, 'workCount', [], 'latest');
-    if (latest > 0n) {
-        await checkWork(rpc, 1n, payer, 'latest');
+    if (latest >= expectedId) {
+        await checkWork(rpc, expectedId, payer, 'latest', metadata);
         return { waitingForFinality: { role: 'registerArtwork' } };
     }
-    return firstWorkRequest(rpc, payer, 'registerArtwork', data);
+    assert.equal(finalized, expectedId - 1n);
+    assert.equal(latest, finalized, 'Registry changed since finality');
+    return workRequest(rpc, payer, 'registerArtwork', secondWork ? refundData : data, expectedId);
 }
 
-async function firstWorkRequest(rpc, payer, operation, callData) {
+async function workRequest(rpc, payer, operation, callData, expectedId = 1n) {
     const [nonce, pending, code, predicted, ...codeChecks] = await Promise.all([
         rpc('eth_getTransactionCount', [payer, 'latest']), rpc('eth_getTransactionCount', [payer, 'pending']),
         rpc('eth_getCode', [payer, 'latest']), rpc('eth_call', [{ from: payer, to: fixture.core, data: callData, value: '0x0' }, 'pending']),
@@ -79,9 +92,10 @@ async function firstWorkRequest(rpc, payer, operation, callData) {
     ]);
     assert.equal(code, '0x', 'Select the reviewed externally owned test payer');
     assert.equal(nonce, pending, 'A payer request is pending. Check the wallet activity before retrying.');
-    assert.equal(predicted.toLowerCase(), market.encodeFunctionResult(operation, [1n]), 'Pending rehearsal history changed');
+    assert.equal(predicted.toLowerCase(), market.encodeFunctionResult(operation, [expectedId]), 'Pending rehearsal history changed');
     return { operation, nonce: toQuantity(BigInt(nonce)), target: fixture.core,
-        ...(operation === 'registerArtwork' && { metadataUri: uri }),
+        ...(operation === 'registerArtwork' && { metadataUri: expectedId === 2n ? refundWork.metadataUri : uri }),
+        ...(expectedId === 2n && { rehearsalWorkId: '2' }),
         data: callData, dataHash: keccak256(callData), dataSha256: sha(callData), deployments: [], codeChecks };
 }
 
@@ -92,14 +106,14 @@ export async function openingAtHead(rpc, payer, block) {
     const [latest] = await view(rpc, 'auctionCount', [], 'latest');
     if (latest > 0n) return { waitingForFinality: { role: 'createAuction' } };
     await simulateRegisteredOpening(rpc, payer, block, rehearsalOpening.reserveWei, rehearsalOpening.hours);
-    return firstWorkRequest(rpc, payer, 'createAuction', openingData);
+    return workRequest(rpc, payer, 'createAuction', openingData);
 }
 
-export async function buildArtworkReview(review, register, providers, { opening = false } = {}) {
+export async function buildArtworkReview(review, register, providers, { opening = false, secondWork = false } = {}) {
     const payer = checkedPayer(review, register);
     const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });
     const observe = opening ? openingAtHead : registrationAtHead;
-    const [first, second] = await Promise.all(providers.map(rpc => observe(rpc, payer, block)));
+    const [first, second] = await Promise.all(providers.map(rpc => observe(rpc, payer, block, secondWork)));
     assert.deepEqual(first, second, 'Providers disagree on the rehearsal state. Refresh later.');
     await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
     return { chainId: chain, payer, block, ...first };
@@ -161,18 +175,20 @@ async function readReviewedEvent(rpc, hash, payer, calldata, eventName) {
     return { block, included, tx, receipt, event, log };
 }
 
-export async function inspectRegistrationReceipt(rpc, hash, payer) {
-    const { block, receipt, event, log } = await readReviewedEvent(rpc, hash, payer, data, 'ArtworkRegistered');
+export async function inspectRegistrationReceipt(rpc, hash, payer, secondWork = false) {
+    const metadata = secondWork ? refundWork.metadataUri : uri;
+    const { block, receipt, event, log } = await readReviewedEvent(rpc, hash, payer, secondWork ? refundData : data, 'ArtworkRegistered');
     assert(event.args.artworkId > 0n);
+    if (secondWork) assert.equal(event.args.artworkId, 2n, 'Unexpected ID for the refund rehearsal work');
     assert.equal(event.args.creator, payer);
-    assert.equal(event.args.metadataURI, uri);
+    assert.equal(event.args.metadataURI, metadata);
     const at = { blockHash: block.hash, requireCanonical: true };
-    const [work, [tokenId]] = await Promise.all([checkWork(rpc, event.args.artworkId, payer, at),
+    const [work, [tokenId]] = await Promise.all([checkWork(rpc, event.args.artworkId, payer, at, metadata),
         view(rpc, 'artworkToToken', [event.args.artworkId], at, fixture.nft)]);
     assert.equal(tokenId, 0n, 'Unexpected token at the registration block');
     assert.equal(work.floor, 0n, 'Unexpected floor at the registration block');
     return { block, txHash: hash, transactionIndex: receipt.transactionIndex, workId: String(event.args.artworkId),
-        creator: payer, core: fixture.core, metadataUri: uri, logCount: receipt.logs.length, logIndex: BigInt(log.logIndex).toString(),
+        creator: payer, core: fixture.core, metadataUri: metadata, logCount: receipt.logs.length, logIndex: BigInt(log.logIndex).toString(),
         atRegistrationBlock: { activeAuctionId: work.activeAuction === 0n ? null : String(work.activeAuction),
             canonicalFloorWei: String(work.floor), tokenId: null } };
 }
@@ -220,11 +236,11 @@ export async function checkRegistrationPublication(receipt, register, providers)
     return result;
 }
 
-export async function verifyArtworkRegistration(review, register, txHash, providers) {
+export async function verifyArtworkRegistration(review, register, txHash, providers, secondWork = false) {
     const payer = checkedPayer(review, register);
     assert(isHexString(txHash, 32), 'Expected the public registration transaction hash');
     requireIndependentProviders(providers);
-    const [first, second] = await Promise.all(providers.map(rpc => inspectRegistrationReceipt(rpc, txHash.toLowerCase(), payer)));
+    const [first, second] = await Promise.all(providers.map(rpc => inspectRegistrationReceipt(rpc, txHash.toLowerCase(), payer, secondWork)));
     assert.deepEqual(first, second, 'Providers disagree on the registration receipt');
     await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true, expectedBlock: first.block });
     const publicationEvidence = await checkRegistrationPublication(first, register, providers);
@@ -236,11 +252,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         const [reviewFile, registerFile, option, hash, ...extra] = process.argv.slice(2);
         const opening = option === '--check-opening' && hash && extra.length === 1;
         const auctionRequest = option === '--opening-plan' || option === '--serve-opening';
-        assert(reviewFile && registerFile && (opening || (!extra.length && ((!hash && (!option || auctionRequest || option === '--plan')) ||
-            (['--verify-receipt','--verify-opening'].includes(option) && hash)))), 'Usage: review-rehearsal-artwork.mjs review.json register.json [--plan | --verify-receipt HASH | --verify-opening HASH | --check-opening RESERVE_WEI HOURS | --opening-plan | --serve-opening]');
+        const secondWork = ['--refund-work-plan','--serve-refund-work','--verify-refund-work'].includes(option);
+        assert(reviewFile && registerFile && (opening || (!extra.length && ((!hash && (!option || auctionRequest || ['--plan','--refund-work-plan','--serve-refund-work'].includes(option))) ||
+            (['--verify-receipt','--verify-opening','--verify-refund-work'].includes(option) && hash)))), 'Usage: review-rehearsal-artwork.mjs review.json register.json [--plan | --verify-receipt HASH | --verify-opening HASH | --check-opening RESERVE_WEI HOURS | --opening-plan | --serve-opening | --refund-work-plan | --serve-refund-work | --verify-refund-work HASH]');
         const [review, register] = await Promise.all([reviewFile, registerFile].map(async path => JSON.parse(await readFile(path, 'utf8'))));
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
-        const getPlan = () => buildArtworkReview(review, register, providers, { opening: auctionRequest });
+        const getPlan = () => buildArtworkReview(review, register, providers, { opening: auctionRequest, secondWork });
         if (opening) {
             const payer = checkedPayer(review, register);
             const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });
@@ -248,9 +265,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             assert.deepEqual(first, second, 'Providers disagree on the simulated auction');
             await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
             console.log(JSON.stringify({ ...first, rpcReadings: 2 }, null, 2));
-        } else if (option === '--verify-receipt') console.log(JSON.stringify(await verifyArtworkRegistration(review, register, hash, providers), null, 2));
+        } else if (option === '--verify-receipt' || option === '--verify-refund-work') console.log(JSON.stringify(await verifyArtworkRegistration(review, register, hash, providers, secondWork), null, 2));
         else if (option === '--verify-opening') console.log(JSON.stringify(await verifyArtworkOpening(review, register, hash, providers), null, 2));
-        else if (option === '--plan' || option === '--opening-plan') console.log(JSON.stringify(await getPlan(), null, 2));
+        else if (option?.endsWith('-plan') || option === '--plan') console.log(JSON.stringify(await getPlan(), null, 2));
         else {
             checkedPayer(review, register);
             const { url } = await listenForReview(getPlan, {

@@ -175,6 +175,20 @@ node scripts/read-ordinary-outbid-refund.mjs docs/testnet/ordinary-auction-1-set
 
 The JSON file supplies the reviewed issuer addresses and runtime hashes. The command reads the specified auction. It matches the creditor, amount and entry number in both finalized receipts, including their block positions and the published queue cursor. A successful ETH payment returns `delivered`. A rejected payment returns `credited-for-withdrawal`, which still requires a creditor withdrawal for delivery. The [isolated EVM rehearsal](../../scripts/rehearse-ordinary-settlement-receipts.cjs) exercised both outcomes in a single batch. Public participant evidence requires the two corresponding Base Sepolia receipts.
 
+### Second work for the two-collector test
+
+The first work already has a settled NFT. The creator can register a separate work for the two-collector test. On November 27 Base and PublicNode both simulated `registerArtwork(string)` returning ID 2 on the reviewed payout Core. The exact request has calldata SHA-256 `2ff394272a59051ccc4e4b2acc732a80f60efc52b903d552920b83c475c280b2`. It registers the title **ArtSoul Outbid Refund Rehearsal**, sends zero test ETH and opens no auction.
+
+Use the same release review and custody-register files as for the first registration. The plan checks the finalized first sale, both contract runtimes, the creator, existing registrations, pending nonce and simulated new ID. Only the creator can submit this rehearsal request from the local review page. A matching included or finalized second registration retires the request. Another work at ID 2 stops the review. A competing registration can still change the assigned ID at inclusion. Keep the public receipt if that happens and investigate before another submission.
+
+```sh
+node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.json> --refund-work-plan
+node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.json> --serve-refund-work
+node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.json> --verify-refund-work REGISTRATION_TX
+```
+
+After registration the creator opens a separate auction. Two distinct collectors place bids. Record the outbidding and refund-processing receipts for the queue reader above. The first auction's winner-surplus withdrawal covers another payment path.
+
 ### Restoring the first hosted sale
 
 A read-only, data-only PostgreSQL export included just the three private issuer, sale and credit tables. Its archive contained three table-data entries and occupied 2,540 bytes. Restoring into an empty local database with migrations 018 and 023 reproduced every field of the hosted issuer, finalized sale and allocations. The source and restored tables each had one row. The temporary database and local export were removed after comparison. This drill covers that sale. A full catalog and indexer recovery still requires its own release rehearsal.

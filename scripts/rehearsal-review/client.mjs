@@ -10,12 +10,19 @@ export const rehearsalArtwork = Object.freeze({
     dataSha256: '134d57c45b210427d7193990e3fd2a587692421b92904d7d83eb4331ea56bc3b'
 });
 
-export const rehearsalMetadataUri = 'data:application/json;base64,' + btoa(JSON.stringify({
-    name: rehearsalArtwork.title,
-    description: 'Technical test of artwork registration on Base Sepolia.',
-    image: 'https://artsoulprotocol.com/favicon.jpg',
-    media_type: 'image/jpeg'
-}));
+function metadataUri(name, description) {
+    return 'data:application/json;base64,' + btoa(JSON.stringify({
+        name, description,
+        image: 'https://artsoulprotocol.com/favicon.jpg',
+        media_type: 'image/jpeg'
+    }));
+}
+export const rehearsalMetadataUri = metadataUri(rehearsalArtwork.title, 'Technical test of artwork registration on Base Sepolia.');
+export const refundWork = Object.freeze({
+    title: 'ArtSoul Outbid Refund Rehearsal',
+    metadataUri: metadataUri('ArtSoul Outbid Refund Rehearsal', 'Base Sepolia test of two collectors bidding and the outbid deposit refund.'),
+    dataSha256: '2ff394272a59051ccc4e4b2acc732a80f60efc52b903d552920b83c475c280b2'
+});
 
 export const rehearsalOpening = Object.freeze({
     reserveWei: '1000000000000000', hours: '24',
@@ -83,17 +90,19 @@ export async function walletRequest(provider, plan) {
     await matchWallet(provider, plan);
     const create = ['OrdinaryMarket', 'OrdinaryPayoutMarket'].includes(plan.operation);
     const artwork = plan.operation === 'registerArtwork';
+    const refundRegistration = artwork && plan.rehearsalWorkId === '2';
     const opening = plan.operation === 'createAuction';
     const bid = plan.operation === 'placeBid';
     const settlement = plan.operation === 'settleAuction';
     const withdrawal = plan.operation === 'withdraw';
     if (artwork || opening || bid || settlement || withdrawal) {
-        const digest = withdrawal ? withdrawalDigest : settlement ? settlementDigest : (bid ? rehearsalLateBid : artwork ? rehearsalArtwork : rehearsalOpening).dataSha256;
+        const artworkFixture = refundRegistration ? refundWork : rehearsalArtwork;
+        const digest = withdrawal ? withdrawalDigest : settlement ? settlementDigest : (bid ? rehearsalLateBid : artwork ? artworkFixture : rehearsalOpening).dataSha256;
         check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === digest &&
             plan.deployments.length === 0 &&
             plan.codeChecks.length === 2 && sameAddress(plan.codeChecks[0].address, rehearsalArtwork.core) &&
             sameAddress(plan.codeChecks[1].address, rehearsalArtwork.nft), 'Unexpected artwork request.');
-        if (artwork) check(plan.metadataUri === rehearsalMetadataUri, 'Unexpected registration metadata.');
+        if (artwork) check(plan.metadataUri === (refundRegistration ? refundWork.metadataUri : rehearsalMetadataUri), 'Unexpected registration metadata.');
         if (bid) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === rehearsalLateBid.deposit,
             'Unexpected bidder or deposit.');
         if (settlement || withdrawal) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === '0x0',
@@ -130,7 +139,7 @@ export async function walletRequest(provider, plan) {
     }
     if (artwork || opening || settlement) {
         const simulation = await rpc('eth_call', [{ from: plan.payer, to: rehearsalArtwork.core, data: plan.data, value: '0x0' }, 'pending']);
-        check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === 1n,
+        check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === (refundRegistration ? 2n : 1n),
             settlement ? 'Settlement or token ID changed. Refresh the chain evidence.' :
                 opening ? 'Auction history changed. Refresh the chain evidence.' : 'Work registry changed. Refresh the chain evidence.');
     }
@@ -252,7 +261,7 @@ export async function start() {
         } else if (current.existingAuctionHistory) {
             status('The reviewed Core already has finalized auction history. This first-auction request is closed. Use the opening receipt to verify the work and its terms.');
         } else if (current.finalizedArtwork) {
-            status('Verified artwork ' + current.finalizedArtwork.id + ' · ' + rehearsalArtwork.title +
+            status('Verified artwork ' + current.finalizedArtwork.id + ' · ' + (current.finalizedArtwork.id === '2' ? refundWork.title : rehearsalArtwork.title) +
                 ' · creator ' + current.payer + ' at finalized Base Sepolia block ' + BigInt(current.block.number) + '.');
         } else if (current.finalizedPair) {
             const { core, nft } = current.finalizedPair;
@@ -317,10 +326,11 @@ export async function start() {
                 addField('Starting price', '0.001 test ETH');
                 addField('Duration', rehearsalOpening.hours + ' hours from inclusion');
             } else if (artwork) {
-                addField('Title', rehearsalArtwork.title);
+                const second = plan.rehearsalWorkId === '2';
+                addField('Title', second ? refundWork.title : rehearsalArtwork.title);
                 addField('Method', 'registerArtwork(string) · no mint or auction');
-                addField('Expected work', '1 if the registry is still empty at inclusion');
-                addField('Metadata URI', rehearsalMetadataUri);
+                addField('Expected work', second ? '2 if the registry is unchanged at inclusion' : '1 if the registry is still empty at inclusion');
+                addField('Metadata URI', plan.metadataUri);
             } else {
                 for (const [role, address] of Object.entries(plan.roles)) addField(roleName[role], address);
                 addField('Safe confirmations', 'Any 2 of 3');

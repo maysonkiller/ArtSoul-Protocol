@@ -315,6 +315,8 @@ Local engineering is active as of November 18. Deployment, custody changes and m
 
 Eleven active C items remain. C2, C3, C4, C6 and C11 have implementation acceptance. C16 is retired.
 
+**November 27 progress.** On the replacement testnet NFT, two providers agreed on the first mint log and the supply increase from zero to one. The [receipt](../testnet/ordinary-auction-1-settlement.json) and the [next registration review](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md) cover separate steps in C7/C13. For C14/D4 the [health monitor](../runbooks/A9_INFRA_COST_MONITORING.md) now checks that observed samples bracket the chosen interval and reports gaps. The [D6 rehearsal](../architecture/POST_PHASE_A_PRODUCT_DIRECTION_2026-10-24.md) counts the test sale by payer and fee. Launch observation and evidence of actual demand still require mainnet activity.
+
 | Items | Evidence still needed |
 | --- | --- |
 | C0, C1 | Select and verify production custody and recovery. The [deployed Core simulation](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md) checked single and batched Safe refunds. Confirm the fixed limits against a signed public rehearsal before final architecture acceptance. |

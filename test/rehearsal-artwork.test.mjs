@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { Interface, keccak256 } from 'ethers';
 import { readArtworkMetadata } from '../src/api/safe-artwork-fetch.js';
-import { rehearsalArtwork as work, rehearsalMetadataUri as uri, rehearsalOpening, walletRequest } from '../scripts/rehearsal-review/client.mjs';
+import { rehearsalArtwork as work, rehearsalMetadataUri as uri, rehearsalOpening, rehearsalLateBid, refundWork, walletRequest } from '../scripts/rehearsal-review/client.mjs';
 import { checkRegistrationPublication, inspectOpeningReceipt, inspectRegistrationReceipt, openingAtHead, registrationAtHead, simulateRegisteredOpening, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
 
 const market = new Interface([
@@ -124,6 +124,28 @@ test('a matching existing registration stops new submissions before and after fi
     await assert.rejects(registrationAtHead(rpc(0, 1, payer, 'different'), payer, block), /different work/);
 });
 
+test('second work requires the finalized first sale and closes the request on matching registration', async () => {
+    const price = BigInt(rehearsalOpening.reserveWei);
+    function reader(finalized, latest, state = 4n, metadata = refundWork.metadataUri) {
+        return async (method, [target, at]) => {
+            assert.equal(method, 'eth_call');
+            const call = market.parseTransaction({data:target.data});
+            if (at !== 'latest') assert.deepEqual(at, {blockHash:block.hash, requireCanonical:true});
+            assert.equal(target.to, call.name === 'artworkToToken' ? work.nft : work.core);
+            if (call.name === 'works') return returned('works', [payer, call.args[0] === 1n ? uri : metadata, 0, call.args[0] === 1n ? price : 0]);
+            if (call.name === 'workCount') return returned(call.name, [at === 'latest' ? latest : finalized]);
+            if (call.name === 'artworkToToken') return returned(call.name, [1]);
+            assert.equal(call.name, 'auctions');
+            return returned(call.name, [1, price, 100, 100, 200, rehearsalLateBid.bidder, price, 0, state, rehearsalLateBid.bidder]);
+        };
+    }
+    const observe = rpc => registrationAtHead(rpc, payer, block, true);
+    await assert.rejects(observe(reader(1, 1, 1n)), /finalized settlement/);
+    await assert.rejects(observe(reader(2, 2, 4n, uri)), /different work/);
+    assert.deepEqual(await observe(reader(1, 2)), {waitingForFinality:{role:'registerArtwork'}});
+    assert.deepEqual(await observe(reader(2, 2)), {complete:true, finalizedArtwork:{id:'2'}});
+});
+
 test('wallet re-simulates the exact pinned call with zero ETH and fails on a changed pending registry or altered terms', async () => {
     const codes = new Map([[work.core, '0x6001'], [work.nft, '0x6002']]);
     const plan = { operation: 'registerArtwork', target: work.core, deployments: [], payer, chainId, nonce: '0x12',
@@ -145,6 +167,17 @@ test('wallet re-simulates the exact pinned call with zero ETH and fails on a cha
     }
     predicted = 2;
     await assert.rejects(walletRequest(provider, plan), /registry changed/);
+    const secondData = market.encodeFunctionData('registerArtwork', [refundWork.metadataUri]);
+    const secondPlan = {...plan, rehearsalWorkId: '2', metadataUri: refundWork.metadataUri, data: secondData, dataSha256: refundWork.dataSha256};
+    const secondProvider = {request: request => {
+        if (request.method !== 'eth_call') return provider.request(request);
+        assert.deepEqual(request.params, [{from:payer,to:work.core,data:secondData,value}, 'pending']);
+        return returned('registerArtwork', [predicted]);
+    }};
+    assert.deepEqual(await walletRequest(secondProvider, secondPlan), {from:payer,to:work.core,chainId,nonce:'0x12',value,data:secondData});
+    await assert.rejects(walletRequest(secondProvider, {...secondPlan, metadataUri:uri}), /registration metadata/);
+    predicted = 3;
+    await assert.rejects(walletRequest(secondProvider, secondPlan), /registry changed/);
 });
 
 function receiptRpc(change = {}) {
@@ -207,6 +240,29 @@ test('receipt inclusion verifies the real work ID from the event even when anoth
     const result = await inspectRegistrationReceipt(receiptRpc(), hash, payer);
     assert.deepEqual(result, { block, txHash: hash, transactionIndex: '0x0', workId: '7', creator: payer, core: work.core, metadataUri: uri,
         logCount: 1, logIndex:'2', atRegistrationBlock:{activeAuctionId:null,canonicalFloorWei:'0',tokenId:null} });
+});
+
+test('the second registration receipt binds its own URI, emitted ID and stored work', async () => {
+    const secondData = market.encodeFunctionData('registerArtwork', [refundWork.metadataUri]);
+    function reader(id) {
+        const secondEvent = market.encodeEventLog('ArtworkRegistered', [id, payer, refundWork.metadataUri]);
+        return receiptRpc({
+            eth_getTransactionByHash: () => ({...tx, input:secondData}),
+            eth_getTransactionReceipt: () => ({...receipt, logs:[{...receipt.logs[0], ...secondEvent}]}),
+            eth_call: call => {
+                const parsed = market.parseTransaction({data:call.data});
+                assert.equal(parsed.args[0], 2n);
+                if (parsed.name === 'artworkToToken') return returned(parsed.name, [0]);
+                assert.equal(parsed.name, 'works');
+                return returned(parsed.name, [payer, refundWork.metadataUri, 0, 0]);
+            }
+        });
+    }
+    const result = await inspectRegistrationReceipt(reader(2), hash, payer, true);
+    assert.equal(result.workId, '2');
+    assert.equal(result.metadataUri, refundWork.metadataUri);
+    await assert.rejects(inspectRegistrationReceipt(reader(3), hash, payer, true), /Unexpected ID/);
+    await assert.rejects(inspectRegistrationReceipt(receiptRpc(), hash, payer, true), /Unexpected reviewed calldata/);
 });
 
 test('registration evidence follows the same publication recovery path and exact log as the signed rehearsal', async () => {
