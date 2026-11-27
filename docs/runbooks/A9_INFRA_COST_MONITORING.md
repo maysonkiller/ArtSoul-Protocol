@@ -82,6 +82,14 @@ database and synchronization fields cannot establish a passing window.
 The output describes sampled worker health. Symptoms between probes,
 customer journeys, receipts and provider charges have their own evidence.
 
+For D4 the proposed minimum is seven consecutive days of Base mainnet Core operation without a critical incident. The observation may be extended. Before the window starts, record the sampling cadence and permitted gap for the deployed worker. Record the operator's incident register separately from the health samples. Include incidents already open at the start. Supply a private JSON object with `chainId`, `coreAddress`, `coverageFrom`, `coverageThrough` and `criticalIncidents`. Use UTC timestamps. Each incident has an `openedAt` and a `resolvedAt`, or null while unresolved. An empty array records the operator's review of that period.
+
+```sh
+node scripts/check-indexer-health.mjs --core-stability "$JOURNAL" "$START_UTC" "$END_UTC" "$MAX_GAP_SECONDS" "$INCIDENT_REGISTER"
+```
+
+The command requires both sources to cover the interval and rejects any overlapping critical incident. Retain the original sources, participant checks and the release decision. A passing report establishes only sampled worker health and the reported incident history.
+
 On November 27 the public-catalogue Base Sepolia worker was read through its
 loopback health endpoint at 00:26:10.936 and 00:31:22.876 UTC. The
 [two redacted observations](../../test/fixtures/base-sepolia-health-window-2026-11-27.ndjson)

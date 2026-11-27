@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { Interface } from 'ethers';
+import { id, Interface } from 'ethers';
 import { checkGenesisMetadata, checkIssuedGenesisMedia } from '../scripts/check-genesis-metadata.mjs';
 import { block, founder, head, mainnetCollector, provider, review, tx } from './helpers/genesis-grant-rpc.mjs';
 
@@ -95,6 +95,7 @@ test('issued Genesis media connects the verified grant, locked owner, exact toke
     const check = (id, readers) => checkIssuedGenesisMedia(review, tx, prefix, id, files, readers);
     const issued = await check('0', [node(), node()]);
     assert.equal(issued.transactionHash, tx);
+    assert.equal(issued.safeTxHash, id('fixture Safe proposal'));
     assert.equal(issued.recipient, founder);
     assert.equal(issued.resources.metadata.uri, prefix + '0');
     assert.equal(issued.rpcReadings, 2);

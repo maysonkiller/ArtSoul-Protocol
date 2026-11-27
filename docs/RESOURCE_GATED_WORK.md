@@ -162,6 +162,7 @@ Use the [read-only preflight](../scripts/verify-treasury-safes.mjs) before bindi
 | Per-role `address`, `owners`, `threshold` | Safe proxy address, array of its intended owner addresses and the approved signature count |
 | Per-role `proxyCodeHash`, `singleton`, `singletonCodeHash` | Reviewed proxy runtime hash, implementation address and reviewed implementation runtime hash |
 | Per-role `modules`, `guard`, `moduleGuard`, `fallbackHandler` | Approved module address array and the three expected addresses. Use an empty array or the zero address for an absent component. Review the authority of each enabled extension |
+| Per-role `fallbackHandlerCodeHash` | Pin the handler's published runtime digest in the production register. Verification reads the handler code at the same finalized block as the Safe. |
 | Optional `core` | After deployment, supply an object with the Core `address` and reviewed deployed runtime `codeHash` including its immutable values. The script then checks each on-chain getter against its assigned Safe |
 | `nft` for an ordinary pair | Supply the paired NFT `address` and its independently reviewed deployed runtime `codeHash`, including the immutable Core address. Record both contracts in the same register. The verifier checks both hashes, the three Safe bindings, `Core.nft()` and `NFT.core()` |
 

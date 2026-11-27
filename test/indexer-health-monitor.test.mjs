@@ -6,7 +6,8 @@ import {
     checkIndexerHealth,
     evaluateIndexerHealth,
     loadMonitorConfig,
-    reviewHealthWindow
+    reviewHealthWindow,
+    reviewCoreStability
 } from '../scripts/check-indexer-health.mjs';
 
 const NOW = Date.parse('2026-07-21T12:00:00.000Z');
@@ -91,6 +92,36 @@ test('accepts a fresh healthy Base Sepolia indexer response', () => {
     const result = evaluateIndexerHealth(healthyPayload(), config, NOW);
     assert.equal(result.ok, true);
     assert.deepEqual(result.failures, []);
+});
+
+test('the Core launch review binds seven days of worker samples to the mainnet incident register', async () => {
+    const day = 86400000;
+    const time = offset => new Date(NOW + offset).toISOString();
+    const core = '0x' + 'ac'.repeat(20);
+    const policy = {...config, expectedChainId:8453, expectedCoreAddress:core};
+    const register = {chainId:8453, coreAddress:core, coverageFrom:time(-day), coverageThrough:time(8*day),
+        criticalIncidents:[{openedAt:time(-day), resolvedAt:time(-1)}]};
+    const lines = Array.from({length:169}, (_, hour) => {
+        const checkedAt = time(hour * 3600000);
+        const health = healthyPayload({timestamp:checkedAt, indexer:{chainId:'8453', contractAddress:core,
+            lastConfirmedBlock:100+hour, lastIndexedBlock:103+hour, currentBlock:107+hour}});
+        return JSON.stringify({checkedAt, ...evaluateIndexerHealth(health, policy, Date.parse(checkedAt))});
+    });
+    const check = (overrides = {}, end = time(7*day), cfg = policy, samples = lines) =>
+        reviewCoreStability(samples, cfg, time(0), end, 3600, {...register,...overrides}, NOW+8*day);
+    const result = await check();
+    assert.equal(result.samples, 169);
+    assert.equal(result.criticalIncidentsInWindow, 0);
+    await assert.rejects(check({},time(7*day-1)), /seven/);
+    await assert.rejects(check({},time(7*day),{...policy,expectedChainId:84532}), /mainnet/);
+    await assert.rejects(check({coreAddress:'0x'+'ab'.repeat(20)}), /cover/);
+    await assert.rejects(check({coverageThrough:time(6*day)}), /cover/);
+    await assert.rejects(check({criticalIncidents:undefined}), /cover/);
+    for (const incident of [{openedAt:time(-day),resolvedAt:null}, {openedAt:time(day),resolvedAt:time(day+1)}]) {
+        await assert.rejects(check({criticalIncidents:[incident]}), /overlaps/);
+    }
+    await assert.rejects(check({criticalIncidents:[{openedAt:time(day)}]}), /Invalid critical/);
+    await assert.rejects(check({},time(7*day),policy,lines.filter((_,i)=>i !== 42)), /gap/);
 });
 
 test('reports malformed counters instead of treating them as a healthy zero', async () => {

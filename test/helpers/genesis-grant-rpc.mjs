@@ -5,7 +5,8 @@ import { prepareGenesisGrants } from '../../scripts/prepare-genesis-grants.mjs';
 const abi = new Interface([
     'function grantAuthority() view returns (address)', 'function founderRecipient() view returns (address)',
     'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)', 'event Locked(uint256 tokenId)',
-    'event GenesisGranted(uint256 indexed tokenId,address indexed recipient,uint8 indexed category,bytes32 decisionHash)'
+    'event GenesisGranted(uint256 indexed tokenId,address indexed recipient,uint8 indexed category,bytes32 decisionHash)',
+    'event ExecutionSuccess(bytes32 indexed txHash,uint256 payment)'
 ]);
 const genesis = '0x' + '11'.repeat(20), safe = '0x' + '22'.repeat(20), founder = '0x' + '33'.repeat(20);
 const mainnetCollector = '0x' + '44'.repeat(20), code = '0x610100';
@@ -18,8 +19,9 @@ const safeAbi = new Interface(['function execTransaction(address,uint256,bytes,u
 export function safeTransaction(reviewed = review, hash = tx, header = block, changes = {}) {
     const prepared = prepareGenesisGrants(reviewed).transaction;
     const { to, value, data, operation } = { ...prepared, ...changes };
-    const input = safeAbi.encodeFunctionData('execTransaction', [to, value, data, operation, 0, 0, 0, ZeroAddress, ZeroAddress, '0x11']);
-    return { hash, to: reviewed.safe, blockHash: header.hash, blockNumber: header.number, transactionIndex: '0x1', input };
+    const { safeTxGas = 0, baseGas = 0, gasPrice = 0, gasToken = ZeroAddress, refundReceiver = ZeroAddress, signatures = '0x11' } = changes;
+    const input = safeAbi.encodeFunctionData('execTransaction', [to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, signatures]);
+    return { hash, to: reviewed.safe, value: '0x0', blockHash: header.hash, blockNumber: header.number, transactionIndex: '0x1', input };
 }
 export function receipt(reviewed = review, hash = tx, header = block) {
     const genesis = reviewed.genesis;
@@ -34,6 +36,7 @@ export function receipt(reviewed = review, hash = tx, header = block) {
         log(genesis, 'Locked', [grant.tokenId]);
         log(genesis, 'GenesisGranted', [grant.tokenId, grant.recipient, grant.category, grant.decisionHash]);
     }
+    log(reviewed.safe, 'ExecutionSuccess', [id('fixture Safe proposal'), 0n]);
     return result;
 }
 export function provider(overrides = {}, reviewed = review, hash = tx, header = block) {

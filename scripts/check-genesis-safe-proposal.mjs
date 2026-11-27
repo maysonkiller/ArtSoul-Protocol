@@ -12,15 +12,21 @@ const abi = new Interface(['function execTransaction(address to,uint256 value,by
 const fields = abi.getFunction('execTransaction').inputs.slice(0, 9).map(({ name, type }) => ({ name, type }));
 const safeTypes = { SafeTx: [...fields, { name: 'nonce', type: 'uint256' }] };
 
-export function checkGrantConfirmations(prepared, custody, proposal, nonce) {
-    assert(proposal.chainId === 8453 && getAddress(proposal.to) === prepared.safe &&
-        getAddress(custody.address) === prepared.safe && proposal.value === '0', 'Wrong Safe, chain or outer value');
-    const decoded = abi.decodeFunctionData('execTransaction', proposal.data);
-    assert.equal(abi.encodeFunctionData('execTransaction', decoded), proposal.data.toLowerCase(), 'Noncanonical Safe calldata');
+// Shared by the proposal check and the finalized receipt check.
+export function decodeReviewedGrantCall(prepared, data) {
+    const decoded = abi.decodeFunctionData('execTransaction', data);
+    assert.equal(abi.encodeFunctionData('execTransaction', decoded), data.toLowerCase(), 'Noncanonical Safe calldata');
     assert(decoded.to === prepared.transaction.to && decoded.value === 0n && decoded.operation === 0n &&
         decoded.data === prepared.transaction.data, 'Different Genesis grant CALL');
     assert(decoded.safeTxGas === 0n && decoded.baseGas === 0n && decoded.gasPrice === 0n &&
         decoded.gasToken === ZeroAddress && decoded.refundReceiver === ZeroAddress, 'Unreviewed gas or refund terms');
+    return decoded;
+}
+
+export function checkGrantConfirmations(prepared, custody, proposal, nonce) {
+    assert(proposal.chainId === 8453 && getAddress(proposal.to) === prepared.safe &&
+        getAddress(custody.address) === prepared.safe && proposal.value === '0', 'Wrong Safe, chain or outer value');
+    const decoded = decodeReviewedGrantCall(prepared, proposal.data);
     const digest = TypedDataEncoder.hash({ chainId: 8453, verifyingContract: prepared.safe }, safeTypes,
         { ...Object.fromEntries(fields.map(({ name }) => [name, decoded[name]])), nonce });
     const owners = new Set(custody.owners.map(getAddress));

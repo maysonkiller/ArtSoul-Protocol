@@ -130,6 +130,9 @@ export async function verifySafeAtBlock(entry, role, rpc, block) {
         check(hash(word) && getAddress('0x' + word.slice(-40)) === expected, role + ' ' + field + ' mismatch');
     }
     await checkCode(entry.singleton, entry.singletonCodeHash, role + ' singleton');
+    if (entry.fallbackHandlerCodeHash !== undefined) {
+        await checkCode(address(entry.fallbackHandler, role + ' fallback handler'), entry.fallbackHandlerCodeHash, role + ' fallback handler');
+    }
     const [actualOwners] = await view(entry.address, 'getOwners');
     const [threshold] = await view(entry.address, 'getThreshold');
     check(addressSet(actualOwners, 'on-chain owners').join() === owners.join(), role + ' owner set mismatch');

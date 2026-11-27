@@ -367,7 +367,7 @@ deployment with outstanding payouts and NFTs.
 
 ## 17. Phase Status And Canonical Phase Model
 
-The [November 25 release decision](CHANGELOG_2026-11-25_RELEASE_SEQUENCE.md) governs testnet custody, production wallet selection, audit timing, operating readiness and the use of actual demand when deciding whether to expand.
+The [release decision](CHANGELOG_2026-11-25_RELEASE_SEQUENCE.md) governs testnet custody, production wallet selection, operating readiness and the use of actual demand when deciding whether to expand. Financially critical contracts require independent review before accepting real funds. The full system audit and retest precede D acceptance. Plan at least seven incident-free days after Core launch before the separate Genesis pilot and extend observation when warranted.
 
 September 30 scheduling amendment: the founder requests implementation of the
 previously approved artist-support feature now, as an isolated, tested addition.

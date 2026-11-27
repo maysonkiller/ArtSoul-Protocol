@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { Interface, ZeroAddress, ZeroHash, isHexString, keccak256 } from 'ethers';
 import { prepareGenesisGrants } from './prepare-genesis-grants.mjs';
+import { decodeReviewedGrantCall } from './check-genesis-safe-proposal.mjs';
+import { decodeReceiptLog } from '../src/indexer/settlement-receipt.js';
 import { confirmFinalizedBlock, finalizedBlock, readRpc, requireIndependentProviders } from './verify-treasury-safes.mjs';
 
 const abi = new Interface([
@@ -12,9 +14,7 @@ const abi = new Interface([
     'event Locked(uint256 tokenId)',
     'event GenesisGranted(uint256 indexed tokenId,address indexed recipient,uint8 indexed category,bytes32 decisionHash)'
 ]);
-const safeExecution = new Interface([
-    'function execTransaction(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,bytes signatures)'
-]);
+const safeExecution = new Interface(['event ExecutionSuccess(bytes32 indexed txHash,uint256 payment)']);
 const quantity = value => typeof value === 'string' && /^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(value);
 const nonzeroHash = value => isHexString(value, 32) && value.toLowerCase() !== ZeroHash;
 
@@ -64,13 +64,22 @@ async function inspectBatch(rpc, prepared, founder, codeHash, hash) {
     assert(transaction?.hash?.toLowerCase() === hash && transaction.to?.toLowerCase() === prepared.safe.toLowerCase() &&
         transaction.blockHash?.toLowerCase() === block.hash && transaction.blockNumber?.toLowerCase() === block.number &&
         transaction.transactionIndex?.toLowerCase() === receipt.transactionIndex.toLowerCase(), 'Different Safe execution transaction');
-    const execution = safeExecution.parseTransaction({ data: transaction.input });
-    assert(execution?.name === 'execTransaction' && execution.args.to === genesis && execution.args.value === 0n &&
-        execution.args.operation === 0n && execution.args.data === prepared.transaction.data && execution.args.signatures !== '0x',
-    'Safe execution differs from the reviewed Genesis CALL');
+    assert.equal(transaction.value, '0x0', 'Safe execution carried an unreviewed ETH value');
+    try {
+        assert.notEqual(decodeReviewedGrantCall(prepared, transaction.input).signatures, '0x');
+    } catch {
+        throw new Error('Safe execution differs from the reviewed Genesis CALL or reimbursement terms');
+    }
+    const success = receipt.logs.filter(log => log?.address?.toLowerCase() === prepared.safe.toLowerCase() &&
+        log.topics?.[0]?.toLowerCase() === safeExecution.getEvent('ExecutionSuccess').topicHash);
+    assert.equal(success.length, 1, 'Expected one Safe execution success');
+    const { index, args } = decodeReceiptLog(safeExecution, 'ExecutionSuccess', success[0], receipt);
+    assert(BigInt(index) > previous && nonzeroHash(args.txHash) && args.payment === 0n,
+        'Wrong Safe execution result, order or payment');
     await confirmFinalizedBlock(rpc, await finalizedBlock(8453, rpc), block);
     return { chainId: 8453, genesis, safe: prepared.safe, transactionHash: hash, block,
-        transactionIndex: BigInt(receipt.transactionIndex).toString(), grants };
+        transactionIndex: BigInt(receipt.transactionIndex).toString(), safeTxHash: args.txHash,
+        safeExecutionIndex: String(index), grants };
 }
 
 export async function verifyGenesisGrants(review, transactionHash, providers) {
@@ -78,10 +87,13 @@ export async function verifyGenesisGrants(review, transactionHash, providers) {
     assert(nonzeroHash(review.genesisCodeHash) && nonzeroHash(transactionHash), 'Supply the reviewed initialized runtime hash and mined transaction hash');
     const binding = { genesisCodeHash: review.genesisCodeHash.toLowerCase(), founder: review.founder.toLowerCase(),
         policyHash: review.policyHash.toLowerCase(), calldataHash: keccak256(prepared.transaction.data) };
+    const approved = review.safeTxHash;
+    if (approved !== undefined) assert(nonzeroHash(approved), 'Invalid reviewed Safe proposal hash');
     requireIndependentProviders(providers);
     const [first, second] = await Promise.all(providers.map(rpc => inspectBatch(rpc, prepared, binding.founder,
         binding.genesisCodeHash, transactionHash.toLowerCase())));
     assert.deepEqual(first, second, 'Providers disagree on finalized Genesis grants');
+    if (approved !== undefined) assert.equal(first.safeTxHash, approved.toLowerCase(), 'Different approved Safe proposal hash');
     return { ...first, ...binding };
 }
 
