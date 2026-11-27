@@ -71,7 +71,11 @@ All 17 focused tests passed. They cover funding denial/grant-only protection, fi
 
 A real provider run returned an incomplete response at the original 384-token limit. The bridge now requests a response after the server commits the input audio, preserves the provider's bounded reason code, and allows 1,024 output tokens per response including reasoning. A separate reviewed run sent the recorded greeting to the localhost bridge in real time. The provider acknowledged the configured voice and returned 468,000 bytes of PCM plus a Russian transcript. The input used a public fixture and the output was counted in memory. Physical microphones, speakers and iOS audio routing still require device acceptance. Public-service access controls and ongoing funding require their own release decision.
 
-## Official references
+## English conversation follow-up
+
+On November 28 a second funded loopback test used the public English greeting and goodbye in one conversation. The client waited for the listening state after the first reply, then sent the second fixture over the same socket. Marin returned 5.65 and 4.25 seconds of English audio respectively. Both replies were measured in memory with no input or output device.
+
+## Provider documentation
 
 - [Realtime conversations and server-owned session configuration](https://developers.openai.com/api/docs/guides/realtime-conversations)
 - [Realtime server controls](https://developers.openai.com/api/docs/guides/voice-server-controls?voice-api=realtime)
