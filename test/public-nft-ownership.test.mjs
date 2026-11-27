@@ -86,8 +86,8 @@ test('public NFT consumers use one verified history across cards, filters, saved
       let result;
       if (name === 'rpc/read_verified_nft_boundary') result = [{ ...marker }];
       else if (name === 'rpc/read_aura_border_setting') result = [frameSetting];
-      else if (name === 'rpc/aura_source_states') {
-        assert.deepEqual(body,{p_kind:'platform',p_chain:84532,p_scope:CORE,p_addresses:[CREATOR]});
+      else if (name === 'rpc/publisher_frame_states') {
+        assert.deepEqual(body,{p_chain:84532,p_scope:CORE,p_addresses:[CREATOR]});
         result = sourceStates;
       }
       else if (name === 'rpc/read_verified_nft_cards') result = body.p_artwork_ids.map(id => ({ ...owners.find(row => row.artwork_id === id), ...marker }));
@@ -134,12 +134,12 @@ test('public NFT consumers use one verified history across cards, filters, saved
     designatePlatform();
     process.env.ARTSOUL_AURA_SOURCES_ENABLED='true';
     process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA='';
-    sourceStates=[{address:CREATOR,enabled:true,revision:1}];
+    sourceStates=[{address:CREATOR,kind:'platform',enabled:true,revision:1}];
     const card=(await cardRequest({id:'77'})).body.data[0];
     assert.equal(card.aura_kind,'platform');
     assert.equal(card.current_owner_address,OWNER);
     process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA=CORE+':'+CREATOR;
-    sourceStates=[{address:CREATOR,enabled:false,revision:2}];
+    sourceStates=[{address:CREATOR,kind:'platform',enabled:false,revision:2}];
     assert.equal((await cardRequest({id:'77'})).body.data[0].aura_kind,undefined);
   });
   await t.test('only the designated, registered and minted work receives the platform frame across public readers', async () => {

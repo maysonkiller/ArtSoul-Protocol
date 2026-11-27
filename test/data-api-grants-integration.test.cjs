@@ -278,6 +278,7 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   });
   await t.test('appearance designations bind a publisher to its Core or a collection to its network', () => {
     query(fs.readFileSync('sql/migrations/20261126194000_aura_sources.sql','utf8'));
+    query(fs.readFileSync('sql/migrations/20261127021000_founder_frame_sources.sql','utf8'));
     query(fs.readFileSync('test/fixtures/aura-sources.sql','utf8'));
   });
   await t.test('read-only verification accepts explicit grants and detects drift in review column permissions', () => {

@@ -170,7 +170,12 @@ export async function listenForReview(loadPlan, { loadRegistration, loadAuction 
         try {
             if (name === 'plan.json') {
                 // Coalesce overlapping reads only. The wallet confirmation always requests fresh on-chain checks.
-                inflight ??= Promise.resolve().then(loadPlan).finally(() => { inflight = undefined; });
+                inflight ??= Promise.resolve().then(loadPlan).catch(error => {
+                    // A load-balanced RPC can briefly serve an older finalized head.
+                    // Repeat all independent reads once. Other mismatches fail immediately.
+                    if (error.message !== 'Provider has not finalized the requested block') throw error;
+                    return loadPlan();
+                }).finally(() => { inflight = undefined; });
                 const result = await inflight;
                 res.writeHead(200, { 'Content-Type': 'application/json' }).end(req.method === 'HEAD' ? undefined : JSON.stringify(result));
             } else if (evidence.has(name)) {

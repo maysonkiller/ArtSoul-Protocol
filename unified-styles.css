@@ -714,6 +714,7 @@ body.future .artwork-page-compact-action {
     --c-accent: var(--accent-classic);
     --c-accent-2: var(--accent-classic);
     --c-accent-3: var(--accent-classic);
+    --c-aura-founder: #98536a;
     --c-aura-gold: var(--accent-classic);
     --c-aura-blue: var(--accent-classic);
     --c-verification-blue: #345e8e;
@@ -745,6 +746,7 @@ body.future .artwork-page-compact-action {
     --c-accent: var(--accent-future);
     --c-accent-2: var(--neon-purple);
     --c-accent-3: var(--accent-future-2);
+    --c-aura-founder: #ff9abd;
     --c-aura-gold: #d4af37;
     --c-aura-blue: #3b82f6;
     --c-verification-blue: #175dc5;
@@ -785,7 +787,7 @@ body.future .artwork-page-compact-action {
     pointer-events: none;
 }
 
-.artsoul-aura-frame--genesis::after, .artsoul-aura-frame--partner::after {
+.artsoul-aura-frame--founder::after, .artsoul-aura-frame--genesis::after, .artsoul-aura-frame--partner::after {
     border-color: var(--aura-glow);
 }
 
@@ -835,7 +837,6 @@ body:is(.classic,.future) :is(.artsoul-card-title,.artsoul-card-creator,.home-sh
     overflow: hidden;
     white-space: nowrap;
     pointer-events: none;
-    mix-blend-mode: multiply;
     font-size: calc(var(--aura-band) - .1875rem);
     font-weight: 750;
 }
@@ -851,7 +852,7 @@ body:is(.classic,.future) :is(.artsoul-card-title,.artsoul-card-creator,.home-sh
     bottom: calc((var(--aura-band) - 1em) / 2);
     left: 50%;
     transform: translateX(-50%);
-    color: var(--c-brand-mark-background);
+    color: var(--aura-glow, var(--c-accent));
     line-height: 1;
 }
 .artsoul-aura-caption > artsoul-aura-track { display: none; }
@@ -860,7 +861,7 @@ body:is(.classic,.future) :is(.artsoul-card-title,.artsoul-card-creator,.home-sh
         display: block;
         position: absolute;
         inset: 0;
-        fill: var(--c-brand-mark-background);
+        fill: var(--aura-glow, var(--c-accent));
     }
     .future .artsoul-aura-caption:has(> artsoul-aura-track > svg) > .aura-word { display: none; }
 }
@@ -8466,6 +8467,7 @@ body:is(.classic, .future) .artsoul-artwork-card.artsoul-aura-frame,
     box-shadow: var(--artwork-aura-shadow);
 }
 .future .artsoul-aura-frame--platform { --aura-glow: var(--c-accent-2); }
+.artsoul-aura-frame--founder { --aura-glow: var(--c-aura-founder); }
 .artsoul-aura-frame--genesis { --aura-glow: var(--c-aura-blue); }
 .artsoul-aura-frame--partner { --aura-glow: var(--c-aura-gold); }
 

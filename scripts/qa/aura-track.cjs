@@ -91,9 +91,7 @@ async function sampleInk(page, track) {
     const ink=await shot();
     await track.evaluate(el=>el.style.visibility='hidden');
     const strip=await shot();
-    await track.evaluate(el=>el.parentElement.style.visibility='hidden');
-    const original=await shot();
-    await track.evaluate(el=>{el.style.visibility='';el.parentElement.style.visibility='';});
+    await track.evaluate(el=>{el.style.visibility='';});
     await style.evaluate(el=>el.remove());
     const matched=await page.evaluate(async buffers=>{
         const pixels=await Promise.all(buffers.map(async buffer=>{
@@ -103,15 +101,15 @@ async function sampleInk(page, track) {
             ctx.drawImage(img,-Math.round(img.width/2)+60,0);
             return ctx.getImageData(0,0,120,26).data;
         }));
-        const [ink,strip,original]=pixels;
+        const [ink,strip]=pixels;
         let matches=0;
         for(let i=0; i<ink.length;i+=4) {
             const delta=(a,b)=>Math.max(...[0,1,2].map(c=>Math.abs(a[i+c]-b[i+c])));
-            if(delta(ink,strip)>40 && delta(ink,original)<12) matches++;
+            if(delta(ink,strip)>40 && ink[i+2]>ink[i+1]+70 && ink[i]>ink[i+1]+50) matches++;
         }
         return matches;
-    },[ink,strip,original]);
-    assert(matched>=4,`Expected solid glyph pixels matching the underlying gradient; got ${matched}`);
+    },[ink,strip]);
+    assert(matched>=4,`Expected solid glyph pixels with the original violet caption color; got ${matched}`);
     return matched;
 }
 
@@ -153,17 +151,23 @@ async function run(engine) {
         assert(await page.locator('.artwork-detail-frame .aura-word').isVisible());
         assert(!await track.isVisible());
         await page.emulateMedia({reducedMotion:'no-preference'});
-        const staticGenesis = await page.evaluate(()=>{
-            const frame=document.querySelector('.artwork-detail-frame');
-            const label=window.ArtSoulArtworkCard.createAuraCaption('Genesis');
-            frame.replaceChildren(label);
-            const staticWord=label.querySelector('.aura-word');
-            const genesis=staticWord.checkVisibility() && !label.querySelector('svg,artsoul-aura-track') && !staticWord.getAnimations().length;
+        for (const [kind,word] of [['genesis','Genesis'],['partner','ArtSoul Partner'],['founder','ArtSoul Founder']]) {
+            await page.evaluate(({kind,word})=>{
+                const frame=document.querySelector('.artwork-detail-frame');
+                frame.classList.remove('artsoul-aura-frame--platform','artsoul-aura-frame--genesis','artsoul-aura-frame--founder','artsoul-aura-frame--partner');
+                frame.classList.add('artsoul-aura-frame--'+kind);
+                frame.replaceChildren(window.ArtSoulArtworkCard.createAuraCaption(word));
+            },{kind,word});
+            await page.locator('.artwork-detail-frame artsoul-aura-track[data-running] svg').waitFor();
+            await page.emulateMedia({reducedMotion:'reduce'});
+            assert(await page.locator('.artwork-detail-frame .aura-word').isVisible());
+            await page.emulateMedia({reducedMotion:'no-preference'});
+        }
+        await page.evaluate(()=>{
             document.body.classList.replace('future','classic');
             document.documentElement.classList.replace('future','classic');
-            return genesis && getComputedStyle(label).display==='none';
         });
-        assert(staticGenesis,'Genesis and Classic static');
+        assert(!await track.isVisible(),'Classic has no moving caption');
     } finally { await browser.close(); }
 }
 (async()=>{await run(chromium);await run(webkit);})().catch(error=>{console.error(error);process.exitCode=1;});

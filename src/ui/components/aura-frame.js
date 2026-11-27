@@ -5,6 +5,7 @@
  */
 export function auraFrameClassName(kind = 'none') {
     switch (kind) {
+        case 'founder':
         case 'platform':
         case 'genesis':
         case 'partner':
@@ -16,11 +17,12 @@ export function auraFrameClassName(kind = 'none') {
 
 export const auraFrameLabels = Object.freeze({
     platform: 'ArtSoul platform NFT',
+    founder: 'Work by the ArtSoul founder',
     genesis: 'Genesis aura',
     partner: 'Partner collection NFT'
 });
 
-export const auraWords = Object.freeze({platform: 'ArtSoul', genesis: 'Genesis', partner: 'ArtSoul Partner'});
+export const auraWords = Object.freeze({platform: 'ArtSoul', founder: 'ArtSoul Founder', genesis: 'Genesis', partner: 'ArtSoul Partner'});
 
 // Both text paths share a start at the middle of the upper-left corner.
 // Reversing the lower half keeps the title readable after the corner.
@@ -138,13 +140,19 @@ export function auraCaption(h, word) {
     if (!Object.values(auraWords).includes(word)) return null;
     return h('span', {className: 'artsoul-aura-caption', 'aria-hidden': 'true'},
         h('span', {className: 'aura-word'}, word),
-        word === auraWords.genesis ? null : h('artsoul-aura-track', {'data-word': word}));
+        h('artsoul-aura-track', {'data-word': word}));
 }
 
 export function projectedArtworkAura(artwork) {
     if (artwork?.source === 'v41_projection' && artwork.chain_id === 84532 &&
+        artwork.aura_kind === 'founder' && artwork.founder_origin_verified === true && typeof artwork.minted === 'boolean') {
+        return {className:auraFrameClassName('founder'), label:auraFrameLabels.founder,
+            ...(artwork.aura_border_text === true ? {borderLabel:auraWords.founder} : {})};
+    }
+    if (artwork?.source === 'v41_projection' && artwork.chain_id === 84532 &&
         artwork.minted === false && artwork.platform_publication_verified === true) {
-        return {className:'artsoul-aura-frame artsoul-publisher-frame', label:'Published by ArtSoul'};
+        return {className:'artsoul-aura-frame artsoul-publisher-frame', label:'Published by ArtSoul',
+            ...(artwork.aura_border_text === true ? {borderLabel:auraWords.platform} : {})};
     }
     if (artwork?.source !== 'v41_projection' || artwork.minted !== true ||
         (artwork.ownership_status !== 'verified' &&

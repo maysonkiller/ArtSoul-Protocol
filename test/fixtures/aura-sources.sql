@@ -23,6 +23,16 @@ BEGIN
     PERFORM public.manage_aura_sources(actor,v,NULL,NULL,'partner',8453,'',core,'',0,true,'Curated collection');
     ASSERT (SELECT enabled FROM public.aura_source_states('partner',8453,'',ARRAY[core]));
     ASSERT NOT EXISTS(SELECT 1 FROM public.aura_source_states('partner',84532,'',ARRAY[core]));
+    BEGIN
+        PERFORM public.manage_aura_sources(actor,v,NULL,NULL,'founder',84532,core,actor,'',0,true,'Old alternate review');
+        RAISE EXCEPTION 'Stale alternate review accepted';
+    EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'SOURCE_CHANGED' THEN RAISE; END IF; END;
+    PERFORM public.manage_aura_sources(actor,v,NULL,NULL,'founder',84532,core,actor,'',1,true,'Founder personal works');
+    ASSERT (SELECT kind='founder' AND enabled FROM public.publisher_frame_states(84532,core,ARRAY[actor]));
+    ASSERT NOT EXISTS (SELECT 1 FROM public.publisher_frame_states(8453,core,ARRAY[actor]));
+    ASSERT NOT has_function_privilege('anon','public.publisher_frame_states(integer,text,text[])','EXECUTE');
+    PERFORM public.manage_aura_sources(actor,v,NULL,NULL,'founder',84532,core,actor,'',2,false,'Retired personal wallet');
+    ASSERT NOT (SELECT enabled FROM public.publisher_frame_states(84532,core,ARRAY[actor]));
     ASSERT NOT public.has_collection_origin_review(8453,core,actor);
 END $$;
 ROLLBACK;

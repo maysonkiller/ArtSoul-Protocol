@@ -2,9 +2,9 @@ import { Interface, ZeroAddress } from 'ethers';
 import { createHash } from 'node:crypto';
 import finalizedMints from './catalog-finalized-mints.json' with { type: 'json' };
 import historicalPublications from './catalog-finalized-publications.json' with { type: 'json' };
-import { normalizeWallet, supabaseRest } from './backend.js';
+import { normalizeWallet } from './backend.js';
 import { readAuraBorderSetting } from './aura-border-setting.js';
-import { confirmedPublisherWorks } from './platform-artwork-aura.js';
+import { confirmedPublisherWorks, publisherFrameStates } from './platform-artwork-aura.js';
 import { createRegistrationReaders } from './upload-registration-evidence.js';
 
 // The historical catalog issued all three events in the purchase transaction.
@@ -108,12 +108,8 @@ export async function withCatalogMintOrigins(cards) {
     const addresses = [...new Set([...candidates, ...publications].map(c => normalizeWallet(c.creator)))];
     if (!addresses.length || addresses.length > 200) return cards;
     try {
-        const states = await supabaseRest('rpc/aura_source_states',{method:'POST',signal:AbortSignal.timeout(1800),
-            body:{p_kind:'platform',p_chain:84532,p_scope:core,p_addresses:addresses}});
-        if (!Array.isArray(states) || states.length > addresses.length) return cards;
-        if (states.some(s => !addresses.includes(s?.address) || typeof s.enabled !== 'boolean') ||
-            new Set(states.map(s=>s.address)).size !== states.length) return cards;
-        const publishers = new Set(states.filter(s=>s.enabled).map(s=>s.address));
+        const states = await publisherFrameStates(addresses,84532,core);
+        const publishers = new Map(states.filter(s=>s.enabled).map(s=>[s.address,s.kind]));
         const eligible = publications.filter(c=>publishers.has(normalizeWallet(c.creator)));
         const archivedWorks = eligible.filter(c=>{
             const entry = historicalPublications[c.transaction_hash];
@@ -138,8 +134,14 @@ export async function withCatalogMintOrigins(cards) {
         const credited = await registered;
         for (const work of archivedWorks) credited.add(work);
         if (!marked.size && !credited.size) return cards;
-        const labels = marked.size > 0 && await readAuraBorderSetting().then(s=>s.enabled,()=>false);
-        return cards.map(card=>marked.has(card) ? {...card,aura_kind:'platform',platform_origin_verified:true,
-            ...(labels ? {aura_border_text:true} : {})} : credited.has(card) ? {...card, platform_publication_verified:true} : card);
+        const labels = await readAuraBorderSetting().then(s=>s.enabled,()=>false);
+        return cards.map(card=>{
+            if (!marked.has(card) && !credited.has(card)) return card;
+            const kind = publishers.get(normalizeWallet(card.creator));
+            const origin = kind === 'founder' ? {founder_origin_verified:true} :
+                marked.has(card) ? {platform_origin_verified:true} : {platform_publication_verified:true};
+            return {...card,...origin,...(marked.has(card) || kind === 'founder' ? {aura_kind:kind} : {}),
+                ...(labels ? {aura_border_text:true} : {})};
+        });
     } catch { return cards; }
 }

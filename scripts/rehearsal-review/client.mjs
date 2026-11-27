@@ -160,13 +160,26 @@ export async function walletRequest(provider, plan) {
     return tx;
 }
 
+// Compare named fields, not object insertion order. Ordered signers, deployments
+// and runtime checks stay ordered. The finalized evidence block can advance.
+function equalField(a, b) {
+    if (a === b) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(k => Object.hasOwn(b,k) && equalField(a[k],b[k]));
+}
+
+const reviewFields = {chainId:'network', operation:'operation', payer:'sender', nonce:'sender nonce', target:'target',
+    value:'value', registrationHash:'registration receipt', rehearsalWorkId:'work ID', metadataUri:'metadata URI',
+    data:'transaction data', dataHash:'calldata hash', dataSha256:'calldata digest', codeChecks:'contract code',
+    deployments:'deployment addresses', owners:'Safe signers', roles:'Safe roles'};
+
+function changedReviewField(first, next) {
+    return Object.keys(reviewFields).find(key => !equalField(first[key], next[key]));
+}
+
 export function sameReview(first, next) {
-    return !next.complete && !next.waitingForFinality && !next.lateBidStatus && first.chainId === next.chainId && first.operation === next.operation &&
-        first.payer === next.payer && first.nonce === next.nonce && first.target === next.target && first.value === next.value && first.registrationHash === next.registrationHash &&
-        first.dataHash === next.dataHash && first.dataSha256 === next.dataSha256 &&
-        JSON.stringify(first.codeChecks) === JSON.stringify(next.codeChecks) &&
-        JSON.stringify(first.deployments) === JSON.stringify(next.deployments) &&
-        JSON.stringify(first.owners) === JSON.stringify(next.owners) && JSON.stringify(first.roles) === JSON.stringify(next.roles);
+    return !next.complete && !next.waitingForFinality && !next.lateBidStatus && !changedReviewField(first, next);
 }
 
 export async function start() {
@@ -286,13 +299,13 @@ export async function start() {
         }
         return true;
     }
-    async function refresh() {
+    async function refresh({verifiedPlan, changed} = {}) {
         busy = true; ++stateRevision; connected = undefined; wrongChain = false; plan = undefined;
         const previous = byId('data').textContent;
         byId('review').hidden = true; buttons();
         status('Verifying chain evidence…');
         try {
-            const current = await fetchPlan();
+            const current = verifiedPlan ?? await fetchPlan();
             if (showOutcome(current)) return;
             plan = current;
             if (previous !== plan.data) submitted = false;
@@ -353,6 +366,7 @@ export async function start() {
             if (submitted) walletStatus('Already opened in your wallet. Wait for finality before refreshing.');
             else if (selected) await recheck();
             else walletStatus(connectionHint());
+            if (changed) status('Updated ' + changed + '. Check the displayed request, then select Review in wallet again.');
         } catch (error) { status(error.message); }
         finally { busy = false; buttons(); }
     }
@@ -391,7 +405,11 @@ export async function start() {
             walletStatus('Checking current custody, nonce and deployment addresses…');
             const fresh = await fetchPlan();
             if (showOutcome(fresh)) return;
-            check(sameReview(plan, fresh), 'Deployment or payer state changed. Refresh and review the new request.');
+            const changed = changedReviewField(plan, fresh);
+            if (changed) {
+                await refresh({verifiedPlan:fresh, changed:reviewFields[changed]});
+                return;
+            }
             const tx = await walletRequest(provider, fresh);
             submitted = true;
             status('Review and confirm the request in your wallet.');

@@ -18,7 +18,8 @@ test('a designated publication is marked only after its exact registration is co
     let enabled = true, height = 45, events = [registration];
     t.mock.method(globalThis, 'fetch', async url => {
         switch (new URL(url).pathname.split('/').at(-1)) {
-            case 'aura_source_states': return Response.json([{address:author,enabled}]);
+            case 'publisher_frame_states': return Response.json([{address:author,kind:'platform',enabled}]);
+            case 'read_aura_border_setting': return Response.json([{enabled:true,revision:1}]);
             case 'indexer_state': return Response.json([{last_confirmed_block:height}]);
             case 'contract_events': return Response.json(events);
             default: throw Error('Unexpected publisher read');
@@ -51,8 +52,9 @@ test('Moon 2026 retains publication provenance only for its confirmed registrati
         SUPABASE_URL:'https://fixture.test', SUPABASE_SERVICE_ROLE_KEY:'fixture'});
     let enabled = true;
     t.mock.method(globalThis,'fetch',async url => {
-        assert.equal(String(url),'https://fixture.test/rest/v1/rpc/aura_source_states');
-        return Response.json([{address:creator,enabled}]);
+        if (String(url).endsWith('/read_aura_border_setting')) return Response.json([{enabled:true,revision:1}]);
+        assert.equal(String(url),'https://fixture.test/rest/v1/rpc/publisher_frame_states');
+        return Response.json([{address:creator,kind:'platform',enabled}]);
     });
     const [verified, wrongEvent, wrongArt, wrongUri] = await withCatalogMintOrigins([work,
         {...work,registration_log_index:2}, {...work,artwork_id:'32'}, {...work,metadata_uri:'ipfs://different'}]);
@@ -90,8 +92,8 @@ test('the original catalog can check its pinned mint issuer before ownership tra
     delete settings.ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA;
     t.mock.property(process, 'env', settings);
     const fetch = t.mock.method(globalThis, 'fetch', async (url, init) => {
-        assert.equal(String(url), 'https://fixture.test/rest/v1/rpc/aura_source_states');
-        assert.deepEqual(JSON.parse(init.body), {p_kind:'platform',p_chain:84532,p_scope:core,p_addresses:[creator]});
+        assert.equal(String(url), 'https://fixture.test/rest/v1/rpc/publisher_frame_states');
+        assert.deepEqual(JSON.parse(init.body), {p_chain:84532,p_scope:core,p_addresses:[creator]});
         return Response.json([]);
     });
     const cards = [{source:'v41_projection',chain_id:84532,minted:true,creator,mint_transaction_hash:'0x'+'2'.repeat(64)}];
@@ -117,9 +119,9 @@ test('an archived mint follows the token across owners and still requires a curr
     t.mock.property(process, 'env', { ...process.env, ARTSOUL_AURA_SOURCES_ENABLED:'true',
         ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:core, ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA:'0xf061f70503c37cf2196a28f4785e524d0fb32538',
         SUPABASE_URL:'https://fixture.test', SUPABASE_SERVICE_ROLE_KEY:'fixture' });
-    let enabled = true;
+    let enabled = true, kind = 'platform';
     t.mock.method(globalThis, 'fetch', async url => {
-        if (String(url) === 'https://fixture.test/rest/v1/rpc/aura_source_states') return Response.json([{address:creator,enabled}]);
+        if (String(url) === 'https://fixture.test/rest/v1/rpc/publisher_frame_states') return Response.json([{address:creator,kind,enabled}]);
         assert.equal(String(url), 'https://fixture.test/rest/v1/rpc/read_aura_border_setting');
         return Response.json([{enabled:true,revision:1}]);
     });
@@ -132,6 +134,11 @@ test('an archived mint follows the token across owners and still requires a curr
         assert.equal(verified.aura_border_text, true);
     }
     for (const unmatched of [otherToken, otherWork, otherUri]) assert.equal(unmatched.aura_kind, undefined);
+    kind = 'founder';
+    const [personal] = await withCatalogMintOrigins([card]);
+    assert.equal(personal.founder_origin_verified,true);
+    assert.equal(personal.aura_kind,'founder');
+    assert.equal(personal.platform_origin_verified,undefined);
     enabled = false;
     assert.equal((await withCatalogMintOrigins([card]))[0].aura_kind, undefined);
 });
