@@ -209,11 +209,19 @@ node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.
 node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.json> --verify-refund-opening REGISTRATION_TX OPENING_TX
 ```
 
-Two distinct collectors then place bids. Record the outbidding and refund-processing receipts for the queue reader above. The first auction's winner-surplus withdrawal covers another payment path.
-
 Both public providers returned the successful [opening of auction 2](https://sepolia.basescan.org/tx/0x87883da08e3404683f3ae7ed4c7912ba091562d5d11b33152becf1dc25219f8d) for work 2 in block 64,118,482, hash `0xd9ee63c5db8d76122ca46c47a4b93ee958c6eaa528e2ed73e6ccfee38554613d`. The creator submitted the reviewed calldata with zero ETH value and used 180,691 gas. The emitted reserve was 0.001 test ETH. The opening block was November 27 at 02:12:45 UTC and the original deadline was November 28 at 02:12:45 UTC (03:12:45 in Warsaw).
 
-The two-provider finality check subsequently confirmed that opening against the registration, stored auction and NFT state. The [first collector's bid](https://sepolia.basescan.org/tx/0x5585d1f23e7139e5268615f685ceef531f6d614dd9a076c342fae46d09db21c3) was included at 08:58:05 UTC in block 64,240,084 (`0x4c0524dbf6927aa1d5d6fb1d9ea59449de7bdd6c40709ecdd31fef277f734ed3`). Both providers returned the signed calldata, successful receipt and matching `BidAccepted` event with a price of 0.001 test ETH and a deposit of 0.01 test ETH. It used 106,579 gas and left the original deadline in place. Use the separate collector for the next bid. A winner-surplus withdrawal on auction 1 and a displaced deposit on auction 2 have distinct receipts.
+The two-provider finality check subsequently confirmed that opening against the registration, stored auction and NFT state. The [first collector's bid](https://sepolia.basescan.org/tx/0x5585d1f23e7139e5268615f685ceef531f6d614dd9a076c342fae46d09db21c3) was included at 08:58:05 UTC in block 64,240,084 (`0x4c0524dbf6927aa1d5d6fb1d9ea59449de7bdd6c40709ecdd31fef277f734ed3`). Both providers returned the signed calldata, successful receipt and matching `BidAccepted` event with a price of 0.001 test ETH and a deposit of 0.01 test ETH. It used 106,579 gas and left the original deadline in place.
+
+Both public providers finalized the [second bid](https://sepolia.basescan.org/tx/0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f) in block 64,248,306 (`0x5c2117e20bf0c130858222696e86ae0a005e5276d146e6fd6fe99893b26099a2`), timestamped November 27 at 09:25:30 UTC. It used 164,649 gas. Both nodes matched the signed price of 0.011 test ETH, the 0.01 test ETH deposit and the new leader `0xb7553cd3377817186DFB36beF1C3118540911efb`. The stored end still equaled the original deadline. The two-provider queue reader verified both contract runtimes and the `OutbidRefundQueued` event for entry 0. The Core owed 0.01 test ETH to the first bidder `0x316014C808f64CF731b4E51Bd32F61f2E52D1819`. At the bid block the cursor was 0 of 1 and the auction was open.
+
+After bidding ends, open the first review below on the same computer. The reviewed sender is the displaced collector. Once both providers finalize the close, open the second review. Check Base Sepolia (84532), the reviewed Core, zero outgoing test ETH plus test gas, and the method in the wallet. The first call is `closeAuction(2)` and the second is `processRefunds(2, 1)`. Keep both public receipt hashes. For the final read, set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to two independent Base Sepolia endpoints and replace `PROCESSING_TX` with the second receipt hash.
+
+```sh
+node scripts/review-rehearsal-refund-auction.mjs --serve close 0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f
+node scripts/review-rehearsal-refund-auction.mjs --serve refund 0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f
+node scripts/read-ordinary-outbid-refund.mjs docs/testnet/ordinary-auction-1-settlement.json 2 0 0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f PROCESSING_TX
+```
 
 ### Restoring the first hosted sale
 

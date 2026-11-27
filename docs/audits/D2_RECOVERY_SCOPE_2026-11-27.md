@@ -28,6 +28,14 @@ The comparison used `jsonb_agg(to_jsonb(row) ORDER BY revision)` for settings an
 
 The replacement Core's private issuer, sale and primary credit tables each contained one row during a separate current aggregate read. The prior [three-table restore](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md#restoring-the-first-hosted-sale) pertains to that signed sale. A matching count by itself does not establish row equality.
 
+### Restore after the frame-source revocations
+
+At **09:36:11 UTC** a second read-only statement captured the same two tables from one production snapshot. They contained **four source revisions and five border-setting revisions**. The ordered JSONB payload was **2,539 bytes**. Its SHA-256 was `d2b6089c99a9e82d9487d22eeee3d8e06045c1ea9db83a70f29b19ea92b05fb8`.
+
+A new password-protected PostgreSQL 18.4 instance on `127.0.0.1` applied the four earlier migrations and the [governing Team frame-source migration](../../sql/migrations/20261127130000_governing_team_frame_sources.sql) to empty tables. The restore inserted all nine captured rows in a single transaction. The restored JSONB matched the source byte for byte, including timestamps and the new `runtime_hash` field, which was null in each of these four historical decisions.
+
+The normal source reader returned revision 2, disabled, for both the former Platform publisher and former Partner designation. The collection reader returned zero active sources for those addresses. The setting reader returned revision 5 with labels enabled. Both tables retained RLS, and all six table/role combinations denied direct Data API privileges. The disposable listener was confirmed closed and its data directory and one-off runner were removed. This second read covered only the two appearance tables. The independent full-project recovery point remains the one listed below.
+
 ## Cutover limits
 
 The last evidenced independent encrypted full database and Storage recovery point is [November 9](B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md). The November 16 full database archive was read-validated. This drill covered current Storage and two mutable settings tables. A new independent whole-project backup and full isolated restore at the eventual cutover, including current roles, schemas, mutable service data and indexer progress, are still required before destructive operations. C14 and D2 remain open.
