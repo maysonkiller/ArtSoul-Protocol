@@ -22,12 +22,14 @@ const market = new Interface([
 const data = market.encodeFunctionData('registerArtwork', [uri]);
 const refundData = market.encodeFunctionData('registerArtwork', [refundWork.metadataUri]);
 const openingData = market.encodeFunctionData('createAuction', [1n, rehearsalOpening.reserveWei, Number(rehearsalOpening.hours) * 3600]);
+const refundOpeningData = market.encodeFunctionData('createAuction', [2n, rehearsalOpening.reserveWei, Number(rehearsalOpening.hours) * 3600]);
 const chain = '0x14a34';
 const signedRegistration = '0xe6e6f19235b714814c40bb1ab20aebd4ff2408f17c9e8bc4f15e1e7ee391eacf';
 const sha = bytes => createHash('sha256').update(Buffer.from(bytes.slice(2), 'hex')).digest('hex');
 assert.equal(sha(data), fixture.dataSha256, 'Unsigned fixture differs from the browser review');
 assert.equal(sha(refundData), refundWork.dataSha256, 'Refund fixture differs from the browser review');
 assert.equal(sha(openingData), rehearsalOpening.dataSha256, 'Unsigned auction differs from the browser review');
+assert.equal(sha(refundOpeningData), refundWork.openingSha256, 'Refund auction differs from the browser review');
 
 function checkedPayer(review, register) {
     assert.equal(review.chainId, 84532);
@@ -99,40 +101,48 @@ async function workRequest(rpc, payer, operation, callData, expectedId = 1n) {
         data: callData, dataHash: keccak256(callData), dataSha256: sha(callData), deployments: [], codeChecks };
 }
 
-export async function openingAtHead(rpc, payer, block) {
+export async function openingAtHead(rpc, payer, block, secondWork = false, registrationHash) {
+    const id = secondWork ? 2n : 1n;
+    if (secondWork) {
+        await checkedRefundRegistration(rpc, payer, registrationHash, block);
+    }
     const at = { blockHash: block.hash, requireCanonical: true };
     const [finalized] = await view(rpc, 'auctionCount', [], at);
-    if (finalized > 0n) return { complete: true, existingAuctionHistory: true };
+    if (finalized >= id) return { complete: true, existingAuctionHistory: true, ...(secondWork && {rehearsalWorkId: '2'}) };
+    assert.equal(finalized, id - 1n, 'Unexpected previous auction count');
     const [latest] = await view(rpc, 'auctionCount', [], 'latest');
-    if (latest > 0n) return { waitingForFinality: { role: 'createAuction' } };
-    await simulateRegisteredOpening(rpc, payer, block, rehearsalOpening.reserveWei, rehearsalOpening.hours);
-    return workRequest(rpc, payer, 'createAuction', openingData);
+    if (latest >= id) return { waitingForFinality: { role: 'createAuction' } };
+    assert.equal(latest, finalized, 'Auction history changed since finality');
+    await simulateRegisteredOpening(rpc, payer, block, rehearsalOpening.reserveWei, rehearsalOpening.hours, secondWork);
+    const request = await workRequest(rpc, payer, 'createAuction', secondWork ? refundOpeningData : openingData, id);
+    return secondWork ? { ...request, registrationHash: registrationHash.toLowerCase() } : request;
 }
 
-export async function buildArtworkReview(review, register, providers, { opening = false, secondWork = false } = {}) {
+export async function buildArtworkReview(review, register, providers, { opening = false, secondWork = false, registrationHash } = {}) {
     const payer = checkedPayer(review, register);
     const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });
     const observe = opening ? openingAtHead : registrationAtHead;
-    const [first, second] = await Promise.all(providers.map(rpc => observe(rpc, payer, block, secondWork)));
+    const [first, second] = await Promise.all(providers.map(rpc => observe(rpc, payer, block, secondWork, registrationHash)));
     assert.deepEqual(first, second, 'Providers disagree on the rehearsal state. Refresh later.');
     await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
     return { chainId: chain, payer, block, ...first };
 }
 
 // This read exercises the actual registered work and never requests a wallet or opens the review server.
-export async function simulateRegisteredOpening(rpc, payer, block, reserveWei, hours) {
+export async function simulateRegisteredOpening(rpc, payer, block, reserveWei, hours, secondWork = false) {
     assert(/^[1-9]\d{0,77}$/.test(reserveWei) && BigInt(reserveWei) < (1n << 256n), 'Use a positive uint256 reserve in wei');
     assert(['24', '36', '48'].includes(hours), 'Choose 24, 36 or 48 hours');
     const at = { blockHash: block.hash, requireCanonical: true };
-    const [work, [token], [count]] = await Promise.all([checkWork(rpc, 1n, payer, at),
-        view(rpc, 'artworkToToken', [1], at, fixture.nft), view(rpc, 'auctionCount', [], at)]);
+    const id = secondWork ? 2n : 1n;
+    const [work, [token], [count]] = await Promise.all([checkWork(rpc, id, payer, at, secondWork ? refundWork.metadataUri : uri),
+        view(rpc, 'artworkToToken', [id], at, fixture.nft), view(rpc, 'auctionCount', [], at)]);
     assert.equal(work.activeAuction, 0n, 'This work already has an auction');
     assert(work.floor === 0n && token === 0n, 'This work already settled or minted');
     const call = { from: payer, to: fixture.core, value: '0x0',
-        data: market.encodeFunctionData('createAuction', [1n, reserveWei, Number(hours) * 3600]) };
+        data: market.encodeFunctionData('createAuction', [id, reserveWei, Number(hours) * 3600]) };
     const raw = await rpc('eth_call', [call, at]);
     assert.equal(raw.toLowerCase(), market.encodeFunctionResult('createAuction', [count + 1n]), 'Unexpected simulated auction ID');
-    return { chainId: 84532, block, artworkId: '1', core: fixture.core, creator: payer,
+    return { chainId: 84532, block, artworkId: String(id), core: fixture.core, creator: payer,
         reserveWei, durationHours: Number(hours), simulatedAuctionId: (count + 1n).toString(), calldataHash: keccak256(call.data) };
 }
 
@@ -193,14 +203,25 @@ export async function inspectRegistrationReceipt(rpc, hash, payer, secondWork = 
             canonicalFloorWei: String(work.floor), tokenId: null } };
 }
 
-export async function inspectOpeningReceipt(rpc, hash, payer) {
-    const { block, included, tx, receipt, event, log } = await readReviewedEvent(rpc, hash, payer, openingData, 'AuctionOpened');
+async function checkedRefundRegistration(rpc, payer, hash, at, openingIndex) {
+    assert(isHexString(hash, 32), 'Supply the finalized registration transaction hash for work 2');
+    const registration = await inspectRegistrationReceipt(rpc, hash.toLowerCase(), payer, true);
+    const height = BigInt(registration.block.number), end = BigInt(at.number);
+    assert(height < end || (height === end && registration.block.hash === at.hash &&
+        (openingIndex === undefined || BigInt(registration.transactionIndex) < BigInt(openingIndex))), 'Registration must precede the reviewed opening');
+    return registration;
+}
+
+export async function inspectOpeningReceipt(rpc, hash, payer, secondWork = false, registrationHash) {
+    const { block, included, tx, receipt, event, log } = await readReviewedEvent(rpc, hash, payer, secondWork ? refundOpeningData : openingData, 'AuctionOpened');
+    if (secondWork) await checkedRefundRegistration(rpc, payer, registrationHash, block, receipt.transactionIndex);
     const { auctionId, artworkId, startPrice, end } = event.args;
     const durationSeconds = BigInt(rehearsalOpening.hours) * 3600n;
-    assert(auctionId > 0n && artworkId === 1n && startPrice === BigInt(rehearsalOpening.reserveWei), 'Unexpected auction opening terms');
+    assert((secondWork ? auctionId === 2n && artworkId === 2n : auctionId > 0n && artworkId === 1n) &&
+        startPrice === BigInt(rehearsalOpening.reserveWei), 'Unexpected auction opening terms');
     assert.equal(end, BigInt(included.timestamp) + durationSeconds, 'Auction deadline differs from the signed duration');
     const at = { blockHash: block.hash, requireCanonical: true };
-    const [work, auction, [token]] = await Promise.all([checkWork(rpc, artworkId, payer, at),
+    const [work, auction, [token]] = await Promise.all([checkWork(rpc, artworkId, payer, at, secondWork ? refundWork.metadataUri : uri),
         view(rpc, 'auctions', [auctionId], at), view(rpc, 'artworkToToken', [artworkId], at, fixture.nft)]);
     assert(work.activeAuction === auctionId && work.floor === 0n && token === 0n, 'Work state differs at the opening block');
     assert(auction.artworkId === artworkId && auction.startPrice === startPrice && auction.originalEnd === end &&
@@ -208,15 +229,16 @@ export async function inspectOpeningReceipt(rpc, hash, payer) {
     return { block, txHash: hash, creator: payer, core: fixture.core, transactionIndex: receipt.transactionIndex,
         nonce: String(BigInt(tx.nonce)), gasUsed: String(BigInt(receipt.gasUsed)), logIndex: String(BigInt(log.logIndex)),
         artworkId: String(artworkId), auctionId: String(auctionId), reserveWei: String(startPrice), durationSeconds: String(durationSeconds),
+        ...(secondWork && { registrationHash: registrationHash.toLowerCase() }),
         openedAt: new Date(Number(BigInt(included.timestamp)) * 1000).toISOString(), originalEnd: new Date(Number(end) * 1000).toISOString(),
         atOpeningBlock: { bidWei: String(auction.price), depositWei: String(auction.deposit), tokenId: null, canonicalFloorWei: '0' } };
 }
 
-export async function verifyArtworkOpening(review, register, hash, providers) {
+export async function verifyArtworkOpening(review, register, hash, providers, secondWork = false, registrationHash) {
     const payer = checkedPayer(review, register);
     assert(isHexString(hash, 32), 'Expected a public auction opening transaction hash');
     requireIndependentProviders(providers);
-    const [first, second] = await Promise.all(providers.map(rpc => inspectOpeningReceipt(rpc, hash.toLowerCase(), payer)));
+    const [first, second] = await Promise.all(providers.map(rpc => inspectOpeningReceipt(rpc, hash.toLowerCase(), payer, secondWork, registrationHash)));
     assert.deepEqual(first, second, 'Providers disagree on the opening receipt');
     await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true, expectedBlock: first.block });
     return { ...first, rpcReadings: 2 };
@@ -251,13 +273,19 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
         const [reviewFile, registerFile, option, hash, ...extra] = process.argv.slice(2);
         const opening = option === '--check-opening' && hash && extra.length === 1;
+        const refundOpening = ['--refund-opening-plan','--serve-refund-opening','--verify-refund-opening'].includes(option);
         const auctionRequest = option === '--opening-plan' || option === '--serve-opening';
-        const secondWork = ['--refund-work-plan','--serve-refund-work','--verify-refund-work'].includes(option);
-        assert(reviewFile && registerFile && (opening || (!extra.length && ((!hash && (!option || auctionRequest || ['--plan','--refund-work-plan','--serve-refund-work'].includes(option))) ||
-            (['--verify-receipt','--verify-opening','--verify-refund-work'].includes(option) && hash)))), 'Usage: review-rehearsal-artwork.mjs review.json register.json [--plan | --verify-receipt HASH | --verify-opening HASH | --check-opening RESERVE_WEI HOURS | --opening-plan | --serve-opening | --refund-work-plan | --serve-refund-work | --verify-refund-work HASH]');
+        const secondWork = refundOpening || ['--refund-work-plan','--serve-refund-work','--verify-refund-work'].includes(option);
+        if (refundOpening) {
+            assert(isHexString(hash, 32), 'Supply the finalized registration transaction hash for work 2');
+            assert(option === '--verify-refund-opening' ? extra.length === 1 && isHexString(extra[0],32) : !extra.length,
+                'To verify the opening, supply the registration hash followed by the opening hash');
+        }
+        assert(reviewFile && registerFile && (refundOpening || opening || (!extra.length && ((!hash && (!option || auctionRequest || ['--plan','--refund-work-plan','--serve-refund-work'].includes(option))) ||
+            (['--verify-receipt','--verify-opening','--verify-refund-work'].includes(option) && hash)))), 'Expected release review and register files followed by an artwork rehearsal option. See the ordinary market rehearsal runbook.');
         const [review, register] = await Promise.all([reviewFile, registerFile].map(async path => JSON.parse(await readFile(path, 'utf8'))));
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
-        const getPlan = () => buildArtworkReview(review, register, providers, { opening: auctionRequest, secondWork });
+        const getPlan = () => buildArtworkReview(review, register, providers, { opening: auctionRequest || refundOpening, secondWork, registrationHash: refundOpening ? hash : undefined });
         if (opening) {
             const payer = checkedPayer(review, register);
             const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });
@@ -267,13 +295,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             console.log(JSON.stringify({ ...first, rpcReadings: 2 }, null, 2));
         } else if (option === '--verify-receipt' || option === '--verify-refund-work') console.log(JSON.stringify(await verifyArtworkRegistration(review, register, hash, providers, secondWork), null, 2));
         else if (option === '--verify-opening') console.log(JSON.stringify(await verifyArtworkOpening(review, register, hash, providers), null, 2));
+        else if (option === '--verify-refund-opening') console.log(JSON.stringify(await verifyArtworkOpening(review, register, extra[0], providers, true, hash), null, 2));
         else if (option?.endsWith('-plan') || option === '--plan') console.log(JSON.stringify(await getPlan(), null, 2));
         else {
             checkedPayer(review, register);
+            if (refundOpening) await getPlan();
             const { url } = await listenForReview(getPlan, {
-                loadRegistration: option === '--serve-opening'
-                    ? () => verifyArtworkRegistration(review, register, signedRegistration, providers)
-                    : undefined
+                loadRegistration: option === '--serve-opening' || option === '--serve-refund-opening'
+                    ? () => verifyArtworkRegistration(review, register, refundOpening ? hash : signedRegistration, providers, refundOpening) : undefined
             });
             console.log('Open the private Base Sepolia rehearsal page on this computer:\n' + url);
         }

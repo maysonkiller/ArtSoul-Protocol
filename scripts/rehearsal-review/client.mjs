@@ -21,7 +21,8 @@ export const rehearsalMetadataUri = metadataUri(rehearsalArtwork.title, 'Technic
 export const refundWork = Object.freeze({
     title: 'ArtSoul Outbid Refund Rehearsal',
     metadataUri: metadataUri('ArtSoul Outbid Refund Rehearsal', 'Base Sepolia test of two collectors bidding and the outbid deposit refund.'),
-    dataSha256: '2ff394272a59051ccc4e4b2acc732a80f60efc52b903d552920b83c475c280b2'
+    dataSha256: '2ff394272a59051ccc4e4b2acc732a80f60efc52b903d552920b83c475c280b2',
+    openingSha256: 'e9b881c04839ae5a61072902b1c988950d2ac9a248815e409d0a728133e3d6a2'
 });
 
 export const rehearsalOpening = Object.freeze({
@@ -92,17 +93,20 @@ export async function walletRequest(provider, plan) {
     const artwork = plan.operation === 'registerArtwork';
     const refundRegistration = artwork && plan.rehearsalWorkId === '2';
     const opening = plan.operation === 'createAuction';
+    const refundOpening = opening && plan.rehearsalWorkId === '2';
     const bid = plan.operation === 'placeBid';
     const settlement = plan.operation === 'settleAuction';
     const withdrawal = plan.operation === 'withdraw';
     if (artwork || opening || bid || settlement || withdrawal) {
         const artworkFixture = refundRegistration ? refundWork : rehearsalArtwork;
-        const digest = withdrawal ? withdrawalDigest : settlement ? settlementDigest : (bid ? rehearsalLateBid : artwork ? artworkFixture : rehearsalOpening).dataSha256;
+        const digest = withdrawal ? withdrawalDigest : settlement ? settlementDigest : refundOpening ? refundWork.openingSha256 :
+            (bid ? rehearsalLateBid : artwork ? artworkFixture : rehearsalOpening).dataSha256;
         check(sameAddress(plan.target, rehearsalArtwork.core) && plan.dataSha256 === digest &&
             plan.deployments.length === 0 &&
             plan.codeChecks.length === 2 && sameAddress(plan.codeChecks[0].address, rehearsalArtwork.core) &&
             sameAddress(plan.codeChecks[1].address, rehearsalArtwork.nft), 'Unexpected artwork request.');
         if (artwork) check(plan.metadataUri === (refundRegistration ? refundWork.metadataUri : rehearsalMetadataUri), 'Unexpected registration metadata.');
+        if (refundOpening) check(/^0x[0-9a-f]{64}$/i.test(plan.registrationHash), 'Missing reviewed work registration.');
         if (bid) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === rehearsalLateBid.deposit,
             'Unexpected bidder or deposit.');
         if (settlement || withdrawal) check(sameAddress(plan.payer, rehearsalLateBid.bidder) && plan.value === '0x0',
@@ -139,7 +143,7 @@ export async function walletRequest(provider, plan) {
     }
     if (artwork || opening || settlement) {
         const simulation = await rpc('eth_call', [{ from: plan.payer, to: rehearsalArtwork.core, data: plan.data, value: '0x0' }, 'pending']);
-        check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === (refundRegistration ? 2n : 1n),
+        check(/^0x[0-9a-f]{64}$/i.test(simulation) && BigInt(simulation) === (refundRegistration || refundOpening ? 2n : 1n),
             settlement ? 'Settlement or token ID changed. Refresh the chain evidence.' :
                 opening ? 'Auction history changed. Refresh the chain evidence.' : 'Work registry changed. Refresh the chain evidence.');
     }
@@ -158,7 +162,7 @@ export async function walletRequest(provider, plan) {
 
 export function sameReview(first, next) {
     return !next.complete && !next.waitingForFinality && !next.lateBidStatus && first.chainId === next.chainId && first.operation === next.operation &&
-        first.payer === next.payer && first.nonce === next.nonce && first.target === next.target && first.value === next.value &&
+        first.payer === next.payer && first.nonce === next.nonce && first.target === next.target && first.value === next.value && first.registrationHash === next.registrationHash &&
         first.dataHash === next.dataHash && first.dataSha256 === next.dataSha256 &&
         JSON.stringify(first.codeChecks) === JSON.stringify(next.codeChecks) &&
         JSON.stringify(first.deployments) === JSON.stringify(next.deployments) &&
@@ -259,7 +263,8 @@ export async function start() {
         } else if (current.emptyWinnerCredit) {
             status('This wallet has no remaining winner credit on the reviewed Core.');
         } else if (current.existingAuctionHistory) {
-            status('The reviewed Core already has finalized auction history. This first-auction request is closed. Use the opening receipt to verify the work and its terms.');
+            status(current.rehearsalWorkId === '2' ? 'Auction ID 2 is already occupied. Use its opening receipt to verify the work and terms.' :
+                'The reviewed Core already has finalized auction history. This first-auction request is closed. Use the opening receipt to verify the work and its terms.');
         } else if (current.finalizedArtwork) {
             status('Verified artwork ' + current.finalizedArtwork.id + ' · ' + (current.finalizedArtwork.id === '2' ? refundWork.title : rehearsalArtwork.title) +
                 ' · creator ' + current.payer + ' at finalized Base Sepolia block ' + BigInt(current.block.number) + '.');
@@ -297,7 +302,7 @@ export async function start() {
             const bid = plan.operation === 'placeBid';
             const settlement = plan.operation === 'settleAuction';
             const withdrawal = plan.operation === 'withdraw';
-            byId('operation').textContent = withdrawal ? 'Withdraw the winner’s surplus' : settlement ? 'Settle auction 1 and mint its NFT' : bid ? 'First late bid · auction 1' : opening ? 'Open the first rehearsal auction' : artwork ? 'Register rehearsal artwork' :
+            byId('operation').textContent = withdrawal ? 'Withdraw the winner’s surplus' : settlement ? 'Settle auction 1 and mint its NFT' : bid ? 'First late bid · auction 1' : opening ? (plan.rehearsalWorkId === '2' ? 'Open the two-collector rehearsal auction' : 'Open the first rehearsal auction') : artwork ? 'Register rehearsal artwork' :
                 create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
             byId('fields').replaceChildren();
             addField('Network', 'Base Sepolia · 84532');
@@ -321,7 +326,8 @@ export async function start() {
                 addField('Deadline before your bid', new Date(rehearsalLateBid.deadline * 1000).toISOString());
                 addField('If included in time', 'Bidding extends by 10 minutes. If you win, settle within the payment window.');
             } else if (opening) {
-                addField('Work', '1 · ' + rehearsalArtwork.title);
+                addField('Work', plan.rehearsalWorkId === '2' ? '2 · ' + refundWork.title : '1 · ' + rehearsalArtwork.title);
+                if (plan.registrationHash) addField('Verified registration', plan.registrationHash);
                 addField('Method', 'createAuction(uint256,uint256,uint256)');
                 addField('Starting price', '0.001 test ETH');
                 addField('Duration', rehearsalOpening.hours + ' hours from inclusion');

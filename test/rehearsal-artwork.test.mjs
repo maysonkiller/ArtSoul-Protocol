@@ -60,6 +60,17 @@ test('opening wallet review accepts only work 1 at the displayed reserve and dur
     await assert.rejects(walletRequest(provider, { ...plan, target: work.nft }), /Unexpected artwork/);
     predicted = 2n;
     await assert.rejects(walletRequest(provider, plan), /Auction history changed/);
+    const second = market.encodeFunctionData('createAuction', [2, 1000000000000000n, 86400]);
+    const secondPlan = {...plan, rehearsalWorkId:'2', registrationHash:hash, data:second, dataSha256:refundWork.openingSha256};
+    const secondProvider = {request: request => {
+        if (request.method !== 'eth_call') return provider.request(request);
+        assert.deepEqual(request.params,[{from:payer,to:work.core,data:second,value},'pending']);
+        return returned('createAuction',[predicted]);
+    }};
+    assert.equal((await walletRequest(secondProvider,secondPlan)).data, second);
+    await assert.rejects(walletRequest(secondProvider,{...secondPlan,registrationHash:undefined}), /registration/);
+    predicted = 3n;
+    await assert.rejects(walletRequest(secondProvider,secondPlan), /Auction history changed/);
 });
 
 test('first auction rehearsal uses only hash-pinned calls for the registered, unsold work', async () => {
@@ -240,6 +251,42 @@ test('receipt inclusion verifies the real work ID from the event even when anoth
     const result = await inspectRegistrationReceipt(receiptRpc(), hash, payer);
     assert.deepEqual(result, { block, txHash: hash, transactionIndex: '0x0', workId: '7', creator: payer, core: work.core, metadataUri: uri,
         logCount: 1, logIndex:'2', atRegistrationBlock:{activeAuctionId:null,canonicalFloorWei:'0',tokenId:null} });
+});
+
+test('refund auction approval requires the exact second registration and a later opening receipt', async () => {
+    const openHash = '0x' + 'd'.repeat(64), zero = '0x' + '0'.repeat(40), reserve = BigInt(rehearsalOpening.reserveWei);
+    const end = 86416n;
+    const registerData = market.encodeFunctionData('registerArtwork',[refundWork.metadataUri]);
+    const openData = market.encodeFunctionData('createAuction',[2,reserve,86400]);
+    function reader(reversed = false) {
+        const hashes = reversed ? [openHash,hash] : [hash,openHash];
+        const index = key => '0x' + hashes.indexOf(key).toString(16);
+        return receiptRpc({
+            eth_getTransactionByHash: key => ({...tx, hash:key, transactionIndex:index(key), nonce:'0x14', input:key===hash ? registerData : openData}),
+            eth_getTransactionReceipt: key => ({...receipt, transactionHash:key, transactionIndex:index(key), gasUsed:'0x100',
+                logs:[{...receipt.logs[0], transactionHash:key, transactionIndex:index(key), ...(key===hash ?
+                    market.encodeEventLog('ArtworkRegistered',[2,payer,refundWork.metadataUri]) :
+                    market.encodeEventLog('AuctionOpened',[2,2,reserve,end]))}]}),
+            eth_getBlockByNumber: tag => tag==='finalized' ? block : {...block, timestamp:'0x10',transactions:hashes},
+            eth_call: call => {
+                const {name, args} = market.parseTransaction({data:call.data});
+                if (name === 'auctionCount') return returned(name,[2]);
+                assert.equal(args[0],2n);
+                if (name==='artworkToToken') return returned(name,[0]);
+                if (name==='works') return returned(name,[payer,refundWork.metadataUri,2,0]);
+                assert.equal(name,'auctions');
+                return returned(name,[2,reserve,end,end,0,zero,0,0,1,zero]);
+            }
+        });
+    }
+    await assert.rejects(openingAtHead(reader(),payer,block,true),/registration transaction hash/);
+    await assert.rejects(openingAtHead(receiptRpc(),payer,block,true,hash),/reviewed calldata/);
+    assert.deepEqual(await openingAtHead(reader(),payer,block,true,hash),{complete:true,existingAuctionHistory:true,rehearsalWorkId:'2'});
+    const opening = await inspectOpeningReceipt(reader(),openHash,payer,true,hash);
+    assert.equal(opening.artworkId,'2');
+    assert.equal(opening.auctionId,'2');
+    assert.equal(opening.registrationHash,hash);
+    await assert.rejects(inspectOpeningReceipt(reader(true),openHash,payer,true,hash),/Registration must precede/);
 });
 
 test('the second registration receipt binds its own URI, emitted ID and stored work', async () => {

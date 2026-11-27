@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { formatEther } from 'ethers';
-import { rehearsalArtwork, rehearsalMetadataUri } from './client.mjs';
+import { rehearsalArtwork, rehearsalMetadataUri, refundWork } from './client.mjs';
 
 // All dynamic values appear in text nodes. No wallet, executable script or remote media is loaded.
 function text(value) {
@@ -15,7 +15,8 @@ export function registrationPage(proof) {
     assert.equal(proof.rpcReadings, 2);
     assert.equal(proof.core, rehearsalArtwork.core);
     assert.equal(proof.nft.toLowerCase(), rehearsalArtwork.nft.toLowerCase());
-    assert.equal(proof.metadataUri, rehearsalMetadataUri);
+    if (proof.metadataUri === refundWork.metadataUri) assert.equal(proof.workId, '2');
+    else assert.equal(proof.metadataUri, rehearsalMetadataUri);
     const metadata = JSON.parse(Buffer.from(proof.metadataUri.split(',')[1], 'base64').toString('utf8'));
     const snapshot = proof.atRegistrationBlock;
     const fields = [
