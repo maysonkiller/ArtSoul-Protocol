@@ -14,7 +14,7 @@ const MAX_RPC_BYTES = 1024 * 1024;
 const MAX_SCAN_BLOCKS = 2000n;
 const MAX_LOGS = 128;
 const MAX_MATCHES = 8;
-const METHODS = new Set(['eth_chainId', 'eth_getBlockByNumber', 'eth_getCode', 'eth_getLogs', 'eth_getTransactionReceipt']);
+const METHODS = new Set(['eth_chainId', 'eth_getBlockByNumber', 'eth_getCode', 'eth_call', 'eth_getLogs', 'eth_getTransactionReceipt']);
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const lower = value => typeof value === 'string' ? value.toLowerCase() : '';
 const validAddress = value => ADDRESS.test(value || '') && !/^0x0{40}$/i.test(value);

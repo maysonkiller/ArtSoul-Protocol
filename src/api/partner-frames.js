@@ -12,14 +12,27 @@ const blockNumber = value => typeof value === 'string' && /^0x[0-9a-f]{1,13}$/.t
 
 export async function hasPartnerContract(chain, address, readers = createRegistrationReaders(networks[chain])) {
     const signal = AbortSignal.timeout(4500);
-    const observations = await Promise.all(readers.map(async rpc => {
-        const [network, code] = await Promise.all([rpc('eth_chainId', [], {signal}),
-            rpc('eth_getCode', [address, 'finalized'], {signal})]);
-        if (blockNumber(network) !== chain || typeof code !== 'string' || !/^0x(?:[0-9a-f]{2})*$/i.test(code)) throw new Error('Invalid contract observation');
-        return code.toLowerCase();
+    if (readers.length !== 2) throw new Error('Two collection observations are required');
+    const heads = await Promise.all(readers.map(async rpc => {
+        const [network, head] = await Promise.all([rpc('eth_chainId', [], {signal}),
+            rpc('eth_getBlockByNumber', ['finalized',false], {signal})]);
+        if (blockNumber(network) !== chain || !Number.isSafeInteger(blockNumber(head?.number)) || !txHash.test(head?.hash)) {
+            throw new Error('Invalid collection network or finalized block');
+        }
+        return head;
     }));
-    if (observations.length !== 2 || observations[0] !== observations[1]) throw new Error('Contract observations differ');
-    return observations[0] !== '0x' && !/^0xef0100[0-9a-f]{40}$/.test(observations[0]);
+    const head = blockNumber(heads[0].number) <= blockNumber(heads[1].number) ? heads[0] : heads[1];
+    const at = {blockHash:head.hash,requireCanonical:true};
+    const codes = await Promise.all(readers.map(rpc=>rpc('eth_getCode',[address,at],{signal})));
+    if (codes.some(code=>typeof code !== 'string' || !/^0x(?:[0-9a-f]{2})*$/i.test(code)) ||
+        codes[0].toLowerCase() !== codes[1].toLowerCase()) throw new Error('Contract observations differ');
+    if (codes[0] === '0x' || /^0xef0100[0-9a-f]{40}$/i.test(codes[0])) return false;
+
+    const support = await Promise.all(readers.map(rpc=>Promise.all(['01ffc9a7','ffffffff','80ac58cd'].map(id=>
+        rpc('eth_call',[{to:address,gas:'0xf000',data:'0x01ffc9a7'+id.padEnd(64,'0')},at],{signal})))));
+    if (support[0].some((answer,i)=>answer !== support[1][i])) throw new Error('Collection interfaces differ');
+    const encoded = value=>'0x'+String(value).padStart(64,'0');
+    return support[0].every((answer,i)=>answer === encoded(i === 1 ? 0 : 1));
 }
 
 export function mintTransactionHint(mint) {

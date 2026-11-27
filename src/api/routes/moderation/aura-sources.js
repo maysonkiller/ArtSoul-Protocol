@@ -37,7 +37,7 @@ export default async function handler(req,res) {
                 const hasCode = await hasPartnerContract(Number(chain),subject).catch(() => {
                     throw serviceError('SOURCE_UNAVAILABLE','Could not check the collection contract. Try again.',503);
                 });
-                if (!hasCode) throw serviceError('INVALID_SOURCE','Enter the deployed collection contract address on the selected network.');
+                if (!hasCode) throw serviceError('INVALID_SOURCE','Enter the ERC-721 collection contract address on the selected network.');
             }
         }
         const rows = await supabaseRest('rpc/manage_aura_sources',{method:'POST',body:params});

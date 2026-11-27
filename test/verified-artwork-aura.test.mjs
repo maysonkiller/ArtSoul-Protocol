@@ -5,14 +5,25 @@ import { verifiedArtworkAura } from '../src/api/verified-artwork-aura.js';
 import { receiptPartnerFrames, hasPartnerContract } from '../src/api/partner-frames.js';
 import { projectedArtworkAura } from '../src/ui/components/aura-frame.js';
 
-test('Partner designation requires contract code on the selected network', async () => {
-    const rpc = (chain, code) => async method => method === 'eth_chainId' ? chain : code;
-    const code = rpc('0x14a34','0x1234');
-    const empty = rpc('0x14a34','0x');
-    const delegated = rpc('0x14a34','0xef0100' + '12'.repeat(20));
-    assert.equal(await hasPartnerContract(84532, 'collection', [code, code]), true);
-    for (const reader of [empty,delegated]) assert.equal(await hasPartnerContract(84532,'wallet',[reader,reader]),false);
+test('Partner designation requires matching ERC-721 support on the selected finalized chain', async () => {
+    const block={number:'0x8',hash:'0x'+'ab'.repeat(32)};
+    const rpc = (code,interfaces=['01ffc9a7','80ac58cd']) => async (method,params) => {
+        if (method === 'eth_chainId') return '0x14a34';
+        if (method === 'eth_getBlockByNumber') return block;
+        assert.deepEqual(params[1],{blockHash:block.hash,requireCanonical:true});
+        if (method === 'eth_getCode') return code;
+        assert.equal(method,'eth_call');
+        const id=params[0].data.slice(10,18);
+        return '0x'+(interfaces.includes(id)?'1':'0').padStart(64,'0');
+    };
+    const code=rpc('0x1234'), empty=rpc('0x');
+    assert.equal(await hasPartnerContract(84532,'collection',[code,code]),true);
+    for (const reader of [empty,rpc('0xef0100'+'12'.repeat(20)),rpc('0x1234',[]),
+        rpc('0x1234',['01ffc9a7']),rpc('0x1234',['01ffc9a7','80ac58cd','ffffffff'])]) {
+        assert.equal(await hasPartnerContract(84532,'wallet',[reader,reader]),false);
+    }
     await assert.rejects(hasPartnerContract(84532,'collection',[empty,code]));
+    await assert.rejects(hasPartnerContract(84532,'collection',[code,rpc('0x1234',[])]));
     await assert.rejects(hasPartnerContract(8453,'collection',[code,code]));
 });
 
