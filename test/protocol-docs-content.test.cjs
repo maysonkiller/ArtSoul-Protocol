@@ -26,7 +26,7 @@ const original = [
 ];
 let compiled;
 async function components(runtime = React, bindings = {}) {
-  const [{transformWithOxc}, {PROTOCOL_DOC_SECTIONS: sections}, {auraFrameClassName}] = await Promise.all([
+  const [{transformWithOxc}, {PROTOCOL_DOC_SECTIONS: sections}, aura] = await Promise.all([
     import('vite'), import('../src/content/protocol-docs.js'), import('../src/ui/components/aura-frame.js')
   ]);
   const source = [fs.readFileSync('src/ui/components/verification-mark.jsx','utf8').replace('export function', 'function'),
@@ -34,7 +34,7 @@ async function components(runtime = React, bindings = {}) {
     .replace(/^import .*;\r?$/gm, '')
     .replace(/createRoot\(document.getElementById\('app'\)\).render\(<ProtocolDocsApp \/>\);/, '');
   compiled ||= (await transformWithOxc(source, 'docs-content-fixture.jsx', {jsx: {runtime: 'classic'}})).code;
-  const scope = {React: runtime, sections, auraFrameClassName, ...bindings};
+  const scope = {React: runtime, sections, ...aura, ...bindings};
   vm.runInNewContext(compiled + ';this.Block=ProtocolBlock;this.Section=ProtocolSection;this.App=ProtocolDocsApp;', scope);
   return scope;
 }
@@ -138,14 +138,15 @@ test('the collection gallery links to a readable key for the origin mark', async
   assert.match(fs.readFileSync('src/entries/gallery.jsx', 'utf8'), new RegExp('href="/docs-protocol#' + section.id + '"'));
 });
 
-test('the NFT frame guide names each example in priority order using the actual theme-aware frame', async () => {
+test('the NFT frame guide uses the full caption and theme-aware frame for each designation', async () => {
   const {sections, Section, auraFrameClassName} = await components();
   const section = sections.find(item => item.id === 'nft-frames');
   const html = renderToStaticMarkup(React.createElement(Section, {section, isOpen: true}));
   assert.match(html, /<figcaption>Frame examples<\/figcaption><dl>/);
-  assert.deepEqual([...html.matchAll(/<dt class="([^"]+)">([^<]+)<\/dt><dd>/g)].map(([, classes, name]) => [classes, name]), [
-    ['platform', 'Platform'], ['genesis', 'Genesis'], ['partner', 'ArtSoul Partner']
-  ].map(([kind, name]) => ['protocol-frame-example ' + auraFrameClassName(kind), name]));
+  for (const [kind, name] of [['platform','ArtSoul'], ['founder','ArtSoul Founder'], ['genesis','ArtSoul Genesis'], ['partner','ArtSoul Partner']]) {
+    assert.ok(html.includes('<dt class="protocol-frame-example ' + auraFrameClassName(kind) + '"><span>' + name + '</span>'));
+    assert.ok(html.includes('data-word="' + name + '"'));
+  }
   assert.match(section.text, /Base mainnet/);
   assert.match(section.text, /without a confirmed match keep their standard frame/);
   assert.match(section.text, /reduced motion keeps the labels still/i);
@@ -153,7 +154,8 @@ test('the NFT frame guide names each example in priority order using the actual 
 
 test('searchable text comes from the same visible paragraphs, table cells, lists and FAQ', async () => {
   const {sections, Block} = await components();
-  const plain = html => html.replace(/<[^>]*>/g, ' ').replace(/&#x([a-f0-9]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+  const plain = html => html.replace(/<span class="artsoul-aura-caption"[^>]*>.*?<\/artsoul-aura-track><\/span>/g, '')
+    .replace(/<[^>]*>/g, ' ').replace(/&#x([a-f0-9]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
     .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
   for (const section of sections) {
     const html = section.blocks.map(block => renderToStaticMarkup(React.createElement(Block, {block}))).join(' ');

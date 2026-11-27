@@ -17,7 +17,7 @@ function sameDeployment(designation, chainId, nftAddress) {
 // A Genesis grant here identifies the granted NFT itself, never every work
 // made or held by its recipient. A Partner review covers one deployment.
 export function verifiedArtworkAura({ chainId, nftAddress, tokenId }, {
-  platformRegistration, genesisDeployment, partnerReview, receipt, canonicalMintBlock
+  platformRegistration, officialCollection, genesisDeployment, partnerReview, receipt, canonicalMintBlock
 }) {
   if ((chainId !== 8453 && chainId !== 84532) || typeof nftAddress !== 'string' || !/^0x[0-9a-f]{40}$/i.test(nftAddress) ||
       nftAddress.toLowerCase() === ZeroAddress || typeof tokenId !== 'string' || !/^(0|[1-9]\d{0,77})$/.test(tokenId) ||
@@ -27,7 +27,8 @@ export function verifiedArtworkAura({ chainId, nftAddress, tokenId }, {
 
   const genesis = chainId === 8453 && sameDeployment(genesisDeployment, chainId, nftAddress);
   const partner = partnerReview?.approved === true && sameDeployment(partnerReview, chainId, nftAddress);
-  if ((!genesis && !partner) || canonicalMintBlock?.chainId !== chainId ||
+  const official = officialCollection?.verifiedIssuer === true && sameDeployment(officialCollection, chainId, nftAddress);
+  if ((!genesis && !partner && !official) || canonicalMintBlock?.chainId !== chainId ||
       !Number.isSafeInteger(canonicalMintBlock.number) || canonicalMintBlock.number < 1 ||
       !Number.isSafeInteger(canonicalMintBlock.finalizedThrough) || canonicalMintBlock.finalizedThrough < canonicalMintBlock.number ||
       !/^0x[0-9a-f]{64}$/.test(canonicalMintBlock.hash) || canonicalMintBlock.hash === ZeroHash ||
@@ -54,6 +55,9 @@ export function verifiedArtworkAura({ chainId, nftAddress, tokenId }, {
     event.args.to !== ZeroAddress && event.args.tokenId === id);
   if (mints.length !== 1) return null;
   const recipient = mints[0].args.to;
+  const collectionMint = (official || partner) && events.filter(event => event.name === 'CollectionMinted' && event.args.recipient === recipient &&
+    event.args.firstTokenId <= id && id < event.args.firstTokenId + event.args.quantity).length === 1;
+  if (official && collectionMint) return 'platform';
   if (genesis) {
     const tokenEvents = events.filter(event => event.args.tokenId === id);
     if (tokenEvents.length === 3) {
@@ -62,7 +66,7 @@ export function verifiedArtworkAura({ chainId, nftAddress, tokenId }, {
           grant.args.recipient === recipient && grant.args.category <= 3n && grant.args.decisionHash !== ZeroHash) return 'genesis';
     }
   }
-  if (partner && events.filter(event => event.name === 'CollectionMinted' && event.args.recipient === recipient &&
-      event.args.firstTokenId <= id && id < event.args.firstTokenId + event.args.quantity).length === 1) return 'partner';
+  if (partner && (collectionMint || (partnerReview.standardMint === true &&
+      !events.some(event => ['CollectionMinted','GenesisGranted','Locked'].includes(event.name))))) return 'partner';
   return null;
 }

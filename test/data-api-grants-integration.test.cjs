@@ -282,7 +282,23 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   await t.test('appearance designations bind a publisher to its Core or a collection to its network', () => {
     query(fs.readFileSync('sql/migrations/20261126194000_aura_sources.sql','utf8'));
     query(fs.readFileSync('sql/migrations/20261127021000_founder_frame_sources.sql','utf8'));
+    const personal = '0x6ec8c121043357ac231e36d403edabf90ae6989b', core='0x43368f7e2d5f11f4b7e11928d66d3f4a5a4e4cef';
+    query(`INSERT INTO artsoul_private.aura_sources(kind,chain_id,scope,address,revision,enabled,actor,role_version,reason)
+      VALUES ('platform',84532,'${core}','${personal}',1,true,'fixture',1,'Original trial'),
+             ('partner',84532,'','${personal}',1,true,'fixture',1,'Original trial'),
+             ('partner',8453,'','${personal}',1,true,'fixture',1,'Other network');`);
+    // Current testnet production has neither the Genesis issuer table nor its
+    // future mainnet wallet lookup. The frame migration must still install.
+    query('ALTER TABLE artsoul_private.genesis_issuers RENAME TO fixture_deferred_genesis_issuers');
+    query(fs.readFileSync('sql/migrations/20261127130000_governing_team_frame_sources.sql','utf8'));
+    assert.equal(query(`SELECT count(*) FROM artsoul_private.aura_sources WHERE address='${personal}' AND
+      chain_id=84532 AND revision=2 AND NOT enabled AND actor='migration:20261127130000' AND role_version=0 AND policy_version IS NULL`),'2');
+    assert.equal(query(`SELECT count(*) FROM artsoul_private.aura_sources WHERE address='${personal}' AND revision=1 AND enabled AND actor='fixture'`),'3');
+    assert.equal(query(`SELECT count(*) FROM artsoul_private.aura_sources WHERE address='${personal}' AND chain_id=8453`),'1');
     query(fs.readFileSync('test/fixtures/aura-sources.sql','utf8'));
+    query('ALTER TABLE artsoul_private.fixture_deferred_genesis_issuers RENAME TO genesis_issuers');
+    query(fs.readFileSync('sql/migrations/20261125223000_wallet_genesis_frames.sql','utf8'));
+    query(fs.readFileSync('test/fixtures/designated-genesis-frames.sql','utf8'));
   });
   await t.test('read-only verification accepts explicit grants and detects drift in review column permissions', () => {
     const report = fs.readFileSync('sql/verification/phase_a_security_verification.sql', 'utf8');

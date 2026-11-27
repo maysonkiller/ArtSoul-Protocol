@@ -1,5 +1,5 @@
 import { React } from '../../entries/react-runtime.js';
-import { WalletNftMedia } from './wallet-nft-media.jsx';
+import { WalletNftMedia, WalletNftName } from './wallet-nft-media.jsx';
 
 // B36: Wallet presentation only. No background reads, transfers or listings.
 const OPTIONS = [
@@ -51,7 +51,7 @@ function NftCard({ item }) {
     </WalletNftMedia>
     <div className="wallet-asset-copy">
       <div className="wallet-nft-title-row">
-        <h4 title={item.name || item.tokenId}>{item.name || ('NFT #' + item.tokenId)}</h4>
+        <h4 title={item.name || item.tokenId}><WalletNftName item={item}>{item.name || ('NFT #' + item.tokenId)}</WalletNftName></h4>
         <NetworkBadge network={item.network}/>
       </div>
       <p className="wallet-asset-collection">{item.collection || 'Unnamed collection'}</p>

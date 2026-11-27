@@ -1,91 +1,150 @@
 import { React } from '../../entries/react-runtime.js';
 import { canSearch, createSearchState } from '../search/search-state.js';
 
+const sourceKinds = {
+    founder: ['Founder artist wallet', 'Personal works registered by this wallet receive the Founder frame.'],
+    platform: ['Official ArtSoul publisher', 'Artist registrations must match both the publisher wallet and the selected publishing contract.'],
+    official_collection: ['Official ArtSoul collection', 'The issuing wallet and collection contract must match on the selected network.'],
+    partner: ['Partner collection', 'Choose the partner’s dedicated ERC-721 collection. Its frame follows each verified NFT when it changes hands.'],
+    genesis: ['Genesis contract', 'A Genesis frame requires the designated Base mainnet contract and a verified grant for the individual token.']
+};
+
+const validAddress = value => /^0x[\da-f]{40}$/i.test(value.trim()) && !/^0x0{40}$/i.test(value.trim());
+
 export function AuraSources({ api, wallet, isSessionCurrent }) {
-    const [kind,setKind] = React.useState('platform');
-    const [chain,setChain] = React.useState('84532');
-    const [deployment,setDeployment] = React.useState('catalog');
-    return <details className="identity-applications"><summary>Manage frame sources</summary>
-        <label>Frame source <select value={kind} onChange={e => { setKind(e.target.value); setChain('84532'); }}>
-            <option value="platform">Platform publisher wallet</option><option value="founder">Founder artist wallet</option><option value="partner">Partner collection contract</option>
+    const [kind, setKind] = React.useState('founder');
+    const [chain, setChain] = React.useState('84532');
+    const [deployment, setDeployment] = React.useState('catalog');
+    const [issuer, setIssuer] = React.useState('');
+    const publisher = kind === 'platform' || kind === 'founder';
+    const officialCollection = kind === 'official_collection';
+    const genesis = kind === 'genesis';
+    function changeKind(value) {
+        setKind(value);
+        setDeployment('catalog');
+        setIssuer('');
+        if (value === 'genesis') setChain('8453');
+    }
+    const query = new URLSearchParams({wallet: wallet.toLowerCase(), kind, chain});
+    if (publisher) query.set('deployment', deployment);
+    if (officialCollection) query.set('issuer', issuer.trim().toLowerCase());
+    return <details className="identity-applications admin-frame-sources"><summary>Manage frame sources</summary>
+        <label><span id="admin-frame-kind">Frame source</span><select aria-labelledby="admin-frame-kind" value={kind} onChange={event => changeKind(event.target.value)}>
+            {Object.entries(sourceKinds).map(([value, [label]]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        {kind === 'partner' && <p>Enter the NFT collection contract on its issuing network. For personal founder works, select Founder artist wallet.</p>}
-        {kind === 'partner' && <label>Network <select value={chain} onChange={e=>setChain(e.target.value)}>
-            <option value="84532">Base Sepolia</option><option value="8453">Base</option></select></label>}
-        {kind !== 'partner' && <label>Publishing contract <select value={deployment} onChange={e => setDeployment(e.target.value)}>
-            <option value="catalog">Current website catalog</option><option value="rehearsal">New auction rehearsal</option></select></label>}
-        <SourceEditor key={wallet + kind + chain + deployment} {...{kind,chain,deployment,api,wallet,isSessionCurrent}} />
+        <p>{sourceKinds[kind][1]}</p>
+        {genesis ? <p>Network / Base mainnet</p> : <label><span id="admin-frame-network">Network</span><select aria-labelledby="admin-frame-network" value={chain} onChange={event => {
+            setChain(event.target.value); setDeployment('catalog'); setIssuer('');
+        }}><option value="84532">Base Sepolia (testnet)</option><option value="8453">Base mainnet</option></select></label>}
+        {publisher && <label><span id="admin-frame-deployment">Publishing contract</span><select aria-labelledby="admin-frame-deployment" value={deployment} onChange={event => setDeployment(event.target.value)}>
+            <option value="catalog">{chain === '84532' ? 'Website catalog' : 'Mainnet publishing contract'}</option>
+            {chain === '84532' && <option value="rehearsal">New auction rehearsal</option>}
+        </select></label>}
+        {officialCollection && <label>Original collection issuer wallet<input type="text" value={issuer} placeholder="0x…"
+            autoCapitalize="none" spellCheck={false} maxLength={42} onChange={event => setIssuer(event.target.value)} /></label>}
+        {(!officialCollection || validAddress(issuer)) && <SourceEditor key={query.toString()}
+            path={'aura-sources?' + query.toString()} {...{kind, publisher, api, wallet, isSessionCurrent}} />}
     </details>;
 }
 
-function SourceEditor({kind,chain,deployment,api,wallet,isSessionCurrent}) {
-    const [address,setAddress] = React.useState('');
-    const [source,setSource] = React.useState(null);
-    const [list,setList] = React.useState(null);
-    const [reason,setReason] = React.useState('');
-    const [message,setMessage] = React.useState('');
-    const [busy,setBusy] = React.useState(false);
-    const [matches,setMatches] = React.useState(null);
-    const search = React.useMemo(() => createSearchState({onChange:setMatches}),[]);
+function SourceEditor({kind, publisher, path, api, wallet, isSessionCurrent}) {
+    const [address, setAddress] = React.useState('');
+    const [source, setSource] = React.useState(null);
+    const [list, setList] = React.useState(null);
+    const [reason, setReason] = React.useState('');
+    const [message, setMessage] = React.useState('');
+    const [operation, setOperation] = React.useState('');
+    const [matches, setMatches] = React.useState(null);
+    const search = React.useMemo(() => createSearchState({onChange: setMatches}), []);
     const sequence = React.useRef(0);
-    React.useEffect(()=>()=>{sequence.current++; search.cancel();},[search]);
-    const path = 'aura-sources?wallet='+encodeURIComponent(wallet.toLowerCase())+'&kind='+kind+'&chain='+chain+
-        (kind !== 'partner' ? '&deployment='+deployment : '');
-    const label = kind === 'partner' ? 'Collection contract' : 'Publisher address or profile name';
-    const validAddress = /^0x[\da-f]{40}$/i.test(address.trim());
-    function edit(value) { sequence.current++; search.reset(); setAddress(value); setSource(null); setList(null); setReason(''); setMessage(''); setBusy(false); }
-    async function load(target,after) {
+    React.useEffect(() => () => { sequence.current++; search.cancel(); }, [search]);
+    const current = request => isSessionCurrent() && sequence.current === request;
+    const genesis = kind === 'genesis';
+    const label = kind === 'founder' ? 'Artist wallet or profile name' : publisher ? 'Publisher wallet or profile name' : 'NFT collection contract';
+    const busy = Boolean(operation);
+    function edit(value) {
+        sequence.current++; search.reset(); setAddress(value); setSource(null); setList(null); setReason(''); setMessage('');
+    }
+    async function load(target, after) {
+        if (!isSessionCurrent()) return;
         const request = ++sequence.current;
-        search.reset(); setBusy(true); setSource(null); setReason(''); setMessage('');
+        search.reset(); setOperation('Loading source…'); setSource(null); setList(null); setReason(''); setMessage('');
+        if (target) setAddress(target.trim());
         try {
-            const data = await api(path + (target ? '&address='+encodeURIComponent(target.trim()) : after ? '&after='+encodeURIComponent(after) : ''));
-            if (!isSessionCurrent() || sequence.current !== request) return;
-            if (target) { setSource({...data.sources[0],scope:data.scope}); setAddress(data.sources[0].address); }
-            else setList(data);
-        } catch(error) { if (isSessionCurrent() && sequence.current === request) setMessage(error.message); }
-        finally { if (isSessionCurrent() && sequence.current === request) setBusy(false); }
+            const suffix = target ? '&address=' + encodeURIComponent(target.trim()) : after ? '&after=' + encodeURIComponent(after) : '';
+            const data = await api(path + suffix);
+            if (!current(request)) return;
+            if (target) {
+                const entry = data.sources[0];
+                if (entry?.address !== target.trim().toLowerCase()) throw Error('Could not verify this source address.');
+                setSource({...entry, scope: data.scope, configuredGenesis: data.configuredGenesis});
+                setAddress(entry.address);
+            } else setList(data);
+        } catch (error) {
+            if (current(request)) setMessage(error.message || 'Could not load frame sources.');
+        } finally {
+            if (current(request)) setOperation('');
+        }
     }
     async function save() {
-        if (!source || busy || !isSessionCurrent()) return;
+        if (!source || busy || reason.trim().length < 5 || !isSessionCurrent()) return;
+        if (genesis && !source.enabled && source.configuredGenesis !== source.address) return;
         const request = ++sequence.current;
-        setBusy(true);
+        setOperation('Saving source…'); setMessage('');
         try {
-            const data = await api(path+'&address='+encodeURIComponent(source.address),{ method:'POST',body:JSON.stringify({
-                scope:source.scope,revision:source.revision,enabled:!source.enabled,reason:reason.trim()
+            const data = await api(path + '&address=' + encodeURIComponent(source.address), { method: 'POST', body: JSON.stringify({
+                scope: source.scope, revision: source.revision, enabled: !source.enabled, reason: reason.trim()
             }) });
-            if (isSessionCurrent() && sequence.current === request) {
-                setSource({...data.sources[0],scope:data.scope}); setReason(''); setList(null);
-                setMessage(data.sources[0].enabled ? 'Frame source enabled.' : 'Frame source disabled.');
+            if (!current(request)) return;
+            const saved = data.sources[0];
+            if (saved?.address !== source.address || saved.enabled !== !source.enabled || saved.revision !== source.revision + 1 || data.scope !== source.scope) {
+                throw Error('Check the source again to verify its current status.');
             }
-        } catch(error) { if (isSessionCurrent() && sequence.current === request) { setMessage(error.message); setSource(null); } }
-        finally { if (isSessionCurrent() && sequence.current === request) setBusy(false); }
+            setSource({...saved, scope: data.scope, configuredGenesis: data.configuredGenesis}); setReason(''); setList(null);
+            setMessage(saved.enabled ? 'Frame source enabled.' : 'Frame source disabled.');
+        } catch (error) {
+            if (current(request)) { setMessage(error.message || 'Could not save this frame source.'); setSource(null); }
+        } finally {
+            if (current(request)) setOperation('');
+        }
     }
+    const canFind = publisher && canSearch(address) && !address.trim().toLowerCase().startsWith('0x');
+    const canChange = source && (!genesis || source.enabled || source.address === source.configuredGenesis);
     return <div>
-        <p>{kind !== 'partner' ? 'Base Sepolia. The original registration must name this publisher on the selected contract. A founder wallet marks personal works. A platform wallet marks official ArtSoul publications. Enabling one replaces the other for this wallet and contract.' :
-            'Use the exact contract of the partner collection. A verified mint identifies each eligible token, including after a transfer.'}</p>
-        <label>{label}<input value={address} placeholder={kind !== 'partner' ? 'Name or 0x…' : '0x…'} maxLength={100} disabled={busy} onChange={e=>edit(e.target.value)} /></label>
-        {kind !== 'partner' && <button type="button" disabled={busy} onClick={()=>edit(wallet)}>Use my wallet</button>}
-        {kind !== 'partner' && canSearch(address) && !validAddress && !address.trim().startsWith('0x') ?
-            <button type="button" disabled={busy || matches?.status === 'loading'} onClick={()=>search.search(address,'artists')}>Find profile</button> :
-            <button type="button" disabled={busy || !validAddress} onClick={()=>load(address)}>Check address</button>}
-        <button type="button" disabled={busy} onClick={()=>load(null)}>View sources</button>
+        {!genesis && <>
+            <label>{label}<input value={address} placeholder={publisher ? 'Profile name or 0x…' : '0x…'} maxLength={publisher ? 100 : 42}
+                autoCapitalize="none" spellCheck={false} disabled={busy} onChange={event => edit(event.target.value)} /></label>
+            {publisher && <button type="button" disabled={busy} onClick={() => load(wallet)}>Use my wallet</button>}
+            {canFind ? <button type="button" disabled={busy || matches?.status === 'loading'}
+                onClick={() => search.search(address, 'artists')}>Find profile</button> :
+                <button type="button" disabled={busy || !validAddress(address)} onClick={() => load(address)}>Check address</button>}
+        </>}
+        <button type="button" disabled={busy} onClick={() => load(null)}>{genesis ? 'Check Genesis deployment' : 'View sources'}</button>
         {matches?.status === 'loading' && <p role="status">Searching profiles…</p>}
         {matches?.status === 'error' && <p role="status">{matches.error}</p>}
         {matches?.status === 'ready' && <div>
             {matches.groups.artists.items.length ? <ul>{matches.groups.artists.items.map(profile =>
-                <li key={profile.wallet_address}><button type="button" onClick={()=>{edit(profile.wallet_address);load(profile.wallet_address);}}>
+                <li key={profile.wallet_address}><button type="button" disabled={busy} onClick={() => load(profile.wallet_address)}>
                     {profile.username || 'Profile'} / {profile.wallet_address}
                 </button></li>)}</ul> : <p>No matching public profiles.</p>}
-            {matches.nextCursor && <button type="button" onClick={()=>search.search(address,'artists',true)}>More profiles</button>}
+            {matches.nextCursor && <button type="button" onClick={() => search.search(address, 'artists', true)}>More profiles</button>}
         </div>}
-        {list && <div><ul>{list.sources.map(s=><li key={s.address}><button type="button" disabled={busy} onClick={()=>load(s.address)}>{s.address}</button> {s.enabled ? 'Enabled' : 'Disabled'}</li>)}</ul>
-            {!list.sources.length && <p>No recorded sources on this page.</p>}
-            {list.configuredPublisher && <button type="button" disabled={busy} onClick={()=>load(list.configuredPublisher)}>Check configured publisher</button>}
-            {list.next && <button type="button" disabled={busy} onClick={()=>load(null,list.next)}>Next sources</button>}</div>}
-        {source && <div><p>{source.enabled ? 'Enabled' : 'Disabled'} / {source.address}</p>
-            {source.scope && <p>Issuing Core / {source.scope}</p>}
-            <label>Reason for the change<textarea value={reason} disabled={busy} maxLength={500} onChange={e=>setReason(e.target.value)} /></label>
-            <button type="button" disabled={busy || reason.trim().length < 5} onClick={save}>{source.enabled ? 'Disable frame source' : 'Enable frame source'}</button></div>}
-        <p role="status">{busy ? 'Checking…' : message}</p>
+        {list && <div>
+            {genesis && (list.configuredGenesis ?
+                <p>Designated Genesis contract <button type="button" disabled={busy} onClick={() => load(list.configuredGenesis)}>{list.configuredGenesis}</button></p> :
+                <p>The Base mainnet Genesis deployment has not been configured.</p>)}
+            {list.sources.length ? <ul>{list.sources.map(item => <li key={item.address}>
+                <button type="button" disabled={busy} onClick={() => load(item.address)}>{item.address}</button> {item.enabled ? 'Enabled' : 'Disabled'}
+            </li>)}</ul> : !genesis && <p>No recorded sources on this page.</p>}
+            {list.next && <button type="button" disabled={busy} onClick={() => load(null, list.next)}>Next sources</button>}
+        </div>}
+        {source && <div>
+            <p><strong>{source.enabled ? 'Enabled' : 'Disabled'}</strong> / {source.address}</p>
+            {source.scope && <p>{publisher ? 'Publishing contract' : 'Original issuer'} / {source.scope}</p>}
+            {publisher && !source.enabled && <p>Enabling this source replaces any {kind === 'founder' ? 'official publisher' : 'Founder'} designation for this wallet on this publishing contract.</p>}
+            {canChange && <><label>Reason for the change<textarea value={reason} disabled={busy} maxLength={500} onChange={event => setReason(event.target.value)} /></label>
+                <button type="button" disabled={busy || reason.trim().length < 5} onClick={save}>{source.enabled ? 'Disable frame source' : 'Enable frame source'}</button></>}
+        </div>}
+        <p role="status">{operation || message}</p>
     </div>;
 }

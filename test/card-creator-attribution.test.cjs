@@ -22,6 +22,17 @@ const { creatorLabel } = context.window.ArtSoulArtworkCard;
 const CREATOR = '0x1111111111111111111111111111111111111111';
 const COLLECTOR = '0x2222222222222222222222222222222222222222';
 
+test('only an issued platform NFT displays the project logo and the founder designation is textual', () => {
+  const { officialMark, founderMark } = context.window.ArtSoulArtworkCard;
+  const h = (tag, props, ...children) => ({ tag, props, children });
+  const official = { minted: true, aura_kind: 'platform' };
+  assert.equal(officialMark(h, official, { kind: 'platform' }).props.alt, 'Official ArtSoul NFT');
+  for (const kind of ['founder', 'genesis', 'partner']) assert.equal(officialMark(h, official, { kind }), null);
+  assert.equal(officialMark(h, { ...official, minted: false, platform_publication_verified: true }, { kind: 'platform' }), null);
+  assert.equal(officialMark(h, { ...official, aura_kind: 'founder' }, { kind: 'platform' }), null);
+  assert.deepEqual(founderMark(h, { kind: 'founder' }).children, ['Founder']);
+});
+
 class FakeElement {
   constructor(tagName) {
     this.tagName = tagName.toUpperCase();

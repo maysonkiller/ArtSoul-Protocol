@@ -38,39 +38,30 @@ Use user-facing status labels, not developer internals:
 
 Do not show "indexer", "projection", or "pending indexer" as public product language.
 
-## Aura System
+## Artwork frames and the official mark
 
-One aura can be auto-assigned to an NFT by priority:
+| Caption in Future | Source of the frame |
+| --- | --- |
+| ArtSoul | An official publisher's verified registration on its designated Core, or a proven mint from a designated official collection. The ArtSoul logo is reserved for a verified official NFT. |
+| ArtSoul Founder | The original creator of a personal work matches the Founder designation for that publishing contract. The metallic turquoise frame can appear at verified registration. |
+| ArtSoul Genesis | The exact NFT has a finalized grant from the designated, soulbound Genesis contract on Base mainnet. Its rail is blue. |
+| ArtSoul Partner | The exact NFT was minted by a collection the governing Team reviewed for partnership on that chain. Its rail is gold. |
 
-1. Platform aura: shimmer cyan/purple/pink.
-2. Genesis aura: blue, static.
-3. Partner collection aura: gold, labeled ArtSoul Partner.
-4. None.
+Previews and artwork details share the same frame and caption. The public site uses one frame per item. A purchase or wallet transfer preserves the token's origin. Holding an eligible NFT does not decorate unrelated works in its owner's wallet. A personal Founder designation gives no identity check, Genesis grant or discovery weight.
 
-Users do not pick aura colors. The Future border label defaults to off. The admin panel's **NFT appearance** setting applies to verified frames on cards and artwork details. When enabled, the label sits on the colored edge. Platform, Partner, Founder and Genesis labels travel around all four sides as a single word or phrase. Both horizontal edges read from left to right. Larger artwork views use a larger label and a slower lap. Reduced-motion labels stay stationary. The Genesis rail stays blue and static as its caption moves in Future. A reviewed founder publisher uses a rose frame for personal works, including verified registrations before mint. This designation carries no role, identity check, Genesis grant or Trust weight. The active issuer and registration determine the label on artwork and auction surfaces. Classic retains its static frame.
+In Classic the frame is static. In Future, **Show labels on verified frames** places the full caption on the edge. It follows all four sides with both horizontal edges readable left to right. Larger artwork views use larger text and a slower lap. Reduced motion keeps the caption still. The switch controls label visibility and defaults to off. Previewing a frame changes the sample only.
 
-Open [NFT appearance](/admin#nft-appearance) with a verified administrator wallet or an active Team wallet in the current staff-authority pair. Each change records the actor, staff authorization version and setting revision. Team changes also record the [authority policy version](../../sql/migrations/20261125185000_aura_authority_team.sql). Saving checks the role and revision in the same transaction and rechecks Team membership for the site's origin and network. The public artwork API reads the boolean only for already verified frames. Missing settings storage leaves labels off.
+### Staff controls
 
-### Evidence for each frame
+A passkey-verified Administrator or a verified Team member in the current staff-authority pair can change label visibility and review a blue identity check for a profile or collection. An applicant's own wallet cannot approve its application. Only a verified Team member of the active pair manages frame sources. A change belongs to the selected network, source and revision. The database rechecks the staff role and current authority policy on write.
 
-For a verified Founder work the ArtSoul logo and visible Founder label identify the creator on the card and detail page. The official publication mark stays beside the title of a platform publication. The profile identity check requires its own approval.
+In **Admin → NFT appearance → Manage frame sources**, choose the source type and network, review the complete addresses and record the reason. Team can retire a source through the same screen. Keep a dedicated publishing wallet for official mainnet works, separate from personal accounts, treasury accounts and Safe signer keys. Enter it only after the issuing deployment is reviewed. The original Base Sepolia catalog and replacement rehearsal have different Core contracts. Each publisher designation applies to its selected deployment.
 
-A November 26 mobile viewport check exercised the built Gallery NFT tab and artwork detail at 430 pixels using a fixture with verified Platform status. Chromium and WebKit both measured the caption changing position in Future. Classic hid the caption, and the reduced-motion preference kept the Future caption stationary. The mobile motion stylesheet permits this animation only for Platform and Partner captions.
+### How the site verifies an NFT
 
-In **Manage frame sources**, a Platform publisher can be designated for the current Base Sepolia catalog or for the new auction rehearsal before the catalog switches. Each choice uses its exact issuing Core. Reviewers can enter a wallet, select their connected wallet or search public profiles by name and check the resulting full address before saving. The selection prepares a visual designation without changing the public catalog or its on-chain contracts.
+- **Ordinary works.** The catalog joins the reviewed Core and publisher to the registration. A finalized NFT mint establishes eligibility for the official logo beside the title. The profile's blue check comes from its independent identity review. The gallery, home, profile, Saved and artwork detail use the common projection.
+- **Official collections.** Record the collection NFT contract and its original issuer. For an eligible token in Wallet NFTs, both readers must agree with the reviewed runtime and issuer at the mint block. The mint receipt must contain the transfer from zero and the matching collection mint for that token. Collection titles and owner-supplied metadata cannot establish origin.
+- **Partners.** Approve a dedicated ERC-721 collection on its own network. An ArtSoul-format receipt must contain the token in the reported mint range and the corresponding mint to the same recipient. A reviewed external ERC-721 can supply its standard transfer from zero for that exact token. The readers check the code at the mint block. Shared ArtSoul NFT contracts are ineligible as Partner collections. A partner can have a separately reviewed blue identity check. [ERC-721 mint events](https://eips.ethereum.org/EIPS/eip-721#specification)
+- **Genesis.** Team can manage the visual source for the designated Base mainnet contract. Issuance follows the existing multisig grant process. A wallet inventory entry must match its chain, contract, serial and verified grant. The transferable test prototype and other NFTs in a holder's wallet remain ineligible. Top-100k is a separate profile badge.
 
-The artwork API can supply Platform status when ownership verification is active and a verified Base Sepolia NFT's original registration matches the designated Core and publisher. Gallery, profile, Saved and detail consume the same projected status. The admin panel previews the label on a sample frame as soon as the checkbox changes, confirms persistence after the server responds and identifies missing verification or publisher configuration. Previewing leaves every artwork's eligibility unchanged. Historical Ethereum Sepolia cards have no aura.
-
-The resolver also accepts evidence for the two new mint formats. A finalized mint receipt must match a canonical block obtained independently, and the NFT contract must emit the ERC-721 mint to the same recipient as its grant or collection event.
-
-- A grant on the designated Base mainnet Genesis contract identifies that exact Genesis token. The receipt must show its mint, lock and grant in order, from the same issuer. Showing a frame on a separate artwork requires its own verified link. The transferable testnet prototype and a creator's wallet holdings cannot establish that link.
-- A Partner mint requires the current curated Partner approval for that chain and collection address, plus a matching token in the range emitted by `CollectionMinted`. A blue identity check authenticates the collection's origin and confers no Partner status.
-- Top-100k is a numbered mainnet profile badge. It has no input to this resolver. Its live display depends on confirmed eligibility and issuance records.
-
-All eight combinations of eligible sources and rollback cases are covered in `test/verified-artwork-aura.test.mjs`. The Genesis and Partner receipt formats were also exercised on a disposable chain using a two-token Genesis grant and a three-token collection mint.
-
-Verified appearance staff can manage visual sources in **NFT appearance → Manage frame sources**. Select the source type and check the full address before enabling or disabling it. Platform designations bind the original publishing wallet to the active Base Sepolia Core. Partner designations bind a collection contract to Base or Base Sepolia. Each decision appends a reason and revision. The server checks both the role and, for Team, the current authority pair. These entries grant no wallet access, trading permission, discovery weight or blue mark. Genesis uses only the designated mainnet grant contract. Frame eligibility follows the minted token across transfers.
-
-The wallet inventory verifies a Partner mint transaction locator against its receipt and an independently read finalized chain boundary and mint block. It omits the decoration when evidence is incomplete. Collection-wide public gallery and detail coverage still depends on the hosted collection catalog publishing actual collection tokens. The ordinary gallery and artwork detail already consume the same Platform proof. The three-pixel frame and the Future caption appear on both surfaces. The label moves continuously along the bottom edge for Platform and Partner. Genesis and reduced-motion labels stay stationary, and Classic shows the frame alone.
-
-In the signed-in owner's Wallet NFTs, the dedicated Genesis token itself can receive its static frame after the reviewed Base mainnet issuer is enabled. Both inventory views check the exact contract, serial and recipient against finalized grants. One private database call covers the eligible candidates on a page and reads the Future caption setting. The profile's lowest serial remains a separate display. Hosted activation requires the wallet frame migration and the reviewed Genesis pilot. [Wallet grant projection](../../sql/migrations/20261125223000_wallet_genesis_frames.sql)
+The [receipt tests](../../test/verified-artwork-aura.test.mjs) cover source priority, token identity, contract and issuer mismatch, and replaced blocks. The [wallet tests](../../test/wallet-genesis-frames.test.mjs) cover both inventory views and the detail dialog. Live acceptance for the collection catalog and the mainnet Genesis pilot requires their actual deployments and indexed mints.

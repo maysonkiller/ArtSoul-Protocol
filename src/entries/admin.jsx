@@ -695,7 +695,8 @@ function ProtocolAdminPage() {
             {ready && identityAllowed && activeSection === 'identity' && <IdentityReviews
                 key={catalogEpoch + catalogWallet} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent} />}
             {ready && appearanceAllowed && activeSection === 'appearance' && <AuraAppearance
-                key={`${catalogEpoch}:${catalogWallet}`} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent} />}
+                key={`${catalogEpoch}:${catalogWallet}`} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent}
+                frameSourceManager={access.role === 'team' && authorityWallet === catalogWallet && access.frameSourceManager === true} />}
 
             {ready && activeSection === 'artworks' && <AdminArtworkCatalog
                 key={`${catalogEpoch}:${catalogWallet}:${readySession.current?.request}`}

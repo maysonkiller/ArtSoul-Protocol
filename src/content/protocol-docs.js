@@ -90,13 +90,14 @@ const sections = [
         id: "nft-frames",
         title: "NFT frames",
         blocks: [
-            {"type":"paragraph","text":"A minted NFT can display one frame. When several apply, ArtSoul shows the first confirmed match in this order."},
+            {"type":"paragraph","text":"A frame identifies a verified artwork origin or collection. A blue check beside a creator’s name identifies their verified profile."},
             {"type":"frame-examples","caption":"Frame examples","items":[
-                {"kind":"platform","name":"Platform","text":"The artwork was registered by a designated ArtSoul publisher."},
-                {"kind":"genesis","name":"Genesis","text":"The work has a confirmed link to a Genesis grant on Base mainnet."},
+                {"kind":"platform","name":"ArtSoul","text":"A designated ArtSoul publisher registered the work. The official NFT logo appears after verified minting."},
+                {"kind":"founder","name":"ArtSoul Founder","text":"A designated founder wallet registered this personal work. Its metallic turquoise frame can appear before minting."},
+                {"kind":"genesis","name":"ArtSoul Genesis","text":"This NFT has a confirmed Genesis grant on Base mainnet."},
                 {"kind":"partner","name":"ArtSoul Partner","text":"The work belongs to an approved Partner Collection."}
             ]},
-            {"type":"paragraph","text":"Works without a confirmed match keep their standard frame. Classic uses static outlines. Future uses a multicolor edge for Platform, blue for Genesis and gold for ArtSoul Partner. The Platform edge shimmers on desktop. When frame labels are enabled, ArtSoul and ArtSoul Partner travel along the edge. Reduced motion keeps the labels still."}
+            {"type":"paragraph","text":"Works without a confirmed match keep their standard frame. Classic uses static outlines. Future uses a multicolor edge for official ArtSoul NFTs, metallic turquoise for Founder, blue for Genesis and gold for Partner. When enabled, the full label travels around the frame. Reduced motion keeps the labels still."}
         ]
     },
     {

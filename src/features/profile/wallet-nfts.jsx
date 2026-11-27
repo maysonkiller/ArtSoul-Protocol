@@ -1,7 +1,7 @@
 import { React } from '../../entries/react-runtime.js';
 import { createPortal } from 'react-dom';
 import { MultiChainWalletAssets } from './multichain-wallet-assets.jsx';
-import { WalletNftMedia } from './wallet-nft-media.jsx';
+import { WalletNftMedia, WalletNftName } from './wallet-nft-media.jsx';
 
 const currentWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
 const empty = () => ({ status: 'idle', page: null, index: 0, message: '' });
@@ -43,7 +43,7 @@ function NftDetails({ item, quote, onClose }) {
   const title = item.name || `Token ${item.tokenId}`;
   return createPortal(<dialog ref={dialog} className="wallet-nft-dialog" aria-labelledby="walletNftTitle"
     onCancel={event => { event.preventDefault(); onClose(); }}>
-    <header className="wallet-nft-dialog-heading"><div><p className="wallet-nfts-note">Base / {item.tokenType}</p><h2 id="walletNftTitle">{title}</h2></div>
+    <header className="wallet-nft-dialog-heading"><div><p className="wallet-nfts-note">Base / {item.tokenType}</p><h2 id="walletNftTitle"><WalletNftName item={item}>{title}</WalletNftName></h2></div>
       <button type="button" className="btn-secondary" onClick={onClose} autoFocus>Close</button></header>
     <div className="wallet-nft-detail-layout">
       <NftPreview item={item} />
@@ -212,7 +212,7 @@ function BaseWalletNfts({ wallet }) {
           <NftPreview item={item} />
           <div className="wallet-nft-body">
             <div className="wallet-nft-title-row">
-              <h4 title={item.name || `Token ${item.tokenId}`}>{item.name || `Token ${item.tokenId}`}</h4>
+              <h4 title={item.name || `Token ${item.tokenId}`}><WalletNftName item={item}>{item.name || `Token ${item.tokenId}`}</WalletNftName></h4>
               <span className="wallet-chain-chip" data-chain="base-mainnet" role="img" aria-label="Network: Base" title="Base">
                 <img src="/brand/base.svg" alt="" loading="lazy" decoding="async" /><span>Base</span>
               </span>

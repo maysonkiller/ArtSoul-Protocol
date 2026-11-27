@@ -4,7 +4,7 @@ import { auraFrameClassName, projectedArtworkAura, auraCaption, auraWords } from
 
 test('a perimeter label keeps the complete designation together in reading order', () => {
     const create = (tag, props, ...children) => ({tag, props, children});
-    for (const name of ['ArtSoul', 'Genesis', 'ArtSoul Partner', 'ArtSoul Founder']) {
+    for (const name of ['ArtSoul', 'ArtSoul Genesis', 'ArtSoul Partner', 'ArtSoul Founder']) {
         const label = auraCaption(create, name);
         assert.equal(label.props['aria-hidden'], 'true');
         assert.deepEqual(label.children[0].children, [name]);
@@ -39,7 +39,7 @@ test('the shared aura API supplies exactly one decoration without mutating calle
 test('only the verified minted projection exposes a named frame to the interface', () => {
     const nft = { source: 'v41_projection', minted: true, ownership_status: 'verified', chain_id: 84532, aura_kind: 'platform' };
     assert.deepEqual(projectedArtworkAura(nft), {
-        className: auraFrameClassName('platform'), label: 'ArtSoul platform NFT'
+        className: auraFrameClassName('platform'), kind: 'platform', label: 'ArtSoul platform NFT'
     });
     for (const artwork of [null, {}, { metadata: nft }, { ...nft, source: 'wallet' }, { ...nft, source: 'pending_indexer' },
         { ...nft, minted: 'true' }, { ...nft, minted: false }, { ...nft, ownership_status: 'unavailable' },

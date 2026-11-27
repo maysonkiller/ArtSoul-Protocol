@@ -24,7 +24,8 @@ export async function publicGenesisSerial(wallet) {
 
 export async function walletGenesisFrames(page, wallet) {
   const deployment = profileGenesisDeployment();
-  if (!deployment || page?.wallet !== wallet || !Array.isArray(page.items) || page.items.length > 12) return page;
+  if (!deployment || process.env.ARTSOUL_AURA_SOURCES_ENABLED !== 'true' ||
+      page?.wallet !== wallet || !Array.isArray(page.items) || page.items.length > 12) return page;
   const basePage = page.chainId === 8453 && page.network === 'Base' && page.view === undefined;
   function serialFor(item) {
     const onBase = basePage ? item.chainId === undefined && item.network === undefined :
@@ -35,7 +36,7 @@ export async function walletGenesisFrames(page, wallet) {
   const serials = [...new Set(page.items.map(serialFor).filter(id => id !== null))];
   if (!serials.length) return page;
   try {
-    const rows = await supabaseRest('rpc/read_wallet_genesis_frames', { method: 'POST',
+    const rows = await supabaseRest('rpc/read_designated_wallet_genesis_frames', { method: 'POST',
       body: { ...deployment, p_wallet: wallet, p_serials: serials }, signal: AbortSignal.timeout(2000) });
     if (!Array.isArray(rows) || rows.length > serials.length ||
         rows.some(row => !serials.includes(row?.token_id) || typeof row.border_text !== 'boolean')) return page;

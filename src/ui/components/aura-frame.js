@@ -22,7 +22,7 @@ export const auraFrameLabels = Object.freeze({
     partner: 'Partner collection NFT'
 });
 
-export const auraWords = Object.freeze({platform: 'ArtSoul', founder: 'ArtSoul Founder', genesis: 'Genesis', partner: 'ArtSoul Partner'});
+export const auraWords = Object.freeze({platform: 'ArtSoul', founder: 'ArtSoul Founder', genesis: 'ArtSoul Genesis', partner: 'ArtSoul Partner'});
 
 // Both text paths share a start at the middle of the upper-left corner.
 // Reversing the lower half keeps the title readable after the corner.
@@ -67,6 +67,8 @@ if (globalThis.customElements && globalThis.ResizeObserver && !customElements.ge
     });
     const syncPage = () => { for (const track of tracks) track.updatePlayback(); };
     customElements.define('artsoul-aura-track', class extends HTMLElement {
+        static get observedAttributes() { return ['data-word']; }
+        attributeChangedCallback() { this.updatePlayback(); }
         connectedCallback() {
             if (!tracks.size) document.addEventListener('visibilitychange', syncPage);
             tracks.add(this);
@@ -90,7 +92,7 @@ if (globalThis.customElements && globalThis.ResizeObserver && !customElements.ge
                 this.removeAttribute('data-running');
                 return;
             }
-            if (!this.firstElementChild || this.drawnWidth !== width || this.drawnHeight !== height) {
+            if (!this.firstElementChild || this.drawnWidth !== width || this.drawnHeight !== height || this.drawnWord !== this.getAttribute('data-word')) {
                 this.draw(this.size);
             }
             if (this.firstElementChild) {
@@ -122,13 +124,14 @@ if (globalThis.customElements && globalThis.ResizeObserver && !customElements.ge
                 const repeat = {dur, repeatCount:'indefinite'};
                 textPath.append(svgNode('animate', {...repeat, attributeName:'startOffset',
                     values:backwards?'66.666667%;33.333333%':'33.333333%;66.666667%'}));
-                label.append(textPath, svgNode('animate', {...repeat, attributeName:'opacity',
-                    keyTimes:'0;.006;.494;.506;.994;1', values:backwards?'.5;0;0;1;1;.5':'.5;1;1;0;0;.5'}));
+                label.append(textPath, svgNode('animate', {...repeat, attributeName:'opacity', calcMode:'discrete',
+                    keyTimes:'0;.5;1', values:backwards?'0;1;0':'1;0;1'}));
                 svg.append(label);
             }
             this.replaceChildren(svg);
             this.drawnWidth = width;
             this.drawnHeight = height;
+            this.drawnWord = word;
             this.lap = length / 48;
             svg.setCurrentTime(fraction * this.lap);
         }
@@ -163,6 +166,6 @@ export function projectedArtworkAura(artwork) {
     if (![8453, 84532, '8453', '84532'].includes(chain) ||
         (kind === 'genesis' && Number(chain) !== 8453)) return null;
     const className = auraFrameClassName(kind);
-    return className ? { className, label: auraFrameLabels[kind],
+    return className ? { className, kind, label: auraFrameLabels[kind],
         ...(artwork.aura_border_text === true ? { borderLabel: auraWords[kind] } : {}) } : null;
 }

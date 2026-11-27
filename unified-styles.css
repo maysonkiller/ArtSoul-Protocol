@@ -714,7 +714,10 @@ body.future .artwork-page-compact-action {
     --c-accent: var(--accent-classic);
     --c-accent-2: var(--accent-classic);
     --c-accent-3: var(--accent-classic);
-    --c-aura-founder: #98536a;
+    --c-aura-founder: #307f80;
+    --c-aura-founder-deep: #25615f;
+    --c-aura-founder-metal: #47909c;
+    --c-aura-founder-light: #56bcc5;
     --c-aura-gold: var(--accent-classic);
     --c-aura-blue: var(--accent-classic);
     --c-verification-blue: #345e8e;
@@ -746,7 +749,10 @@ body.future .artwork-page-compact-action {
     --c-accent: var(--accent-future);
     --c-accent-2: var(--neon-purple);
     --c-accent-3: var(--accent-future-2);
-    --c-aura-founder: #ff9abd;
+    --c-aura-founder: #72e6d3;
+    --c-aura-founder-deep: #1a2f44;
+    --c-aura-founder-metal: #1e827b;
+    --c-aura-founder-light: #60e4e8;
     --c-aura-gold: #d4af37;
     --c-aura-blue: #3b82f6;
     --c-verification-blue: #175dc5;
@@ -816,7 +822,8 @@ body.future .artwork-page-compact-action {
     text-align: center; line-height: 1.08; font-weight: 800;
 }
 .artsoul-official-nft { object-fit: cover; }
-body:is(.classic,.future) :is(.artsoul-card-title,.artsoul-card-creator,.home-showcase-title,.home-showcase-creator):has(> .artsoul-identity-name):has(> :is(.artsoul-official-nft,.artsoul-card-identity-check)) {
+.artsoul-founder-label { flex: none; margin-inline-start: .4em; color: var(--c-aura-founder); font-size: .8125em; font-weight: 650; }
+body:is(.classic,.future) :is(.artsoul-card-title,.artsoul-card-creator,.home-showcase-title,.home-showcase-creator):has(> .artsoul-identity-name):has(> :is(.artsoul-official-nft,.artsoul-card-identity-check,.artsoul-founder-label)) {
     display: flex;
     align-items: center;
 }
@@ -867,6 +874,7 @@ body:is(.classic,.future) :is(.artsoul-card-title,.artsoul-card-creator,.home-sh
 }
 
 @supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
+    .artsoul-aura-frame--founder::after,
     .future .artsoul-aura-frame--platform::after,
     .future .artsoul-aura-frame--partner::after {
         border: 0;
@@ -882,6 +890,11 @@ body:is(.classic,.future) :is(.artsoul-card-title,.artsoul-card-creator,.home-sh
     .future .artsoul-aura-frame--platform::after {
         background: linear-gradient(120deg, var(--c-accent), var(--c-accent-2), var(--c-accent-3), var(--c-accent));
         background-size: 300% 100%;
+    }
+    :is(.classic, .future) .artsoul-aura-frame--founder::after {
+        background: linear-gradient(125deg, var(--c-aura-founder-deep), var(--c-aura-founder-metal) 18%,
+            var(--c-aura-founder-light) 29%, var(--c-aura-founder-metal) 44%, var(--c-aura-founder-deep) 59%,
+            var(--c-aura-founder-metal) 75%, var(--c-aura-founder-light) 87%, var(--c-aura-founder-deep));
     }
     @media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
         .future .artsoul-aura-frame--platform::after { animation: artsoulAuraShimmer 6s linear infinite; }
