@@ -79,11 +79,13 @@ test('issued first-work evidence binds the draft, paying collector and current h
         'function tokenURI(uint256) returns (string)', 'function mintPrice(uint256) returns (uint256)',
         'function maxSupply() returns (uint32)', 'function configurationLocked() returns (bool)',
         'function allocatedSupply() returns (uint256)', 'function royaltyInfo(uint256,uint256) returns (address,uint256)',
-        'function marketplaceRegistry() returns (address)'
+        'function marketplaceRegistry() returns (address)', 'function protocolReceiver() returns (address)',
+        'function protocolTreasury() returns (address)'
     ]);
     const values = { creator: address, firstCollector: buyer, collectionFirstCollector: buyer,
         ownerOf: holder, tokenURI: prefix + '1', mintPrice: 42n, openingReserve: 31n, maxSupply: 5n,
-        allocatedSupply: 5n, configurationLocked: true, royaltyInfo: [address, 550n], marketplaceRegistry: rehearsalCore };
+        allocatedSupply: 5n, configurationLocked: true, royaltyInfo: [address, 550n], marketplaceRegistry: rehearsalCore,
+        protocolReceiver: '0x' + '8'.repeat(40), protocolTreasury: '0x' + '8'.repeat(40) };
     let chain = '0x14a34', canonical = block;
     async function rpc(method, params) {
         if (method === 'eth_chainId') return chain;
@@ -91,8 +93,8 @@ test('issued first-work evidence binds the draft, paying collector and current h
         assert.deepEqual(params[1], { blockHash: block.hash, requireCanonical: true });
         if (method === 'eth_getCode') { assert.equal(params[0], address); return code; }
         assert.equal(method, 'eth_call');
-        assert.equal(params[0].to, address);
         const call = abi.parseTransaction({ data: params[0].data });
+        assert.equal(params[0].to, call.name === 'protocolTreasury' ? rehearsalCore : address);
         if (call.name === 'royaltyInfo') {
             assert.deepEqual([...call.args], [1n, 10000n]);
             return abi.encodeFunctionResult(call.fragment, values.royaltyInfo);
@@ -130,6 +132,7 @@ test('issued first-work evidence binds the draft, paying collector and current h
         ['ownerOf', ZeroAddress, /do not agree/], ['mintPrice', 30n, /opening price/], ['tokenURI', prefix + '2', /URI differs/],
         ['maxSupply', 4n, /supply/], ['allocatedSupply', 3n, /allocation/], ['openingReserve', 32n, /opening price/],
         ['configurationLocked', false, /Locked/], ['marketplaceRegistry', buyer, /marketplace registry/],
+        ['protocolReceiver', buyer, /protocol treasury/], ['protocolTreasury', ZeroAddress, /protocol treasury/],
         ['royaltyInfo', [holder, 550n], /creator royalty/],
         ['royaltyInfo', [address, 549n], /creator royalty/]]) {
         const previous = values[field];
@@ -170,6 +173,7 @@ test('issued first-work evidence binds the draft, paying collector and current h
     const withProvenance = second => checkIssuedFirstWork(json, address, runtime, digest,
         [receiptRpc(receiver), second], { settlement, issuance });
     const issued = await withProvenance(receiptRpc(receiver));
+    assert.equal(issued.protocolTreasury, values.protocolTreasury);
     assert.equal(issued.provenance.mintRecipient, receiver);
     assert.equal(issued.firstCollector, buyer);
     assert.equal(issued.owner, holder);

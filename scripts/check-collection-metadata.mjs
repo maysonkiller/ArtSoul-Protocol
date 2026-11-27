@@ -52,6 +52,9 @@ export async function checkIssuedFirstWork(draftJson, collection, runtimeHash, e
         throw new Error('Locked collection supply, allocation or opening price differs from the reviewed draft.');
     }
     if (first.marketplaceRegistry !== rehearsalCore) throw new Error('Collection does not bind the reviewed Base Sepolia marketplace registry.');
+    if (first.protocolTreasury === ZeroAddress || first.protocolReceiver !== first.protocolTreasury) {
+        throw new Error('The collection fee receiver differs from the reviewed Base Sepolia protocol treasury.');
+    }
     if (first.creator === ZeroAddress || first.owner === ZeroAddress || first.firstCollector === ZeroAddress ||
         first.firstCollector !== first.openingBuyer) throw new Error('The issued first token and its paid opening auction do not agree.');
     if (first.royaltyReceiver !== first.creator || first.royaltyAmount !== 550n) {
@@ -68,7 +71,7 @@ export async function checkIssuedFirstWork(draftJson, collection, runtimeHash, e
     await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(84532, rpc), block)));
     return { chainId: 84532, collection: address, runtimeHash: runtimeHash.toLowerCase(), block, rpcReadings: 2,
         creator: first.creator, firstCollector: first.firstCollector, owner: first.owner, supply, marketplaceRegistry: first.marketplaceRegistry,
-        openingReserveWei: reserve.toString(), publicMintPriceWei: first.price.toString(), metadata,
+        protocolTreasury: first.protocolTreasury, openingReserveWei: reserve.toString(), publicMintPriceWei: first.price.toString(), metadata,
         ...(provenance && { provenance }) };
 }
 
@@ -82,20 +85,23 @@ async function readFirstWork(rpc, address, runtimeHash, block) {
         'function tokenURI(uint256) view returns (string)', 'function mintPrice(uint256) view returns (uint256)',
         'function configurationLocked() view returns (bool)', 'function maxSupply() view returns (uint32)',
         'function allocatedSupply() view returns (uint256)', 'function royaltyInfo(uint256,uint256) view returns (address,uint256)',
-        'function marketplaceRegistry() view returns (address)'
+        'function marketplaceRegistry() view returns (address)', 'function protocolReceiver() view returns (address)',
+        'function protocolTreasury() view returns (address)'
     ]);
-    async function read(name, args = []) {
-        const result = await rpc('eth_call', [{ to: address, data: abi.encodeFunctionData(name, args) }, at]);
+    async function read(name, args = [], target = address) {
+        const result = await rpc('eth_call', [{ to: target, data: abi.encodeFunctionData(name, args) }, at]);
         const decoded = abi.decodeFunctionResult(name, result);
         return decoded.length === 1 ? decoded[0] : decoded;
     }
     const [creator, firstCollector, openingBuyer, owner, uri, price, locked, supply, allocated, openingReserve,
-        [royaltyReceiver, royaltyAmount], marketplaceRegistry] = await Promise.all([
+        [royaltyReceiver, royaltyAmount], marketplaceRegistry, protocolReceiver, protocolTreasury] = await Promise.all([
         read('creator'), read('firstCollector', [1]), read('collectionFirstCollector'),
         read('ownerOf', [1]), read('tokenURI', [1]), read('mintPrice', [1]), read('configurationLocked'),
-        read('maxSupply'), read('allocatedSupply'), read('mintPrice', [0]), read('royaltyInfo', [1, 10000]), read('marketplaceRegistry')
+        read('maxSupply'), read('allocatedSupply'), read('mintPrice', [0]), read('royaltyInfo', [1, 10000]), read('marketplaceRegistry'),
+        read('protocolReceiver'), read('protocolTreasury', [], rehearsalCore)
     ]);
-    return { creator, firstCollector, openingBuyer, owner, uri, price, locked, supply, allocated, openingReserve, royaltyReceiver, royaltyAmount, marketplaceRegistry };
+    return { creator, firstCollector, openingBuyer, owner, uri, price, locked, supply, allocated, openingReserve,
+        royaltyReceiver, royaltyAmount, marketplaceRegistry, protocolReceiver, protocolTreasury };
 }
 
 export async function checkPublishedTokenMetadata(metadataURI, tokenId, expectedSha256) {
