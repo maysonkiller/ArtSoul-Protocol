@@ -26,6 +26,8 @@ test('a designated publication is marked only after its exact registration is co
     });
     async function frame() { return projectedArtworkAura((await withCatalogMintOrigins([card]))[0]); }
     assert.equal((await frame()).label,'Published by ArtSoul');
+    events = [{...registration,contract_address:'0x'+core.slice(2).toUpperCase()}];
+    assert.equal((await frame()).label,'Published by ArtSoul');
     for (const change of [{artwork_id:'30'}, {log_index:4}, {block_number:46}, {contract_address:author},
         {event_data:{...registration.event_data,creator:core}}, {event_data:{...registration.event_data,metadataURI:'other'}}]) {
         events = [{...registration,...change}]; assert.equal(await frame(),null);
