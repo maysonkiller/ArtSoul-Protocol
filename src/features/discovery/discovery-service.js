@@ -580,7 +580,7 @@
         const list = (Array.isArray(artworks) ? artworks : [])
             .filter(isPublicArtwork)
             .map(normalizeArtwork);
-        return list.filter(artwork => galleryTabForArtwork(artwork) === normalizedTab);
+        return normalizedTab === 'all' ? list : list.filter(artwork => galleryTabForArtwork(artwork) === normalizedTab);
     }
 
     function searchArtworks(artworks = [], query = '') {

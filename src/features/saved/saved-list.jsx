@@ -51,7 +51,7 @@ export function SavedList({ wallet }) {
     </p>}
     {!signingIn && state.status === 'error' && <p role="status">{state.error} <button type="button" className="btn-secondary" onClick={() => savedStore.load()}>Retry</button></p>}
     {!signingIn && state.status === 'loading' && !state.items.length && <p role="status">Loading favorites…</p>}
-    {!signingIn && state.status === 'ready' && !state.items.length && <p>No favorites yet. <a href="/gallery#discover">Explore the gallery</a></p>}
+    {!signingIn && state.status === 'ready' && !state.items.length && <p>No favorites yet. <a href="/gallery#all">Explore the gallery</a></p>}
     <div className="profile-artwork-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" aria-busy={state.status === 'loading'}>
       {state.items.map(item => <SavedArtwork key={savedKey(item)} item={item} pending={state.pending.has(savedKey(item))} />)}
     </div>

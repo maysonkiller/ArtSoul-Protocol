@@ -4,7 +4,7 @@ const fs = require('node:fs');
 
 const PAGES = ['index.html','gallery.html','artwork.html','profile.html',
     'upload.html','collection-builder.html','admin.html','docs-protocol.html'];
-const DESTINATIONS = ['/','/gallery#discover','/upload','/docs-protocol','/profile'];
+const DESTINATIONS = ['/','/gallery#all','/upload','/docs-protocol','/profile'];
 
 test('shared native header has five destinations, Profile last, on every product route', () => {
     for (const page of PAGES) {

@@ -9,6 +9,7 @@ import '../features/saved/saved-ui.js';
 const { useState, useEffect, useMemo, useRef } = React;
 
         const GALLERY_TABS = [
+            { id: 'all', label: 'All works' },
             { id: 'discover', label: 'Discovery' },
             { id: 'live_auctions', label: 'Auctions' },
             { id: 'nft', label: 'NFTs' },
@@ -33,7 +34,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         function getInitialGalleryTab() {
             const hash = (window.location.hash || '').replace('#', '');
             const tabId = GALLERY_TAB_ALIASES[hash] || hash;
-            return GALLERY_TABS.some(tab => tab.id === tabId) ? tabId : 'discover';
+            return GALLERY_TABS.some(tab => tab.id === tabId) ? tabId : 'all';
         }
 
         function GalleryPage() {

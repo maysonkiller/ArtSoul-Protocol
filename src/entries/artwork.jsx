@@ -3119,8 +3119,7 @@ function OwnershipIdentity({ source, label, name, verified, className, style, na
             const contextPanel = (
                 <section key="context" className="artwork-page-panel artwork-page-context artwork-mobile-context">
                     <header className="artwork-page-header">
-                        <h1 className="artwork-detail-title">{artwork.title}{aura && artwork.aura_kind === 'platform' &&
-                            <img className="artsoul-official-nft" src="/favicon.jpg" alt="Official ArtSoul NFT" title="Official ArtSoul NFT" />}</h1>
+                        <h1 className="artwork-detail-title">{artwork.title}{window.ArtSoulArtworkCard?.officialMark?.(React.createElement, artwork, aura)}</h1>
                         {window.ArtSoulArtworkCard?.ReactSavedControl && React.createElement(window.ArtSoulArtworkCard.ReactSavedControl, { artwork, detail: true })}
                     </header>
                     <div className="artwork-page-description">

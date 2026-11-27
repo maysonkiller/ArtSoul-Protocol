@@ -1,4 +1,5 @@
 import './artwork-player.css';
+import { artworkAudio } from './artwork-audio.js';
 
 function mediaTime(seconds) {
     if (!Number.isFinite(seconds)) return '–:––';
@@ -69,18 +70,19 @@ class ArtworkMediaPlayer extends HTMLElement {
             label(play, playing ? 'Pause' : 'Play');
         };
         const syncVolume = () => {
-            const silent = media.muted || media.volume === 0;
+            const silent = (isVideo ? media.muted : artworkAudio.isMuted(media)) || media.volume === 0;
             mute.dataset.muted = String(silent);
             label(mute, silent ? 'Unmute' : 'Mute');
-            volume.value = media.muted ? 0 : media.volume;
+            volume.value = silent ? 0 : media.volume;
             volume.setAttribute('aria-valuetext', Math.round(volume.value * 100) + '%');
         };
         const syncTime = () => {
-            const duration = media.duration;
+            const duration = isVideo ? media.duration : artworkAudio.knownDuration(media);
             seek.disabled = !Number.isFinite(duration) || duration <= 0;
             seek.max = seek.disabled ? 0 : duration;
-            seek.value = media.currentTime;
-            const position = mediaTime(media.currentTime);
+            const elapsed = isVideo ? media.currentTime : artworkAudio.elapsed(media);
+            seek.value = elapsed;
+            const position = mediaTime(elapsed);
             const displayed = position + ' / ' + mediaTime(duration);
             if (clock.textContent !== displayed) {
                 clock.textContent = displayed;
@@ -110,7 +112,7 @@ class ArtworkMediaPlayer extends HTMLElement {
             sampleClock();
         };
         this.events.signal.addEventListener('abort', stopClock, { once: true });
-        const startPlayback = () => media.play().catch(error => {
+        const startPlayback = () => (isVideo ? media.play() : artworkAudio.play(media)).catch(error => {
             if (error.name !== 'AbortError') report('Playback could not start. Try again.');
         });
         const togglePlay = () => {
@@ -122,12 +124,19 @@ class ArtworkMediaPlayer extends HTMLElement {
         if (isVideo) listen(media, 'click', event => { event.preventDefault(); event.stopPropagation(); togglePlay(); });
         listen(mute, 'click', () => {
             const wasPlaying = !media.paused && !media.ended;
-            if (media.volume === 0) { media.volume = 1; media.muted = false; }
-            else media.muted = !media.muted;
-            if (wasPlaying && (!media.muted || media.paused) && !media.ended && media.isConnected && !document.hidden) startPlayback();
+            const silent = (isVideo ? media.muted : artworkAudio.isMuted(media)) || media.volume === 0;
+            if (media.volume === 0) media.volume = 1;
+            if (isVideo) media.muted = !silent;
+            else artworkAudio.setMuted(media, !silent);
+            if (wasPlaying && (silent || media.paused) && !media.ended && media.isConnected && !document.hidden) startPlayback();
             syncVolume();
         });
-        listen(volume, 'input', () => { media.volume = Number(volume.value); media.muted = media.volume === 0; syncVolume(); });
+        listen(volume, 'input', () => {
+            media.volume = Number(volume.value);
+            if (isVideo) media.muted = Number(volume.value) === 0;
+            else artworkAudio.setMuted(media, Number(volume.value) === 0);
+            syncVolume();
+        });
         listen(seek, 'input', () => { if (!seek.disabled) { media.currentTime = Number(seek.value); syncTime(); } });
         listen(speed, 'change', () => { media.playbackRate = Number(speed.value); });
         listen(media, 'ratechange', () => { speed.value = media.playbackRate; });

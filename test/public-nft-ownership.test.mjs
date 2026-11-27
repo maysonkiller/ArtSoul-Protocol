@@ -152,7 +152,7 @@ test('public NFT consumers use one verified history across cards, filters, saved
     }
     const registrations = calls.filter(call => call.name === 'contract_events');
     assert.equal(registrations.length, 4);
-    assert.ok(registrations.every(call => call.query.get('contract_address') === `eq.${CORE}` &&
+    assert.ok(registrations.every(call => call.query.get('contract_address') === `ilike.${CORE}` &&
       call.query.get('transaction_hash') === `in.(${hash(10)})` && call.query.get('select').split(',').includes('artwork_id::text')));
     const artworkReads = calls.filter(call => call.name === 'v41_artworks' && call.query.get('select').split(',').includes('minted'));
     assert.ok(artworkReads.length >= 2 && artworkReads.every(call => call.query.get('select').split(',').includes('log_index')));

@@ -747,7 +747,7 @@ test('open_page navigates only to declared pages without provider or wallet work
   });
   const tool = tools.get('open_page');
   const expected = [
-    ['home', '/', 'Home'], ['gallery', '/gallery#discover', 'Explore'],
+    ['home', '/', 'Home'], ['gallery', '/gallery#all', 'Explore'],
     ['nfts', '/gallery#nft', 'NFTs'], ['marketplace', '/gallery#marketplace', 'Marketplace'],
     ['auctions', '/gallery#live_auctions', 'Auctions'], ['collections', '/gallery#collections', 'Collections'],
     ['profile', '/profile', 'Profile'], ['collected', '/profile#collected', 'Collected ArtSoul NFTs'],

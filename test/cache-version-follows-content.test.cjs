@@ -18,18 +18,18 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
-  'src/features/discovery/discovery-service.js': { version: 2, sha256: 'c9a152e266934f4f' },
+  'src/features/discovery/discovery-service.js': { version: 3, sha256: 'd210af43c20e4f65' },
   'src/features/discovery/gallery-contract-runtime.js': { version: 3, sha256: '5f1e3a95ef176761' },
   'src/features/discovery/public-contract-runtime.js': { version: 1, sha256: '16ace3baeafdae78' },
-  'unified-styles.css': { version: 106, sha256: '84d8c8c1bc590ce8' },
-  'mobile-no-motion.css': { version: 7, sha256: 'aa97ee46cf5ec1a3' },
+  'unified-styles.css': { version: 107, sha256: 'efea1d87fecfc0ed' },
+  'mobile-no-motion.css': { version: 8, sha256: 'a537e6e853a4ab94' },
   'src/ui/themed-selects.js': { version: 3, sha256: '4bd40279cb547f54' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 8, sha256: '618e006edefcf241' },
-  'src/ui/components/artwork-card.js': { version: 50, sha256: '26d1b1a5984a5a0b' },
+  'src/ui/components/artwork-card.js': { version: 51, sha256: '14cd30caf80b2c64' },
   'contracts-integration.js': { version: 22, sha256: 'fe7434b072e2fd55' },
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
-  'webmcp-tools.js': { version: 45, sha256: 'fd3d07095a95007f' },
+  'webmcp-tools.js': { version: 46, sha256: '3cc1aa1a30f974a1' },
   'voice-commands.js': { version: 23, sha256: '364752c033bcc6a1' },
   'avatar-dropdown.js': { version: 76, sha256: '61d3213941b894b0' },
   'header-prepaint.js': { version: 12, sha256: '13b9bd8192b2ce51' },

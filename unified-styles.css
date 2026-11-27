@@ -792,8 +792,7 @@ body.future .artwork-page-compact-action {
 .artsoul-aura-caption { display: none; }
 .future .artsoul-aura-frame:has(> .artsoul-aura-caption) {
     --aura-band: .8125rem;
-    --aura-corner: 1.125rem;
-    --aura-lap: 18s;
+    isolation: isolate;
     box-sizing: border-box;
     padding: var(--aura-band);
 }
@@ -802,8 +801,6 @@ body.future .artwork-page-compact-action {
 }
 .future .artwork-detail-frame:has(> .artsoul-aura-caption) {
     --aura-band: clamp(1rem, 1.35vw, 1.375rem);
-    --aura-corner: 1.625rem;
-    --aura-lap: 32s;
 }
 .future .artsoul-aura-frame:has(> .artsoul-aura-caption)::after {
     border-width: var(--aura-band);
@@ -817,6 +814,13 @@ body.future .artwork-page-compact-action {
     text-align: center; line-height: 1.08; font-weight: 800;
 }
 .artsoul-official-nft { object-fit: cover; }
+body:is(.classic,.future) :is(.artsoul-card-title,.artsoul-card-creator,.home-showcase-title,.home-showcase-creator):has(> .artsoul-identity-name):has(> :is(.artsoul-official-nft,.artsoul-card-identity-check)) {
+    display: flex;
+    align-items: center;
+}
+.artsoul-identity-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.artsoul-card-identity-check, .artsoul-official-nft { flex: none; }
+.artsoul-publisher-frame::after { border: 2px solid var(--c-accent); }
 .identity-applications { overflow-wrap: anywhere; }
 .identity-applications label { display: grid; gap: .35rem; margin-block: .65rem; }
 .identity-applications summary { cursor: pointer; }
@@ -831,8 +835,9 @@ body.future .artwork-page-compact-action {
     overflow: hidden;
     white-space: nowrap;
     pointer-events: none;
-    container-type: size;
-    container-name: aura;
+    mix-blend-mode: multiply;
+    font-size: calc(var(--aura-band) - .1875rem);
+    font-weight: 750;
 }
 .future .artsoul-aura-caption::before {
     content: '';
@@ -847,41 +852,17 @@ body.future .artwork-page-compact-action {
     left: 50%;
     transform: translateX(-50%);
     color: var(--c-brand-mark-background);
-    font-size: calc(var(--aura-band) - .1875rem);
-    font-weight: 750;
     line-height: 1;
-    --aura-axis: calc(var(--aura-band) / 2);
 }
-@container aura (min-width: 440px) {
-    .artwork-detail-frame > .artsoul-aura-caption > .aura-word { --aura-lap: 48s; }
-}
-@container aura (min-width: 700px) {
-    .artwork-detail-frame > .artsoul-aura-caption > .aura-word { --aura-lap: 64s; }
-}
-@container aura (min-width: 960px) {
-    .artwork-detail-frame > .artsoul-aura-caption > .aura-word { --aura-lap: 80s; }
-}
-@supports (width: 1cqw) {
-    @media (prefers-reduced-motion: no-preference) {
-        .future :is(.artsoul-aura-frame--platform,.artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-word {
-            top: 0; left: 0; bottom: auto;
-            transform-origin: 0 0;
-            animation: artsoulAuraCaption var(--aura-lap) linear infinite;
-        }
+.artsoul-aura-caption > artsoul-aura-track { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+    .future .artsoul-aura-caption > artsoul-aura-track:defined {
+        display: block;
+        position: absolute;
+        inset: 0;
+        fill: var(--c-brand-mark-background);
     }
-}
-/* Keep the lower edge readable from left to right. Turn the word between
-   edges while transparent, so corners never show it upside down. */
-@keyframes artsoulAuraCaption {
-    0%, 100% { opacity: 0; transform: translate(var(--aura-corner), var(--aura-axis)) rotate(0deg) translate(0,-50%); }
-    24.99% { opacity: 0; transform: translate(calc(100cqw - var(--aura-corner)), var(--aura-axis)) rotate(0deg) translate(-100%,-50%); }
-    25% { opacity: 0; transform: translate(calc(100cqw - var(--aura-axis)), var(--aura-corner)) rotate(90deg) translate(0,-50%); }
-    49.99% { opacity: 0; transform: translate(calc(100cqw - var(--aura-axis)), calc(100cqh - var(--aura-corner))) rotate(90deg) translate(-100%,-50%); }
-    50% { opacity: 0; transform: translate(calc(100cqw - var(--aura-corner)), calc(100cqh - var(--aura-axis))) rotate(0deg) translate(-100%,-50%); }
-    74.99% { opacity: 0; transform: translate(var(--aura-corner), calc(100cqh - var(--aura-axis))) rotate(0deg) translate(0,-50%); }
-    75% { opacity: 0; transform: translate(var(--aura-axis), calc(100cqh - var(--aura-corner))) rotate(-90deg) translate(0,-50%); }
-    99.99% { opacity: 0; transform: translate(var(--aura-axis), var(--aura-corner)) rotate(-90deg) translate(-100%,-50%); }
-    1%, 24%, 26%, 49%, 51%, 74%, 76%, 99% { opacity: 1; }
+    .future .artsoul-aura-caption:has(> artsoul-aura-track > svg) > .aura-word { display: none; }
 }
 
 @supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
@@ -903,6 +884,9 @@ body.future .artwork-page-compact-action {
     }
     @media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
         .future .artsoul-aura-frame--platform::after { animation: artsoulAuraShimmer 6s linear infinite; }
+        .future .artsoul-aura-frame--platform:has(> .artsoul-aura-caption > artsoul-aura-track:not([data-running]))::after {
+            animation-play-state: paused;
+        }
     }
 }
 
@@ -7229,6 +7213,14 @@ body:is(.classic, .future) .site-primary-nav a {
     white-space: nowrap;
 }
 body:is(.classic, .future) .site-primary-nav a:hover { background: var(--c-surface-muted); }
+@media (hover: hover) and (pointer: fine) {
+    body:is(.classic,.future) .site-header .site-primary-nav a:hover {
+        text-decoration: underline;
+        text-decoration-color: var(--seasonal-control-ink, var(--c-accent));
+        text-underline-offset: .32em;
+        transition: none;
+    }
+}
 body:is(.classic, .future) .site-primary-nav a:is([aria-current="page"], [aria-current="location"]) {
     color: var(--seasonal-control-ink, var(--c-accent));
     background: transparent;

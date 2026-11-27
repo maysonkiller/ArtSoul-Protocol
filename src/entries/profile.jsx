@@ -1,3 +1,4 @@
+import '../ui/components/artwork-audio.js';
 import { ProfileEditDialog } from '../features/profile/profile-edit-dialog.jsx';
 import { ProfileContentReport } from '../features/moderation/profile-content-report.jsx';
 import { staffEntryHint } from '../features/admin/staff-entry.js';

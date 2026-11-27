@@ -7,7 +7,9 @@ test('a perimeter label keeps the complete designation together in reading order
     for (const name of ['ArtSoul', 'Genesis', 'ArtSoul Partner']) {
         const label = auraCaption(create, name);
         assert.equal(label.props['aria-hidden'], 'true');
-        assert.deepEqual(label.children.map(node => node.children), [[name]]);
+        assert.deepEqual(label.children[0].children, [name]);
+        if (name === 'Genesis') assert.equal(label.children[1], null);
+        else assert.equal(label.children[1].props['data-word'], name);
     }
     assert.equal(auraWords.partner, 'ArtSoul Partner');
     assert.equal(auraCaption(create, 'unreviewed'), null);

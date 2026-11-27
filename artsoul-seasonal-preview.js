@@ -43,14 +43,48 @@
   const hero=DOC.querySelector('.home-hero');if(hero){hero.insertAdjacentElement('afterend',scene)}else{scene.classList.add('as-scene-internal');BODY.appendChild(scene)}
   const byId=id=>DOC.getElementById(id);
   const modeButtons=[...panel.querySelectorAll('[data-mode]')];
-  let panelOpen=false,lastFocus=null;
-  function closePanel(){panel.dataset.open='false';panelButton.setAttribute('aria-expanded','false');panelOpen=false;if(lastFocus&&typeof lastFocus.focus==='function')lastFocus.focus()}
-  function openPanel(){lastFocus=DOC.activeElement;panel.dataset.open='true';panelButton.setAttribute('aria-expanded','true');panelOpen=true;modeButtons[0]?.focus()}
+  let panelOpen=false,lastFocus=null,clampedPosition=null;
+  function closePanel(){clampedPosition=null;panel.dataset.open='false';panelButton.setAttribute('aria-expanded','false');panelOpen=false;if(lastFocus&&typeof lastFocus.focus==='function')lastFocus.focus({preventScroll:true})}
+  function openPanel(){lastFocus=DOC.activeElement;panel.dataset.open='true';panelButton.setAttribute('aria-expanded','true');panelOpen=true;modeButtons.find(b=>b.dataset.mode===mode)?.focus({preventScroll:true})}
   panelButton.addEventListener('click',()=>panelOpen?closePanel():openPanel());
   byId('as-close').addEventListener('click',closePanel);
   DOC.addEventListener('pointerdown',e=>{if(panelOpen&&!panel.contains(e.target)&&!panelButton.contains(e.target))closePanel()});
   DOC.addEventListener('keydown',e=>{if(e.key==='Escape'&&panelOpen)closePanel()});
-  modeButtons.forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;store.set('artsoul_seasonal_preview_mode',mode);applyMode()}));
+  function chooseMode(next, persist) {
+    if (!modes.includes(next) || next === mode) return;
+    const previous = panelOpen && clampedPosition?.anchor.isConnected &&
+      Math.abs(window.scrollY - clampedPosition.scroll) <= 1 ? clampedPosition : null;
+    let anchor = previous?.anchor;
+    if (!anchor && window.scrollY > 1) {
+      const x = Math.floor(innerWidth * .4);
+      const top = Math.max(getHeaderOffset(), ribbon.getBoundingClientRect().bottom);
+      // A sliver of the hero can remain above the discovery shelf when the installation enters.
+      const shelf = hero && scene.nextElementSibling;
+      const shelfBounds = shelf?.getBoundingClientRect();
+      if (shelfBounds?.top < innerHeight && shelfBounds.bottom > top && hero.getBoundingClientRect().top < getHeaderOffset()) {
+        anchor = shelf;
+      }
+      for (const y of [top + 12, innerHeight * .5, innerHeight * .8]) {
+        if (anchor) break;
+        anchor = DOC.elementsFromPoint(x, Math.max(1, Math.min(innerHeight - 1, y))).find(el =>
+          el.closest('main') && !scene.contains(el) && !el.contains(scene) && el.tagName !== 'MAIN');
+      }
+    }
+    const before = previous?.top ?? anchor?.getBoundingClientRect().top;
+    clampedPosition = null;
+    mode = next;
+    if (persist) store.set('artsoul_seasonal_preview_mode',mode);
+    applyMode();
+    if (anchor?.isConnected) {
+      const delta = anchor.getBoundingClientRect().top - before;
+      if (Math.abs(delta) > 1) window.scrollBy({top:delta, behavior:'instant'});
+      // Removing the installation can put the requested position above scroll zero.
+      if (panelOpen && Math.abs(anchor.getBoundingClientRect().top - before) > 1) {
+        clampedPosition = {anchor, top:before, scroll:window.scrollY};
+      }
+    }
+  }
+  modeButtons.forEach(b=>b.addEventListener('click',()=>chooseMode(b.dataset.mode,true)));
   byId('as-snow-toggle').addEventListener('click',()=>{if(staticScene||mode==='original')return;snow=!snow;store.set('artsoul_seasonal_preview_snow',snow?'on':'off');applyMode()});
   byId('as-preview-fireworks').addEventListener('click',()=>showFireworks(false));
   function getHeaderOffset(){if(!header)return 0;const cs=getComputedStyle(header);return ['sticky','fixed'].includes(cs.position)?Math.round(header.getBoundingClientRect().height):0}
@@ -440,5 +474,5 @@
   domObserver.observe(BODY,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden','aria-hidden','aria-disabled'],attributeOldValue:true});
   DOC.addEventListener('visibilitychange',()=>{if(!DOC.hidden)scheduleDecoration();});
   updateLabels();applyMode();tick();setInterval(tick,1000);clockSync().then(tick);
-  window.ArtSoulSeasonalPreview={getState:()=>({mode,snow,locale:'en',timezone:'Europe/Warsaw',targetUtc:new Date(TARGET).toISOString(),clockSynced}),previewFireworks:()=>showFireworks(false),setMode:x=>{if(modes.includes(x)){mode=x;applyMode()}}};
+  window.ArtSoulSeasonalPreview={getState:()=>({mode,snow,locale:'en',timezone:'Europe/Warsaw',targetUtc:new Date(TARGET).toISOString(),clockSynced}),previewFireworks:()=>showFireworks(false),setMode:x=>chooseMode(x,false)};
 })();

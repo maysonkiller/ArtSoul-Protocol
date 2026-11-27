@@ -250,7 +250,7 @@ function seasonalPreviewOnlyPlugin() {
                     '<link rel="stylesheet" href="/artsoul-seasonal-preview.css?v=85">\n</head>')
                     .replace(/<body\b[^>]*>(?:\s*<script>document\.body\.classList\.add\([^<]+<\/script>)?/i, body => body + '<script>(function(){var mode="newyear";try{var saved=localStorage.getItem("artsoul_seasonal_preview_mode");if(saved==="original"||saved==="winter")mode=saved}catch{}document.body.dataset.asSeason=document.documentElement.dataset.asSeason=mode})()</script>')
                     .replace('</body>',
-                        '<script src="/artsoul-seasonal-preview.js?v=85" defer></script>\n</body>');
+                        '<script src="/artsoul-seasonal-preview.js?v=86" defer></script>\n</body>');
             }
         }
     };

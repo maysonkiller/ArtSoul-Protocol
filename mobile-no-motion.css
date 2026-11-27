@@ -62,10 +62,5 @@
         :root:not(#artsoul-motion-enabled) body.future .artsoul-card-audio-avatar[data-playing="true"] {
             animation: artsoulAudioAvatarSpin 3s linear infinite !important;
         }
-        @supports (width: 1cqw) {
-            :root:not(#artsoul-motion-enabled) body.future :is(.artsoul-aura-frame--platform, .artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-word {
-                animation: artsoulAuraCaption var(--aura-lap) linear infinite !important;
-            }
-        }
     }
 }

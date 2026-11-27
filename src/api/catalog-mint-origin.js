@@ -1,13 +1,16 @@
 import { Interface, ZeroAddress } from 'ethers';
 import { createHash } from 'node:crypto';
 import finalizedMints from './catalog-finalized-mints.json' with { type: 'json' };
+import historicalPublications from './catalog-finalized-publications.json' with { type: 'json' };
 import { normalizeWallet, supabaseRest } from './backend.js';
 import { readAuraBorderSetting } from './aura-border-setting.js';
+import { confirmedPublisherWorks } from './platform-artwork-aura.js';
 import { createRegistrationReaders } from './upload-registration-evidence.js';
 
 // The historical catalog issued all three events in the purchase transaction.
 // These events identify the issuer even after an NFT leaves the original buyer.
 const abi = new Interface([
+    'event ArtworkRegistered(uint256 indexed artworkId,address indexed creator,string metadataURI)',
     'event CanonicalArtworkMinted(uint256 indexed tokenId,uint256 indexed artworkId,address indexed creator,address owner,string tokenURI)',
     'event SettlementCompleted(uint256 indexed auctionId,uint256 indexed artworkId,address indexed winner,uint256 finalPrice,uint256 tokenId)',
     'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)'
@@ -46,7 +49,26 @@ export function catalogOriginDigest(hash, origin) {
     return createHash('sha256').update(JSON.stringify(fields)).digest('hex');
 }
 
-export async function readFinalizedCatalogMint(hash, providers = readers, timeout = 3200) {
+export function catalogRegistration(receipt, hash) {
+    if (receipt?.status !== '0x1' || receipt.transactionHash !== hash || !Array.isArray(receipt.logs)) return null;
+    const records = [];
+    for (const log of receipt.logs) {
+        if (log.address?.toLowerCase() !== core || log.topics?.[0] !== abi.getEvent('ArtworkRegistered').topicHash) continue;
+        if (log.removed || log.transactionHash !== hash || log.blockHash !== receipt.blockHash || log.blockNumber !== receipt.blockNumber) return null;
+        const {artworkId, creator, metadataURI} = abi.parseLog(log).args;
+        const index = Number(BigInt(log.logIndex));
+        if (!Number.isSafeInteger(index) || index < 0 || creator === ZeroAddress) return null;
+        records.push({artworkId:String(artworkId),creator:creator.toLowerCase(),uri:metadataURI,logIndex:index});
+    }
+    return records.length === 1 ? records[0] : null;
+}
+
+export function publicationDigest(hash, origin) {
+    return createHash('sha256').update(JSON.stringify([84532, core, hash, origin.artworkId, origin.creator,
+        origin.uri, origin.logIndex])).digest('hex');
+}
+
+export async function readFinalizedCatalogMint(hash, providers = readers, timeout = 3200, parseOrigin = catalogMintOrigin) {
     if (!hashPattern.test(hash)) throw new Error('Expected a public transaction hash.');
     const signal = AbortSignal.timeout(timeout);
     const results = await Promise.all(providers.map(async rpc => {
@@ -55,7 +77,7 @@ export async function readFinalizedCatalogMint(hash, providers = readers, timeou
         if (chain !== '0x14a34' || !receipt || BigInt(receipt.blockNumber) > BigInt(finalized.number)) return null;
         const block = await rpc('eth_getBlockByNumber',[receipt.blockNumber,false],{signal});
         if (block?.hash !== receipt.blockHash || block.number !== receipt.blockNumber || !block.transactions.includes(hash)) return null;
-        const origin = catalogMintOrigin(receipt,hash);
+        const origin = parseOrigin(receipt,hash);
         return origin && {origin, blockHash:block.hash, blockNumber:Number(BigInt(block.number))};
     }));
     return results[0] && JSON.stringify(results[0]) === JSON.stringify(results[1]) ? results[0] : null;
@@ -81,13 +103,24 @@ export async function withCatalogMintOrigins(cards) {
         normalizeWallet(process.env.ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA ?? nft) !== nft) return cards;
     const candidates = cards.filter(c => c.source === 'v41_projection' && c.chain_id === 84532 && c.minted === true &&
         !c.aura_kind && hashPattern.test(c.mint_transaction_hash) && normalizeWallet(c.creator));
-    const addresses = [...new Set(candidates.map(c => normalizeWallet(c.creator)))];
+    const publications = cards.filter(c => c.source === 'v41_projection' && c.chain_id === 84532 &&
+        c.minted === false && normalizeWallet(c.creator) && hashPattern.test(c.transaction_hash));
+    const addresses = [...new Set([...candidates, ...publications].map(c => normalizeWallet(c.creator)))];
     if (!addresses.length || addresses.length > 200) return cards;
     try {
         const states = await supabaseRest('rpc/aura_source_states',{method:'POST',signal:AbortSignal.timeout(1800),
             body:{p_kind:'platform',p_chain:84532,p_scope:core,p_addresses:addresses}});
         if (!Array.isArray(states) || states.length > addresses.length) return cards;
-        const publishers = new Set(states.filter(s=>s.enabled === true && addresses.includes(s.address)).map(s=>s.address));
+        if (states.some(s => !addresses.includes(s?.address) || typeof s.enabled !== 'boolean') ||
+            new Set(states.map(s=>s.address)).size !== states.length) return cards;
+        const publishers = new Set(states.filter(s=>s.enabled).map(s=>s.address));
+        const eligible = publications.filter(c=>publishers.has(normalizeWallet(c.creator)));
+        const archivedWorks = eligible.filter(c=>{
+            const entry = historicalPublications[c.transaction_hash];
+            return entry && c.block_number === entry.blockNumber && entry.digest === publicationDigest(c.transaction_hash,
+                {artworkId:String(c.artwork_id),creator:normalizeWallet(c.creator),uri:c.metadata_uri,logIndex:c.registration_log_index});
+        });
+        const registered = confirmedPublisherWorks(eligible.filter(c=>!historicalPublications[c.transaction_hash]), core).catch(()=>new Set());
         const marked = new Set();
         await Promise.all(candidates.filter(c=>publishers.has(normalizeWallet(c.creator))).map(async card=>{
             const hash = card.mint_transaction_hash;
@@ -102,9 +135,11 @@ export async function withCatalogMintOrigins(cards) {
             if (proof?.creator === normalizeWallet(card.creator) && proof.artworkId === String(card.artwork_id) &&
                 proof.tokenId === String(card.token_id) && proof.uri === card.metadata_uri) marked.add(card);
         }));
-        if (!marked.size) return cards;
-        const labels = await readAuraBorderSetting().then(s=>s.enabled,()=>false);
+        const credited = await registered;
+        for (const work of archivedWorks) credited.add(work);
+        if (!marked.size && !credited.size) return cards;
+        const labels = marked.size > 0 && await readAuraBorderSetting().then(s=>s.enabled,()=>false);
         return cards.map(card=>marked.has(card) ? {...card,aura_kind:'platform',platform_origin_verified:true,
-            ...(labels ? {aura_border_text:true} : {})} : card);
+            ...(labels ? {aura_border_text:true} : {})} : credited.has(card) ? {...card, platform_publication_verified:true} : card);
     } catch { return cards; }
 }

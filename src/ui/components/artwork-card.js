@@ -64,15 +64,18 @@
     }
 
     function officialMark(h, artwork, aura) {
-        return aura && artwork.aura_kind === 'platform' ? h('img', {className: 'artsoul-official-nft',
-            src: '/favicon.jpg', alt: 'Official ArtSoul NFT', title: 'Official ArtSoul NFT'}) : null;
+        if (!aura) return null;
+        const label = artwork.minted === false && artwork.platform_publication_verified === true ? 'Published by ArtSoul'
+            : artwork.aura_kind === 'platform' ? 'Official ArtSoul NFT' : null;
+        return label ? h('img', {className: 'artsoul-official-nft', src: '/favicon.jpg', alt: label, title: label}) : null;
     }
 
     function decorateIdentity(title, creator, artwork, aura) {
         const official = officialMark(cardElement, artwork, aura);
         const check = creatorMark(cardElement, artwork);
-        if (official) title.appendChild(official);
-        if (check) creator.appendChild(check);
+        for (const [line, mark] of [[title, official], [creator, check]]) {
+            if (mark) line.replaceChildren(cardElement('span', {className:'artsoul-identity-name'}, line.textContent), mark);
+        }
     }
 
     function identityKeys(artwork = {}) {
@@ -286,6 +289,15 @@
         button.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${label}`);
     }
 
+    function playPreview(media) {
+        if (media.tagName === 'AUDIO' && window.ArtSoulArtworkAudio) return window.ArtSoulArtworkAudio.play(media);
+        return media.play();
+    }
+
+    function previewMuted(media) {
+        return media.tagName === 'AUDIO' && window.ArtSoulArtworkAudio ? window.ArtSoulArtworkAudio.isMuted(media) : media.muted;
+    }
+
     function createPlaybackButton(media, label, onPlayError) {
         const button = document.createElement('button');
         button.type = 'button';
@@ -295,7 +307,7 @@
         button.setAttribute('aria-label', `Play ${label}`);
         isolateMediaControl(button);
         button.addEventListener('click', () => {
-            if (media.paused || media.ended) media.play().catch(error => {
+            if (media.paused || media.ended) playPreview(media).catch(error => {
                 syncPlaybackButton(button, media, label);
                 if (media.paused) onPlayError?.(error);
             });
@@ -305,17 +317,19 @@
     }
 
     function syncMuteButton(button, media, label) {
-        button.dataset.muted = String(media.muted);
-        button.setAttribute('aria-label', `${media.muted ? 'Unmute' : 'Mute'} ${label}`);
+        const muted = previewMuted(media);
+        button.dataset.muted = String(muted);
+        button.setAttribute('aria-label', `${muted ? 'Unmute' : 'Mute'} ${label}`);
     }
 
     function bindPreviewStatus(media, show) {
         let unsubscribe;
         let waitingAt = null;
         let started = false;
-        const events = ['play', 'playing', 'waiting', 'timeupdate', 'volumechange', 'seeked', 'pause', 'ended', 'emptied'];
+        const events = ['play', 'playing', 'waiting', 'timeupdate', 'volumechange', 'seeked', 'pause', 'ended', 'emptied', 'loadedmetadata', 'durationchange'];
         function display(type) {
-            const position = media.currentTime || 0;
+            const position = media.tagName === 'AUDIO' && window.ArtSoulArtworkAudio
+                ? window.ArtSoulArtworkAudio.elapsed(media) : media.currentTime || 0;
             if (type === 'play' || type === 'playing') started = true;
             if (type === 'emptied') started = false;
             if (type === 'playing' || media.paused || position !== waitingAt) waitingAt = null;
@@ -335,6 +349,7 @@
             display('sample');
         }
         function update({ type }) {
+            if (media.tagName === 'AUDIO' && (type === 'loadedmetadata' || type === 'durationchange')) window.ArtSoulArtworkAudio?.knownDuration(media);
             if (media.paused || media.ended || type === 'emptied') {
                 unsubscribe?.();
                 unsubscribe = null;
@@ -356,11 +371,13 @@
 
     function togglePreviewMute(media, onPlayError) {
         const wasPlaying = !media.paused && !media.ended;
-        media.muted = !media.muted;
+        const muted = !previewMuted(media);
+        if (media.tagName === 'AUDIO' && window.ArtSoulArtworkAudio) window.ArtSoulArtworkAudio.setMuted(media, muted);
+        else media.muted = muted;
         // Reaffirm active playback within the Unmute gesture. WebKit can queue the
         // sound-policy change before reflecting it in paused or the volumechange event.
-        if (wasPlaying && (!media.muted || media.paused) && !media.ended && media.isConnected && !media.ownerDocument.hidden) {
-            media.play().catch(error => { if (media.paused) onPlayError?.(error); });
+        if (wasPlaying && (!muted || media.paused) && !media.ended && media.isConnected && !media.ownerDocument.hidden) {
+            playPreview(media).catch(error => { if (media.paused) onPlayError?.(error); });
         }
     }
 
@@ -952,6 +969,7 @@
             avatar.decoding = 'async';
             avatar.dataset.playing = 'false';
             const audio = document.createElement('audio');
+            if (window.ArtSoulStorageImage?.isValidStorageUrl(url)) audio.crossOrigin = 'anonymous';
             audio.src = url;
             audio.preload = 'none';
             audio.className = 'artsoul-card-audio-element';
@@ -1255,7 +1273,7 @@
             stopCardActivation(event);
             const audio = ref.current;
             if (!audio) return;
-            if (audio.paused || audio.ended) audio.play().catch(error => reportPlayError(audio, error));
+            if (audio.paused || audio.ended) playPreview(audio).catch(error => reportPlayError(audio, error));
             else audio.pause();
         };
         const toggleMute = event => {
@@ -1263,7 +1281,7 @@
             const audio = ref.current;
             if (!audio) return;
             togglePreviewMute(audio, error => reportPlayError(audio, error));
-            setMuted(audio.muted);
+            setMuted(previewMuted(audio));
         };
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
@@ -1281,11 +1299,12 @@
                         onClick: toggleMute, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                         onTouchStart: stopCardPropagation, onDragStart: stopCardActivation })
                 ),
-                h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'none',
+                h('audio', { ref, crossOrigin: window.ArtSoulStorageImage?.isValidStorageUrl(url) ? 'anonymous' : undefined,
+                    src: url, className: 'artsoul-card-audio-element', preload: 'none',
                     onPlay: event => { pauseOtherMedia(event.currentTarget); syncPlaying(event); },
                     onPlaying: syncPlaying, onPause: syncPlaying, onEnded: syncPlaying,
                     onError: onUnavailable || undefined,
-                    onVolumeChange: event => setMuted(event.currentTarget.muted) })
+                    onVolumeChange: event => setMuted(previewMuted(event.currentTarget)) })
             )
         );
     }
@@ -1363,9 +1382,9 @@
             ),
             h('div', { className: 'artsoul-card-body' },
                 h('div', { className: 'artsoul-card-title-row' },
-                    h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork', officialMark(h, artwork, aura)),
+                    h('h3', { className: 'artsoul-card-title' }, h('span', {className:'artsoul-identity-name'}, artwork.title || 'Untitled Artwork'), officialMark(h, artwork, aura)),
                     reactNetworkMarker(h, artwork)),
-                h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`, creatorMark(h, artwork)),
+                h('p', { className: 'artsoul-card-creator' }, h('span', {className:'artsoul-identity-name'}, `Creator: ${creatorLabel(artwork)}`), creatorMark(h, artwork)),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     h('span', { className: 'artsoul-card-price-label' }, summary.label),
@@ -1413,6 +1432,7 @@
     });
 
     window.ArtSoulArtworkCard = {
+        officialMark,
         decorateIdentity,
         createAuraCaption: word => window.ArtSoulAuraCaption?.(cardElement, word),
         createCardElement,
