@@ -18,6 +18,26 @@ function verify(options = {}) {
     const creditor = toBeHex(12,20), amount = 10000000000000000n;
     const providers = queued.providers.map(({origin}, i) => Object.assign(async (method, params) => {
         if (method === 'eth_chainId') return '0x14a34';
+        if (options.discover) {
+            const commonHeight = 8192, head = { number: toQuantity(commonHeight), hash: toBeHex(commonHeight, 32) };
+            if (method === 'eth_getBlockByNumber' && params[0] === 'finalized') {
+                return i === 0 ? head : { number: toQuantity(commonHeight + 1), hash: toBeHex(commonHeight + 1, 32) };
+            }
+            if (method === 'eth_getBlockByNumber' && params[0] === head.number) return head;
+            if (method === 'eth_call' && params[0].data === abi.encodeFunctionData('refundProgress', [1]) &&
+                (typeof params[1] === 'string' || params[1]?.blockHash === head.hash)) {
+                const at = typeof params[1] === 'string' ? Number(BigInt(params[1])) : commonHeight;
+                assert(at >= queued.location.blockNumber && at <= commonHeight);
+                const done = at >= processed.location.blockNumber && !options.pending && !(options.disagree && i === 1);
+                return abi.encodeFunctionResult('refundProgress', [done ? 1 : 0, 2]);
+            }
+            if (method === 'eth_getLogs') {
+                assert.deepEqual(params, [{ address: queued.pair.coreAddress, fromBlock: toQuantity(194), toBlock: toQuantity(194),
+                    topics: abi.encodeFilterTopics('OutbidRefundProcessed', [1, 0, creditor]) }]);
+                const log = { ...processed.location, blockNumber: toQuantity(194) };
+                return options.ambiguous ? [log, log] : [log];
+            }
+        }
         const key = params[1]?.blockHash ?? params[0];
         const f = ['finalized', processed.location.blockHash, processed.location.transactionHash, toQuantity(194)].includes(key) ? processed : queued;
         const paid = f === processed;
@@ -38,7 +58,7 @@ function verify(options = {}) {
         return f.providers[i](method,params);
     }, {origin}));
     return verifyOutbidRefund(queued.pair, '1', options.entry ?? '0', queued.location.transactionHash,
-        processed.location.transactionHash, providers);
+        options.discover ? '--discover' : processed.location.transactionHash, providers);
 }
 
 test('matches each finalized outbid entry to actual delivery or withdrawable credit', async () => {
@@ -56,6 +76,24 @@ test('requires the same indexed obligation, full amount and processed cursor', a
     await assert.rejects(verify({amount:1n}), /disposition do not match/);
     await assert.rejects(verify({cursor:0}), /disagrees with finalized queue/);
     await assert.rejects(verify({entry:'1'}), /one matching ordinary refund event/);
+});
+
+test('discovers only the finalized payout block or reports the common pending height', async () => {
+    const waiting = await verify({ discover: true, pending: true });
+    assert.equal(waiting.disposition, 'pending-at-finality');
+    assert.deepEqual(waiting.checkedThrough, {blockNumber: 8192, blockHash: toBeHex(8192, 32)});
+    assert.equal(waiting.queued.amountWei, '10000000000000000');
+    assert.equal(waiting.processed, undefined);
+    for (const paid of [true, false]) {
+        const found = await verify({ discover: true, paid });
+        assert.equal(found.disposition, paid ? 'delivered' : 'credited-for-withdrawal');
+        assert.equal(found.processed.transactionHash, toBeHex(1094, 32));
+        assert.equal(found.processed.blockNumber, 194);
+        assert.equal(found.processed.rpcReadings, 2);
+    }
+    await assert.rejects(verify({ discover: true, disagree: true }), /disagree/);
+    await assert.rejects(verify({ discover: true, ambiguous: true }), /Expected one matching refund/);
+    await assert.rejects(verify({ discover: true, amount: 1n }), /disposition do not match/);
 });
 
 async function verifyBatch(options = {}) {

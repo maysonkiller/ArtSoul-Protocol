@@ -215,13 +215,15 @@ The two-provider finality check subsequently confirmed that opening against the 
 
 Both public providers finalized the [second bid](https://sepolia.basescan.org/tx/0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f) in block 64,248,306 (`0x5c2117e20bf0c130858222696e86ae0a005e5276d146e6fd6fe99893b26099a2`), timestamped November 27 at 09:25:30 UTC. It used 164,649 gas. Both nodes matched the signed price of 0.011 test ETH, the 0.01 test ETH deposit and the new leader `0xb7553cd3377817186DFB36beF1C3118540911efb`. The stored end still equaled the original deadline. The two-provider queue reader verified both contract runtimes and the `OutbidRefundQueued` event for entry 0. The Core owed 0.01 test ETH to the first bidder `0x316014C808f64CF731b4E51Bd32F61f2E52D1819`. At the bid block the cursor was 0 of 1 and the auction was open.
 
-After bidding ends, open the first review below on the same computer. The reviewed sender is the displaced collector. Once both providers finalize the close, open the second review. Check Base Sepolia (84532), the reviewed Core, zero outgoing test ETH plus test gas, and the method in the wallet. The first call is `closeAuction(2)` and the second is `processRefunds(2, 1)`. Keep both public receipt hashes. For the final read, set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to two independent Base Sepolia endpoints and replace `PROCESSING_TX` with the second receipt hash.
+After bidding ends, open the first review below on the same computer. The reviewed sender is the first bidder. Once both providers finalize the close, open the second review. Check Base Sepolia (84532), the reviewed Core, zero outgoing test ETH plus test gas, and the method in the wallet. The first call is `closeAuction(2)` and the second is `processRefunds(2, 1)`. The participant can report completion without copying a transaction hash. For the final read, the reviewer sets `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to independent Base Sepolia archive endpoints.
 
 ```sh
 node scripts/review-rehearsal-refund-auction.mjs --serve close 0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f
 node scripts/review-rehearsal-refund-auction.mjs --serve refund 0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f
-node scripts/read-ordinary-outbid-refund.mjs docs/testnet/ordinary-auction-1-settlement.json 2 0 0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f PROCESSING_TX
+node scripts/read-ordinary-outbid-refund.mjs docs/testnet/ordinary-auction-1-settlement.json 2 0 0x040c624c7d3561ca50bdd63de2087cdc77a3fb3f542e3b87f190b349e2a9ca1f --discover
 ```
+
+The discovery read reported `pending-at-finality` through block 64,464,037 (`0xdf6c2ae816e730bdcf01c41105cce1eeb285313322cc7d5e62d2c7063f674644`). Once the cursor passes entry 0, each provider searches historical cursor values and reads the matching event in a single block. The receipt reader checks the block, contract, creditor, amount and whether the payment was delivered or credited for withdrawal. Its `processed.transactionHash` can also be used for the batch fee report above.
 
 ### Restoring the first hosted sale
 

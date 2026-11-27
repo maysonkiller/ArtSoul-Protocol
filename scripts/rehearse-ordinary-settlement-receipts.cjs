@@ -13,6 +13,7 @@ async function main() {
         readOrdinaryRefundEntry, readOrdinaryRefundBatch } =
         await import('../src/indexer/nft-deployment-proof.js');
     const { readBidExtension } = await import('./review-rehearsal-late-bid.mjs');
+    const { verifyOutbidRefund } = await import('./read-ordinary-outbid-refund.mjs');
     const chainId = 84532;
     const hardhat = { ...config.networks.hardhat, chainId, forking: undefined };
     const rpc = await createProvider({ ...config, networks: { hardhat } }, 'hardhat', artifacts);
@@ -123,12 +124,16 @@ async function main() {
         await rpc.send('evm_setNextBlockTimestamp', [Number((await market.auctions(2)).end)]);
         await mine(market.closeAuction(2));
         const batch = await mine(market.processRefunds(2, 8));
-        await finalize();
+        // The discovery reader queries intermediate state. Mine individual archive
+        // blocks here because bulk filler blocks do not retain that state on Hardhat.
+        for (let i = 0; i < 128; i++) await rpc.send('evm_mine', []);
         const measured = await readOrdinaryRefundBatch(listener, { ...review, ...location(batch), transactionHash: batch.hash });
         assert.deepEqual([measured.configuredBatchLimit,measured.configuredGasArgument,measured.requestedEntries,
             measured.processedEntries,measured.distinctCreditors,measured.deliveredEntries,measured.creditedEntries],
         ['8','30000','8',2,2,1,1]);
         console.log('Local batch: requested 8, processed 2, delivered 1, credited 1; whole-transaction execution gas', String(batch.gasUsed));
+        // These local adapter fixtures exercise real EVM history on one disposable chain.
+        const readers = [rpc.send.bind(rpc), rpc.send.bind(rpc)];
         for (const [i, queued] of queuedReceipts.entries()) {
             const options = {...review, auctionId:'2', entry:String(i)};
             const obligation = await readOrdinaryRefundEntry(listener, {...options, ...location(queued),
@@ -139,8 +144,11 @@ async function main() {
             assert.equal(payment.creditor, obligation.creditor);
             assert.equal(payment.amountWei, obligation.amountWei);
             assert.equal(payment.paid, i === 1);
+            const discovered = await verifyOutbidRefund(review, '2', String(i), queued.hash, '--discover', readers);
+            assert.equal(discovered.processed.transactionHash, batch.hash);
+            assert.equal(discovered.disposition, i === 1 ? 'delivered' : 'credited-for-withdrawal');
         }
-        console.log('PASS: finalized local outbid receipts matched both wallet delivery and fallback credit in one batch.');
+        console.log('PASS: discovered the finalized local batch from each queued bid and verified wallet delivery and fallback credit.');
     } finally {
         provider.destroy();
     }
