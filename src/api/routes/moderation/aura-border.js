@@ -5,7 +5,6 @@ import { getWebAuthnConfig, readModerationSession, roleBoundSessionsEnabled } fr
 import { requireProtocolAdminEnabled } from '../../protocol-admin-config.js';
 import { validateAuraSetting } from '../../aura-border-setting.js';
 import { readNftOwnershipConfig } from '../../nft-ownership.js';
-import { platformPublisherFor } from '../../platform-artwork-aura.js';
 
 function fail(statusCode, code, message) {
     return Object.assign(new Error(message), { statusCode, code });
@@ -15,7 +14,7 @@ function publicFrameSource() {
     try {
         const config = readNftOwnershipConfig();
         if (!config) return 'awaiting_ownership';
-        return platformPublisherFor(config) ? 'configured' : 'awaiting_publisher';
+        return process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true' ? 'registry' : 'awaiting_publisher';
     } catch {
         return 'unavailable';
     }
@@ -58,7 +57,7 @@ export default async function handler(req, res) {
             throw fail(503, 'AURA_SETTING_UNCONFIRMED', 'Reload the current appearance setting to verify the change.');
         }
         return res.status(200).json({ ...saved, publicFrameSource: publicFrameSource(),
-            ...(process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true' ? { sourcesEnabled:true } : {}) });
+            ...(process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true' && access.role === 'team' && policy ? { sourcesEnabled:true } : {}) });
     } catch (error) {
         const detail = String(error?.details?.message || error.message || '');
         if (detail.includes('AURA_REVISION_CONFLICT')) error = fail(409, 'AURA_REVISION_CONFLICT', 'The setting changed. Reload it before saving.');

@@ -1,7 +1,7 @@
 import { React, createRoot } from './react-runtime.js';
 import '../../docs-protocol.css';
 import { PROTOCOL_DOC_SECTIONS as sections } from '../content/protocol-docs.js';
-import { auraFrameClassName } from '../ui/components/aura-frame.js';
+import { auraFrameClassName, auraCaption, auraWords } from '../ui/components/aura-frame.js';
 import { VerificationMark } from '../ui/components/verification-mark.jsx';
 
 const { useEffect, useLayoutEffect, useState } = React;
@@ -20,7 +20,9 @@ function ProtocolBlock({ block }) {
             <dl>
                 {block.items.map(item => (
                     <div key={item.kind}>
-                        <dt className={`protocol-frame-example ${auraFrameClassName(item.kind)}`}>{item.name}</dt>
+                        <dt className={`protocol-frame-example ${auraFrameClassName(item.kind)}`}>
+                            <span>{item.name}</span>{auraCaption(React.createElement, auraWords[item.kind])}
+                        </dt>
                         <dd>{item.text}</dd>
                     </div>
                 ))}

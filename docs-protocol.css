@@ -405,7 +405,7 @@ body:is(.classic, .future) .protocol-section-body h3 { font-size: 1rem; }
     gap: 1rem;
     margin: 0;
 }
-.protocol-frame-example { padding: .7rem .8rem; border-radius: .65rem; font-weight: 600; }
+.protocol-frame-example { display: grid; place-items: center; min-height: 6.5rem; padding: .7rem .8rem; border-radius: .85rem; font-weight: 600; }
 .protocol-frame-legend dd { margin: .5rem 0 0; line-height: 1.5; }
 body:is(.classic, .future) .protocol-section-body p,
 body:is(.classic, .future) .protocol-section-body li { line-height: 1.75; }

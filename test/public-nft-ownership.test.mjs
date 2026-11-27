@@ -123,13 +123,23 @@ test('public NFT consumers use one verified history across cards, filters, saved
   };
 
   const designatePlatform = () => {
-    process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA = `${CORE}:${CREATOR}`;
+    process.env.ARTSOUL_AURA_SOURCES_ENABLED='true';
+    sourceStates=[{address:CREATOR,kind:'platform',enabled:true,revision:1}];
     rows.v41_artworks[0].log_index = 5;
     const registration = lifecycle()[0];
     registration.artwork_id = '77';
     registration.event_data.metadataURI = rows.v41_artworks[0].metadata_uri;
     rows.contract_events = [registration];
   };
+  await t.test('a settled personal work retains its verified Founder origin after a transfer without an official mark', async () => {
+    designatePlatform();
+    sourceStates = [{address:CREATOR,kind:'founder',enabled:true,revision:2}];
+    const card = (await cardRequest({id:'77'})).body.data[0];
+    assert.equal(card.aura_kind,'founder');
+    assert.equal(card.founder_origin_verified,true);
+    assert.equal(card.platform_origin_verified,undefined);
+    assert.equal(card.current_owner_address,OWNER);
+  });
   await t.test('staff source decisions follow the original publisher across sales and can revoke a configured wallet', async () => {
     designatePlatform();
     process.env.ARTSOUL_AURA_SOURCES_ENABLED='true';
@@ -140,6 +150,8 @@ test('public NFT consumers use one verified history across cards, filters, saved
     assert.equal(card.current_owner_address,OWNER);
     process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA=CORE+':'+CREATOR;
     sourceStates=[{address:CREATOR,kind:'platform',enabled:false,revision:2}];
+    assert.equal((await cardRequest({id:'77'})).body.data[0].aura_kind,undefined);
+    process.env.ARTSOUL_AURA_SOURCES_ENABLED='false';
     assert.equal((await cardRequest({id:'77'})).body.data[0].aura_kind,undefined);
   });
   await t.test('only the designated, registered and minted work receives the platform frame across public readers', async () => {
@@ -195,6 +207,7 @@ test('public NFT consumers use one verified history across cards, filters, saved
   });
   await t.test('unconfigured or unrelated publishers cannot introduce marks or authority reads using artwork metadata', async () => {
     designatePlatform();
+    sourceStates=[];
     const work = rows.v41_artworks[0];
     work.metadata_uri = 'data:application/json,' + encodeURIComponent(JSON.stringify({aura_kind:'platform', genesis:true, verified:true}));
     for (const config of ['', `${NFT}:${CREATOR}`, `${CORE}:${BUYER}`, `${CORE}:${address('0')}`]) {

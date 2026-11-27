@@ -42,17 +42,6 @@ export async function confirmedPublisherWorks(candidates, core) {
   return verified;
 }
 
-// The deployment and publisher are designated together. Changing the active
-// Core cannot carry a previous deployment's visual status into its successor.
-export function platformPublisherFor(config) {
-  if (config?.chainId !== 84532) return null;
-  const designation = process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA || '';
-  const [core, publisher, ...extra] = designation.toLowerCase().split(':');
-  if (extra.length || core !== config.coreAddress ||
-      !normalizeWallet(publisher) || /^0x0{40}$/.test(publisher)) return null;
-  return publisher;
-}
-
 export async function publisherFrameStates(addresses, chain, core) {
   const states = await supabaseRest('rpc/publisher_frame_states',{method:'POST',body:{
     p_chain:chain,p_scope:core,p_addresses:addresses
@@ -67,20 +56,17 @@ export async function publisherFrameStates(addresses, chain, core) {
 
 export async function readArtworkAuraKinds(artworks, ownership) {
   const qualified = new Map();
-  if (!ownership?.config || !artworks.length) return qualified;
-  const publisher = platformPublisherFor(ownership?.config);
-  const publishers = new Map(publisher ? [[publisher, 'platform']] : []);
+  if (process.env.ARTSOUL_AURA_SOURCES_ENABLED !== 'true' || !ownership?.config || !artworks.length) return qualified;
   const core = ownership.config.coreAddress;
   const proven = new Map(ownership.rows.map(row => [row.artwork_id, row]));
-  if (process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true') {
-    const addresses = [...new Set(artworks.filter(a => a.minted === true && proven.get(a.artwork_id)?.verified)
-      .map(a => normalizeWallet(a.creator)).filter(Boolean))];
-    if (!addresses.length || addresses.length > 200) return qualified;
-    try {
-      const states = await publisherFrameStates(addresses, ownership.config.chainId, core);
-      for (const s of states) { if (s.enabled) publishers.set(s.address,s.kind); else publishers.delete(s.address); }
-    } catch { return qualified; }
-  }
+  const addresses = [...new Set(artworks.filter(a => a.minted === true && proven.get(a.artwork_id)?.verified)
+    .map(a => normalizeWallet(a.creator)).filter(Boolean))];
+  if (!addresses.length || addresses.length > 200) return qualified;
+  let publishers;
+  try {
+    const states = await publisherFrameStates(addresses, ownership.config.chainId, core);
+    publishers = new Map(states.filter(s => s.enabled).map(s => [s.address,s.kind]));
+  } catch { return qualified; }
   if (!publishers.size) return qualified;
   const confirmed = Number(ownership.confirmed_through);
   const candidates = artworks.filter(artwork => {

@@ -584,6 +584,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
   const startPrice = weiToEth(auction?.start_price);
   const salePrice = resale?.active ? resale.price : 0;
   const creatorIdentity = maps.publicIdentities?.get(normalizeText(artwork.creator).toLowerCase());
+  const frameKind = ownershipStatus === 'verified' && maps.artworkAuraKinds.get(artworkId);
   const guidance = getAIValueGuidance(metadata);
   const noGuidanceRecorded = Object.keys(metadata).length > 0 &&
     metadata.ai_value_guidance == null && metadata.properties?.ai_value_guidance == null;
@@ -644,8 +645,9 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     auction_winner_address: auctionWinnerAddress,
     current_owner_address: currentOwnerAddress,
     ...(ownershipStatus ? { ownership_status: ownershipStatus } : {}),
-    ...(ownershipStatus === 'verified' && maps.artworkAuraKinds.has(artworkId) ? {
-      aura_kind: maps.artworkAuraKinds.get(artworkId),
+    ...(frameKind ? {
+      aura_kind: frameKind,
+      ...(frameKind === 'founder' ? { founder_origin_verified:true } : {}),
       ...(maps.auraBorderEnabled ? { aura_border_text: true } : {})
     } : {}),
     vote_count: signals.like,

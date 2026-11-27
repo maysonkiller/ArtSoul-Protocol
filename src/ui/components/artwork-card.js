@@ -64,17 +64,14 @@
     }
 
     function officialMark(h, artwork, aura) {
-        if (!aura) return null;
-        const label = artwork.minted === false && artwork.platform_publication_verified === true ? 'Published by ArtSoul'
-            : artwork.aura_kind === 'platform' ? 'Official ArtSoul NFT' : null;
-        return label ? h('img', {className: 'artsoul-official-nft', src: '/favicon.jpg', alt: label, title: label}) : null;
+        if (artwork.minted !== true || aura?.kind !== 'platform' || artwork.aura_kind !== 'platform') return null;
+        const label = 'Official ArtSoul NFT';
+        return h('img', {className: 'artsoul-official-nft', src: '/favicon.jpg', alt: label, title: label});
     }
 
     function founderMark(h, aura) {
         if (aura?.kind !== 'founder') return null;
-        return h('span', {className: 'inline-flex items-center gap-1 ml-1 text-xs', title: aura.label},
-            h('img', {src: '/favicon.jpg', alt: '', width: 14, height: 14, className: 'rounded-full'}),
-            h('span', {}, 'Founder'));
+        return h('span', {className: 'artsoul-founder-label', title: aura.label}, 'Founder');
     }
 
     function decorateIdentity(title, creator, artwork, aura) {

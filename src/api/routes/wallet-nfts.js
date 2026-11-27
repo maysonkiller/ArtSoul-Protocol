@@ -2,10 +2,10 @@ import { allowMethods, requireWallet, sendError } from '../backend.js';
 import { readExternalWalletNfts, readExternalWalletEthQuote } from '../external-wallet-nfts.js';
 import { readMultichainWalletAssets } from '../multichain-wallet-assets.js';
 import { walletGenesisFrames } from '../profile-genesis.js';
-import { walletPartnerFrames } from '../partner-frames.js';
+import { walletCollectionFrames } from '../partner-frames.js';
 
 async function walletFrames(page,wallet) {
-  return walletPartnerFrames(await walletGenesisFrames(page,wallet),wallet);
+  return walletCollectionFrames(await walletGenesisFrames(page,wallet),wallet);
 }
 
 export default async function handler(req, res) {

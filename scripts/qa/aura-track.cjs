@@ -22,8 +22,16 @@ async function serveBuild(route, work) {
         return route.fulfill({path:path.resolve('public/brand/artsoul-audio-cover-384.webp'),contentType:'image/webp'});
     }
     if (url.origin !== origin) return route.abort();
-    if (url.pathname.startsWith('/api/')) return route.fulfill({json:url.pathname === '/api/public/artworks'
-        ? {success:true, data:[work], count:1, warnings:[]} : {}});
+    if (url.pathname.startsWith('/api/')) {
+        const fixtures = {
+            '/api/public/artworks': {success:true, data:[work], count:1, warnings:[]},
+            '/api/moderation/access': {enabled:true,setupEnabled:true,eligible:true,authenticated:true,wallet:artist,
+                serverTime:1000,access:{role:'admin',dualWallet:true,stepUpActive:true,stepUpExpiresAt:3601000,wallet:artist}},
+            '/api/moderation/aura-border': {enabled:true,revision:0,sourcesEnabled:false},
+            '/api/moderation/review-queue': {reports:[],events:[],hidden:[],moderationLog:[],notifications:[]}
+        };
+        return route.fulfill({json:fixtures[url.pathname] || {}});
+    }
     const file = path.resolve(dist, '.' + url.pathname);
     if (!file.startsWith(dist + path.sep)) return route.abort();
     const ext = path.extname(file);
@@ -46,13 +54,24 @@ function measure(track) {
     const path = svg.querySelector('path'), labels = [...svg.querySelectorAll('text')];
     const length = path.getTotalLength() / 3, seconds = parseFloat(svg.querySelector('animate').getAttribute('dur'));
     const bounds = svg.getBoundingClientRect(), w = bounds.width, h = bounds.height;
-    function sample(fraction) {
+    function sample(fraction, straight = false) {
         svg.setCurrentTime(((fraction + 1) % 1) * seconds);
         const word = labels.reduce((a,b) => +getComputedStyle(a).opacity > +getComputedStyle(b).opacity ? a : b);
+        assertWord(word);
+        if (straight) for (let i=0; i<word.getNumberOfChars(); i++) {
+            const a = word.getStartPositionOfChar(i), b = word.getEndPositionOfChar(i);
+            const x = (a.x+b.x)/2, y = (a.y+b.y)/2;
+            if (x<=0 || y<=0 || x>=w || y>=h) throw Error('Glyph outside frame on a straight rail: ' + track.dataset.word);
+        }
         const i = Math.floor(word.getNumberOfChars()/2);
         const start = word.getStartPositionOfChar(i), end = word.getEndPositionOfChar(i);
         return {x:(start.x+end.x)/2, y:(start.y+end.y)/2, angle:word.getRotationOfChar(i),
             opacity:+getComputedStyle(word).opacity, wordLength:word.getComputedTextLength(), chars:word.getNumberOfChars()};
+    }
+    function assertWord(text) {
+        const expected = track.dataset.word;
+        if (text.querySelector('textPath').textContent !== expected || text.getNumberOfChars() !== expected.length ||
+            labels.filter(label => Number(getComputedStyle(label).opacity) > 0).length !== 1) throw Error('Incorrect or overlapping moving caption: ' + expected);
     }
     function nearest(x,y) {
         let best = 0, minimum = Infinity;
@@ -63,7 +82,7 @@ function measure(track) {
         return best / length;
     }
     const sides = [[w/2,0],[w,h/2],[w/2,h],[0,h/2]].map(([x,y]) => {
-        const t = nearest(x,y), a = sample(t), b = sample(t+0.25/seconds);
+        const t = nearest(x,y), a = sample(t,true), b = sample(t+0.25/seconds);
         return {angle:a.angle, speed:Math.hypot(a.x-b.x,a.y-b.y)*4};
     });
     let maxCornerStep = 0, minOpacity = 1;
@@ -72,7 +91,7 @@ function measure(track) {
         let previous;
         for (let i=-12; i<=12; i++) {
             const p = sample(t+i/24/seconds);
-            if (p.chars !== 7 || p.wordLength < 15) throw Error('Letters lost at corner');
+            if (p.chars !== track.dataset.word.length || p.wordLength < 15) throw Error('Letters lost at corner');
             if (previous) maxCornerStep = Math.max(maxCornerStep, Math.hypot(p.x-previous.x,p.y-previous.y));
             minOpacity = Math.min(minOpacity,p.opacity);
             previous=p;
@@ -115,7 +134,7 @@ async function sampleInk(page, track) {
 
 async function run(engine) {
     const name = engine.name();
-    const opts = name === 'chromium' ? {channel:process.env.CHROMIUM_CHANNEL,args:['--mute-audio']}
+    const opts = name === 'chromium' ? {channel:process.env.CHROMIUM_CHANNEL,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH,args:['--mute-audio']}
         : {executablePath:process.env.WEBKIT_EXECUTABLE_PATH};
     const browser = await engine.launch(opts);
     try {
@@ -152,7 +171,7 @@ async function run(engine) {
         assert(await page.locator('.artwork-detail-frame .aura-word').isVisible());
         assert(!await track.isVisible());
         await page.emulateMedia({reducedMotion:'no-preference'});
-        for (const [kind,word] of [['genesis','Genesis'],['partner','ArtSoul Partner'],['founder','ArtSoul Founder']]) {
+        for (const [kind,word] of [['genesis','ArtSoul Genesis'],['partner','ArtSoul Partner'],['founder','ArtSoul Founder']]) {
             await page.evaluate(({kind,word})=>{
                 const frame=document.querySelector('.artwork-detail-frame');
                 frame.classList.remove('artsoul-aura-frame--platform','artsoul-aura-frame--genesis','artsoul-aura-frame--founder','artsoul-aura-frame--partner');
@@ -160,6 +179,7 @@ async function run(engine) {
                 frame.replaceChildren(window.ArtSoulArtworkCard.createAuraCaption(word));
             },{kind,word});
             await page.locator('.artwork-detail-frame artsoul-aura-track[data-running] svg').waitFor();
+            await track.evaluate(measure);
             await page.emulateMedia({reducedMotion:'reduce'});
             assert(await page.locator('.artwork-detail-frame .aura-word').isVisible());
             await page.emulateMedia({reducedMotion:'no-preference'});
@@ -178,8 +198,43 @@ async function run(engine) {
             const mark = page.locator(creatorSelector).getByTitle('Work by the ArtSoul founder').first();
             await mark.waitFor();
             assert.equal((await mark.innerText()).trim(),'Founder');
-            assert.equal(await mark.locator('img').getAttribute('src'),'/favicon.jpg');
+            assert.equal(await mark.locator('img').count(),0);
             assert.equal(await page.locator('[title="Official ArtSoul NFT"]').count(),0);
+        }
+        // A stable fixture identity exercises the real appearance component
+        // without connecting a browser wallet or initiating a sign-in.
+        await page.addInitScript(wallet => {
+            if (location.pathname !== '/admin.html') return;
+            for (const [key,value] of Object.entries({
+                currentWalletAddress:wallet,getCurrentWalletAddress:()=>wallet,artsoulWalletStateSettled:true,
+                SupabaseAuth:{getAuthenticatedWallet:()=>wallet}
+            })) Object.defineProperty(window,key,{configurable:true,get:()=>value,set:()=>{}});
+        },artist);
+        await page.goto(origin+'/admin.html#nft-appearance',{waitUntil:'domcontentloaded'});
+        const preview=page.locator('.admin-aura-preview');
+        await preview.waitFor().catch(async error=>{
+            console.error('Admin preview state', await page.locator('main').innerText());
+            throw error;
+        });
+        await preview.scrollIntoViewIfNeeded();
+        for (const [kind,word] of [['platform','ArtSoul'],['founder','ArtSoul Founder'],['genesis','ArtSoul Genesis'],['partner','ArtSoul Partner']]) {
+            await preview.getByRole('combobox').selectOption(kind);
+            assert.equal(await preview.locator('img').count(),kind === 'platform' ? 1 : 0);
+            const selector='artsoul-aura-track[data-word="'+word+'"]';
+            const track=preview.locator(selector);
+            await track.locator('svg').waitFor();
+            const r=await track.evaluate(measure);
+            await track.evaluate((el,t)=>{const svg=el.querySelector('svg');svg.setCurrentTime(t*el.lap);},r.top);
+            if(process.env.ARTSOUL_QA_SHOTS) await preview.screenshot({path:path.join(process.env.ARTSOUL_QA_SHOTS,name+'-admin-'+kind+'.png')});
+            console.log(name,'admin',kind,word,r.minOpacity);
+        }
+        await page.goto(origin+'/docs-protocol.html#nft-frames',{waitUntil:'domcontentloaded'});
+        const examples=page.locator('.protocol-frame-example');
+        await examples.first().waitFor({state:'attached'});
+        assert.equal(await examples.count(), 4);
+        for(const element of await examples.all()){
+            await element.scrollIntoViewIfNeeded(); const track=element.locator('artsoul-aura-track');
+            await track.locator('svg').waitFor(); await track.evaluate(measure);
         }
     } finally { await browser.close(); }
 }

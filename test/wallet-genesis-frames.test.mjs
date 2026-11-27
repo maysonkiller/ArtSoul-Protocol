@@ -17,7 +17,7 @@ const environment = {
   SESSION_SECRET: 'synthetic-test-inventory-frames-session',
   ARTSOUL_MULTICHAIN_ASSETS_ENABLED:'true', ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED:'true',
   ARTSOUL_EXTERNAL_BASE_NFTS_ALCHEMY_API_KEY:'synthetic-inventory-key',
-  ARTSOUL_PROFILE_GENESIS_ENABLED:'true', ARTSOUL_PROFILE_GENESIS_DEPLOYMENT:JSON.stringify(deployment),
+  ARTSOUL_AURA_SOURCES_ENABLED:'true', ARTSOUL_PROFILE_GENESIS_ENABLED:'true', ARTSOUL_PROFILE_GENESIS_DEPLOYMENT:JSON.stringify(deployment),
   SUPABASE_URL:'https://database.example', SUPABASE_SERVICE_ROLE_KEY:'synthetic-test-service'
 };
 
@@ -45,7 +45,7 @@ test('authenticated Base and multichain NFT pages decorate exact grant serials i
       const items = network.includes('base-mainnet') ? [...baseItems,nft('201','eth-mainnet')] : [nft('201','eth-mainnet')];
       return Response.json({data:{ownedNfts:items,totalCount:items.length}});
     }
-    assert.equal(new URL(url).pathname, '/rest/v1/rpc/read_wallet_genesis_frames');
+    assert.equal(new URL(url).pathname, '/rest/v1/rpc/read_designated_wallet_genesis_frames');
     assert.deepEqual(JSON.parse(options.body), {p_genesis:collection, p_code_hash:deployment.genesisCodeHash,
       p_authority:safe, p_founder:wallet, p_wallet:wallet, p_serials:[0,201,202]});
     reads++;
@@ -83,7 +83,7 @@ test('Base preview and dialog and the multichain card with expanded details use 
     const compiled = await transformWithOxc(source, name + '.jsx', { jsx:{runtime:'classic'} });
     return vm.runInNewContext(compiled.code + '\n({' + symbols.join(',') + '})', { React, ...context });
   }
-  const frame = await components('wallet-nft-media',['WalletNftMedia'],{ auraFrameClassName, auraFrameLabels, auraWords, auraCaption });
+  const frame = await components('wallet-nft-media',['WalletNftMedia','WalletNftName'],{ auraFrameClassName, auraFrameLabels, auraWords, auraCaption });
   const { NftPreview, NftDetails } = await components('wallet-nfts',['NftPreview','NftDetails'], {
     ...frame, document:{body:{}}, createPortal:child=>child
   });
@@ -98,6 +98,10 @@ test('Base preview and dialog and the multichain card with expanded details use 
     assert.doesNotMatch(render(), /artsoul-aura-caption/);
     item.aura_kind = 'partner';
     assert.match(render(), /artsoul-aura-frame--partner/);
+    assert.doesNotMatch(render(), /Official ArtSoul NFT/);
+    item.aura_kind = 'platform';
+    assert.match(render(), /artsoul-aura-frame--platform/);
+    if (component !== NftPreview) assert.match(render(), /alt="Official ArtSoul NFT"/);
     delete item.aura_kind;
     assert.doesNotMatch(render(), /artsoul-aura-/);
   }

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Interface, ZeroAddress, ZeroHash } from 'ethers';
+import { Interface, ZeroAddress, ZeroHash, id, keccak256 } from 'ethers';
 import { verifiedArtworkAura } from '../src/api/verified-artwork-aura.js';
-import { receiptPartnerFrames, hasPartnerContract } from '../src/api/partner-frames.js';
+import { receiptCollectionFrames, walletCollectionFrames, hasPartnerContract } from '../src/api/partner-frames.js';
 import { projectedArtworkAura } from '../src/ui/components/aura-frame.js';
 
 test('Partner designation requires matching ERC-721 support on the selected finalized chain', async () => {
@@ -51,10 +51,106 @@ test('partner inventory requires final canonical mint evidence for each token in
   const readers=[async method=>method==='eth_chainId' ? '0x2105' : receipt,
     async (method,[tag])=>method==='eth_chainId' ? '0x2105' : tag==='finalized' ? {number:'0xc'} :
       {number:'0xb',hash:canonical,transactions:[transactionHash]}];
-  assert.deepEqual([...await receiptPartnerFrames(items,8453,readers)],['9']);
+  const sources = new Map([[nftAddress,{address:nftAddress,kind:'partner'}]]);
+  assert.deepEqual([...await receiptCollectionFrames(items,8453,sources,readers)],[['9','partner']]);
   canonical=ZeroHash;
-  assert.equal((await receiptPartnerFrames(items,8453,readers)).size,0);
-  assert.equal((await receiptPartnerFrames(items,84532,readers)).size,0);
+  assert.equal((await receiptCollectionFrames(items,8453,sources,readers)).size,0);
+  assert.equal((await receiptCollectionFrames(items,84532,sources,readers)).size,0);
+});
+
+test('official collection status follows the token when the approved runtime, immutable creator and canonical mint agree', async () => {
+  const code = '0x601234', issuer = '0x' + '18'.repeat(20);
+  const source = {address:nftAddress,kind:'official_collection',issuer,runtime_hash:keccak256(code)};
+  const sources = new Map([[nftAddress,source]]);
+  const items = ['9','10'].map(id=>({id,tokenId:id,contractAddress:nftAddress,mintTransactionHash:transactionHash}));
+  const receipt = {status:'0x1',blockNumber:'0xb',blockHash,transactionHash,logs:[mint,collection]};
+  function reader(returnedIssuer, runtime) {
+    return async (method, params) => {
+      if (method === 'eth_chainId') return '0x2105';
+      if (method === 'eth_getTransactionReceipt') return receipt;
+      if (method === 'eth_getBlockByNumber') return params[0] === 'finalized' ? {number:'0xc'} :
+        {number:'0xb',hash:blockHash,transactions:[transactionHash]};
+      assert.deepEqual(params[1],{blockHash,requireCanonical:true});
+      if (method === 'eth_getCode') { assert.equal(params[0],nftAddress); return runtime; }
+      assert.deepEqual(params[0],{to:nftAddress,data:id('creator()').slice(0,10)});
+      return '0x'+returnedIssuer.slice(2).padStart(64,'0');
+    };
+  }
+  const rpc = reader(issuer,code);
+  const read = other=>receiptCollectionFrames(items,8453,sources,[rpc,other]);
+  assert.deepEqual([...await read(rpc)],[['9','platform']]);
+  for (const other of [reader(recipient,code),reader(issuer,'0x6012')]) assert.equal((await read(other)).size,0);
+  receipt.logs = [mint];
+  assert.equal((await read(rpc)).size,0);
+});
+
+test('a reviewed external ERC-721 uses its standard mint, with shared and inconsistent contracts excluded', async () => {
+  const item = {id:'9',tokenId:'9',contractAddress:nftAddress,mintTransactionHash:transactionHash};
+  const receipt = {status:'0x1',blockNumber:'0xb',blockHash,transactionHash,logs:[mint]};
+  const sources = new Map([[nftAddress,{address:nftAddress,kind:'partner'}]]);
+  function reader(code) {
+    return async (method,params) => {
+      if (method === 'eth_chainId') return '0x2105';
+      if (method === 'eth_getTransactionReceipt') return receipt;
+      if (method === 'eth_getBlockByNumber') return params[0] === 'finalized' ? {number:'0xc'} :
+        {number:'0xb',hash:blockHash,transactions:[transactionHash]};
+      assert.equal(method,'eth_getCode');
+      assert.deepEqual(params,[nftAddress,{blockHash,requireCanonical:true}]);
+      return code;
+    };
+  }
+  const rpc = reader('0x6001');
+  const read = second=>receiptCollectionFrames([item],8453,sources,[rpc,second]);
+  assert.deepEqual([...await read(rpc)],[['9','partner']]);
+  assert.equal((await read(reader('0x'))).size,0);
+  receipt.logs = [log('Transfer',[recipient,nftAddress,9])];
+  assert.equal((await read(rpc)).size,0);
+  receipt.logs = [mint,log('CollectionMinted',[1,recipient,recipient,3,1,100])];
+  assert.equal((await read(rpc)).size,0);
+  assert.equal(await hasPartnerContract(84532,'0x810DD5459c9cC5d82f13F8D52545a654Ec0bbe4c',[]),false);
+});
+
+test('wallet collection lookup removes the official mark on revocation and excludes a copied token on another chain', async t => {
+  const settings = {ARTSOUL_AURA_SOURCES_ENABLED:'true', SUPABASE_URL:'https://database.example',
+    SUPABASE_SERVICE_ROLE_KEY:'synthetic-frame-test'};
+  for (const [key,value] of Object.entries(settings)) {
+    const previous = process.env[key];
+    process.env[key] = value;
+    t.after(()=>{ if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
+  }
+  const code = '0x603010';
+  const registered = [{address:nftAddress,kind:'official_collection',issuer:recipient,runtime_hash:keccak256(code)}];
+  const holder = '0x'+'13'.repeat(20);
+  const item = {id:'8453:'+nftAddress+':9',network:'base-mainnet',chainId:8453,contractAddress:nftAddress,
+    mintTransactionHash:transactionHash,tokenId:'9',tokenType:'ERC721',quantity:'1'};
+  const page = {view:'nfts',wallet:holder,items:[item,{...item,id:'1:'+nftAddress+':9',network:'eth-mainnet',chainId:1}]};
+  let approved = true, receiptReads = 0;
+  t.mock.method(globalThis,'fetch',async (url, options) => {
+    const endpoint = new URL(url);
+    if (endpoint.hostname === 'database.example') {
+      if (endpoint.pathname.endsWith('/read_aura_border_setting')) return Response.json([{enabled:true,revision:3}]);
+      assert.equal(endpoint.pathname,'/rest/v1/rpc/collection_frame_sources');
+      assert.deepEqual(JSON.parse(options.body),{p_chain:8453,p_addresses:[nftAddress]});
+      return Response.json(approved ? registered : []);
+    }
+    const {id,method,params} = JSON.parse(options.body);
+    let result;
+    switch (method) {
+      case 'eth_chainId': result='0x2105'; break;
+      case 'eth_getBlockByNumber': result = params[0] === 'finalized' ? {number:'0xc'} : {number:'0xb',hash:blockHash,transactions:[transactionHash]}; break;
+      case 'eth_getTransactionReceipt': receiptReads++; result={status:'0x1',blockNumber:'0xb',blockHash,transactionHash,logs:[mint,collection]}; break;
+      case 'eth_getCode': result=code; break;
+      case 'eth_call': result='0x'+recipient.slice(2).padStart(64,'0'); break;
+      default: assert.fail(method);
+    }
+    return Response.json({jsonrpc:'2.0',id,result});
+  });
+  const decorated = await walletCollectionFrames(page,holder);
+  assert.deepEqual(decorated.items[0],{...item,aura_kind:'platform',aura_border_text:true});
+  assert.equal(decorated.items[1].aura_kind,undefined);
+  approved = false;
+  assert.deepEqual(await walletCollectionFrames(page,holder),page);
+  assert.equal(receiptReads,1);
 });
 function evidence(logs = [mint, lock, grant, collection]) {
   return { platformRegistration: {...deployment, tokenId: '9'}, genesisDeployment: deployment,

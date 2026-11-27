@@ -68,10 +68,10 @@ test('source management binds an explicit switch to the displayed Core and curre
   const core='0x'+'a'.repeat(40);
   process.env={...previous,ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:core,ARTSOUL_AURA_SOURCES_ENABLED:'true',ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true'};
   t.after(()=>{process.env=previous;});
-  let member=true;
+  let member=true, role='team';
   let expectedCore=core;
   const calls=fixture(t,(path,options)=>{
-    if(path.startsWith('artsoul_staff_roles?'))return json([{role:'team',authorization_version:2}]);
+    if(path.startsWith('artsoul_staff_roles?'))return json([{role,authorization_version:2}]);
     if(path.startsWith('artsoul_staff_authority_policy?'))return json([{origin:'https://example.com',chain_id:84532,
       version:3,wallet_a:member?STAFF:'0x'+'2'.repeat(40),wallet_b:'0x'+'3'.repeat(40)}]);
     if(path==='rpc/manage_aura_sources'){
@@ -95,7 +95,45 @@ test('source management binds an explicit switch to the displayed Core and curre
   assert.equal((await call(change,'rehearsal')).statusCode,409);
   assert.equal((await call({...change,scope:expectedCore},'rehearsal')).body.sources[0].enabled,true);
   member=false;assert.equal((await call(change)).statusCode,403);
+  role='admin';member=true;assert.equal((await call(change)).statusCode,403);
   assert.equal(calls.filter(c=>c.path==='rpc/manage_aura_sources').length,4);
+});
+
+test('mainnet frame sources bind the reviewed Core, original collection issuer and dedicated Genesis contract',async t=>{
+  const previous=process.env;
+  process.env={...previous,ARTSOUL_AURA_SOURCES_ENABLED:'true',ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true',
+    ARTSOUL_CORE_ADDRESS_BASE_MAINNET:'', ARTSOUL_PROFILE_GENESIS_ENABLED:'false'};
+  t.after(()=>{process.env=previous;});
+  const issuer='0x'+'a'.repeat(40),token='0x'+'c'.repeat(40);
+  fixture(t,(path,options)=>{
+    if(path.startsWith('artsoul_staff_roles?'))return json([{role:'team',authorization_version:2}]);
+    if(path.startsWith('artsoul_staff_authority_policy?'))return json([{origin:'https://example.com',chain_id:84532,version:3,
+      wallet_a:STAFF,wallet_b:issuer}]);
+    if(path==='rpc/manage_aura_sources'){
+      const b=JSON.parse(options.body);
+      return json(b.p_enabled===null?[]:[{address:b.p_address,enabled:b.p_enabled,revision:b.p_revision+1}]);
+    }
+  });
+  async function call(kind,overrides={},body){
+    const request=req({method:body?'POST':'GET',body,cookie:cookie(true,2),query:{wallet:STAFF,kind,chain:'8453',address:token,...overrides}});
+    Object.assign(request.headers,{origin:'https://example.com','content-type':'application/json'});
+    const out=response();await auraSources(request,out);return out;
+  }
+  assert.equal((await call('platform',{deployment:'catalog'})).statusCode,503);
+  process.env.ARTSOUL_CORE_ADDRESS_BASE_MAINNET=token;
+  assert.equal((await call('founder',{deployment:'catalog'})).body.scope,token);
+  assert.equal((await call('platform',{deployment:'rehearsal'})).statusCode,400);
+  assert.equal((await call('official_collection')).statusCode,400);
+  assert.equal((await call('official_collection',{issuer})).body.scope,issuer);
+  assert.equal((await call('genesis')).body.configuredGenesis,null);
+  const change={scope:'',reason:'Recorded issuer review',enabled:true,revision:0};
+  assert.equal((await call('genesis',{},change)).statusCode,409);
+  assert.equal((await call('genesis',{chain:'84532'})).statusCode,400);
+  process.env.ARTSOUL_PROFILE_GENESIS_ENABLED='true';
+  process.env.ARTSOUL_PROFILE_GENESIS_DEPLOYMENT=JSON.stringify({chainId:8453,genesis:token,safe:issuer,founder:STAFF,genesisCodeHash:'0x'+'1'.repeat(64)});
+  assert.equal((await call('genesis')).body.configuredGenesis,token);
+  assert.equal((await call('genesis',{address:issuer},change)).statusCode,409);
+  assert.equal((await call('genesis',{},change)).body.sources[0].enabled,true);
 });
 
 test('frame settings require verified admin or a team wallet still in the current authority pair', async t => {
@@ -153,7 +191,7 @@ test('frame settings require verified admin or a team wallet still in the curren
   });
   assert.deepEqual((await call()).body,{...saved,publicFrameSource:'awaiting_publisher'});
   process.env.ARTSOUL_PLATFORM_PUBLISHER_BASE_SEPOLIA = process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA + ':' + STAFF;
-  assert.deepEqual((await call()).body,{...saved,publicFrameSource:'configured'});
+  assert.deepEqual((await call()).body,{...saved,publicFrameSource:'awaiting_publisher'});
   process.env.ARTSOUL_NFT_OWNERSHIP_ENABLED = 'invalid';
   assert.deepEqual((await call()).body,{...saved,publicFrameSource:'unavailable'});
   rotatedDuringRequest=true;

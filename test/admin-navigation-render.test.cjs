@@ -14,17 +14,18 @@ test.before(async()=>{
         'admin-navigation-render.jsx',{jsx:{runtime:'classic'}})).code;
 });
 
-function render({state='ready',wallet=WALLET,staff=true,authority=true,role=authority?'team':'moderator',section='queue',dialog=false}={}) {
+function render({state='ready',wallet=WALLET,staff=true,authority=true,role=authority?'team':'moderator',section='queue',dialog=false,frameSourceManager=false,identityReviewer=false}={}) {
     const ready = state==='ready';
     const data = {reports:[],events:[],hidden:[],moderationLog:[],notifications:[]};
     // Use actual page JSX with explicit state fixtures. No network, wallet or
     // native credential operation is executed by a static render.
-    const states = [state,staff?{role,dualWallet:true,stepUpActive:ready}:null,
+    const states = [state,staff?{role,dualWallet:true,stepUpActive:ready,frameSourceManager,identityReviewer}:null,
         'pending_review',null,data,section,false,'',null,staff?wallet:'',authority?wallet:'',dialog];
     let index=0;
     const scope={React:{...React,useState:initial=>[index<states.length?states[index++]:initial,()=>{}]},
         window:{artsoulWalletStateSettled:true,getCurrentWalletAddress:()=>wallet},
-        AuraAppearance:()=>React.createElement('section',{'data-fixture':'appearance'},'Frame label controls'),
+        AuraAppearance:props=>React.createElement('section',{'data-fixture':'appearance','data-sources':props.frameSourceManager===true},'Frame label controls'),
+        IdentityReviews:()=>React.createElement('section',{'data-fixture':'identity'},'Identity reviews'),
         StaffFactorDialog:()=>React.createElement('dialog',{'data-fixture':'factor'},'Factor dialog'),
         StaffPasskeyDialog:()=>React.createElement('dialog',{'data-fixture':'passkey'},'Passkey dialog'),
         StaffAuthority:()=>React.createElement('div',{'data-fixture':'staff'},'Team fixture')};
@@ -79,6 +80,19 @@ test('the NFT appearance destination preserves the account and verification gate
     assert.match(render({section:'appearance',role:'team',authority:true}),/data-fixture="appearance"/);
     assert.doesNotMatch(render({section:'appearance',role:'team',authority:false}),/data-fixture="appearance"/);
     assert.doesNotMatch(render({section:'appearance',role:'team',authority:true,state:'step_up'}),/data-fixture="appearance"/);
+});
+
+test('source management requires a verified governing Team capability while blue identity review remains independent',()=>{
+    const enabled={section:'appearance',frameSourceManager:true,identityReviewer:true};
+    assert.match(render({...enabled,role:'team',authority:true}),/data-sources="true"/);
+    assert.match(render({...enabled,role:'admin',authority:true}),/data-sources="false"/);
+    assert.match(render({...enabled,role:'team',frameSourceManager:false}),/data-sources="false"/);
+    for(const overrides of [{authority:false},{state:'step_up'},{role:'moderator'}]) {
+        assert.doesNotMatch(render({...enabled,role:'team',...overrides}),/data-sources="true"/);
+    }
+    assert.match(render({section:'identity',role:'admin',identityReviewer:true,authority:false}),/data-fixture="identity"/);
+    assert.match(render({section:'identity',role:'team',identityReviewer:true,authority:true}),/data-fixture="identity"/);
+    assert.doesNotMatch(render({section:'identity',role:'team',identityReviewer:false,authority:true,frameSourceManager:true}),/data-fixture="identity"/);
 });
 
 test('a factor dialog has one stable location before the protected body',()=>{
