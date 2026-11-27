@@ -22,7 +22,7 @@ node scripts/generate-assistant-audio.mjs
 
 For an approved recording batch, confirm the receiving organization's available promotional balance in Billing, then supply its `OPENAI_ORG_ID`, the grant's UTC expiry as `ARTSOUL_VOICE_GRANT_EXPIRES_AT`, and a server-side `OPENAI_API_KEY`. Select up to ten explicit phrase IDs with `--only` and a cumulative USD ceiling with `--budget-usd`. The generator defaults to a dry run. Adding `--generate` opens one Realtime session per missing phrase. Each attempt reserves $0.025 locally, including failed or interrupted attempts. Other projects can consume the same grant. Review the remaining credit before each batch. After an interruption, `--recover` finishes publishing an already received recording offline. [OpenAI API credit coverage and balance](https://help.openai.com/en/articles/20001626-api-credits-benefit-for-eligible-chatgpt-subscriptions)
 
-If the recorder process was terminated, confirm it has exited before clearing a stale `docs/private/assistant-audio-generation-ledger.json.lock`. An unresolved paid attempt without received bytes requires inspection of provider usage before a retry.
+If the recorder process was terminated, confirm it has exited before clearing a stale `docs/private/assistant-audio-generation-ledger.json.lock`. Check provider usage after an unresolved paid attempt. For a single confirmed failure, explicitly select its ID with `--only` and `--retry-failed` to make one new attempt. Both attempts count toward the cumulative budget. Interrupted attempts with unclear outcomes remain blocked.
 
 ## Why declared tools instead of clicking
 

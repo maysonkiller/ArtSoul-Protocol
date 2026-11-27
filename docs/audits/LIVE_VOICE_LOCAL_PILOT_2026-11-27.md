@@ -1,6 +1,6 @@
 # Local live voice pilot — 2026-11-27
 
-Status: implemented and tested offline; disabled by default. No production route, provider session, credential read, paid request or browser microphone acceptance was performed for this implementation. This does not reopen Phase B engineering acceptance or imply a public voice service is ready.
+The local pilot is disabled by default. A funded loopback run using a public Russian greeting received 9.75 seconds of Russian audio from Marin. The public site continues to serve prerecorded speech.
 
 ## Scope
 
@@ -17,7 +17,7 @@ This is a deliberately half-duplex developer test: capture pauses during replies
 | Provider | Fixed `gpt-realtime-2.1-mini`, official `marin`, PCM24k; model/voice/format/token/VAD settings checked against provider acknowledgement before capture is admitted |
 | Language | English or Russian, selected before starting; no raw provider instructions accepted from the browser |
 | Provisioning | One durable, exclusive attempt marker written before opening the provider socket; failed attempts remain consumed; no retries or reconnects |
-| Generation | At most four responses, each at most 384 output tokens; tool continuations count toward the same total |
+| Generation | At most four responses, each at most 1,024 output tokens; tool continuations count toward the same total |
 | Audio | At most 60 seconds of input PCM; output PCM separately bounded to 60 seconds; individual frames and socket messages bounded |
 | Lifetime | Server terminates its provider socket at 60 seconds; connection timeout 12 seconds; client also stops on expiry, hidden tab, page exit, account/auth change or Stop |
 | Tools | At most two reviewed tool requests; matching one-time call IDs; result at most 6,000 UTF-8 bytes; only read/navigation tool allowlist |
@@ -67,11 +67,15 @@ node --check src/ai/live-voice-client.js
 node --test test/live-voice-session.test.mjs test/live-voice-client.test.mjs
 ```
 
-All 16 focused tests passed. They cover funding denial/grant-only protection, fixed voice acknowledgement, PCM and response quotas, reviewed tool continuation, replay rejection, stop/expiry/failures, no retries, origin/static-file boundaries, explicit gesture, late microphone permission cleanup, PCM playback, hidden/account cleanup, discarded late tool output and reviewed navigation. A real loopback HTTP/WebSocket smoke with the gate disabled returned the pilot page/client script, returned 404 for private and arbitrary source paths, and ended the socket with `funding_not_verified`; no provider was contacted.
+All 17 focused tests passed. They cover funding denial/grant-only protection, fixed voice acknowledgement, PCM and response quotas, reviewed tool continuation, replay rejection, stop/expiry/failures, no retries, origin/static-file boundaries, explicit gesture, late microphone permission cleanup, PCM playback, hidden/account cleanup, discarded late tool output and reviewed navigation. A real loopback HTTP/WebSocket smoke with the gate disabled returned the pilot page/client script, returned 404 for private and arbitrary source paths, and ended the socket with `funding_not_verified`; no provider was contacted.
 
-Still unverified: an actual funded provider acknowledgement/Marin response, real microphone/speaker behavior on desktop and iOS, measured billing against the selected grant, and long-term public-service abuse/concurrency controls. Do not describe the offline tests as a successful paid session or public readiness.
+A real provider run returned an incomplete response at the original 384-token limit. The bridge now requests a response after the server commits the input audio, preserves the provider's bounded reason code, and allows 1,024 output tokens per response including reasoning. A separate reviewed run sent the recorded greeting to the localhost bridge in real time. The provider acknowledged the configured voice and returned 468,000 bytes of PCM plus a Russian transcript. The input used a public fixture and the output was counted in memory. Physical microphones, speakers and iOS audio routing still require device acceptance. Public-service access controls and ongoing funding require their own release decision.
 
-## Official references
+## English conversation follow-up
+
+On November 28 a second funded loopback test used the public English greeting and goodbye in one conversation. The client waited for the listening state after the first reply, then sent the second fixture over the same socket. Marin returned 5.65 and 4.25 seconds of English audio respectively. Both replies were measured in memory with no input or output device.
+
+## Provider documentation
 
 - [Realtime conversations and server-owned session configuration](https://developers.openai.com/api/docs/guides/realtime-conversations)
 - [Realtime server controls](https://developers.openai.com/api/docs/guides/voice-server-controls?voice-api=realtime)
