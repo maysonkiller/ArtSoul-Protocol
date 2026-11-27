@@ -11,7 +11,7 @@
  * What it costs and where the audio goes:
  *
  * - SpeechRecognition transcribes through the browser. Fixed replies use
- *   reviewed static recordings; other replies use native speechSynthesis.
+ *   reviewed static Marin recordings; unrecorded replies remain text-only.
  *   Recording generation is an offline operation, not a user request. Playback
  *   makes no AI API call and exposes no key or user content to an AI provider.
  * - The browser may use an online recognition service for each spoken turn.
@@ -34,8 +34,9 @@
 (function () {
     'use strict';
 
-    // Existing language preferences select command recognition only.
+    // Legacy input preferences do not opt someone into Russian spoken replies.
     const LANG_KEY = 'artsoul.voice.lang';
+    const REPLY_LANG_KEY = 'artsoul.voice.reply-lang';
     // Older clients could persist consent before an asynchronous dialog resolved.
     const NOTICE_KEY = 'artsoul.voice.notice.v2';
     const NAVIGATION_KEY = 'artsoul.voice.next-page';
@@ -279,7 +280,7 @@
 
     const TEXT = {
         title: 'ArtSoul commands',
-        hint: 'Choose the language you speak. Replies are in English. Wallet actions need your review and signature.',
+        hint: 'Choose EN or RU for recognition and recorded speech. On-screen replies stay English. Wallet actions need your review and signature.',
         input: 'Your command', placeholder: 'Open gallery, search moon…',
         send: 'Send', microphone: 'Use microphone', stop: 'Stop listening',
         conversation: 'Start voice chat', endConversation: 'End voice chat',
@@ -290,8 +291,9 @@
         reviewCommand: 'Voice chat paused. Check the command and press Send to review this action.',
         listenReply: 'Listen to answer', stopReply: 'Stop audio',
         audioUnavailable: 'Audio could not play in this browser. The answer is available as text.',
+        audioMissing: 'This answer has no Marin recording in the selected language. It is available as text.',
         audioBlocked: 'Tap Listen to answer to play the audio.',
-        audioNotice: 'AI-generated voice.',
+        audioNotice: 'AI-generated voice: Marin.',
         helpSpeech: 'You can open the gallery, find artwork, or ask about your activity. The examples below show the available commands. Wallet actions always need your review and signature.',
         close: 'Close commands', examples: 'Examples',
         noSpeech: 'Voice is unavailable in this browser. You can type instead.',
@@ -330,10 +332,12 @@
             .map(id => Object.freeze({lang: 'en', id, text: TEXT[id], url: `/audio/assistant/v1/en-${id}.wav`}))
     );
 
-    function getReplyAudio(text) {
-        const phrase = ['options', 'askSearch', 'askTitle'].find(id => TEXT[id] === text);
-        if (phrase) return `/audio/assistant/v1/phrases/en-${phrase}.wav`;
-        return replyClips.find(clip => clip.text === text)?.url || '';
+    function getReplyAudio(text, lang = 'en') {
+        return window.ArtSoulVoicePhraseBank?.lookup(text, lang) || '';
+    }
+
+    function fixedReply(id, fallback) {
+        return window.ArtSoulVoicePhraseBank?.text(id) || fallback;
     }
 
     function hoursText(value) {
@@ -351,7 +355,7 @@
     function describeResult(tool, result) {
         const t = TEXT;
         const data = result || {};
-        if (data.error) return { say: t.error(data.error), show: data.error };
+        if (data.error) return { say: fixedReply('r2ToolError', t.error(data.error)), show: data.error };
         if (data.opened === false && data.code === 'wallet_required') return { say: t.noWallet, show: t.noWallet };
         if (data.opened === false && data.code === 'wallet_nfts_unavailable') {
             const message = 'Wallet NFTs are currently unavailable.';
@@ -368,7 +372,7 @@
         }
         if ((data.submitted === false && !(tool === DRAFT_TOOL && data.prepared === true)) || data.prepared === false || data.opened === false || data.updated === false) {
             const reason = data.reason || '';
-            return { say: t.refused(reason), show: reason };
+            return { say: fixedReply('r2ActionNotCompleted', t.refused(reason)), show: reason };
         }
 
         switch (tool) {
@@ -411,7 +415,10 @@
             const tail = more ? 'More matches are available. Open Search ArtSoul and choose a category.' : '';
             const warning = typeof data.warning === 'string' && data.warning.trim()
                 ? 'Artwork, auction and artist results are unavailable. Only matching pages and documentation are shown.' : '';
-            return { say: [head, warning, tail].filter(Boolean).join(' '), show: [head, warning, tail].filter(Boolean).join('\n'), links };
+            // Fixed speech never substitutes invented counts or a success claim for a partial result.
+            const say = warning ? [head, warning, tail].filter(Boolean).join(' ')
+                : fixedReply(lines.length ? 'r2SearchResults' : 'r2NoMatches', head);
+            return { say, show: [head, warning, tail].filter(Boolean).join('\n'), links };
         }
         case 'add_to_saved':
         case 'remove_from_saved': {
@@ -425,23 +432,24 @@
                 `${item.title}, ends in ${hoursText(item.hours_remaining)}`);
             const head = `${data.count || 0} auctions are open.`;
             const text = [head, ...top].join(' ');
-            return { say: text, show: text };
+            const say = Array.isArray(data.auctions) ? fixedReply(Number(data.count) === 0 && !items.length ? 'r2NoAuctions' : 'r2AuctionResults', text) : text;
+            return { say, show: text };
         }
         case 'search_artworks': {
             const items = Array.isArray(data.results) ? data.results : [];
             const head = `Found ${data.count || 0}.`;
             const text = [head, items.slice(0, 3).map(item => `${item.title} (#${item.artwork_id})`).join(', ')].join(' ');
-            return { say: text, show: text };
+            return { say: fixedReply(items.length ? 'r2SearchResults' : 'r2NoMatches', text), show: text };
         }
         case 'get_artwork':
         case 'get_auction_state': {
             const text = `${data.title}. Status: ${data.status}. Current bid: ${data.current_bid_eth} ETH.`;
-            return { say: text, show: text };
+            return { say: fixedReply(tool === 'get_artwork' ? 'r2ArtworkResults' : 'r2AuctionResults', text), show: text };
         }
         case 'get_artwork_provenance': {
             const short = value => (value ? `${String(value).slice(0, 6)}…${String(value).slice(-4)}` : '—');
             const show = `Creator ${short(data.creator)} / First Collector ${short(data.first_collector)} / Owner ${short(data.owner)}`;
-            return { say: 'Creator, First Collector and Owner are shown on screen.', show };
+            return { say: fixedReply('r2ProvenanceResults', 'Creator, First Collector and Owner are shown on screen.'), show };
         }
         case 'get_my_activity': {
             const needs = Array.isArray(data.needs_attention) ? data.needs_attention : [];
@@ -456,17 +464,17 @@
             };
             const items = needs.slice(0, 5);
             const show = [head, ...items.map(entry => `• ${entry.artwork_id ? `Artwork #${entry.artwork_id}: ` : ''}${labels[entry.tool] || entry.why}`)].join('\n');
-            return { say: head, show, links: items.filter(entry => entry.artwork_id).map(entry => ({
+            return { say: fixedReply('r2ActivityResults', head), show, links: items.filter(entry => entry.artwork_id).map(entry => ({
                 url: `/artwork/${entry.artwork_id}`, label: `View artwork #${entry.artwork_id}`
             })) };
         }
         case 'open_page': {
             const text = data.opened ? `Opening ${data.title}.` : 'Page was not opened.';
-            return { say: text, show: text };
+            return { say: data.opened === true ? fixedReply('r2PageNavigation', text) : text, show: text };
         }
         case 'open_artwork': {
             const text = `Opening ${data.title}.`;
-            return { say: text, show: text };
+            return { say: data.opened === true ? fixedReply('r2PageNavigation', text) : text, show: text };
         }
         case 'revoke_wallet_access': {
             const text = data.revoked
@@ -549,6 +557,7 @@
         const staffHelp = 'Use public catalog commands here. Try “open gallery”, “search moon” or “open artwork 31”.';
 
         let inputLanguage = readStored(LANG_KEY) === 'ru' ? 'ru' : 'en';
+        let replyLanguage = readStored(REPLY_LANG_KEY) === 'ru' ? 'ru' : 'en';
         let recognition = null;
         let handsFree = false;
         let leavingFor = null;
@@ -563,7 +572,6 @@
         let generation = 0;
         let audioGeneration = 0;
         let answerToRead = '';
-        let utterance = null;
         let speaking = false;
         let clipAudio = null;
         let clipAttempt = null;
@@ -585,8 +593,8 @@
         panel.innerHTML =
             '<div class="artsoul-voice-panel-head">' +
             '<h2 id="artsoulVoiceTitle"></h2>' +
-            '<button type="button" class="artsoul-voice-lang" data-lang="en" aria-label="Recognize English commands" title="Recognize English commands">EN</button>' +
-            '<button type="button" class="artsoul-voice-lang" data-lang="ru" aria-label="Recognize Russian commands" title="Recognize Russian commands">RU</button>' +
+            '<button type="button" class="artsoul-voice-lang" data-lang="en" aria-label="English commands and recorded speech" title="English commands and recorded speech">EN</button>' +
+            '<button type="button" class="artsoul-voice-lang" data-lang="ru" aria-label="Russian commands and recorded speech" title="Russian commands and recorded speech">RU</button>' +
             '<button type="button" class="artsoul-voice-close">×</button>' +
             '</div>' +
             '<p class="artsoul-voice-hint" id="artsoulVoiceHint"></p>' +
@@ -629,6 +637,8 @@
             panel.querySelector('h2').textContent = t.title;
             panel.querySelector('.artsoul-voice-hint').textContent = typeof Recognition === 'function'
                 ? t.hint + ' ' + t.conversationHint : t.hint;
+            panel.querySelector('.artsoul-voice-hint').textContent += replyLanguage === 'ru'
+                ? ' Recorded replies: Russian.' : ' Recorded replies: English.';
             if (/^\/upload(?:\.html)?\/?$/.test(window.location?.pathname || '')) {
                 panel.querySelector('.artsoul-voice-hint').textContent += ' For a draft, say “title” and dictate it, or say “choose 48 hours”.';
             }
@@ -687,8 +697,8 @@
             chat.title = TEXT.conversationHint;
             chat.setAttribute('aria-pressed', String(handsFree));
             chat.dataset.listening = String(handsFree && Boolean(recognition));
-            const hasClip = Boolean(getReplyAudio(answerToRead)) && typeof window.Audio === 'function';
-            const supportsAudio = hasClip || (typeof window.speechSynthesis?.speak === 'function' && typeof SpeechSynthesisUtterance === 'function');
+            const hasClip = Boolean(getReplyAudio(answerToRead, replyLanguage));
+            const supportsAudio = hasClip && typeof window.Audio === 'function';
             audioNotice.textContent = TEXT.audioNotice;
             audioNotice.hidden = !hasClip;
             replay.hidden = !answerToRead;
@@ -696,7 +706,7 @@
             replay.textContent = speaking ? TEXT.stopReply : TEXT.listenReply;
             replay.setAttribute('aria-pressed', String(speaking));
             if (answerToRead && !supportsAudio) {
-                audioStatus.textContent = TEXT.audioUnavailable;
+                audioStatus.textContent = hasClip ? TEXT.audioUnavailable : TEXT.audioMissing;
                 audioStatus.hidden = false;
             }
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => { el.disabled = busy || noticePending; });
@@ -718,10 +728,7 @@
                     clipAudio.load();
                 } catch { /* Already stopped; text remains available. */ }
             }
-            if (utterance) utterance.onstart = utterance.onend = utterance.onerror = null;
-            utterance = null;
             speaking = false;
-            try { window.speechSynthesis?.cancel(); } catch { /* Text remains available. */ }
             controls();
         }
 
@@ -764,7 +771,7 @@
                 if (!textToSay || panel.hidden || document.visibilityState === 'hidden') return;
                 silence();
                 audioStatus.hidden = true;
-                const clip = getReplyAudio(textToSay);
+                const clip = getReplyAudio(textToSay, replyLanguage);
                 if (clip && typeof window.Audio === 'function') {
                     if (!clipAudio) {
                         clipAudio = new window.Audio();
@@ -791,7 +798,7 @@
                         clipAudio.onplaying = null;
                         window.clearTimeout?.(clipTimer);
                         // A stalled clip can emit playing and never emit ended.
-                        clipTimer = handsFree ? window.setTimeout(() => finish({name: 'TimeoutError'}), 60000) : null;
+                        clipTimer = window.setTimeout(() => finish({name: 'TimeoutError'}), 65000);
                     };
                     clipAudio.onended = () => finish();
                     clipAudio.onerror = () => finish({name: 'MediaError'});
@@ -805,42 +812,10 @@
                     playback?.catch(error => finish(error || {name: 'MediaError'}));
                     return;
                 }
-                if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') {
-                    afterPlayback(true);
-                    return;
-                }
-                const current = new SpeechSynthesisUtterance(textToSay);
-                let started = false;
-                utterance = current;
-                current.lang = 'en-US';
-                current.onstart = () => {
-                    if (utterance !== current) return;
-                    started = true;
-                    speaking = true;
-                    controls();
-                };
-                const finish = failed => {
-                    if (utterance !== current) return;
-                    window.clearTimeout?.(clipTimer);
-                    clipTimer = null;
-                    utterance = null;
-                    speaking = false;
-                    if (failed) {
-                        audioStatus.textContent = TEXT.audioUnavailable;
-                        audioStatus.hidden = false;
-                    }
-                    afterPlayback(failed);
-                };
-                current.onend = () => finish(!started);
-                current.onerror = () => finish(true);
-                // Some mobile engines accept speak() and never deliver an event.
-                // Stop the chat if playback cannot complete; never guess when to listen.
-                if (handsFree) clipTimer = window.setTimeout(() => {
-                    if (utterance !== current) return;
-                    finish(true);
-                    window.speechSynthesis.cancel();
-                }, 60000);
-                window.speechSynthesis.speak(current);
+                // Missing/blocked recordings never select an unrelated device voice.
+                audioStatus.textContent = clip ? TEXT.audioUnavailable : TEXT.audioMissing;
+                audioStatus.hidden = false;
+                afterPlayback(true);
             } catch {
                 stopVoice();
                 audioStatus.textContent = TEXT.audioUnavailable;
@@ -882,6 +857,11 @@
             };
             if (transcript.length > 300) { reply('', t.tooLong); return; }
             if (!transcript.trim()) { reply('', t.empty); return; }
+            if (!pendingDraftField && !pendingPrompt && /^(?:hello|hi|hey|привет|здравствуй(?:те)?)[.!]?$/i.test(transcript.trim())) {
+                const greeting = fixedReply('r2Greeting', 'Hello! What would you like to explore in ArtSoul?');
+                reply(transcript, greeting);
+                return;
+            }
             if (!pendingDraftField && /^(?:stop(?: voice chat)?|end voice chat|no[,]? thanks|that['’]s all|стоп|заверши(?:ть)? диалог|ничего не (?:надо|нужно)|хватит|спасибо[,]? пока|на этом вс[её])[.!]?$/i.test(transcript.trim())) {
                 stopVoice();
                 show(transcript, '', [], '');
@@ -913,7 +893,7 @@
             }
             if (command.message) {
                 if (command.nftPrompt) pendingPrompt = 'nft';
-                reply(transcript, command.message);
+                reply(transcript, command.message, command.nftPrompt ? fixedReply('r2WhichPage', command.message) : command.message);
                 return;
             }
             if (command.help) {
@@ -933,12 +913,12 @@
             }
             if (!mayRun(command, confidence)) {
                 const text = t.unsure(transcript);
-                reply(transcript, text);
+                reply(transcript, text, fixedReply('r2LowConfidence', text));
                 return;
             }
             if (handsFree && !CHAT_TOOLS.has(command.tool)) {
                 handsFree = false;
-                reply(transcript, t.reviewCommand);
+                reply(transcript, t.reviewCommand, fixedReply('r2ReviewResult', t.reviewCommand));
                 return;
             }
             const tool = tools.get(command.tool);
@@ -988,7 +968,7 @@
             } catch (error) {
                 if (current !== generation || currentWallet !== walletIdentity()) return;
                 const message = (error && error.message) || String(error);
-                reply(transcript, message, t.error(message));
+                reply(transcript, message, fixedReply('r2ToolError', t.error(message)));
             } finally {
                 busy = false;
                 controls();
@@ -1120,7 +1100,9 @@
                 if (busy) return;
                 stopVoice();
                 inputLanguage = el.dataset.lang === 'ru' ? 'ru' : 'en';
+                replyLanguage = inputLanguage;
                 writeStored(LANG_KEY, inputLanguage);
+                writeStored(REPLY_LANG_KEY, replyLanguage);
                 label();
                 show('', '');
             });

@@ -1,0 +1,1299 @@
+{
+  "version": 1,
+  "voice": "marin",
+  "note": "Fixed public speech only. English interface and default voice language; Russian speech requires explicit RU selection. Catalog entries without validated recording receipts remain silent. Runtime amounts, ownership and receipts are never synthesized or guessed.",
+  "sources": [
+    {
+      "commit": "9510a0ac88c80091e19512c55b260f67c0ceac6f",
+      "scope": "Reviewed PR 519 phrase text and original recording receipts"
+    },
+    {
+      "commit": "60cb70d78eecba79e2778780c2654e7f9a1f4d50",
+      "scope": "Previously shipped short EN/RU PCM excerpts"
+    }
+  ],
+  "clips": [
+    {
+      "lang": "en",
+      "id": "helpSpeech",
+      "text": "You can open the gallery, find artwork, or ask about your activity. The examples below show the available commands. Wallet actions always need your review and signature.",
+      "url": "/audio/assistant/v1/en-helpSpeech.wav"
+    },
+    {
+      "lang": "en",
+      "id": "searchPrompt",
+      "text": "What would you like to find? Try \"search moon\", \"find artists Vera\" or \"search docs fees\".",
+      "url": "/audio/assistant/v1/en-searchPrompt.wav"
+    },
+    {
+      "lang": "en",
+      "id": "publicationPrompt",
+      "text": "What is the title? Try \"prepare artwork titled Moonlight\". You will review the draft on Publish; nothing is uploaded or signed.",
+      "url": "/audio/assistant/v1/en-publicationPrompt.wav"
+    },
+    {
+      "lang": "en",
+      "id": "tooLong",
+      "text": "Use one command of up to 300 characters.",
+      "url": "/audio/assistant/v1/en-tooLong.wav"
+    },
+    {
+      "lang": "en",
+      "id": "empty",
+      "text": "Enter a command first.",
+      "url": "/audio/assistant/v1/en-empty.wav"
+    },
+    {
+      "lang": "en",
+      "id": "unavailable",
+      "text": "Commands are not available on this page.",
+      "url": "/audio/assistant/v1/en-unavailable.wav"
+    },
+    {
+      "lang": "en",
+      "id": "noWallet",
+      "text": "No wallet is connected. Connect one first.",
+      "url": "/audio/assistant/v1/en-noWallet.wav"
+    },
+    {
+      "lang": "en",
+      "id": "submitted",
+      "text": "Done. The wallet approved it and the transaction was sent.",
+      "url": "/audio/assistant/v1/en-submitted.wav"
+    },
+    {
+      "lang": "en",
+      "id": "settled",
+      "text": "Settlement confirmed. The NFT is yours. Artwork details are updating.",
+      "url": "/audio/assistant/v1/en-settled.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "helpSpeech",
+      "text": "Можно открыть галерею, найти работу или узнать о своей активности. Доступные команды показаны в примерах ниже. Действия с кошельком всегда требуют вашей проверки и подписи.",
+      "url": "/audio/assistant/v1/ru-helpSpeech.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "searchPrompt",
+      "text": "Что найти? Например: «найди луна», «найди автора Vera» или «найди в документации fees».",
+      "url": "/audio/assistant/v1/ru-searchPrompt.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "publicationPrompt",
+      "text": "Как назвать работу? Например: «подготовь работу с названием Лунный свет». На Publish вы проверите черновик; файл не загружается, подпись не запрашивается.",
+      "url": "/audio/assistant/v1/ru-publicationPrompt.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "tooLong",
+      "text": "Введите одну команду длиной до 300 символов.",
+      "url": "/audio/assistant/v1/ru-tooLong.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "empty",
+      "text": "Сначала введите команду.",
+      "url": "/audio/assistant/v1/ru-empty.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "unavailable",
+      "text": "Команды недоступны на этой странице.",
+      "url": "/audio/assistant/v1/ru-unavailable.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "noWallet",
+      "text": "Кошелёк не подключён. Сначала подключите его.",
+      "url": "/audio/assistant/v1/ru-noWallet.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "submitted",
+      "text": "Готово. Кошелёк подтвердил, транзакция отправлена.",
+      "url": "/audio/assistant/v1/ru-submitted.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "settled",
+      "text": "Расчёт подтверждён. NFT теперь ваша. Данные работы обновляются.",
+      "url": "/audio/assistant/v1/ru-settled.wav"
+    },
+    {
+      "lang": "en",
+      "id": "options",
+      "text": "You can open the gallery, find artwork, or ask about your activity.",
+      "url": "/audio/assistant/v1/phrases/en-options.wav"
+    },
+    {
+      "lang": "en",
+      "id": "askSearch",
+      "text": "What would you like to find?",
+      "url": "/audio/assistant/v1/phrases/en-askSearch.wav"
+    },
+    {
+      "lang": "en",
+      "id": "askTitle",
+      "text": "What is the title?",
+      "url": "/audio/assistant/v1/phrases/en-askTitle.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "options",
+      "text": "Можно открыть галерею, найти работу или узнать о своей активности.",
+      "url": "/audio/assistant/v1/phrases/ru-options.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "askSearch",
+      "text": "Что найти?",
+      "url": "/audio/assistant/v1/phrases/ru-askSearch.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "askTitle",
+      "text": "Как назвать работу?",
+      "url": "/audio/assistant/v1/phrases/ru-askTitle.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Greeting",
+      "text": "Hello! What would you like to explore in ArtSoul?",
+      "url": "/audio/assistant/v1/phrases/en-r2Greeting.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Greeting",
+      "text": "Привет! Что хотите посмотреть в ArtSoul?",
+      "url": "/audio/assistant/v1/phrases/ru-r2Greeting.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Ready",
+      "text": "I'm ready. You can ask me naturally about ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/en-r2Ready.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Ready",
+      "text": "Я готова. Можете задавать обычные вопросы об ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Ready.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2HowCanHelp",
+      "text": "I can help with artworks, auctions, profiles, and safe wallet preparation.",
+      "url": "/audio/assistant/v1/phrases/en-r2HowCanHelp.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2HowCanHelp",
+      "text": "Могу помочь с работами, аукционами, профилями и безопасной подготовкой действий с кошельком.",
+      "url": "/audio/assistant/v1/phrases/ru-r2HowCanHelp.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2PleaseContinue",
+      "text": "Of course. What would you like to know next?",
+      "url": "/audio/assistant/v1/phrases/en-r2PleaseContinue.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2PleaseContinue",
+      "text": "Конечно. Что хотите узнать дальше?",
+      "url": "/audio/assistant/v1/phrases/ru-r2PleaseContinue.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2OneMoment",
+      "text": "I'll check what ArtSoul can verify.",
+      "url": "/audio/assistant/v1/phrases/en-r2OneMoment.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2OneMoment",
+      "text": "Проверю, какие сведения доступны в ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OneMoment.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NeedClarification",
+      "text": "Could you clarify what you mean?",
+      "url": "/audio/assistant/v1/phrases/en-r2NeedClarification.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NeedClarification",
+      "text": "Можете уточнить, что имеете в виду?",
+      "url": "/audio/assistant/v1/phrases/ru-r2NeedClarification.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2WhichArtwork",
+      "text": "Which artwork? Please tell me its number.",
+      "url": "/audio/assistant/v1/phrases/en-r2WhichArtwork.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2WhichArtwork",
+      "text": "О какой работе речь? Назовите её номер.",
+      "url": "/audio/assistant/v1/phrases/ru-r2WhichArtwork.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ArtworkNumber",
+      "text": "Please give the artwork number from its page.",
+      "url": "/audio/assistant/v1/phrases/en-r2ArtworkNumber.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ArtworkNumber",
+      "text": "Назовите номер произведения с его страницы.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ArtworkNumber.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2WhichPage",
+      "text": "Which section would you like to open?",
+      "url": "/audio/assistant/v1/phrases/en-r2WhichPage.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2WhichPage",
+      "text": "Какой раздел хотите открыть?",
+      "url": "/audio/assistant/v1/phrases/ru-r2WhichPage.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ChooseGallery",
+      "text": "Would you like the gallery, marketplace, or your collection?",
+      "url": "/audio/assistant/v1/phrases/en-r2ChooseGallery.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ChooseGallery",
+      "text": "Открыть галерею, маркетплейс или вашу коллекцию?",
+      "url": "/audio/assistant/v1/phrases/ru-r2ChooseGallery.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2CanOpenPage",
+      "text": "I can open the page for you without touching your wallet.",
+      "url": "/audio/assistant/v1/phrases/en-r2CanOpenPage.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2CanOpenPage",
+      "text": "Могу открыть страницу без действий с вашим кошельком.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CanOpenPage.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2PageOpened",
+      "text": "The ArtSoul page has opened. What next?",
+      "url": "/audio/assistant/v1/phrases/en-r2PageOpened.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2PageOpened",
+      "text": "Страница ArtSoul открыта. Что дальше?",
+      "url": "/audio/assistant/v1/phrases/ru-r2PageOpened.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2FoundNoData",
+      "text": "I do not have verified information for that request.",
+      "url": "/audio/assistant/v1/phrases/en-r2FoundNoData.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2FoundNoData",
+      "text": "У меня нет проверенных данных по этому запросу.",
+      "url": "/audio/assistant/v1/phrases/ru-r2FoundNoData.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NotFound",
+      "text": "That artwork was not found in the available ArtSoul results.",
+      "url": "/audio/assistant/v1/phrases/en-r2NotFound.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NotFound",
+      "text": "В доступных результатах ArtSoul такая работа не найдена.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NotFound.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchAgain",
+      "text": "Would you like to try another title or artwork number?",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchAgain.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchAgain",
+      "text": "Попробуем другое название или номер работы?",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchAgain.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchPrompt",
+      "text": "What should I search for? A title, artist, or artwork number?",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchPrompt.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchPrompt",
+      "text": "Что искать: название, автора или номер работы?",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchPrompt.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchWorking",
+      "text": "I'll look for that in the ArtSoul catalog.",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchWorking.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchWorking",
+      "text": "Поищу это в каталоге ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchWorking.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ShowOpenAuctions",
+      "text": "I'll check the auctions that are currently open.",
+      "url": "/audio/assistant/v1/phrases/en-r2ShowOpenAuctions.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ShowOpenAuctions",
+      "text": "Проверю аукционы, которые сейчас открыты.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ShowOpenAuctions.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2CompareDeadlines",
+      "text": "I'll compare their published auction deadlines.",
+      "url": "/audio/assistant/v1/phrases/en-r2CompareDeadlines.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2CompareDeadlines",
+      "text": "Сравню указанные сроки завершения этих аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CompareDeadlines.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NeedAuctionList",
+      "text": "First ask for the current list of open auctions.",
+      "url": "/audio/assistant/v1/phrases/en-r2NeedAuctionList.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NeedAuctionList",
+      "text": "Сначала получите текущий список аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NeedAuctionList.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionStatus",
+      "text": "I'll check the current auction status from ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionStatus.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionStatus",
+      "text": "Проверю текущий статус аукциона по данным ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionStatus.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionEnded",
+      "text": "An ended auction does not automatically mean the NFT has been minted.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionEnded.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionEnded",
+      "text": "Завершение аукциона не означает, что NFT уже создан.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionEnded.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionSettle",
+      "text": "The winner must complete settlement under the contract rules before an NFT is minted.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionSettle.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionSettle",
+      "text": "Победитель должен завершить расчёт по правилам контракта, прежде чем будет создан NFT.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionSettle.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAuctionAssumption",
+      "text": "I cannot assume an auction is live without checking the source.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAuctionAssumption.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAuctionAssumption",
+      "text": "Не могу считать аукцион открытым, пока не проверю источник данных.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAuctionAssumption.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2OwnerCheck",
+      "text": "I'll check creator, first collector, and current owner separately.",
+      "url": "/audio/assistant/v1/phrases/en-r2OwnerCheck.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2OwnerCheck",
+      "text": "Проверю отдельно автора, первого коллекционера и текущего владельца.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OwnerCheck.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2OwnerNumber",
+      "text": "Please give the artwork number to check ownership.",
+      "url": "/audio/assistant/v1/phrases/en-r2OwnerNumber.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2OwnerNumber",
+      "text": "Назовите номер работы, чтобы проверить владельца.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OwnerNumber.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2OwnerUnknown",
+      "text": "ArtSoul has not confirmed an owner for this item.",
+      "url": "/audio/assistant/v1/phrases/en-r2OwnerUnknown.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2OwnerUnknown",
+      "text": "ArtSoul пока не подтвердил владельца этой работы.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OwnerUnknown.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Provenance",
+      "text": "Creator, First Collector, and current Owner are distinct roles.",
+      "url": "/audio/assistant/v1/phrases/en-r2Provenance.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Provenance",
+      "text": "Автор, первый коллекционер и текущий владелец — разные роли.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Provenance.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Details",
+      "text": "I'll retrieve the published artwork details.",
+      "url": "/audio/assistant/v1/phrases/en-r2Details.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Details",
+      "text": "Получу опубликованные сведения о произведении.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Details.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoInvention",
+      "text": "I will not invent prices, balances, owners, or transactions.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoInvention.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoInvention",
+      "text": "Я не буду придумывать цены, балансы, владельцев или транзакции.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoInvention.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2BidPreview",
+      "text": "I can help prepare a bid preview, but not sign it.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidPreview.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidPreview",
+      "text": "Могу помочь подготовить ставку к просмотру, но не подписывать её.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidPreview.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2BidNumber",
+      "text": "Please name the artwork. Nothing will be signed.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidNumber.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidNumber",
+      "text": "Назовите номер работы. Подписывать ничего не нужно.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidNumber.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2BidReview",
+      "text": "The final amount must be reviewed by you on the ArtSoul page.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidReview.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidReview",
+      "text": "Итоговую сумму нужно лично проверить на странице ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidReview.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2BidWallet",
+      "text": "Only your connected wallet can request your signature.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidWallet.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidWallet",
+      "text": "Только подключённый кошелёк может запросить у вас подпись.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidWallet.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2BidNoConfirm",
+      "text": "I will not confirm or sign a transaction for you.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidNoConfirm.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidNoConfirm",
+      "text": "Я не буду подтверждать или подписывать за вас транзакцию.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidNoConfirm.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NeedAmount",
+      "text": "Please say the exact amount and artwork number before reviewing a bid.",
+      "url": "/audio/assistant/v1/phrases/en-r2NeedAmount.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NeedAmount",
+      "text": "Назовите точную сумму и номер работы перед просмотром ставки.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NeedAmount.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ChangedWallet",
+      "text": "Your wallet changed, so the previous action is no longer valid.",
+      "url": "/audio/assistant/v1/phrases/en-r2ChangedWallet.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ChangedWallet",
+      "text": "Кошелёк изменился, поэтому прежнее действие больше не действует.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ChangedWallet.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2WalletDisconnected",
+      "text": "No wallet is connected. Read-only features are still available.",
+      "url": "/audio/assistant/v1/phrases/en-r2WalletDisconnected.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2WalletDisconnected",
+      "text": "Кошелёк не подключён. Просмотр данных по-прежнему доступен.",
+      "url": "/audio/assistant/v1/phrases/ru-r2WalletDisconnected.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoWalletKeys",
+      "text": "I never need your seed phrase or private key.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoWalletKeys.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoWalletKeys",
+      "text": "Мне никогда не нужны ваша сид-фраза или приватный ключ.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoWalletKeys.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ReviewRequired",
+      "text": "This action needs your explicit review and your wallet's confirmation.",
+      "url": "/audio/assistant/v1/phrases/en-r2ReviewRequired.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ReviewRequired",
+      "text": "Для этого действия требуются ваша проверка и подтверждение в кошельке.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ReviewRequired.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ApprovalDeclined",
+      "text": "The action was not approved. Nothing has been submitted.",
+      "url": "/audio/assistant/v1/phrases/en-r2ApprovalDeclined.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ApprovalDeclined",
+      "text": "Действие не одобрено. Ничего не отправлено.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ApprovalDeclined.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NotFinalized",
+      "text": "This is a preview, not a completed blockchain transaction.",
+      "url": "/audio/assistant/v1/phrases/en-r2NotFinalized.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NotFinalized",
+      "text": "Это предварительный просмотр, а не выполненная блокчейн-транзакция.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NotFinalized.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2CheckReceipt",
+      "text": "A transaction is only confirmed after a verifiable receipt.",
+      "url": "/audio/assistant/v1/phrases/en-r2CheckReceipt.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2CheckReceipt",
+      "text": "Транзакция подтверждена только после проверяемого подтверждения.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CheckReceipt.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Publishing",
+      "text": "I can help prepare an artwork draft for your review.",
+      "url": "/audio/assistant/v1/phrases/en-r2Publishing.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Publishing",
+      "text": "Могу помочь подготовить черновик публикации работы.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Publishing.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2DraftOnly",
+      "text": "Preparing a draft does not publish or mint an NFT.",
+      "url": "/audio/assistant/v1/phrases/en-r2DraftOnly.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2DraftOnly",
+      "text": "Подготовка черновика не публикует работу и не создаёт NFT.",
+      "url": "/audio/assistant/v1/phrases/ru-r2DraftOnly.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2DraftTitle",
+      "text": "What title would you like to use for the artwork?",
+      "url": "/audio/assistant/v1/phrases/en-r2DraftTitle.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2DraftTitle",
+      "text": "Какое название вы хотите дать работе?",
+      "url": "/audio/assistant/v1/phrases/ru-r2DraftTitle.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2CheckDraft",
+      "text": "Please review the details on the publication page.",
+      "url": "/audio/assistant/v1/phrases/en-r2CheckDraft.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2CheckDraft",
+      "text": "Проверьте сведения на странице публикации.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CheckDraft.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Favorites",
+      "text": "I can help you manage Favorites using the existing ArtSoul controls.",
+      "url": "/audio/assistant/v1/phrases/en-r2Favorites.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Favorites",
+      "text": "Могу помочь с избранным через существующие функции ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Favorites.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NeedExactChoice",
+      "text": "Please choose one specific artwork before making changes.",
+      "url": "/audio/assistant/v1/phrases/en-r2NeedExactChoice.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NeedExactChoice",
+      "text": "Выберите одну конкретную работу перед изменением.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NeedExactChoice.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoPermission",
+      "text": "I do not have permission to perform that action.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoPermission.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoPermission",
+      "text": "У меня нет разрешения выполнить это действие.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoPermission.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2OutOfScope",
+      "text": "That is outside the available ArtSoul assistant tools.",
+      "url": "/audio/assistant/v1/phrases/en-r2OutOfScope.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2OutOfScope",
+      "text": "Это вне возможностей доступных инструментов ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2OutOfScope.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2TryText",
+      "text": "You can type your request if the microphone is unavailable.",
+      "url": "/audio/assistant/v1/phrases/en-r2TryText.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2TryText",
+      "text": "Если микрофон недоступен, запрос можно написать текстом.",
+      "url": "/audio/assistant/v1/phrases/ru-r2TryText.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2LowConfidence",
+      "text": "Low recognition confidence. Correct the transcript before submitting.",
+      "url": "/audio/assistant/v1/phrases/en-r2LowConfidence.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2LowConfidence",
+      "text": "Не уверена, что правильно расслышала. Исправьте текст перед отправкой.",
+      "url": "/audio/assistant/v1/phrases/ru-r2LowConfidence.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Misheard",
+      "text": "That may be misheard. Please name a section or artwork number.",
+      "url": "/audio/assistant/v1/phrases/en-r2Misheard.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Misheard",
+      "text": "Похоже, фраза распознана неправильно. Уточните раздел или номер работы.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Misheard.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAction",
+      "text": "Nothing was opened or confirmed.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAction.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAction",
+      "text": "Ничего не открываю и не подтверждаю.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAction.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2WrongArtwork",
+      "text": "Please give the other artwork number so I do not guess.",
+      "url": "/audio/assistant/v1/phrases/en-r2WrongArtwork.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2WrongArtwork",
+      "text": "Назовите номер другой работы, чтобы не выбирать случайную.",
+      "url": "/audio/assistant/v1/phrases/ru-r2WrongArtwork.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoDeadline",
+      "text": "I cannot compare deadlines without a current auction list.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoDeadline.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoDeadline",
+      "text": "Не могу сравнить сроки без актуального списка аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoDeadline.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2CannotHear",
+      "text": "I could not hear that. Please try again or correct the text.",
+      "url": "/audio/assistant/v1/phrases/en-r2CannotHear.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2CannotHear",
+      "text": "Не удалось расслышать. Повторите или исправьте текст.",
+      "url": "/audio/assistant/v1/phrases/ru-r2CannotHear.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VoiceBusy",
+      "text": "I'm still answering. You can interrupt playback.",
+      "url": "/audio/assistant/v1/phrases/en-r2VoiceBusy.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VoiceBusy",
+      "text": "Я ещё отвечаю. Вы можете остановить воспроизведение.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VoiceBusy.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2TextOnly",
+      "text": "This reply is currently available as text.",
+      "url": "/audio/assistant/v1/phrases/en-r2TextOnly.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2TextOnly",
+      "text": "Этот ответ сейчас доступен в текстовом виде.",
+      "url": "/audio/assistant/v1/phrases/ru-r2TextOnly.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2SpeechBlocked",
+      "text": "Your browser blocked playback. Tap Listen to answer.",
+      "url": "/audio/assistant/v1/phrases/en-r2SpeechBlocked.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2SpeechBlocked",
+      "text": "Браузер заблокировал воспроизведение. Нажмите кнопку прослушивания.",
+      "url": "/audio/assistant/v1/phrases/ru-r2SpeechBlocked.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAnotherVoice",
+      "text": "I will not switch to an unverified voice.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAnotherVoice.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAnotherVoice",
+      "text": "Я не буду переключаться на непроверенный голос.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAnotherVoice.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Stop",
+      "text": "Voice chat has stopped.",
+      "url": "/audio/assistant/v1/phrases/en-r2Stop.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Stop",
+      "text": "Голосовой диалог остановлен.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Stop.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Privacy",
+      "text": "Your browser may send microphone audio to its recognition service.",
+      "url": "/audio/assistant/v1/phrases/en-r2Privacy.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Privacy",
+      "text": "Браузер может отправлять звук микрофона в службу распознавания речи.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Privacy.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VerifiedSource",
+      "text": "I'll use ArtSoul's tool results, not guesses.",
+      "url": "/audio/assistant/v1/phrases/en-r2VerifiedSource.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VerifiedSource",
+      "text": "Буду использовать ответы инструментов ArtSoul, а не догадки.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VerifiedSource.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2PleaseRepeat",
+      "text": "Please repeat the question in Russian or English.",
+      "url": "/audio/assistant/v1/phrases/en-r2PleaseRepeat.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2PleaseRepeat",
+      "text": "Повторите вопрос на русском или английском.",
+      "url": "/audio/assistant/v1/phrases/ru-r2PleaseRepeat.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2AnotherQuestion",
+      "text": "Would you like to ask anything else about this artwork?",
+      "url": "/audio/assistant/v1/phrases/en-r2AnotherQuestion.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2AnotherQuestion",
+      "text": "Хотите узнать ещё что-нибудь об этой работе?",
+      "url": "/audio/assistant/v1/phrases/ru-r2AnotherQuestion.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2QuickSummary",
+      "text": "I can give a short summary or open the full artwork page.",
+      "url": "/audio/assistant/v1/phrases/en-r2QuickSummary.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2QuickSummary",
+      "text": "Могу кратко рассказать о работе или открыть её полную страницу.",
+      "url": "/audio/assistant/v1/phrases/ru-r2QuickSummary.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2Goodbye",
+      "text": "Goodbye! You can open the assistant whenever you need it.",
+      "url": "/audio/assistant/v1/phrases/en-r2Goodbye.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2Goodbye",
+      "text": "До встречи! Можете снова открыть помощника, когда потребуется.",
+      "url": "/audio/assistant/v1/phrases/ru-r2Goodbye.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2AuctionResults",
+      "text": "The current auction results are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2AuctionResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2AuctionResults",
+      "text": "Текущие данные об аукционах показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2AuctionResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ArtworkResults",
+      "text": "The verified artwork details are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ArtworkResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ArtworkResults",
+      "text": "Проверенные сведения о работе показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ArtworkResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ProvenanceResults",
+      "text": "Creator, First Collector, and Owner are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ProvenanceResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ProvenanceResults",
+      "text": "Автор, первый коллекционер и текущий владелец показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ProvenanceResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2SearchResults",
+      "text": "The ArtSoul search results are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2SearchResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2SearchResults",
+      "text": "Результаты поиска ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2SearchResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ActivityResults",
+      "text": "Your ArtSoul activity is shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ActivityResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ActivityResults",
+      "text": "Сведения о вашей активности в ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ActivityResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2BidPreparedResult",
+      "text": "Your bid preview is ready for review. Nothing has been signed.",
+      "url": "/audio/assistant/v1/phrases/en-r2BidPreparedResult.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2BidPreparedResult",
+      "text": "Предварительный просмотр ставки готов. Ничего не подписано.",
+      "url": "/audio/assistant/v1/phrases/ru-r2BidPreparedResult.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ReviewResult",
+      "text": "You must review this action and approve it in your own wallet.",
+      "url": "/audio/assistant/v1/phrases/en-r2ReviewResult.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ReviewResult",
+      "text": "Вы должны сами проверить действие и подтвердить его в своём кошельке.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ReviewResult.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2InfoResults",
+      "text": "Verified ArtSoul details are shown on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2InfoResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2InfoResults",
+      "text": "Проверенные сведения ArtSoul показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2InfoResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ActionNotCompleted",
+      "text": "The action was not completed. Check the reason on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ActionNotCompleted.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ActionNotCompleted",
+      "text": "Действие не выполнено. Проверьте причину на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ActionNotCompleted.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2ToolError",
+      "text": "ArtSoul could not complete this request. Check the details on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2ToolError.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2ToolError",
+      "text": "ArtSoul не смог выполнить запрос. Подробности показаны на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2ToolError.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoMatches",
+      "text": "No matching items were returned. Try another title or number.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoMatches.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoMatches",
+      "text": "Совпадений не найдено. Попробуйте другое название или номер.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoMatches.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2NoAuctions",
+      "text": "No open auctions were returned by ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/en-r2NoAuctions.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2NoAuctions",
+      "text": "ArtSoul не вернул открытых аукционов.",
+      "url": "/audio/assistant/v1/phrases/ru-r2NoAuctions.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2LifecycleResults",
+      "text": "The ArtSoul auction and settlement stages are explained on screen.",
+      "url": "/audio/assistant/v1/phrases/en-r2LifecycleResults.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2LifecycleResults",
+      "text": "Этапы аукциона и расчёта ArtSoul объяснены на экране.",
+      "url": "/audio/assistant/v1/phrases/ru-r2LifecycleResults.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2PageNavigation",
+      "text": "Opening the requested ArtSoul page.",
+      "url": "/audio/assistant/v1/phrases/en-r2PageNavigation.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2PageNavigation",
+      "text": "Открываю выбранную страницу ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2PageNavigation.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoLanguageHelp",
+      "text": "Select RU for Russian commands and Marin recordings. On-screen replies stay English. Unrecorded answers remain text-only.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoLanguageHelp.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoLanguageHelp",
+      "text": "Выберите RU для русских команд и записанных ответов голосом Marin. Ответы на экране останутся на английском. Ответы без записи доступны только текстом.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoLanguageHelp.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoDidIt",
+      "text": "Which action would you like me to check? I do not perform wallet operations without your approval.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoDidIt.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoDidIt",
+      "text": "Уточните, какое действие нужно проверить. Я не выполняю операции с кошельком без вашего подтверждения.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoDidIt.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoWalletMenu",
+      "text": "Account menu opened. Select a wallet and approve the connection yourself. Nothing was signed.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoWalletMenu.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoWalletMenu",
+      "text": "Открыла меню аккаунта. Для подключения выберите кошелёк и подтвердите действие сами. Ничего не подписано.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoWalletMenu.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNotifications",
+      "text": "Opening notifications. If no wallet is connected, the panel will show a connection prompt.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNotifications.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNotifications",
+      "text": "Открываю панель уведомлений. Если кошелёк не подключён, появится подсказка.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNotifications.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkLoading",
+      "text": "Wallet state is still loading. Check the network in your wallet menu.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkLoading.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkLoading",
+      "text": "Состояние кошелька ещё загружается. Проверьте сеть в меню кошелька.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkLoading.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkDisconnected",
+      "text": "No wallet is connected. Its selected network is unknown.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkDisconnected.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkDisconnected",
+      "text": "Кошелёк не подключён. Сеть кошелька сейчас неизвестна.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkDisconnected.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoNetworkUnknown",
+      "text": "Wallet connected, but the network is not verified by available state. Check it in your wallet.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoNetworkUnknown.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoNetworkUnknown",
+      "text": "Кошелёк подключён, но сеть не подтверждена доступными данными. Проверьте её в кошельке.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoNetworkUnknown.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoThemeClassic",
+      "text": "ArtSoul Classic appearance is enabled.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoThemeClassic.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoThemeClassic",
+      "text": "Включила классический вид ArtSoul.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoThemeClassic.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoThemeFuture",
+      "text": "ArtSoul Future appearance is enabled.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoThemeFuture.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoThemeFuture",
+      "text": "Включила оформление Future.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoThemeFuture.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoModeClarify",
+      "text": "Which appearance do you want: Classic or Future? Or do you mean voice chat?",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoModeClarify.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoModeClarify",
+      "text": "Какой режим нужен: Classic или Future? Или вы хотите включить голосовой чат?",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoModeClarify.wav"
+    },
+    {
+      "lang": "en",
+      "id": "r2VideoSearchChoice",
+      "text": "Choose a specific result: first, second, or third.",
+      "url": "/audio/assistant/v1/phrases/en-r2VideoSearchChoice.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "r2VideoSearchChoice",
+      "text": "Выберите номер результата: первый, второй или третий.",
+      "url": "/audio/assistant/v1/phrases/ru-r2VideoSearchChoice.wav"
+    }
+  ],
+  "amendments": [
+    {
+      "date": "2026-11-27",
+      "ids": [
+        "r2VideoLanguageHelp"
+      ],
+      "reason": "Explicit Russian speech selection; English visible interface. No existing recording text changed."
+    }
+  ],
+  "model": "gpt-realtime-2.1-mini"
+}

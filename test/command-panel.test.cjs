@@ -90,6 +90,18 @@ function harness({speech = false, audio = false, execute = async () => JSON.stri
     document.visibilityState = navigation.visibility || 'visible';
     window.performance = {getEntriesByType: () => [{type: navigation.type || 'navigate'}]};
   }
+  new Function('window', fs.readFileSync('voice-phrase-bank.js', 'utf8'))(window);
+  // Lifecycle fixtures deliberately expose the recovered core recordings only.
+  // Adding a new reviewed recording must not turn a missing-audio fixture into
+  // a different scenario. The full shipped inventory has separate integrity tests.
+  const actualBank = window.ArtSoulVoicePhraseBank;
+  const coreIds = new Set(['helpSpeech', 'searchPrompt', 'publicationPrompt', 'tooLong', 'empty',
+    'unavailable', 'noWallet', 'submitted', 'settled', 'options', 'askSearch', 'askTitle']);
+  window.ArtSoulVoicePhraseBank = Object.freeze({...actualBank, lookup(text, lang = 'en') {
+    const url = actualBank.lookup(text, lang);
+    const id = /\/(en|ru)-([a-zA-Z0-9]+)\.wav$/.exec(url);
+    return id && (coreIds.has(id[2]) || id[2] === 'r2Greeting' && lang === 'en') ? url : '';
+  }});
   new Function('window', 'document', 'navigator', 'SpeechSynthesisUtterance', 'Audio', source)(window, document, {language: browserLanguage}, function(text) {this.text = text;}, audio ? Audio : undefined);
   const get = selector => nodes.get(selector);
   return {get, document, window, calls, sessions, spoken, utterances, en, ru, storage, players, plays,
@@ -121,6 +133,41 @@ test('opening, typing, examples and language selection never start the microphon
   h.ru.fire('click'); assert.equal(h.get('h2').textContent, 'ArtSoul commands');
   h.submit('помощь'); await flush();
   assert.equal(h.calls.length, 0); assert.equal(h.sessions.length, 0); assert.equal(h.prompts(), 0);
+});
+
+test('a prior explicit RU speech choice restores Russian recordings without translating the interface', async () => {
+  const storage = new Map([['artsoul.voice.lang', 'ru'], ['artsoul.voice.reply-lang', 'ru']]);
+  const h = harness({audio: true, storage}); h.open(); h.submit('помощь'); await flush();
+  h.get('.artsoul-voice-replay').fire('click');
+  assert.equal(h.plays[0].src, '/audio/assistant/v1/ru-helpSpeech.wav');
+  assert.equal(h.get('.artsoul-voice-panel').attrs.lang, 'en');
+  h.en.fire('click'); h.submit('help'); await flush(); h.get('.artsoul-voice-replay').fire('click');
+  assert.equal(h.plays[1].src, '/audio/assistant/v1/en-helpSpeech.wav');
+});
+
+test('greetings use their exact available recording and never consume search or title data', async () => {
+  const h = harness({audio: true}); h.open(); h.submit('hello'); await flush();
+  h.get('.artsoul-voice-replay').fire('click');
+  assert.equal(h.plays[0].src, '/audio/assistant/v1/phrases/en-r2Greeting.wav');
+  assert.deepEqual(h.calls, []);
+  h.ru.fire('click'); h.submit('привет'); await flush();
+  assert.equal(h.get('.artsoul-voice-replay').disabled, true, 'Russian greeting recording is absent');
+  h.en.fire('click'); h.submit('search'); await flush(); h.submit('hello'); await flush();
+  assert.deepEqual(h.calls, [{name: 'search_catalog', args: {query: 'hello'}}]);
+  assert.deepEqual(h.spoken, []);
+});
+
+test('fixed result cues stay separate from displayed live facts and failure states', () => {
+  const h = harness();
+  const { describeResult } = h.window.ArtSoulVoice;
+  assert.equal(describeResult('search_catalog', searchResult).say, 'The ArtSoul search results are shown on screen.');
+  assert.equal(describeResult('find_active_auctions', {count: 0, auctions: []}).say, 'No open auctions were returned by ArtSoul.');
+  assert.notEqual(describeResult('find_active_auctions', {count: 2, auctions: []}).say, 'No open auctions were returned by ArtSoul.');
+  const failed = describeResult('place_bid', {submitted: false, reason: 'Declined in wallet'});
+  assert.equal(failed.show, 'Declined in wallet');
+  assert.equal(failed.say, 'The action was not completed. Check the reason on screen.');
+  const details = describeResult('get_artwork', {title: 'Creator title', status: 'Active', current_bid_eth: '0.002'});
+  assert.match(details.show, /0.002/); assert.doesNotMatch(details.say, /0.002|Creator title/);
 });
 
 test('Russian browser locales and restored input preferences always receive English copy and audio', async () => {
@@ -155,7 +202,7 @@ test('search accepts the next phrase as data and the short spoken question uses 
   const h = harness({speech: true, audio: true});
   h.open(); h.ru.fire('click'); h.get('.artsoul-voice-chat').fire('click'); await flush();
   h.sessions[0].onresult({results: [[{transcript: 'найди', confidence: 1}]]}); await flush();
-  assert.equal(h.plays[0].src, '/audio/assistant/v1/phrases/en-askSearch.wav');
+  assert.equal(h.plays[0].src, '/audio/assistant/v1/phrases/ru-askSearch.wav');
   h.players[0].emit('playing'); h.players[0].emit('ended'); h.runTimers(); await flush();
   h.sessions[1].onresult({results: [[{transcript: 'купи работу 31', confidence: 1}]]}); await flush();
   assert.deepEqual(h.calls, [{name: 'search_catalog', args: {query: 'купи работу 31'}}]);
@@ -215,9 +262,10 @@ test('voice chat listens for the next turn only after a finished answer and stop
       assert.equal(h.sessions.length, 1, 'does not listen during recorded speech');
       h.players[0].emit('ended');
     } else {
-      h.utterances[0].onstart();
-      assert.equal(h.sessions.length, 1, 'does not listen during native speech');
-      h.utterances[0].onend();
+      assert.equal(h.utterances.length, 0, 'no device voice fallback');
+      assert.equal(chat.attrs['aria-pressed'], 'false', 'unavailable audio pauses voice chat');
+      h.runTimers(); assert.equal(h.sessions.length, 1);
+      continue;
     }
     assert.equal(h.sessions.length, 1, 'keeps a brief gap after reply audio');
     h.runTimers(); await flush();
@@ -256,7 +304,7 @@ test('voice chat pauses a protected request for deliberate review and never trea
   assert.equal(h.get('.artsoul-voice-chat').attrs['aria-pressed'], 'false');
   assert.equal(h.get('input').value, 'buy artwork 31');
   assert.match(h.get('.artsoul-voice-answer').textContent, /press Send/);
-  h.utterances[0].onstart(); h.utterances[0].onend(); h.runTimers();
+  assert.deepEqual(h.utterances, []); h.runTimers();
   assert.equal(h.sessions.length, 1);
   h.get('form').fire('submit'); await flush(); assert.equal(h.calls.length, 1);
 });
@@ -357,13 +405,13 @@ test('polite Russian and English stop phrases end voice chat in silence', async 
 });
 
 test('unsuccessful recognition or playback ends voice chat without restarting the microphone', async () => {
-  for (const failure of ['consent', 'constructor-error', 'blocked', 'silence', 'audio', 'audio-stalled', 'native-timeout']) {
+  for (const failure of ['consent', 'constructor-error', 'blocked', 'silence', 'audio', 'audio-stalled', 'no-player']) {
     const h = harness({speech: failure === 'constructor-error' ? failure : true, audio: failure.startsWith('audio')});
     if (failure === 'consent') h.window.confirm = () => false;
     h.open(); const chat = h.get('.artsoul-voice-chat'); chat.fire('click'); await flush();
     if (failure === 'blocked') h.sessions[0].onerror({error: 'not-allowed'});
     if (failure === 'silence') h.sessions[0].onend();
-    if (failure.startsWith('audio') || failure === 'native-timeout') {
+    if (failure.startsWith('audio') || failure === 'no-player') {
       h.sessions[0].onresult({results: [[{transcript: 'help'}]]});
       if (failure === 'audio') h.players[0].emit('error');
       if (failure === 'audio-stalled') h.players[0].emit('playing');
@@ -376,151 +424,99 @@ test('unsuccessful recognition or playback ends voice chat without restarting th
   }
 });
 
-test('typed answers stay silent and manual audio reads the safe summary without rerunning a tool', async () => {
-  const h = harness({execute: async () => JSON.stringify({
+test('dynamic account details remain text-only while their fixed summary has no recording', async () => {
+  const h = harness({audio: true, execute: async () => JSON.stringify({
     created: {count: 2}, owned: {count: 3}, resale_listings: {count: 1},
     needs_attention: [{artwork_id: '31', tool: 'unknown', why: 'Private account detail visible on screen only'}]
   })});
-  h.open();
+  h.open(); h.submit('my activity'); await flush();
   const replay = h.get('.artsoul-voice-replay');
-  assert.equal(replay.hidden, true);
-  h.submit('my activity'); await flush();
   assert.match(h.get('.artsoul-voice-answer').textContent, /Private account detail/);
-  assert.equal(h.spoken.length, 0);
-  assert.equal(replay.hidden, false); assert.equal(replay.disabled, false);
+  assert.equal(replay.disabled, true);
+  assert.match(h.get('.artsoul-voice-audio-status').textContent, /no Marin recording/);
   replay.fire('click');
-  assert.deepEqual(h.spoken, ['You created 2, own 3, and have 1 listings. 1 available actions.']);
   assert.equal(h.calls.length, 1); assert.equal(h.prompts(), 0); assert.equal(h.sessions.length, 0);
-  assert.equal(replay.textContent, 'Listen to answer');
-  assert.equal(replay.attrs['aria-pressed'], 'false');
-  h.utterances[0].onstart();
-  assert.equal(replay.textContent, 'Stop audio'); assert.equal(replay.attrs['aria-pressed'], 'true');
-  const cancelled = h.cancelled();
-  replay.fire('click');
-  assert.equal(h.cancelled(), cancelled + 1);
-  assert.equal(h.utterances[0].onstart, null); assert.equal(h.utterances[0].onend, null); assert.equal(h.utterances[0].onerror, null);
-  assert.equal(replay.textContent, 'Listen to answer'); assert.equal(h.spoken.length, 1);
-  replay.fire('click');
-  assert.equal(h.spoken.length, 2); assert.equal(h.calls.length, 1);
+  assert.deepEqual(h.spoken, []); assert.deepEqual(h.plays, []);
 });
 
 test('listening to a completed wallet action never submits it again or reads the transaction hash', async () => {
   const hash = '0x' + 'ab'.repeat(32);
-  const h = harness({execute: async () => JSON.stringify({submitted: true, transaction_hash: hash, url: '/artwork/31'})});
+  const h = harness({audio: true, execute: async () => JSON.stringify({submitted: true, transaction_hash: hash, url: '/artwork/31'})});
   h.open(); h.submit('buy artwork 31'); await flush();
-  h.get('.artsoul-voice-replay').fire('click'); h.utterances[0].onend();
+  h.get('.artsoul-voice-replay').fire('click'); h.players[0].emit('playing'); h.players[0].emit('ended');
   h.get('.artsoul-voice-replay').fire('click');
-  assert.equal(h.calls.length, 1);
-  assert.equal(h.get('input').value, '');
-  assert.deepEqual(h.spoken, [
-    'Done. The wallet approved it and the transaction was sent.',
-    'Done. The wallet approved it and the transaction was sent.'
-  ]);
-  assert.doesNotMatch(h.spoken.join(' '), new RegExp(hash));
+  assert.equal(h.calls.length, 1); assert.equal(h.get('input').value, '');
+  assert.deepEqual(h.plays.map(play => play.src), Array(2).fill('/audio/assistant/v1/en-submitted.wav'));
+  assert.deepEqual(h.spoken, []);
 });
 
-test('microphone answers speak English when Russian recognition is selected and retain manual playback', async () => {
-  const h = harness({speech: true}); h.open(); h.ru.fire('click');
+test('explicit RU selection speaks the recorded Russian answer while keeping the visible reply English', async () => {
+  const h = harness({speech: true, audio: true}); h.open(); h.ru.fire('click');
   h.get('.artsoul-voice-mic').fire('click'); await flush();
   h.sessions[0].onresult({results: [[{transcript: 'помощь', confidence: 1}]]}); await flush();
-  assert.equal(h.spoken.length, 1);
-  assert.match(h.spoken[0], /open the gallery/);
-  assert.match(h.get('.artsoul-voice-answer').textContent, /open gallery/, 'full examples remain visible');
-  assert.equal(h.utterances[0].lang, 'en-US');
-  const replay = h.get('.artsoul-voice-replay');
-  assert.equal(replay.textContent, 'Listen to answer');
-  h.utterances[0].onstart();
-  assert.equal(replay.textContent, 'Stop audio');
-  h.utterances[0].onend();
-  assert.equal(replay.textContent, 'Listen to answer');
-  assert.equal(replay.attrs['aria-pressed'], 'false');
-  assert.equal(h.get('.artsoul-voice-audio-status').hidden, true);
-  replay.fire('click');
-  assert.deepEqual(h.spoken, [h.spoken[0], h.spoken[0]]);
-  assert.equal(h.sessions.length, 1); assert.equal(h.calls.length, 0);
-});
-
-test('silent native speech rejection remains retryable and stale audio callbacks cannot change a newer answer', async () => {
-  const h = harness(); h.open(); h.submit('help'); await flush();
-  const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
-  replay.fire('click');
-  const old = h.utterances[0], stale = [old.onstart, old.onend, old.onerror];
-  // Some native engines reject an unactivated start without any callback.
-  assert.equal(replay.textContent, 'Listen to answer'); assert.equal(replay.disabled, false);
-  replay.fire('click');
-  assert.equal(h.utterances.length, 2);
-  assert.equal(old.onstart, null); assert.equal(old.onend, null); assert.equal(old.onerror, null);
-  const current = h.utterances[1]; current.onstart();
-  for (const callback of stale) callback({error: 'not-allowed'});
-  assert.equal(replay.textContent, 'Stop audio'); assert.equal(status.hidden, true);
-  current.onerror({error: 'not-allowed'});
-  assert.equal(replay.textContent, 'Listen to answer'); assert.equal(replay.disabled, false);
-  assert.equal(status.hidden, false); assert.match(status.textContent, /answer is available as text/);
+  assert.equal(h.plays[0].src, '/audio/assistant/v1/ru-helpSpeech.wav');
   assert.match(h.get('.artsoul-voice-answer').textContent, /open gallery/);
-  replay.fire('click');
-  assert.equal(status.hidden, true); assert.equal(h.utterances.length, 3);
-  assert.equal(h.calls.length, 0);
+  assert.equal(h.storage.get('artsoul.voice.reply-lang'), 'ru');
+  const replay = h.get('.artsoul-voice-replay');
+  assert.equal(replay.textContent, 'Stop audio');
+  h.players[0].emit('playing'); h.players[0].emit('ended');
+  assert.equal(replay.textContent, 'Listen to answer');
+  replay.fire('click'); assert.equal(h.plays[1].src, h.plays[0].src);
+  assert.equal(h.sessions.length, 1); assert.equal(h.calls.length, 0); assert.deepEqual(h.spoken, []);
 });
 
-test('unavailable or throwing speech synthesis preserves a usable text composer', async () => {
-  for (const failure of ['missing', 'throwing']) {
-    const h = harness(); h.open();
-    if (failure === 'missing') delete h.window.speechSynthesis;
-    else h.window.speechSynthesis.speak = () => {throw Error('Native speech unavailable');};
-    h.submit('help'); await flush();
-    const replay = h.get('.artsoul-voice-replay');
-    assert.equal(replay.hidden, false, failure);
-    if (failure === 'missing') assert.equal(replay.disabled, true);
-    else replay.fire('click');
-    assert.equal(h.get('.artsoul-voice-audio-status').hidden, false, failure);
-    assert.match(h.get('.artsoul-voice-answer').textContent, /open gallery/, failure);
-    assert.equal(h.get('input').disabled, false, failure);
-    h.submit('search moon'); await flush();
-    assert.equal(h.calls.length, 1, failure);
-  }
+test('an unavailable bank fails closed instead of choosing a native voice', async () => {
+  const h = harness({audio: true});
+  delete h.window.ArtSoulVoicePhraseBank;
+  h.open(); h.submit('help'); await flush();
+  const replay = h.get('.artsoul-voice-replay');
+  assert.equal(replay.disabled, true); replay.fire('click');
+  assert.deepEqual(h.plays, []); assert.deepEqual(h.spoken, []);
+  assert.match(h.get('.artsoul-voice-answer').textContent, /open gallery/);
+  assert.match(h.get('.artsoul-voice-audio-status').textContent, /no Marin recording/);
 });
 
-test('closing or hiding the page cancels audio and ignores callbacks already queued by the engine', async () => {
+test('an unavailable media player preserves the composer and never calls device speech', async () => {
+  const h = harness(); h.open();
+  h.window.speechSynthesis.speak = () => assert.fail('Device speech is forbidden');
+  h.submit('help'); await flush();
+  const replay = h.get('.artsoul-voice-replay');
+  assert.equal(replay.disabled, true); replay.fire('click');
+  assert.equal(h.get('.artsoul-voice-audio-status').hidden, false);
+  assert.equal(h.get('input').disabled, false);
+  h.submit('search moon'); await flush(); assert.equal(h.calls.length, 1);
+});
+
+test('closing or hiding the page cancels recordings and ignores queued media callbacks', async () => {
   for (const change of ['close', 'hidden']) {
-    const h = harness(); h.open(); h.submit('help'); await flush();
+    const h = harness({audio: true}); h.open(); h.submit('help'); await flush();
     const replay = h.get('.artsoul-voice-replay'); replay.fire('click');
-    const utterance = h.utterances[0], late = [utterance.onstart, utterance.onend, utterance.onerror];
-    utterance.onstart(); const cancelled = h.cancelled();
+    const player = h.players[0], late = [player.onplaying, player.onended, player.onerror];
+    player.emit('playing'); const pauses = player.pauseCount;
     if (change === 'close') h.get('.artsoul-voice-close').fire('click');
-    else {h.document.visibilityState = 'hidden'; h.document.fire('visibilitychange');}
-    assert.equal(h.cancelled(), cancelled + 1, change);
-    assert.equal(utterance.onstart, null, change); assert.equal(utterance.onend, null, change); assert.equal(utterance.onerror, null, change);
+    else { h.document.visibilityState = 'hidden'; h.document.fire('visibilitychange'); }
+    assert.ok(player.pauseCount > pauses);
+    assert.equal(player.onplaying, null); assert.equal(player.onended, null); assert.equal(player.onerror, null);
     for (const callback of late) callback({error: 'interrupted'});
-    assert.equal(replay.attrs['aria-pressed'], 'false', change);
-    assert.equal(h.get('.artsoul-voice-audio-status').hidden, true, change);
-    replay.fire('click'); assert.equal(h.spoken.length, 1, change);
+    assert.equal(replay.attrs['aria-pressed'], 'false');
+    assert.equal(h.get('.artsoul-voice-audio-status').hidden, true);
+    replay.fire('click'); assert.equal(h.plays.length, 1); assert.deepEqual(h.spoken, []);
   }
 });
 
-test('account, authentication, language and page lifecycle changes make the previous answer unavailable to playback', async () => {
+test('account, authentication, language and page lifecycle changes clear private dynamic answers', async () => {
   for (const change of ['wallet', 'disconnect', 'auth', 'language', 'pagehide']) {
-    const h = harness({execute: async () => JSON.stringify({created: {count: 73}})});
+    const h = harness({audio: true, execute: async () => JSON.stringify({created: {count: 73}})});
     h.connect('0x' + 'a'.repeat(40)); h.open(); h.submit('my activity'); await flush();
     const replay = h.get('.artsoul-voice-replay'); replay.fire('click');
-    const utterance = h.utterances[0], late = [utterance.onstart, utterance.onend, utterance.onerror];
-    utterance.onstart();
     if (change === 'wallet') h.connect('0x' + 'b'.repeat(40));
     if (change === 'disconnect') h.connect(null);
     if (change === 'auth') h.window.fire('artsoul:auth-state-changed');
     if (change === 'language') h.ru.fire('click');
     if (change === 'pagehide') h.window.fire('pagehide');
-    assert.equal(utterance.onstart, null, change); assert.equal(utterance.onend, null, change); assert.equal(utterance.onerror, null, change);
-    for (const callback of late) callback({error: 'interrupted'});
-    assert.equal(replay.attrs['aria-pressed'], 'false', change);
     assert.doesNotMatch(h.get('.artsoul-voice-answer').textContent, /73/, change);
-    if (change === 'wallet' || change === 'disconnect') {
-      replay.fire('click');
-      assert.equal(h.spoken.at(-1), 'Wallet changed. Enter a new command for this account.', change);
-    } else {
-      assert.equal(replay.hidden, true, change);
-      replay.fire('click'); assert.equal(h.spoken.length, 1, change);
-    }
-    assert.equal(h.calls.length, 1, change);
+    replay.fire('click');
+    assert.deepEqual(h.spoken, []); assert.deepEqual(h.plays, []); assert.equal(h.calls.length, 1);
   }
 });
 
@@ -539,7 +535,7 @@ test('fixed replies play directly from the click without native synthesis or ano
     assert.equal(replay.disabled, false, 'a fixed clip does not require native synthesis');
     replay.fire('click');
     assert.equal(h.plays.length, 1, 'play is called in the click stack, before any await');
-    assert.equal(h.plays[0].src, clip.url);
+    assert.equal(h.plays[0].src, h.window.ArtSoulVoice.getReplyAudio(clip.text, lang));
     const player = h.plays[0].player;
     player.emit('playing'); h.plays[0].resolve(); await flush();
     assert.equal(replay.attrs['aria-pressed'], 'true');
@@ -567,10 +563,10 @@ test('recorded settlement replies preserve submitted versus confirmed state and 
       assert.ok(clip, `${lang}: ${confirmed ? 'confirmed' : 'submitted'} has its own exact clip`);
       assert.equal(h.plays.length, 0);
       const replay = h.get('.artsoul-voice-replay'); replay.fire('click');
-      assert.equal(h.plays[0].src, clip.url); urls.push(clip.url);
+      assert.equal(h.plays[0].src, h.window.ArtSoulVoice.getReplyAudio(clip.text, lang)); urls.push(clip.url);
       h.plays[0].player.emit('playing'); h.plays[0].resolve(); await flush();
       h.plays[0].player.emit('ended'); replay.fire('click');
-      assert.equal(h.plays.length, 2); assert.equal(h.plays[1].src, clip.url);
+      assert.equal(h.plays.length, 2); assert.equal(h.plays[1].src, h.window.ArtSoulVoice.getReplyAudio(clip.text, lang));
       assert.deepEqual(h.calls, [{name: 'complete_settlement', args: {artwork_id: '31'}}]);
       assert.equal(h.get('input').value, ''); assert.equal(h.spoken.length, 0);
       assert.doesNotMatch(clip.text, /0x/);
@@ -622,8 +618,10 @@ test('pending fixed playback can be stopped and its start timeout cannot affect 
   assert.equal(replay.attrs['aria-pressed'], 'false'); assert.equal(replay.disabled, false);
   replay.fire('click');
   const current = h.plays[2]; current.player.emit('playing'); current.resolve(); await flush();
-  h.runTimers();
   assert.equal(status.hidden, true); assert.equal(replay.attrs['aria-pressed'], 'true');
+  h.runTimers();
+  assert.equal(status.hidden, false, 'manual playback also has a bounded stall timeout');
+  assert.equal(replay.attrs['aria-pressed'], 'false');
   assert.equal(h.plays.length, 3); assert.equal(h.calls.length, 0); assert.equal(h.spoken.length, 0);
 });
 
@@ -682,21 +680,14 @@ test('a superseded clip cannot stop a newer reply or report its late playback er
   assert.equal(replay.attrs['aria-pressed'], 'false'); assert.equal(h.calls.length, 0);
 });
 
-test('dynamic replies keep exact native speech and disclose an end without a start', async () => {
+test('dynamic replies stay on screen without generic success audio or device fallback', async () => {
   const h = harness({audio: true}); h.open(); h.submit('search moon'); await flush();
   const answer = h.get('.artsoul-voice-answer').textContent;
-  const replay = h.get('.artsoul-voice-replay'), status = h.get('.artsoul-voice-audio-status');
-  replay.fire('click');
-  assert.equal(h.plays.length, 0, 'a dynamic answer must not use a generic success clip');
-  assert.deepEqual(h.spoken, [answer]);
-  h.utterances[0].onend();
-  assert.equal(status.hidden, false); assert.match(status.textContent, /answer is available as text/);
-  assert.equal(replay.disabled, false); assert.equal(replay.attrs['aria-pressed'], 'false');
+  const replay = h.get('.artsoul-voice-replay');
+  assert.equal(replay.disabled, true); replay.fire('click');
+  assert.equal(h.plays.length, 0); assert.deepEqual(h.spoken, []);
   assert.equal(h.get('.artsoul-voice-answer').textContent, answer);
-  replay.fire('click');
-  assert.equal(h.spoken.length, 2); assert.equal(h.calls.length, 1); assert.equal(h.plays.length, 0);
-  h.utterances[1].onstart(); h.utterances[1].onend();
-  assert.equal(status.hidden, true);
+  assert.equal(h.calls.length, 1);
 });
 
 test('search results are safe text links and clear on another request or account change', async () => {

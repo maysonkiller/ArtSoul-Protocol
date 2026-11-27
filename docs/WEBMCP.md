@@ -7,6 +7,23 @@ Profile, Publish, Collection Builder and the protocol guide. Tools belong to the
 person as they move through the site instead of disappearing on the first
 navigation.
 
+## Spoken responses
+
+The assistant uses Marin for prerecorded English and Russian speech. The [phrase bank](audio/assistant-phrase-bank.json) defines paired, complete responses. The [recording manifest](../public/audio/assistant/v1/manifest.json) tracks the generated speech, transcript and digest of each available WAV. Playback of these files requires no API call. Changing the voice language leaves the written interface in English.
+
+The [local live conversation pilot](audits/LIVE_VOICE_LOCAL_PILOT_2026-11-27.md) uses microphone input and the same API voice. Its provider connection is disabled by default. The public site plays the available recordings.
+
+Run the following from the repository root to check the bank and see which responses still need recording. Both commands run offline.
+
+```sh
+node scripts/build-voice-phrase-index.mjs
+node scripts/generate-assistant-audio.mjs
+```
+
+For an approved recording batch, confirm the receiving organization's available promotional balance in Billing, then supply its `OPENAI_ORG_ID`, the grant's UTC expiry as `ARTSOUL_VOICE_GRANT_EXPIRES_AT`, and a server-side `OPENAI_API_KEY`. Select up to ten explicit phrase IDs with `--only` and a cumulative USD ceiling with `--budget-usd`. The generator defaults to a dry run. Adding `--generate` opens one Realtime session per missing phrase. Each attempt reserves $0.025 locally, including failed or interrupted attempts. Other projects can consume the same grant. Review the remaining credit before each batch. After an interruption, `--recover` finishes publishing an already received recording offline. [OpenAI API credit coverage and balance](https://help.openai.com/en/articles/20001626-api-credits-benefit-for-eligible-chatgpt-subscriptions)
+
+If the recorder process was terminated, confirm it has exited before clearing a stale `docs/private/assistant-audio-generation-ledger.json.lock`. An unresolved paid attempt without received bytes requires inspection of provider usage before a retry.
+
 ## Why declared tools instead of clicking
 
 An auction is live state with arithmetic attached. Which number on the page is
@@ -189,12 +206,11 @@ command heard in chat pauses for a deliberate Send and the usual action
 confirmation. The wallet still owns the signature. ArtSoul retains the
 written answer when speech is unavailable.
 
-Speech recognition depends on the browser and can send audio to its speech
-provider, as explained before first use. Fixed responses use 18 bundled
-recordings and six short excerpts from them. Dynamic replies use device speech synthesis. Typed replies are
-silent until the visitor requests playback. The recognizer and response
-player are separate from the RU/EN command parser. See the
-[voice feasibility review](audits/VOICE_ASSISTANT_HANDOFF_2026-11-18.md).
+Speech recognition depends on the browser and can send microphone audio to its
+speech provider, as explained before first use. The [recorded voice](#spoken-responses)
+uses the visitor's selected language. Typed replies are silent until the visitor
+requests playback. The site shows dynamic artwork facts as text. The recognizer
+and response player are separate from the RU/EN command parser.
 
 “Show my collection” opens the Collected tab for ArtSoul NFTs. “Open my
 gallery” opens Explore. “Let's create artwork” opens Publish. The visitor

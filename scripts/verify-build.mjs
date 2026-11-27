@@ -1,9 +1,16 @@
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildVoicePhraseIndex } from './build-voice-phrase-index.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const dist = path.join(root, 'dist');
+const voicePhrases = JSON.parse(await readFile(path.join(root, 'docs/audio/assistant-phrase-bank.json'), 'utf8'));
+const voiceManifest = JSON.parse(await readFile(path.join(root, 'public/audio/assistant/v1/manifest.json'), 'utf8'));
+const expectedVoiceIndex = await buildVoicePhraseIndex(voicePhrases, voiceManifest, dist);
+if ((await readFile(path.join(dist, 'voice-phrase-bank.js'), 'utf8')).replace(/\r/g, '') !== expectedVoiceIndex) {
+    throw new Error('Built voice phrase index does not match the verified recording inventory.');
+}
 const pages = [
     'index.html',
     'gallery.html',
