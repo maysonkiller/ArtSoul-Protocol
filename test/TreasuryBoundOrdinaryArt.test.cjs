@@ -49,6 +49,35 @@ function verifyMarket(coreName, layout, batchLimit) {
     if (coreName === 'OrdinaryPayoutMarket') {
         it('matches the reviewed payout Core and NFT runtime hashes after actual local deployment', verifyPayoutRuntime);
         it('lets only the credited wallet route a rejected refund, including while entries are paused', verifyRoutedRefund);
+        it('delivers all eight displaced deposits in one full batch and leaves the winner funded', async () => {
+            const bidders = (await provider.listAccounts()).slice(2, 11);
+            const reserve = ethers.parseEther('0.1');
+            await mine(engine.connect(artist).registerArtwork('ipfs://full-refund-batch'));
+            await mine(engine.connect(artist).createAuction(1, reserve, day));
+            const deposits = [];
+            for (const bidder of bidders) {
+                const price = deposits.length ? await engine.minimumBid(1) : reserve;
+                const deposit = await engine.requiredDepositForBid(price);
+                await mine(engine.connect(bidder).placeBid(1, price, { value: deposit }));
+                deposits.push(deposit);
+            }
+            await network.provider.send('evm_setNextBlockTimestamp', [Number((await engine.auctions(1)).end)]);
+            await mine(engine.closeAuction(1));
+            assert.deepEqual([...await engine.refundProgress(1)], [0n, 8n]);
+            const displaced = bidders.slice(0, 8);
+            const balances = await Promise.all(displaced.map(bidder => provider.getBalance(bidder.address)));
+            const result = await mine(engine.processRefunds(1, 8));
+            const refunds = result.logs.map(log => engine.interface.parseLog(log));
+            assert.equal(refunds.length, displaced.length);
+            for (const [i, bidder] of displaced.entries()) {
+                assert.equal(refunds[i].name, 'OutbidRefundProcessed');
+                assert.deepEqual([...refunds[i].args], [1n, BigInt(i), bidder.address, deposits[i], true]);
+                assert.equal(await provider.getBalance(bidder.address), balances[i] + deposits[i]);
+            }
+            assert.deepEqual([...await engine.refundProgress(1)], [8n, 8n]);
+            assert.equal((await mine(engine.processRefunds(1, 8))).logs.length, 0);
+            assert.equal(await provider.getBalance(engine.target), deposits[8]);
+        });
     }
 
     async function verifyPayoutRuntime() {
