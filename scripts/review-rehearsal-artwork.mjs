@@ -118,6 +118,25 @@ export async function openingAtHead(rpc, payer, block, secondWork = false, regis
     return secondWork ? { ...request, registrationHash: registrationHash.toLowerCase() } : request;
 }
 
+// Work IDs only increase. Locate the registration with logarithmic historical
+// reads and one indexed log block. The opening verifier authenticates the receipt.
+export async function locateRefundRegistration(rpc, payer, from, through) {
+    let low=BigInt(from), high=BigInt(through);
+    assert(low > 0n && low <= high && high <= BigInt(Number.MAX_SAFE_INTEGER), 'Invalid registration search interval');
+    while (low < high) {
+        const middle=(low+high)/2n;
+        const [count]=await view(rpc,'workCount',[],toQuantity(middle));
+        if (count < 2n) low=middle+1n;
+        else high=middle;
+    }
+    const height=toQuantity(low);
+    const logs=await rpc('eth_getLogs',[{address:fixture.core,fromBlock:height,toBlock:height,
+        topics:market.encodeFilterTopics('ArtworkRegistered',[2n,payer])}]);
+    assert(Array.isArray(logs) && logs.length === 1 && !logs[0].removed &&
+        logs[0].blockNumber === height && isHexString(logs[0].transactionHash,32), 'Missing the unique work 2 registration');
+    return logs[0].transactionHash.toLowerCase();
+}
+
 export async function buildArtworkReview(review, register, providers, { opening = false, secondWork = false, registrationHash } = {}) {
     const payer = checkedPayer(review, register);
     const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });
@@ -285,7 +304,25 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             (['--verify-receipt','--verify-opening','--verify-refund-work'].includes(option) && hash)))), 'Expected release review and register files followed by an artwork rehearsal option. See the ordinary market rehearsal runbook.');
         const [review, register] = await Promise.all([reviewFile, registerFile].map(async path => JSON.parse(await readFile(path, 'utf8'))));
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
-        const getPlan = () => buildArtworkReview(review, register, providers, { opening: auctionRequest || refundOpening, secondWork, registrationHash: refundOpening ? hash : undefined });
+        let discoveredRegistration;
+        const getPlan = async () => {
+            if (option !== '--serve-refund-work') return buildArtworkReview(review,register,providers,
+                {opening:auctionRequest || refundOpening,secondWork,registrationHash:refundOpening ? hash : undefined});
+            if (!discoveredRegistration) {
+                const state=await buildArtworkReview(review,register,providers,{secondWork:true});
+                if (state.finalizedArtwork?.id !== '2') return state;
+                const receipts=await Promise.all(providers.map(async rpc=>{
+                    const first=await rpc('eth_getTransactionReceipt',[signedRegistration]);
+                    assert(first.transactionHash === signedRegistration, 'Unexpected registration checkpoint');
+                    return locateRefundRegistration(rpc,state.payer,first.blockNumber,state.block.number);
+                }));
+                assert.equal(receipts[0],receipts[1],'Providers disagree on the work 2 registration');
+                const next=await buildArtworkReview(review,register,providers,{opening:true,secondWork:true,registrationHash:receipts[0]});
+                discoveredRegistration=receipts[0];
+                return next;
+            }
+            return buildArtworkReview(review,register,providers,{opening:true,secondWork:true,registrationHash:discoveredRegistration});
+        };
         if (opening) {
             const payer = checkedPayer(review, register);
             const { block } = await verifyTreasurySafesWithTwoProviders(register, ...providers, { requirePair: true });

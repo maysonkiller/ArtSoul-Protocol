@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { Interface, keccak256 } from 'ethers';
 import { readArtworkMetadata } from '../src/api/safe-artwork-fetch.js';
 import { rehearsalArtwork as work, rehearsalMetadataUri as uri, rehearsalOpening, rehearsalLateBid, refundWork, walletRequest } from '../scripts/rehearsal-review/client.mjs';
-import { checkRegistrationPublication, inspectOpeningReceipt, inspectRegistrationReceipt, openingAtHead, registrationAtHead, simulateRegisteredOpening, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
+import { locateRefundRegistration, checkRegistrationPublication, inspectOpeningReceipt, inspectRegistrationReceipt, openingAtHead, registrationAtHead, simulateRegisteredOpening, verifyArtworkRegistration } from '../scripts/review-rehearsal-artwork.mjs';
 
 const market = new Interface([
     'function registerArtwork(string) returns (uint256)', 'function workCount() view returns (uint256)',
@@ -355,4 +355,26 @@ test('a failed or substituted request, event, chain, block or stored work cannot
     await assert.rejects(verifyArtworkRegistration(review, register, hash, [receiptRpc(), receiptRpc(changes[0])]), /unavailable/);
     await assert.rejects(verifyArtworkRegistration(review, { ...register, chainId: 8453 }, hash, []));
     await assert.rejects(verifyArtworkRegistration({ ...review, expectedCore: outsider }, register, hash, []), /payout pair/);
+});
+
+test('the same review page can locate finalized work 2 without a second CLI or a catalog scan', async () => {
+    let countReads=0, logs=[{blockNumber:'0x50',transactionHash:hash,removed:false}];
+    const rpc=async (method,params)=>{
+        if (method==='eth_call') {
+            countReads++;
+            assert.equal(params[0].data,market.encodeFunctionData('workCount'));
+            return market.encodeFunctionResult('workCount',[BigInt(params[1])>=80n?2n:1n]);
+        }
+        assert.equal(method,'eth_getLogs');
+        assert.deepEqual(params,[{address:work.core,fromBlock:'0x50',toBlock:'0x50',
+            topics:market.encodeFilterTopics('ArtworkRegistered',[2n,payer])}]);
+        return logs;
+    };
+    assert.equal(await locateRefundRegistration(rpc,payer,16,128),hash);
+    assert(countReads<=7);
+    const valid=logs[0];
+    for (const bad of [[],[valid,valid],[{...valid,removed:true}],[{...valid,blockNumber:'0x51'}]]) {
+        logs=bad;
+        await assert.rejects(locateRefundRegistration(rpc,payer,16,128),/unique/);
+    }
 });
