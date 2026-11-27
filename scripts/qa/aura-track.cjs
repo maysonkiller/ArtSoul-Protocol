@@ -219,6 +219,7 @@ async function run(engine) {
         await preview.scrollIntoViewIfNeeded();
         for (const [kind,word] of [['platform','ArtSoul'],['founder','ArtSoul Founder'],['genesis','ArtSoul Genesis'],['partner','ArtSoul Partner']]) {
             await preview.getByRole('combobox').selectOption(kind);
+            assert.equal(await preview.locator('img').count(),kind === 'platform' ? 1 : 0);
             const selector='artsoul-aura-track[data-word="'+word+'"]';
             const track=preview.locator(selector);
             await track.locator('svg').waitFor();

@@ -64,7 +64,7 @@ export function AuraAppearance({ api, wallet, isSessionCurrent, frameSourceManag
                 {Object.entries(auraWords).map(([kind, word]) => <option key={kind} value={kind}>{word}</option>)}
             </select></label></figcaption>
             <div className={auraFrameClassName(preview)} aria-hidden="true">
-                <img src="/brand/artsoul-audio-cover-384.webp" alt="" width="96" height="96" />
+                {preview === 'platform' && <img src="/brand/artsoul-audio-cover-384.webp" alt="" width="96" height="96" />}
                 {enabled && auraCaption(React.createElement, auraWords[preview])}
             </div>
             <p aria-live="polite">{eligibility[preview]}</p>
