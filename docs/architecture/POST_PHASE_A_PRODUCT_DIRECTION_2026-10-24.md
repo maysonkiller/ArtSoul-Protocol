@@ -395,6 +395,23 @@ The private indexer records the primary creator and ProtocolTreasury credits fro
 
 For example, the isolated database fixture has two primary sales and three resales between blocks 100 and 105. Three wallets paid, two bought twice, secondary volume was 300 wei, protocol credit was 4 wei and ecosystem credit was 2 wei. These are synthetic amounts used to verify filtering and rounding. [Isolated PostgreSQL example](../../test/helpers/ordinary-demand-postgres.mjs)
 
+The November 26 Base Sepolia rehearsal supplied an observed example. Across all
+101 blocks from 64,039,494 through 64,039,594 inclusive (21:49:27–21:49:47 UTC),
+the reviewed Core `0xC4b756B6E3714E4BaB6E7dd4965400F390403CD2` recorded one
+primary purchase, one paying wallet, zero repeat purchases and zero resales.
+The [settlement](https://sepolia.basescan.org/tx/0x07cd8c340164096abdf14f3762e0835254023b794ed7e5e2adfd567cf9864dfa)
+allocated 975,000,000,000,000 wei to the creator and 25,000,000,000,000 wei
+to ProtocolTreasury from the price of 0.001 test ETH. To reproduce the count,
+query `eth_getLogs` on both `sepolia.base.org` and `base-sepolia-rpc.publicnode.com`
+for that Core and inclusive range, filtering the first topic for either
+`AuctionSettled(uint256,uint256,uint256,uint256)` or
+`ResalePurchased(uint256,uint256,address,address,uint256)`. Both endpoints
+returned the same single log and finalized boundary hashes
+`0x660c996d24d166e2969fe15c013511861b9acb2a946e97890dab7cea35a81c6d`
+and `0x7c8aec12fe5e7be29dd9ff004b175c04ef7d020a23c4c6be733aba25316241af`.
+This window verifies measurement on a founder-run rehearsal. Mainnet demand,
+earlier buyer history and operating costs require separate evidence.
+
 For the November 19 paid-place pilot, primary volume includes each retained place premium and the additional mint payment actually earned. Count each once. Exclude place resales, refunded amounts and gas. At a comparable primary price of 1 ETH, the ArtSoul candidate assigns 0.025 ETH to ProtocolTreasury and 0.975 ETH to the creator, with no additional platform fee for the buyer. OpenSea typically takes 0.10 ETH on a 1 ETH primary drop. On a direct 1 ETH primary art sale SuperRare's published terms allocate 0.15 ETH of that price to its DAO treasury, and the buyer contributes a further 0.03 ETH. Those platforms publish terms for different types of NFT sales. Their fees are benchmarks for pricing and offer no evidence of demand for ArtSoul's paid places. [OpenSea fees](https://support.opensea.io/en/articles/8867091-what-fees-do-i-pay-on-opensea) · [SuperRare sale terms](https://help.superrare.com/en/articles/10629742-offers-auctions-and-pricing)
 
 Highlight's published Base mainnet configuration lists a fixed 0.0008 ETH fee for a native ETH mint. This equals the ArtSoul primary fee at 0.032 ETH of gross primary proceeds. ArtSoul's fee is smaller below that price, while the fixed fee is smaller above it. This compares the platform fee on a single successful mint before network gas. [Highlight chain and currency configuration](https://api.highlight.xyz/config/chains)

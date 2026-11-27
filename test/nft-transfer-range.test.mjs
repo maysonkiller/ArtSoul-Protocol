@@ -74,12 +74,19 @@ test('empty complete range is explicit; it is not mistaken for an unavailable RP
 const pairGetters = new Interface(['function nft() view returns(address)', 'function core() view returns(address)']);
 function ordinaryFixture() {
     const f = fixture();
+    f.logs = [log(110, 9, B, C, 1n), log(100, 1, address(0), A, 1n), log(110, 3, A, B, 1n)];
+    f.endSupply = 1n;
     f.finalized = 110;
     f.reverse = CORE;
     f.hook = (method, params) => {
         if (method === 'eth_getBlockByNumber' && params[0] === 'finalized') return {number: hex(f.finalized), hash: hash(f.finalized)};
         if (method !== 'eth_call') return;
         const [call, block] = params;
+        if (call.data === abi.encodeFunctionData('totalSupply') && block.blockHash === hash(110)) {
+            assert.equal(call.to, NFT);
+            assert.equal(block.requireCanonical, true);
+            return abi.encodeFunctionResult('totalSupply', [f.endSupply]);
+        }
         const getter = pairGetters.parseTransaction(call)?.name;
         if (getter) {
             assert.deepEqual(block, {blockHash: hash(110), requireCanonical: true});
@@ -95,8 +102,9 @@ test('explicit ordinary range verifies the immutable pair, finality and a zero-s
     const f = ordinaryFixture();
     const batch = await readOrdinaryTransferRange(f.listener, f.options);
     assert.equal(batch.events.length, 3);
+    assert.deepEqual(batch.mintCoverage, {before:'0',after:'1'});
     assert.deepEqual(f.calls.filter(call => call.method === 'eth_call').map(call => call.params[0].data),
-        [pairGetters.encodeFunctionData('nft'), pairGetters.encodeFunctionData('core'), abi.encodeFunctionData('totalSupply')]);
+        [pairGetters.encodeFunctionData('nft'), pairGetters.encodeFunctionData('core'), abi.encodeFunctionData('totalSupply'), abi.encodeFunctionData('totalSupply')]);
     f.supply = 1n;
     await assert.rejects(readOrdinaryTransferRange(f.listener,f.options),/already has minted tokens/);
 });
@@ -105,6 +113,8 @@ test('an ordinary continuation checks finality and reciprocal binding even after
     const f = ordinaryFixture();
     f.options.bootstrap = false;
     f.supply = 3n;
+    f.endSupply = 4n;
+    f.logs = [log(100, 1, address(0), A, 4n), log(110, 3, A, B, 4n), log(110, 9, B, C, 4n)];
     assert.equal((await readOrdinaryTransferRange(f.listener,f.options)).events.length,3);
     f.finalized = 109;
     await assert.rejects(readOrdinaryTransferRange(f.listener,f.options),/not finalized/);
@@ -129,8 +139,24 @@ test('two-node range check rejects disagreement even when both sources separatel
     const {chainId,coreAddress,nftAddress,expectedCoreCodeHash,expectedNftCodeHash,...range} = first.options;
     const pair = {chainId,coreAddress,nftAddress,expectedCoreCodeHash,expectedNftCodeHash};
     assert.equal((await checkOrdinaryTransferRange(pair,range,providers)).rpcReadings,2);
-    second.logs = [];
+    second.logs = second.logs.filter(event => event.logIndex !== '0x9');
     await assert.rejects(checkOrdinaryTransferRange(pair,range,providers),/disagree/);
+});
+
+test('ordinary ranges reconcile mint events against on-chain supply at both boundaries', async () => {
+    const f = ordinaryFixture();
+    f.logs = [];
+    await assert.rejects(readOrdinaryTransferRange(f.listener,f.options), /supply differs/);
+    f.logs = [log(100,1,address(0),A,2n)];
+    await assert.rejects(readOrdinaryTransferRange(f.listener,f.options), /mint sequence/);
+    f.logs = [log(100,1,A,B,1n)];
+    await assert.rejects(readOrdinaryTransferRange(f.listener,f.options), /precedes its mint/);
+    f.logs = [log(100,1,address(0),A,1n),log(110,1,address(0),B,1n)];
+    await assert.rejects(readOrdinaryTransferRange(f.listener,f.options), /mint sequence/);
+    f.options.bootstrap = false;
+    f.supply = f.endSupply = 1n;
+    f.logs = [];
+    assert.deepEqual((await readOrdinaryTransferRange(f.listener,f.options)).mintCoverage, {before:'1',after:'1'});
 });
 
 function archiveFixture() {

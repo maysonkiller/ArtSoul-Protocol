@@ -207,6 +207,14 @@ The local assistant can open the Guide and search its published topics. It has n
 
 During an announced rehearsal the founder checks the mailbox and moderation queue before opening, during the scheduled session and at close. Prioritize security, access or payment problems, then complaints and general questions. If the founder is unavailable, defer a new supported session and leave financial permissions unchanged. There is no commitment to continuous coverage. Keep personal correspondence private. Record only a case reference, date, disposition and necessary evidence. Publish sanitized incident details where useful. Before mainnet, verify mailbox receive/reply coverage and access recovery, approve a retention procedure and operating budget, and complete applicable operator, terms, privacy and IP review.
 
+On November 27 at 00:30:54 UTC, the [release homepage](https://artsoulprotocol.com/)
+and its [security contact file](https://artsoulprotocol.com/.well-known/security.txt)
+both returned HTTP 200 directly. The footer email link matched the file's
+`Contact` field. The file had a plain-text content type, the expected canonical
+HTTPS URL and an expiry of October 31, 2027 at 23:59:59 UTC. This check covers
+public contact discovery. Verifying a private reply and account recovery
+requires mailbox evidence.
+
 ## Recording an incident
 
 One entry per incident, in this file, appended below. Short is fine. What

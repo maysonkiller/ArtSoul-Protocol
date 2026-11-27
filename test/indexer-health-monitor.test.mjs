@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
     checkIndexerHealth,
     evaluateIndexerHealth,
-    loadMonitorConfig
+    loadMonitorConfig,
+    reviewHealthWindow
 } from '../scripts/check-indexer-health.mjs';
 
 const NOW = Date.parse('2026-07-21T12:00:00.000Z');
@@ -32,6 +34,58 @@ function healthyPayload(overrides = {}) {
 }
 
 const config = loadMonitorConfig({});
+
+test('replays the two recorded Base Sepolia observations offline', async () => {
+    const config = loadMonitorConfig({
+        ARTSOUL_MONITOR_EXPECTED_CORE_ADDRESS:'0x43368f7E2d5f11f4B7E11928D66d3f4A5a4E4ceF',
+        ARTSOUL_MONITOR_MAX_BLOCKS_BEHIND:'50'
+    });
+    const journal = await readFile(new URL('./fixtures/base-sepolia-health-window-2026-11-27.ndjson', import.meta.url), 'utf8');
+    const report = await reviewHealthWindow(journal.trim().split(/\r?\n/), config,
+        '2026-11-27T00:26:15Z', '2026-11-27T00:31:15Z', 330, Date.parse('2026-11-27T00:32:00Z'));
+    assert.equal(report.ok, true);
+    assert.deepEqual([report.samples,report.maxGapMs,report.firstConfirmedBlock,report.lastConfirmedBlock],
+        [2,311940,64086499,64088060]);
+});
+
+test('a sampled window brackets both endpoints and rechecks each observation against the reviewed policy', async () => {
+    const core = '0x' + 'ab'.repeat(20);
+    const pinned = loadMonitorConfig({ARTSOUL_MONITOR_EXPECTED_CORE_ADDRESS: core});
+    const time = seconds => new Date(NOW + seconds * 1000).toISOString();
+    function sample(seconds, block) {
+        const payload = healthyPayload({timestamp: time(seconds), indexer: {
+            contractAddress: core, lastConfirmedBlock: block, lastIndexedBlock: block + 3, currentBlock: block + 7
+        }});
+        return {checkedAt: time(seconds), ...evaluateIndexerHealth(payload, pinned, NOW + seconds * 1000)};
+    }
+    const rows = [sample(0, 100), sample(300, 150), sample(600, 200)];
+    const review = (records, settings = pinned, from = time(1), to = time(599), gap = 300) =>
+        reviewHealthWindow(records.map(row => JSON.stringify(row)), settings, from, to, gap, NOW + 600000);
+    const result = await review(rows);
+    assert.deepEqual([result.coverage, result.samples, result.maxGapMs, result.firstConfirmedBlock, result.lastConfirmedBlock],
+        ['sampled_worker_health', 3, 300000, 100, 200]);
+    assert.equal((await review(rows, pinned, time(0), time(600))).ok, true);
+    for (const shortened of [rows.slice(1), rows.slice(0, 2), [], rows.slice(0, 1)]) {
+        await assert.rejects(review(shortened), /bracket/);
+    }
+    await assert.rejects(review([rows[0], rows[2]]), /gap exceeds/);
+    await assert.rejects(review([rows[0], rows[1], rows[1], rows[2]]), /strictly increasing/);
+    await assert.rejects(review([rows[0], {...rows[1], ok:false}, rows[2]]), /Unhealthy/);
+    await assert.rejects(review([sample(0, 100), sample(300, 90), rows[2]]), /BLOCK_CURSORS/);
+    await assert.rejects(review([sample(0, 100), sample(300, 100), sample(600, 100)]), /forward progress/);
+    const altered = fields => [rows[0], {...rows[1], observed:{...rows[1].observed,...fields}}, rows[2]];
+    await assert.rejects(review(altered({databaseHealthy:false})), /DATABASE/);
+    await assert.rejects(review(altered({depthSynchronized:undefined})), /incomplete/);
+    await assert.rejects(review(altered({coreAddress:'0x'+'cd'.repeat(20)})), /CORE_ADDRESS/);
+    await assert.rejects(review(altered({chainId:8453})), /CHAIN_ID/);
+    await assert.rejects(review(altered({timestamp:time(0)})), /STALE_RESPONSE/);
+    await assert.rejects(review(altered({timestamp:time(0)}), {...pinned,maxResponseAgeMs:600000}), /timestamp did not advance/);
+    await assert.rejects(review(rows, {...pinned,maxBlocksBehind:3}), /BLOCK_LAG/);
+    await assert.rejects(review(rows, config), /Pin a Base Core/);
+    await assert.rejects(review(rows, pinned, time(1), time(601)), /elapsed UTC/);
+    await assert.rejects(review(rows, pinned, '2026-02-30T12:00:00Z', time(599)), /elapsed UTC/);
+    await assert.rejects(reviewHealthWindow(['{broken'],pinned,time(1),time(599),300,NOW+600000), /Invalid JSON/);
+});
 
 test('accepts a fresh healthy Base Sepolia indexer response', () => {
     const result = evaluateIndexerHealth(healthyPayload(), config, NOW);

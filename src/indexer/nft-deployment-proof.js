@@ -387,23 +387,25 @@ async function readTransferRange(listener, options, coreGetter) {
     const toBlock = options.blockNumber;
     const previousBlockHash = options.previousBlockHash.toLowerCase();
     const bootstrap = options.bootstrap;
-    return readAtNftDeployment(listener, options, async (send, proof) => {
+    return readAtNftDeployment(listener, options, async (send, proof, endpoint) => {
         const previous = await send('eth_getBlockByNumber', [`0x${(fromBlock - 1).toString(16)}`, false]);
         if (!matches(quantityPattern, previous?.number) || BigInt(previous.number) !== BigInt(fromBlock - 1) ||
             !matches(hashPattern, previous?.hash) || previous.hash.toLowerCase() !== previousBlockHash) {
             throw new Error('NFT transfer predecessor changed');
         }
+        const atOrigin = { blockHash: previousBlockHash, requireCanonical: true };
         if (bootstrap) {
-            const atOrigin = { blockHash: previousBlockHash, requireCanonical: true };
             const code = await send('eth_getCode', [proof.nftAddress, atOrigin]);
             if (!matches(/^0x(?:[0-9a-f]{2})+$/i, code) || keccak256(code) !== proof.nftCodeHash) {
                 throw new Error('NFT transfer origin runtime mismatch');
             }
-            // The pinned NFT's supply is monotonic and has no reset/burn path.
-            // Zero proves no token transfer can predate the first covered block.
-            const supply = await send('eth_call', [{ to: proof.nftAddress,
-                data: getters.encodeFunctionData('totalSupply') }, atOrigin]);
-            if (!matches(hashPattern, supply) || getters.decodeFunctionResult('totalSupply', supply)[0] !== 0n) {
+        }
+        const ordinary = coreGetter === 'nft';
+        let originSupply;
+        if (bootstrap || ordinary) {
+            [originSupply] = await readField(send, proof.nftAddress, atOrigin, getters, 'totalSupply', []);
+            // The pinned NFT never burns. No transfer can predate a zero-supply predecessor.
+            if (bootstrap && originSupply !== 0n) {
                 throw new Error('NFT transfer origin already has minted tokens');
             }
         }
@@ -448,6 +450,19 @@ async function readTransferRange(listener, options, coreGetter) {
                 eventData: Object.freeze({ from: parsed.args.from.toLowerCase(), to: parsed.args.to.toLowerCase(),
                     tokenId: parsed.args.tokenId.toString() }) });
         }).sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
+        let mintCoverage;
+        if (ordinary) {
+            const [endSupply] = await readField(send, proof.nftAddress, endpoint, getters, 'totalSupply', []);
+            let issued = originSupply;
+            for (const { eventData: { from, tokenId } } of events) {
+                if (!nonzero(from)) {
+                    issued += 1n;
+                    if (BigInt(tokenId) !== issued) throw new Error('Ordinary NFT mint sequence differs from Transfer logs');
+                } else if (BigInt(tokenId) > issued) throw new Error('Ordinary NFT transfer precedes its mint');
+            }
+            if (issued !== endSupply) throw new Error('Ordinary NFT supply differs from Transfer logs');
+            mintCoverage = { before: originSupply.toString(), after: endSupply.toString() };
+        }
         for (let index = 1; index < events.length; index++) {
             if (events[index].blockNumber === events[index - 1].blockNumber &&
                 events[index].transactionIndex < events[index - 1].transactionIndex) {
@@ -467,7 +482,7 @@ async function readTransferRange(listener, options, coreGetter) {
             }
             timestamps.set(number, Number(BigInt(header.timestamp)) * 1000);
         }
-        return Object.freeze({ ...proof, fromBlock, previousBlockHash, bootstrap,
+        return Object.freeze({ ...proof, fromBlock, previousBlockHash, bootstrap, ...(ordinary && { mintCoverage }),
             events: Object.freeze(events.map(event => Object.freeze({ ...event, timestamp: timestamps.get(event.blockNumber) }))) });
     }, coreGetter);
 }

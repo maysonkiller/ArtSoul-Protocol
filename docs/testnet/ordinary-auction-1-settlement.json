@@ -7,5 +7,21 @@
   "auctionId": "1",
   "blockNumber": 64039544,
   "blockHash": "0x6c4c76884da84b0af1db729a67e20d55ba6580814f1634e4788d5ee5d062cf90",
-  "transactionHash": "0x07cd8c340164096abdf14f3762e0835254023b794ed7e5e2adfd567cf9864dfa"
+  "transactionHash": "0x07cd8c340164096abdf14f3762e0835254023b794ed7e5e2adfd567cf9864dfa",
+  "mintBlockEvidence": {
+    "previousBlockHash": "0xeb5bb4874c8dde84df485f109ee9f57063532b01aa1ba104eead34f7030b3892",
+    "mintCoverage": { "before": "0", "after": "1" },
+    "tokenId": "1",
+    "transactionIndex": 3,
+    "transferLogIndex": 9,
+    "firstCollector": "0x5e3167636c5eb7fe143a3c9f40ea2bf1d6888383",
+    "rpcProviders": ["sepolia.base.org", "base-sepolia-rpc.publicnode.com"]
+  },
+  "ownershipAtWinnerWithdrawal": {
+    "blockNumber": 64064023,
+    "blockHash": "0xddf8c4324548e5b2bd8fde9a22f0bdab0881ae2378e8ef345839cdc1082a39ad",
+    "owner": "0x5e3167636c5eb7fe143a3c9f40ea2bf1d6888383",
+    "transferEpochAtMint": "0",
+    "transferEpochAtWithdrawal": "0"
+  }
 }
