@@ -655,6 +655,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     created_at: artwork.indexed_at,
     updated_at: artwork.last_updated_at,
     block_number: artwork.block_number,
+    registration_log_index: artwork.log_index,
     transaction_hash: artwork.transaction_hash,
     moderation_hidden: moderation?.hidden === true
   };

@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync('src/ui/components/artwork-player.js', 'utf8')
-    .replace("import './artwork-player.css';", '').replace('export function', 'function');
+const source = readFileSync('src/ui/components/artwork-audio.js', 'utf8').replace('export const artworkAudio', 'const artworkAudio')
+    + '\n' + readFileSync('src/ui/components/artwork-player.js', 'utf8')
+        .replace(/^import .*;$/gm, '').replace('export function', 'function');
 
-function fixture(kind = 'video') {
+function fixture(kind = 'video', audioWindow = {}) {
     class Element extends EventTarget {
         constructor(tag) { super(); this.tagName = tag?.toUpperCase(); this.dataset = {}; this.attributes = {}; }
         setAttribute(name, value) { this.attributes[name] = String(value); }
@@ -37,7 +38,7 @@ function fixture(kind = 'video') {
     dialog.close = () => { dialog.open = false; };
     let Player;
     const timers = new Set();
-    vm.runInNewContext(source, {HTMLElement:Element, document, customElements:{get() {}, define(name, implementation) { Player = implementation; }},
+    vm.runInNewContext(source, {window:audioWindow, HTMLElement:Element, document, customElements:{get() {}, define(name, implementation) { Player = implementation; }},
         AbortController, URL, location:new URL(document.baseURI),
         setInterval(callback) { timers.add(callback); return callback; },
         clearInterval(callback) { timers.delete(callback); }});
@@ -136,6 +137,94 @@ test('Unmute renews a running track in its gesture and leaves an intentionally p
         fire(media, 'volumechange');
         assert.equal(plays, paused ? 0 : 1);
     }
+});
+
+test('a muted MP3 that collapses from 42 seconds to 3 and then zero recovers on Play', () => {
+    let gain, sourceCount = 0, resumes = 0, reloads = 0, starts = 0;
+    const { media, control, fire } = fixture('audio', {
+        ArtSoulStorageImage: { isValidStorageUrl: () => true },
+        AudioContext: class {
+            state = 'suspended';
+            createGain() { return gain = { gain: { value: 1 }, connect() {}, disconnect() {} }; }
+            createMediaElementSource() { sourceCount++; return { connect() {} }; }
+            resume() { resumes++; this.state = 'running'; return Promise.resolve(); }
+            suspend() { this.state = 'suspended'; return Promise.resolve(); }
+        }
+    });
+    media.crossOrigin = 'anonymous';
+    media.duration = 42.32;
+    media.currentTime = 3;
+    fire(media, 'loadedmetadata');
+    fire(control('.artsoul-media-mute'), 'click');
+    assert.equal(sourceCount, 0);
+    media.currentTime = 3;
+    media.duration = 3;
+    media.ended = true;
+    fire(media, 'ended');
+    assert.equal(control('.ap-time').textContent, '0:03 / 0:42');
+    media.duration = 0.0006;
+    media.currentTime = 0;
+    fire(media, 'durationchange');
+    assert.equal(control('.ap-time').textContent, '0:03 / 0:42');
+    assert.equal(sourceCount, 0);
+    media.load = () => { reloads++; media.currentTime = 0; media.duration = NaN; };
+    media.play = async () => { starts++; media.paused = false; media.ended = false; };
+    fire(control('.artsoul-media-toggle'), 'click');
+    assert.equal(starts, 1);
+    assert.equal(reloads, 1);
+    assert.equal(sourceCount, 1);
+    assert.equal(resumes, 1);
+    assert.equal(media.currentTime, 3);
+    assert.equal(media.muted, false);
+    assert.equal(gain.gain.value, 0);
+    fire(media, 'volumechange');
+    assert.equal(control('.artsoul-media-mute').attributes['aria-label'], 'Unmute');
+    media.duration = 42.32;
+    media.currentTime = 5;
+    media.pause();
+    fire(control('.artsoul-media-mute'), 'click');
+    assert.equal(gain.gain.value, 1);
+    assert.equal(starts, 1);
+    fire(control('.artsoul-media-toggle'), 'click');
+    assert.equal(media.currentTime, 5);
+    assert.equal(reloads, 1);
+    media.ended = true;
+    media.currentTime = media.duration;
+    fire(control('.artsoul-media-toggle'), 'click');
+    assert.equal(media.currentTime, 0);
+    assert.equal(reloads, 1);
+});
+
+test('fresh or replaced audio never inherits another source duration or requests a recovery output', () => {
+    const { media, control, fire } = fixture('audio');
+    media.duration = 60; fire(media, 'loadedmetadata');
+    fire(control('.artsoul-media-mute'), 'click');
+    media.src = 'https://elsewhere.example/a-short-sample.mp3';
+    media.duration = 0; fire(media, 'loadedmetadata');
+    assert.equal(control('.ap-time').textContent, '0:00 / –:––');
+    media.duration = 0.5; fire(media, 'durationchange');
+    fire(control('.artsoul-media-toggle'), 'click');
+    assert.equal(media.paused, false);
+    assert.equal(media.muted, true);
+});
+
+test('third-party media recovers its native source without routing cross-origin sound', () => {
+    const { media, control, fire } = fixture('audio', {
+        ArtSoulStorageImage: { isValidStorageUrl: () => false },
+        AudioContext: class { constructor() { assert.fail('external media must use its native output'); } }
+    });
+    media.crossOrigin = 'anonymous';
+    media.duration = 42; fire(media, 'loadedmetadata');
+    fire(control('.artsoul-media-mute'), 'click');
+    media.duration = 2; media.currentTime = 2; media.ended = true; fire(media, 'ended');
+    let loads = 0;
+    media.load = () => { loads++; media.currentTime = 0; media.duration = NaN; };
+    fire(control('.artsoul-media-toggle'), 'click');
+    assert.equal(loads, 1);
+    assert.equal(media.muted, true);
+    assert.equal(media.currentTime, 2);
+    fire(media, 'emptied');
+    assert.equal(control('.ap-time').textContent, '0:02 / 0:42');
 });
 
 test('audio offers a direct storage download and omits video-only controls', () => {

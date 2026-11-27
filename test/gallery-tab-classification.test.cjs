@@ -66,6 +66,7 @@ test('gallery lifecycle states map to one mutually exclusive tab', () => {
 
     for (const [artwork, expected] of cases) {
         assert.equal(discovery.galleryTabForArtwork(artwork), expected);
+        assert.equal(discovery.filterForGalleryTab([artwork], 'all').length, 1);
         const matchingTabs = tabs.filter(tab => discovery.filterForGalleryTab([artwork], tab).length === 1);
         assert.deepEqual(matchingTabs, expected ? [expected] : []);
     }
@@ -87,7 +88,7 @@ test('expired active auctions enter Discovery even before on-chain finalization'
 test('moderation-hidden works are excluded from every gallery tab', () => {
     const discovery = loadDiscoveryService();
     const hidden = { ...baseArtwork, status: 'registered', moderation_hidden: true };
-    const tabs = ['live_auctions', 'nft', 'discover', 'marketplace', 'collections'];
+    const tabs = ['all', 'live_auctions', 'nft', 'discover', 'marketplace', 'collections'];
 
     for (const tab of tabs) {
         assert.equal(discovery.filterForGalleryTab([hidden], tab).length, 0);
@@ -111,7 +112,7 @@ test('gallery markup keeps the requested order and default without card signals'
     const collections = gallery.indexOf("{ id: 'collections', label: 'Collections' }");
 
     assert.ok(discover >= 0 && discover < auctions && auctions < nft && nft < marketplace && marketplace < collections);
-    assert.match(gallery, /\? tabId : 'discover'/);
+    assert.match(gallery, /\? tabId : 'all'/);
     assert.doesNotMatch(gallery, /showSignals=/);
     assert.match(gallery, /ArtSoulArtworkCard\?\.hasSafeMedia/);
     assert.match(gallery, /TODO: Add a "Make an offer" action to NFT cards/);

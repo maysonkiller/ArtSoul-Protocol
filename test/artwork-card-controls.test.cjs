@@ -214,16 +214,10 @@ test('decorative disc rotation is limited to Future when the reader allows motio
     }
 });
 
-test('the mobile motion guard permits Future publisher and Partner captions when motion is allowed', () => {
-    const touchCss = fs.readFileSync(path.join(root, 'mobile-no-motion.css'), 'utf8');
-    const desktopCss = fs.readFileSync(path.join(root, 'unified-styles.css'), 'utf8');
-    const permitted = touchCss.slice(touchCss.indexOf('@media (prefers-reduced-motion: no-preference)'));
-    const selector = 'body.future :is(.artsoul-aura-frame--platform, .artsoul-aura-frame--partner) > .artsoul-aura-caption > .aura-word';
-    assert.ok(permitted.includes(selector));
-    const rule = permitted.slice(permitted.indexOf(selector)).split('}')[0];
-    assert.match(rule, /animation: artsoulAuraCaption var\(--aura-lap\) linear infinite !important;/);
-    assert.match(desktopCss, /animation: artsoulAuraCaption var\(--aura-lap\) linear infinite;/);
-    assert.equal(touchCss.match(/animation: artsoulAuraCaption/g)?.length, 1);
+test('both mobile and desktop show the moving track only when the Future visitor allows motion', () => {
+    assert.match(css, /\.artsoul-aura-caption > artsoul-aura-track \{ display: none; \}/);
+    assert.match(css, /@media \(prefers-reduced-motion: no-preference\)\s*\{\s*\.future \.artsoul-aura-caption > artsoul-aura-track:defined/);
+    assert.match(css, /:has\(> artsoul-aura-track > svg\) > \.aura-word \{ display: none; \}/);
 });
 
 test('React card still opens when the card itself receives Enter or Space', () => {

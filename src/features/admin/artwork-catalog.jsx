@@ -18,7 +18,8 @@ export function AdminArtworkPreview({ artwork }) {
             : artwork?.media_type === 'audio' && artwork.media_url
             ? <artsoul-media-player key={'audio-' + artwork.media_url}>
                 <img className="admin-audio-cover" src={source && !failed ? source : '/brand/artsoul-audio-cover-384.webp'} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
-                <audio src={artwork.media_url} preload="none" aria-label={artwork.title || 'Audio artwork'} />
+                <audio crossOrigin={window.ArtSoulStorageImage?.isValidStorageUrl(artwork.media_url) ? 'anonymous' : undefined}
+                    src={artwork.media_url} preload="none" aria-label={artwork.title || 'Audio artwork'} />
             </artsoul-media-player>
             : source && !failed
             ? <img src={source} alt={artwork?.title || 'Artwork preview'} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />

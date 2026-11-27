@@ -5,6 +5,43 @@ function matchesRegistrationId(value, id) {
   return value === id || (Number.isSafeInteger(value) && String(value) === id);
 }
 
+function matchesRegistration(event, artwork, core, logIndex) {
+  return Number(event?.chain_id) === 84532 && normalizeWallet(event.contract_address) === core &&
+    event.event_name === 'ArtworkRegistered' && event.transaction_hash === artwork.transaction_hash &&
+    event.log_index === logIndex && event.block_number === artwork.block_number &&
+    event.artwork_id === artwork.artwork_id && matchesRegistrationId(event.event_data?.artworkId, artwork.artwork_id) &&
+    typeof event.event_data.creator === 'string' && event.event_data.creator.toLowerCase() === artwork.creator.toLowerCase() &&
+    event.event_data.metadataURI === artwork.metadata_uri;
+}
+
+// A publisher mark may precede minting. Bind it to the confirmed registration
+// emitted by this Core, independently of the NFT ownership projection.
+export async function confirmedPublisherWorks(candidates, core) {
+  const verified = new Set();
+  if (!candidates.length || candidates.length > 200) return verified;
+  const state = await supabaseRest('indexer_state?select=last_confirmed_block&chain_id=eq.84532' +
+    '&contract_address=ilike.' + core + '&limit=2', {signal:AbortSignal.timeout(1800)});
+  if (!Array.isArray(state) || state.length !== 1 || !/^[1-9]\d*$/.test(String(state[0]?.last_confirmed_block))) return verified;
+  const confirmed = Number(state[0].last_confirmed_block);
+  const rows = candidates.filter(c => Number.isSafeInteger(c.block_number) && c.block_number > 0 &&
+    c.block_number <= confirmed && Number.isSafeInteger(c.registration_log_index) && c.registration_log_index >= 0 &&
+    /^[1-9]\d{0,77}$/.test(c.artwork_id) && /^0x[0-9a-f]{64}$/.test(c.transaction_hash) && typeof c.metadata_uri === 'string');
+  await Promise.all(Array.from({length: Math.ceil(rows.length / 20)}, async (_, page) => {
+    const batch = rows.slice(page * 20, page * 20 + 20);
+    const hashes = [...new Set(batch.map(c => c.transaction_hash))];
+    const ids = [...new Set(batch.map(c => c.artwork_id))];
+    const events = await supabaseRest('contract_events?select=chain_id,contract_address,event_name,artwork_id::text,event_data,transaction_hash,log_index,block_number' +
+      `&chain_id=eq.84532&contract_address=ilike.${core}&event_name=eq.ArtworkRegistered&transaction_hash=in.(${hashes})&artwork_id=in.(${ids})&limit=${batch.length + 1}`,
+      {signal:AbortSignal.timeout(1800)});
+    if (!Array.isArray(events) || events.length > batch.length) return;
+    for (const card of batch) {
+      const matches = events.filter(e => matchesRegistration(e, card, core, card.registration_log_index));
+      if (matches.length === 1) verified.add(card);
+    }
+  }));
+  return verified;
+}
+
 // The deployment and publisher are designated together. Changing the active
 // Core cannot carry a previous deployment's visual status into its successor.
 export function platformPublisherFor(config) {
@@ -56,7 +93,7 @@ export async function readArtworkAuraKinds(artworks, ownership) {
     let events;
     try {
       events = await supabaseRest('contract_events?select=chain_id,contract_address,event_name,artwork_id::text,event_data,transaction_hash,log_index,block_number' +
-        `&chain_id=eq.84532&contract_address=eq.${core}&event_name=eq.ArtworkRegistered` +
+        `&chain_id=eq.84532&contract_address=ilike.${core}&event_name=eq.ArtworkRegistered` +
         `&transaction_hash=in.(${hashes.join(',')})&artwork_id=in.(${ids.join(',')})&limit=${batch.length + 1}`,
       { signal: AbortSignal.timeout(2000) });
     } catch {
@@ -64,12 +101,7 @@ export async function readArtworkAuraKinds(artworks, ownership) {
     }
     if (!Array.isArray(events) || events.length > batch.length) return;
     for (const artwork of batch) {
-      const matches = events.filter(event => Number(event?.chain_id) === 84532 && event.contract_address === core &&
-        event.event_name === 'ArtworkRegistered' && event.transaction_hash === artwork.transaction_hash &&
-        event.log_index === artwork.log_index && event.block_number === artwork.block_number &&
-        event.artwork_id === artwork.artwork_id && matchesRegistrationId(event.event_data?.artworkId, artwork.artwork_id) &&
-        typeof event.event_data.creator === 'string' && event.event_data.creator.toLowerCase() === artwork.creator.toLowerCase() &&
-        event.event_data.metadataURI === artwork.metadata_uri);
+      const matches = events.filter(event => matchesRegistration(event, artwork, core, artwork.log_index));
       if (matches.length === 1) {
         const { chainId, nftAddress } = ownership.config;
         const identity = { chainId, nftAddress, tokenId: proven.get(artwork.artwork_id).token_id };

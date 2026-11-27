@@ -55,7 +55,7 @@ test('desktop bounds Community expansion and keeps both rails reachable', () => 
 
 test('title, description and details share one tight transparent card with Gemini below', () => {
     assert.match(source, /className="artwork-page-panel artwork-page-context artwork-mobile-context"/);
-    assert.match(source, /<h1 className="artwork-detail-title">\{artwork\.title\}[\s\S]*?alt="Official ArtSoul NFT"[\s\S]*?<\/h1>/);
+    assert.match(source, /<h1 className="artwork-detail-title">\{artwork\.title\}[\s\S]*?officialMark\?\.\(React\.createElement, artwork, aura\)[\s\S]*?<\/h1>/);
     assert.match(source, /<h2>Description<\/h2>/);
     assert.match(source, /<h2>Artwork details<\/h2>/);
     assert.doesNotMatch(source, /artwork-page-insights/);
@@ -67,7 +67,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=106/);
+    assert.match(html, /unified-styles\.css\?v=107/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
