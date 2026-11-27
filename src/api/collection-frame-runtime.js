@@ -3,9 +3,9 @@ import { getBytes, keccak256 } from 'ethers';
 // Compiler-generated immutable words differ per deployment. All other bytes,
 // including metadata, must match the reviewed collection implementation.
 const templates = new Map([
-    [20029, { hash: '0xeb666d3132cec9976e9a659f7d384cfe2a3ecbf3749785e4d899493aa03ba99a',
+    [20029, { hash: '0x5272448ef87ea9c6a733b01cc063c636bc38734798f1982c5de0ca1f2f56d311',
         supply: [2426,7891,14226], creator:[962,5188,14153], protocol:[1243,14060], registry:[1138,9750,10427,13699,13785] }],
-    [22557, { hash: '0x66fdcff467de79e637f0a008a737563ed1f0e8613c9134d4059a883af1f8d7c2',
+    [22557, { hash: '0x16bacaf3f0ae75111f5c28f9964c1601ef21ed4f8b5c0608d864b89f0d773123',
         supply:[2617,7850,14003,15012], creator:[1039,4999,13930], protocol:[1357,13837], registry:[1252,8923,9810,13476,13562] }]
 ]);
 

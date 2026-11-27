@@ -1,2 +1,5 @@
-# Solidity includes source-byte hashes in the bytecode metadata of the ordinary pair.
+# Solidity includes source-byte hashes in the bytecode metadata of reviewed contracts.
 contracts/replacement/*.sol text eol=lf
+contracts/launch/CollectionLaunch.sol text eol=lf
+contracts/launch/PartnerFirstWorkLaunch.sol text eol=lf
+contracts/launch/CollectionOperatorApprovals.sol text eol=lf
