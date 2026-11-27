@@ -23,6 +23,7 @@ const emptyIndexerTables = [
     'public.artwork_social_signals', 'public.v41_public_metric_participants', 'public.v41_public_metric_events',
     'artsoul_private.ordinary_settlements', 'artsoul_private.ordinary_runner_up_observations',
     'artsoul_private.ordinary_resale_purchases', 'artsoul_private.ordinary_registrations', 'artsoul_private.ordinary_primary_credits',
+    'artsoul_private.ordinary_nft_ranges', 'artsoul_private.ordinary_nft_transfers',
     'artsoul_private.genesis_grant_batches', 'artsoul_private.genesis_grants'
 ];
 

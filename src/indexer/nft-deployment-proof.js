@@ -1,5 +1,5 @@
 import { AbiCoder, Interface, keccak256 } from 'ethers';
-import { parseOrdinaryResale, parseOrdinarySettlement } from './ordinary-settlement.js';
+import { auctionForIssuedToken, discoverOrdinaryResales, parseOrdinaryResale, parseOrdinarySettlement } from './ordinary-settlement.js';
 import { checkReceipt, decodeReceiptLog, receiptLogIndex, verifyTransactionPosition } from './settlement-receipt.js';
 
 const getters = new Interface([
@@ -10,6 +10,9 @@ const getters = new Interface([
     'function protocolTreasury() view returns (address)',
     'function ecosystemTreasury() view returns (address)',
     'function refundProgress(uint256) view returns (uint256 cursor,uint256 total)',
+    'function refundBatchLimit() view returns (uint256)',
+    'function refundTransferGas() view returns (uint256)',
+    'function processRefunds(uint256 auctionId,uint256 count)',
     'event OutbidRefundQueued(uint256 indexed auctionId,uint256 indexed index,address indexed creditor,uint256 amount)',
     'event OutbidRefundProcessed(uint256 indexed auctionId,uint256 indexed index,address indexed creditor,uint256 amount,bool paid)',
     // Solidity strings use the same ABI representation as bytes.
@@ -154,13 +157,17 @@ async function readOrdinaryAuctionField(send, proof, block, auctionId, method) {
 // Read one sale on the reviewed replacement pair without modifying the prototype cursor.
 export async function readOrdinarySettlement(listener, options) {
     const tx = options?.transactionHash;
-    if (!matches(hashPattern, tx) || !nonzero(tx) || !positiveUint256(options?.auctionId)) {
+    const { auctionId: requestedAuction, tokenId } = options || {};
+    if (!matches(hashPattern, tx) || !nonzero(tx) || (requestedAuction === undefined) === (tokenId === undefined) ||
+        !positiveUint256(requestedAuction ?? tokenId)) {
         throw new Error('Invalid ordinary settlement request');
     }
-    const transactionHash = tx.toLowerCase(), auctionId = options.auctionId;
+    const transactionHash = tx.toLowerCase();
     return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
         const receipt = await send('eth_getTransactionReceipt', [transactionHash]);
+        const auctionId = requestedAuction ?? auctionForIssuedToken(receipt, proof, transactionHash, tokenId);
         const sale = parseOrdinarySettlement(receipt, proof, transactionHash, auctionId);
+        if (tokenId !== undefined && sale.tokenId !== tokenId) throw new Error('Ordinary settlement token changed');
         verifyTransactionPosition(receipt, header, transactionHash);
         const auction = await readOrdinaryAuctionField(send, proof, block, auctionId, 'auctions');
         const offer = await readOrdinaryAuctionField(send, proof, block, auctionId, 'runnerUpOffers');
@@ -208,6 +215,55 @@ export async function readOrdinaryRefundEntry(listener, options) {
             (processed && BigInt(entry) >= cursor)) throw new Error('Refund event disagrees with finalized queue');
         return { ...proof, transactionHash: hash, logIndex: index, auctionId, entry, creditor: args.creditor.toLowerCase(),
             amountWei: args.amount.toString(), ...(processed && { paid: args.paid }) };
+    }, 'nft');
+}
+
+export async function readOrdinaryRefundBatch(listener, options) {
+    if (options?.chainId !== 84532 || !matches(hashPattern, options.transactionHash) || !nonzero(options.transactionHash)) {
+        throw new Error('Invalid Base Sepolia refund batch');
+    }
+    const hash = options.transactionHash.toLowerCase();
+    return readAtNftDeployment(listener, options, async (send, proof, block, header) => {
+        const receipt = await send('eth_getTransactionReceipt', [hash]);
+        checkReceipt(receipt, proof, hash, 'refund batch');
+        verifyTransactionPosition(receipt, header, hash);
+        const tx = await send('eth_getTransactionByHash', [hash]);
+        if (!tx || tx.hash?.toLowerCase() !== hash || tx.to?.toLowerCase() !== proof.coreAddress ||
+            receipt.to?.toLowerCase() !== proof.coreAddress || !matches(addressPattern, tx.from) || !nonzero(tx.from) ||
+            tx.from.toLowerCase() !== receipt.from?.toLowerCase() || tx.blockHash?.toLowerCase() !== proof.blockHash ||
+            tx.blockNumber !== receipt.blockNumber || tx.transactionIndex !== receipt.transactionIndex ||
+            tx.value !== '0x0' || typeof tx.input !== 'string') throw new Error('Unexpected ordinary refund transaction');
+        const [auctionId, requested] = getters.decodeFunctionData('processRefunds', tx.input);
+        if (!auctionId || !requested || getters.encodeFunctionData('processRefunds',[auctionId,requested]) !== tx.input.toLowerCase()) {
+            throw new Error('Unexpected ordinary refund calldata');
+        }
+        const [batchLimit] = await readField(send, proof.coreAddress, block, getters, 'refundBatchLimit', []);
+        const [gasBudget] = await readField(send, proof.coreAddress, block, getters, 'refundTransferGas', []);
+        const [cursor, total] = await readOrdinaryAuctionField(send, proof, block, auctionId.toString(), 'refundProgress');
+        const topic = getters.getEvent('OutbidRefundProcessed').topicHash;
+        const processed = receipt.logs.filter(log => log.address?.toLowerCase() === proof.coreAddress &&
+            log.topics?.[0]?.toLowerCase() === topic);
+        if (cursor > total || requested > batchLimit || !gasBudget || BigInt(processed.length) > requested) {
+            throw new Error('Refund batch exceeds its finalized configuration');
+        }
+        let previousLog = -1, previousEntry;
+        const entries = processed.map(log => {
+            const { args, index } = decodeReceiptLog(getters, 'OutbidRefundProcessed', log, receipt);
+            const queueIndex = args[1];
+            if (index <= previousLog || args.auctionId !== auctionId || queueIndex >= cursor ||
+                (previousEntry !== undefined && queueIndex !== previousEntry + 1n) || !nonzero(args.creditor) || !args.amount) {
+                throw new Error('Refund batch entries disagree with the finalized queue');
+            }
+            previousLog = index;
+            previousEntry = queueIndex;
+            return { entry: queueIndex.toString(), logIndex: index, creditor: args.creditor.toLowerCase(),
+                amountWei: args.amount.toString(), disposition: args.paid ? 'delivered' : 'credited-for-withdrawal' };
+        });
+        return { ...proof, transactionHash: hash, sender: tx.from.toLowerCase(), auctionId: auctionId.toString(),
+            requestedEntries: requested.toString(), configuredBatchLimit: batchLimit.toString(), configuredGasArgument: gasBudget.toString(),
+            processedEntries: entries.length, distinctCreditors: new Set(entries.map(entry => entry.creditor)).size,
+            deliveredEntries: entries.filter(entry => entry.disposition === 'delivered').length,
+            creditedEntries: entries.filter(entry => entry.disposition === 'credited-for-withdrawal').length, entries };
     }, 'nft');
 }
 
@@ -387,6 +443,8 @@ async function readTransferRange(listener, options, coreGetter) {
     const toBlock = options.blockNumber;
     const previousBlockHash = options.previousBlockHash.toLowerCase();
     const bootstrap = options.bootstrap;
+    const ordinary = coreGetter === 'nft';
+    const reviewResales = ordinary && options.reviewResales === true;
     return readAtNftDeployment(listener, options, async (send, proof, endpoint) => {
         const previous = await send('eth_getBlockByNumber', [`0x${(fromBlock - 1).toString(16)}`, false]);
         if (!matches(quantityPattern, previous?.number) || BigInt(previous.number) !== BigInt(fromBlock - 1) ||
@@ -400,7 +458,6 @@ async function readTransferRange(listener, options, coreGetter) {
                 throw new Error('NFT transfer origin runtime mismatch');
             }
         }
-        const ordinary = coreGetter === 'nft';
         let originSupply;
         if (bootstrap || ordinary) {
             [originSupply] = await readField(send, proof.nftAddress, atOrigin, getters, 'totalSupply', []);
@@ -471,7 +528,7 @@ async function readTransferRange(listener, options, coreGetter) {
         }
         // Validate each represented block, not only the range endpoint. An RPC
         // cannot mix an orphan log into a batch with a canonical endpoint.
-        const timestamps = new Map();
+        const timestamps = new Map(), headers = new Map();
         for (const [number, expectedHash] of blockHashes) {
             const header = await send('eth_getBlockByNumber', [`0x${number.toString(16)}`, false]);
             if (!matches(quantityPattern, header?.number) || BigInt(header.number) !== BigInt(number) ||
@@ -481,8 +538,11 @@ async function readTransferRange(listener, options, coreGetter) {
                 throw new Error('NFT Transfer log is not canonical');
             }
             timestamps.set(number, Number(BigInt(header.timestamp)) * 1000);
+            if (reviewResales) headers.set(number,header);
         }
+        const purchases = reviewResales ? await discoverOrdinaryResales(send,proof,fromBlock,events,headers) : null;
         return Object.freeze({ ...proof, fromBlock, previousBlockHash, bootstrap, ...(ordinary && { mintCoverage }),
+            ...(purchases && { purchases }),
             events: Object.freeze(events.map(event => Object.freeze({ ...event, timestamp: timestamps.get(event.blockNumber) }))) });
     }, coreGetter);
 }

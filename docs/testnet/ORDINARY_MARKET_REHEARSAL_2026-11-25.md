@@ -159,6 +159,8 @@ node scripts/index-ordinary-settlement.mjs docs/testnet/ordinary-auction-1-settl
 
 ### Winner credit after settlement
 
+For a read-only browser view of the replacement pair's first sale, run `node scripts/review-rehearsal-late-bid.mjs --sale` and open the printed loopback URL. On November 27 the view returned HTTP 200. Two nodes verified work 1, auction 1, NFT 1, the settlement at block 64,039,544, and the collector's continued ownership at finalized block 64,111,438. The view separates the creator credit of 0.000975 test ETH from the protocol credit of 0.000025 test ETH. Its home page and sale view load without a wallet or a transaction planner. The public catalog still has a different issuer.
+
 The two-provider plan reads the signed primary sale, both contract runtimes, the current creditor balance and a pending-state simulation of `withdraw()`. The November 27 read returned exactly 0.009 test ETH for the winner. This is the remaining deposit from a paid sale. Testing delivery to a losing bidder needs a different auction with competing bidders.
 
 The [winner's withdrawal](https://sepolia.basescan.org/tx/0x6a6701e0b37ca8a861b442a6bb5affc4b42020eccbd1237303ab81e4ccdb61cb) finalized in Base Sepolia block 64,064,023. Base and PublicNode agreed on log index 0, the Core, the winner's address and a payment of 9,000,000,000,000,000 wei. A second read of the withdrawal plan reported zero remaining credit. The wallet sent 0 test ETH, used 32,426 execution gas and paid 199,243,612,937 wei including the L1 data fee.
@@ -175,9 +177,19 @@ node scripts/read-ordinary-outbid-refund.mjs docs/testnet/ordinary-auction-1-set
 
 The JSON file supplies the reviewed issuer addresses and runtime hashes. The command reads the specified auction. It matches the creditor, amount and entry number in both finalized receipts, including their block positions and the published queue cursor. A successful ETH payment returns `delivered`. A rejected payment returns `credited-for-withdrawal`, which still requires a creditor withdrawal for delivery. The [isolated EVM rehearsal](../../scripts/rehearse-ordinary-settlement-receipts.cjs) exercised both outcomes in a single batch. Public participant evidence requires the two corresponding Base Sepolia receipts.
 
+For a direct signed `processRefunds` call, one additional read reports the immutable limits at the receipt block, requested count from the signed calldata, emitted entries, distinct creditor addresses, each disposition, whole-transaction execution gas and Base L1 data and total fees.
+
+```sh
+node scripts/read-ordinary-outbid-refund.mjs docs/testnet/ordinary-auction-1-settlement.json --batch PROCESSING_TX
+```
+
+The approved limits are eight **entries** per call and a 30,000-gas **argument** to each value-carrying EVM call. A creditor can appear more than once. A public receipt measures the whole transaction and records each outcome. It cannot measure gas actually consumed by an individual recipient. In the local EVM the contract received a request for eight, processed two distinct creditors, delivered one payment, recorded one withdrawable credit and consumed 102,432 execution gas for the batch. A full eight-entry signed public batch and measured on-chain fees remain open.
+
 ### Second work for the two-collector test
 
 The first work already has a settled NFT. The creator can register a separate work for the two-collector test. On November 27 Base and PublicNode both simulated `registerArtwork(string)` returning ID 2 on the reviewed payout Core. The exact request has calldata SHA-256 `2ff394272a59051ccc4e4b2acc732a80f60efc52b903d552920b83c475c280b2`. It registers the title **ArtSoul Outbid Refund Rehearsal**, sends zero test ETH and opens no auction.
+
+The [signed registration of artwork 2](https://sepolia.basescan.org/tx/0xb2985bf66fefdcd1d32db037c23cfa4d55c99b151d19b4ba238045ace5561ac5) succeeded at block 64,109,904 (`0xba32ad3eb75a99ac97522856e39a7e8d9a2286bc6ca1ff6095fec656cda54183`) on November 27 at 01:44:09 UTC. Both providers confirmed the finalized work, creator, exact metadata, Core and NFT pair. The publication recovery reader returned `verified`. The receipt used 312,767 gas. The next operation for this work is its auction opening.
 
 Use the same release review and custody-register files as for the first registration. The plan checks the finalized first sale, both contract runtimes, the creator, existing registrations, pending nonce and simulated new ID. Only the creator can submit this rehearsal request from the local review page. A matching included or finalized second registration retires the request. Another work at ID 2 stops the review. A competing registration can still change the assigned ID at inclusion. Keep the public receipt if that happens and investigate before another submission.
 
@@ -199,6 +211,8 @@ node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.
 
 Two distinct collectors then place bids. Record the outbidding and refund-processing receipts for the queue reader above. The first auction's winner-surplus withdrawal covers another payment path.
 
+Both public providers returned the successful [opening of auction 2](https://sepolia.basescan.org/tx/0x87883da08e3404683f3ae7ed4c7912ba091562d5d11b33152becf1dc25219f8d) for work 2 in block 64,118,482, hash `0xd9ee63c5db8d76122ca46c47a4b93ee958c6eaa528e2ed73e6ccfee38554613d`. The creator submitted the reviewed calldata with zero ETH value and used 180,691 gas. The emitted reserve was 0.001 test ETH. The opening block was November 27 at 02:12:45 UTC and the original deadline was November 28 at 02:12:45 UTC (03:12:45 in Warsaw).
+
 ### Restoring the first hosted sale
 
 A read-only, data-only PostgreSQL export included just the three private issuer, sale and credit tables. Its archive contained three table-data entries and occupied 2,540 bytes. Restoring into an empty local database with migrations 018 and 023 reproduced every field of the hosted issuer, finalized sale and allocations. The source and restored tables each had one row. The temporary database and local export were removed after comparison. This drill covers that sale. A full catalog and indexer recovery still requires its own release rehearsal.
@@ -213,7 +227,27 @@ The [ordinary transfer reader](../../scripts/read-ordinary-transfer-range.mjs) c
 node scripts/read-ordinary-transfer-range.mjs <payout-pair-register.json> bootstrap 63494033 0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df 63494033 0x3868ea2419c15a5bf9ee332628da9776f8828ff3f1fc67033c8b2c204a1f79e4
 ```
 
-For a contiguous follow-up, use `continuation` with the next block number, the previous report's endpoint hash, and the new endpoint number and hash. The command returns a read-only observation. The first mint was verified at its settlement block. Hosted transfer persistence and subsequent owner changes remain open.
+For a contiguous follow-up, use `continuation` with the next block number, the previous report's endpoint hash, and the new endpoint number and hash. The command returns a read-only observation.
+
+### Continuous transfer and primary-sale intake
+
+The [Base Sepolia worker](../../scripts/sync-ordinary-history.mjs) independently indexes an immutable ordinary pair. Its three arguments are the reviewed pair file, first block to cover and canonical hash of the zero-supply predecessor. Both nodes must agree on finality, reciprocal contract bindings, initialized runtime hashes, mint counts, canonical transfers and the associated sale and credit receipts. A direct transfer changes the indexed owner without booking revenue. Multiple historic pairs use separate coverage in the same private store.
+
+```sh
+node scripts/sync-ordinary-history.mjs docs/testnet/ordinary-auction-1-settlement.json 63494033 0x8046188d1d848c102718a1d4d24957e4ee580fa5941728ac91bc762c419212df --read-only
+```
+
+Set `ARTSOUL_ORDINARY_RPC_URL` and `ARTSOUL_ORDINARY_RPC_CHECK_URL` to separate archive RPC providers. The default reads one window without a database. For an approved private rehearsal store, install indexer migrations 018, 023 and 024 and set `ARTSOUL_ORDINARY_DATABASE_URL`. Use the same arguments with `--once` to persist the next window or `--follow` for continuous processing. Keep the same zero-supply origin on restart. Each window defaults to 1,000 blocks and may be lowered with `ARTSOUL_ORDINARY_RANGE_BLOCKS` for provider limits. The worker polls once per minute after catch-up. It serializes commits by issuer, retries temporary transport failures and stops on contradictory evidence. The prototype catalog has its own cursor.
+
+For an ArtSoul Core resale, the worker matches the purchase and its adjacent NFT delivery to the transaction receipt on both providers. The existing resale reader verifies the four payment shares, including both treasury addresses. Ownership, payouts and the covered range commit together. A wallet gift only updates ownership. Conflicting evidence stops the worker before it advances its cursor. Disposable EVM tests exercised a paid resale followed by a gift on each of two issuers. PostgreSQL tests check rollback when a receipt disagrees with RPC discovery or a payout is inconsistent.
+
+The [isolated restore test](../../test/helpers/ordinary-history-restore.mjs) starts immediately before the first mint with its independently verified zero-supply predecessor. It locates the mint and primary sale in block 64,039,544 without being given a receipt. The backup includes six private tables covering issuers, transfers, ranges, primary settlements, primary credits and Core resales. The drill compares every row after restoring into an empty PostgreSQL database, resumes at 64,039,545 and verifies the same sale and zero resales. Hosted continuous intake, the replacement public catalog and full database and media recovery still need operational evidence.
+
+To reproduce just this drill on a development machine with PostgreSQL binaries, set `ARTSOUL_TEST_POSTGRES_BIN` to the binary directory, `ARTSOUL_TEST_ORDINARY_HISTORY_ONLY=1` and `ARTSOUL_TEST_LIVE_ORDINARY_HISTORY=1`, then run `node --test test/indexer-reorg-atomicity.test.cjs`. It creates its own disposable local databases and uses the two public Base Sepolia nodes.
+
+The [demand report](../../scripts/report-ordinary-demand.mjs) checks coverage in the same database snapshot as its totals. Add `--primary-coverage` after the four normal arguments to check for linked ranges, continuous supply, recorded transfers and matching sale and credit for every mint. Add `--market-coverage` instead to also reconcile each range's Core resale count with the retained purchase and corresponding token delivery. This requires migrations 020 and 024 alongside the ordinary issuer tables. A range imported with missing sale evidence stays incomplete. The real two-block drill counted one primary purchase of 0.001 test ETH and 25,000,000,000,000 wei in protocol credit. External marketplaces and buyer history before the covered interval require separate evidence.
+
+At finalized Base Sepolia block 64,111,438 (`0xb309160160243f56ba3f56b4232774d0798830ba170d89e938b4b2bc2a6ad3dc`), two public RPCs agreed that the reviewed NFT had one issued token and its ownership-change counter was zero. The first paid resale on this public pair still requires a seller and a buyer.
 # Participant pilot before mainnet
 
 Use Base Sepolia with the replacement Core, NFT contract and matching public indexer. Confirm all three addresses against the candidate release before inviting participants. Keep the existing catalog readable during rehearsal.

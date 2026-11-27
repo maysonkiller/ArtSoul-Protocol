@@ -9,18 +9,25 @@ import { Interface, ZeroAddress, keccak256, toQuantity } from 'ethers';
 import EventListener from '../../src/indexer/event-listener.js';
 import { ingestOrdinarySettlement } from '../../src/indexer/ordinary-settlement-intake.js';
 import { ingestOrdinaryRunnerUpOffer } from '../../src/indexer/ordinary-runner-up-intake.js';
+import { syncOrdinaryHistory } from '../../scripts/sync-ordinary-history.mjs';
+import { reportOrdinaryDemand } from '../../scripts/report-ordinary-demand.mjs';
 
 const address = n => '0x' + n.toString(16).padStart(40, '0');
 const hash = n => '0x' + n.toString(16).padStart(64, '0');
 const abi = new Interface([
     'event ProceedsCredited(uint256 indexed auctionId,address indexed creator,address indexed treasury,uint256 creatorAmount,uint256 protocolAmount)',
-    'function nft() view returns (address)', 'function core() view returns (address)',
+    'function nft() view returns (address)', 'function core() view returns (address)', 'function totalSupply() view returns (uint256)',
     'function auctions(uint256) view returns(uint256,uint256,uint256,uint256,uint256,address,uint256,uint256,uint8,address)',
     'function runnerUpOffers(uint256) view returns(address,uint256,uint256)',
     'event RunnerUpOfferAccepted(uint256 indexed auctionId,address indexed bidder,uint256 price)',
     'event AuctionSettled(uint256 indexed auctionId,uint256 indexed artworkId,uint256 tokenId,uint256 price)',
     'event SettledArtworkIssued(uint256 indexed auctionId,uint256 indexed artworkId,uint256 indexed tokenId,address creator,address firstCollector)',
-    'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)'
+    'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)',
+    'event ResalePurchased(uint256 indexed tokenId,uint256 version,address indexed seller,address indexed buyer,uint256 price)',
+    'event ResaleCredited(uint256 indexed tokenId,uint256 indexed version,address protocol,address ecosystem,uint256,uint256,uint256,uint256)',
+    'function tokenToArtwork(uint256) view returns(uint256)', 'function tokenCreator(uint256) view returns(address)',
+    'function firstCollector(uint256) view returns(address)', 'function protocolTreasury() view returns(address)',
+    'function ecosystemTreasury() view returns(address)'
 ]);
 
 // A small in-process RPC serves real ABI-encoded logs to the unmodified receipt reader.
@@ -83,6 +90,135 @@ function fixture(pair, overrides = {}) {
 function intake(pool, pair, overrides) {
     const { listener, options } = fixture(pair, overrides);
     return ingestOrdinarySettlement(pool, listener, options);
+}
+
+export async function checkOrdinaryHistory(pool) {
+    const { listener, options } = fixture(90);
+    const raw = (method, args) => listener._readRpcCall(provider => provider.send(method, args));
+    const receipt = await raw('eth_getTransactionReceipt', [options.transactionHash]);
+    const { chainId, coreAddress, nftAddress, expectedCoreCodeHash, expectedNftCodeHash } = options;
+    const pair = { chainId, coreAddress, nftAddress, expectedCoreCodeHash, expectedNftCodeHash };
+    const origin = { fromBlock: 90, previousBlockHash: hash(89) };
+    let head = 89, wrongPreviousOwner = false, badCredit = false, omitPurchase = false, wrongResaleCredit = false;
+    function eventsAt(n) {
+        if (n === 90) return receipt.logs.map(log => ({...log,removed:false}));
+        function log(emitter, index, name, values) {
+            return { address: emitter, removed:false, blockHash: hash(n), blockNumber: toQuantity(n),
+                transactionHash: hash(n+20), transactionIndex:'0x0',logIndex:toQuantity(index),...abi.encodeEventLog(name,values) };
+        }
+        if (n === 91) return [log(nftAddress,2,'Transfer',[address(wrongPreviousOwner ? 43 : 41), address(42),1])];
+        if (n === 93) return [log(coreAddress,1,'ResaleCredited',[1,1,address(46),address(47),185,11,wrongResaleCredit?3:2,2]),
+            log(coreAddress,2,'ResalePurchased',[1,1,address(42),address(43),200]),log(nftAddress,3,'Transfer',[address(42),address(43),1])];
+        return [];
+    }
+    const rpc = async (method, args) => {
+        if (method === 'eth_getBlockByNumber') {
+            const n = args[0] === 'finalized' ? head : Number(BigInt(args[0]));
+            return { number: toQuantity(n), hash: hash(n), timestamp: '0x18', transactions: [hash(n+20)] };
+        }
+        if (method === 'eth_call' && args[0].data === abi.encodeFunctionData('totalSupply')) {
+            return abi.encodeFunctionResult('totalSupply', [BigInt(args[1].blockHash) >= 90n ? 1 : 0]);
+        }
+        if (method === 'eth_getLogs') {
+            const n = Number(BigInt(args[0].fromBlock));
+            return eventsAt(n).filter(log => log.address===args[0].address && log.topics[0]===args[0].topics[0] &&
+                !(omitPurchase && log.address===coreAddress));
+        }
+        if (method === 'eth_getTransactionReceipt') {
+            const n = Number(BigInt(args[0]))-20;
+            return { status:'0x1',blockHash:hash(n),blockNumber:toQuantity(n),transactionHash:args[0],transactionIndex:'0x0',
+                logs: badCredit ? eventsAt(n).slice(1) : eventsAt(n) };
+        }
+        if (method === 'eth_call') {
+            const name = abi.parseTransaction(args[0]).name;
+            const fields = { tokenToArtwork:1, tokenCreator:address(40), firstCollector:address(41),
+                protocolTreasury:address(46), ecosystemTreasury:address(47) };
+            if (Object.hasOwn(fields,name)) return abi.encodeFunctionResult(name,[fields[name]]);
+        }
+        return raw(method, args);
+    };
+    const providers = [rpc, (method, args) => rpc(method, args)];
+    const sync = (overrides = {}) => syncOrdinaryHistory({ pool, pair, origin, providers, maxBlocks: 1, ...overrides });
+    const report = (first, last) => reportOrdinaryDemand(pool, String(chainId), coreAddress, String(first), String(last), { marketCoverage: true });
+    const count = async table => Number((await pool.query('SELECT count(*) FROM artsoul_private.' + table +
+        ' WHERE chain_id=$1 AND core_address=$2', [chainId,coreAddress])).rows[0].count);
+    assert.equal((await sync()).status,'awaiting-first-range');
+    head = 90;
+    badCredit = true;
+    await assert.rejects(sync(), /credit/);
+    assert.equal(await count('ordinary_nft_ranges'), 0);
+    assert.equal((await report(90,90)).primaryCoverage, 'incomplete');
+    badCredit = false;
+    assert.equal((await sync({ pool: undefined })).status, 'verified');
+    assert.equal(await count('ordinary_nft_ranges'), 0);
+    const results = await Promise.allSettled([sync(),sync()]);
+    assert.ok(results.some(result => result.status === 'fulfilled' && result.value.primarySales === 1));
+    for (const result of results) if (result.status === 'rejected') assert.match(result.reason.message,/checkpoint changed/);
+    assert.equal(await count('ordinary_settlements'), 1);
+    assert.equal(await count('ordinary_primary_credits'), 1);
+    assert.equal(await count('ordinary_nft_transfers'), 1);
+    head = 92;
+    wrongPreviousOwner = true;
+    await assert.rejects(sync(), /preceding owner/);
+    assert.equal(await count('ordinary_nft_ranges'), 1, 'a failed ownership check rolls back its whole range');
+    wrongPreviousOwner = false;
+    assert.equal((await sync()).throughBlock, 91);
+    assert.equal((await sync()).transfers, 0);
+    assert.equal((await sync()).status, 'caught-up');
+    await assert.rejects(sync({ origin: { ...origin, fromBlock: 89 } }), /retained origin/);
+    await assert.rejects(sync({ pair: { ...pair, nftAddress: address(501) } }), /reviewed pair/);
+    assert.equal(await count('ordinary_nft_ranges'), 3);
+    assert.equal(await count('ordinary_nft_transfers'), 2);
+    assert.equal(await count('ordinary_settlements'), 1, 'a direct transfer does not create a sale');
+    const verified = await report(90,92);
+    assert.equal(verified.primaryCoverage, 'finalized_mints_and_credits');
+    assert.equal(verified.coverage, 'indexed_receipts_only');
+    assert.equal(verified.totals.primary_sales, '1');
+    assert.equal(verified.totals.resales,'0');
+    assert.equal(verified.coreResaleCoverage,'finalized_core_purchases_and_credits');
+    assert.equal((await report(89,92)).primaryCoverage, 'incomplete');
+    assert.equal((await report(90,93)).primaryCoverage, 'incomplete');
+    assert.equal((await report(91,91)).totals.primary_sales, '0');
+    const partial = await pool.connect();
+    try {
+        // Reproduce a partial restore in this transaction, then discard only its fixture rows.
+        await partial.query('BEGIN');
+        await partial.query(`INSERT INTO artsoul_private.ordinary_nft_ranges(chain_id,core_address,origin_block,
+            origin_previous_hash,from_block,previous_hash,through_block,through_hash,supply_before,supply_after,event_count)
+            VALUES ($1,$2,90,$3,94,$4,94,$5,1,1,0),($1,$2,90,$3,95,$5,95,$6,1,2,1)`,
+        [chainId,coreAddress,hash(89),hash(93),hash(94),hash(95)]);
+        const coverage = async (first,last) => (await reportOrdinaryDemand(partial,String(chainId),coreAddress,String(first),
+            String(last),{ primaryCoverage: true })).primaryCoverage;
+        assert.equal(await coverage(90,94), 'incomplete', 'a missing intervening range invalidates the requested coverage');
+        assert.equal(await coverage(95,95), 'incomplete', 'a restored range without its mint cannot certify primary demand');
+        assert.equal((await reportOrdinaryDemand(partial,String(chainId),coreAddress,'94','94',
+            { marketCoverage: true })).coreResaleCoverage,'incomplete','a range without resale evidence cannot certify zero purchases');
+    } finally {
+        await partial.query('ROLLBACK');
+        partial.release();
+    }
+    assert.equal((await pool.query(`SELECT to_wallet FROM artsoul_private.ordinary_nft_transfers WHERE core_address=$1
+        ORDER BY block_number DESC LIMIT 1`, [coreAddress])).rows[0].to_wallet, address(42));
+    head = 93;
+    omitPurchase = true;
+    await assert.rejects(sync(),/discovery differs from the transfer receipt/);
+    omitPurchase = false;
+    wrongResaleCredit = true;
+    await assert.rejects(sync(),/Invalid ordinary resale credits/);
+    assert.equal(await count('ordinary_nft_ranges'),3);
+    wrongResaleCredit = false;
+    assert.equal((await sync()).resales,1);
+    const secondary = await report(90,93);
+    assert.equal(secondary.coreResaleCoverage,'finalized_core_purchases_and_credits');
+    assert.deepEqual([secondary.totals.resales,secondary.totals.resale_volume_wei,secondary.totals.resale_protocol_credit_wei,
+        secondary.totals.resale_ecosystem_credit_wei],['1','200','2','2']);
+    for (const table of ['ordinary_nft_ranges','ordinary_nft_transfers']) {
+        const privileges = await pool.query(`SELECT has_table_privilege(rolname,$1,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AS allowed
+            FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')`, ['artsoul_private.' + table]);
+        assert.equal(privileges.rowCount, 3);
+        assert.ok(privileges.rows.every(role => !role.allowed));
+        await assert.rejects(pool.query('DELETE FROM artsoul_private.' + table), /append-only/);
+    }
 }
 
 async function verifyCommand(pool) {
