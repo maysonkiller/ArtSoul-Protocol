@@ -52,6 +52,24 @@ export function auctionPage(proof) {
         'Finalized auction details', fields);
 }
 
+export function settlementPage({ sale, owner, ownerBlock, ownerBlockHash }) {
+    assert(sale.chainId === 84532 && sale.coreAddress === rehearsalArtwork.core.toLowerCase() &&
+        sale.nftAddress === rehearsalArtwork.nft.toLowerCase() && sale.rpcReadings === 2 &&
+        sale.auctionId === '1' && sale.artworkId === '1' && sale.tokenId === '1' && ownerBlock >= sale.blockNumber,
+        'Unexpected rehearsal sale');
+    const eth = wei => formatEther(wei) + ' test ETH';
+    return evidencePage('First sale and ownership', 'Work 1 · NFT 1',
+        'Two Base Sepolia nodes verified the primary sale and the owner at the finalized block shown below.',
+        'Auction 1 · Settled and minted', [
+            ['Sale price', eth(sale.priceWei)], ['Creator', sale.creator], ['First Collector', sale.firstCollector],
+            ['Owner', owner], ['Ownership block', ownerBlock], ['Ownership block hash', ownerBlockHash],
+            ['Creator proceeds', eth(sale.creatorWei)], ['Protocol proceeds', eth(sale.protocolWei)], ['Protocol treasury', sale.protocol],
+            ['Settlement transaction', sale.transactionHash], ['Settlement block', sale.blockNumber], ['Settlement block hash', sale.blockHash],
+            ['Settlement event index', sale.logIndex], ['Network', 'Base Sepolia (84532)'],
+            ['Core', sale.coreAddress], ['NFT contract', sale.nftAddress]
+        ]);
+}
+
 function evidencePage(title, heading, description, section, fields, details = '') {
     return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

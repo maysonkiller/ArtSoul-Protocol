@@ -7,7 +7,7 @@ import { getAddress, keccak256, toQuantity } from 'ethers';
 import { prepareOrdinaryDeployment } from './prepare-ordinary-deployment.mjs';
 import { expectedRehearsalPairRegister, loadReviewedPair } from './prepare-rehearsal-core.mjs';
 import { prepareRehearsalSafes, rehearsalSafeRelease as release } from './prepare-rehearsal-safes.mjs';
-import { auctionPage, registrationPage } from './rehearsal-review/registration.mjs';
+import { auctionPage, registrationPage, settlementPage } from './rehearsal-review/registration.mjs';
 import { readRpc, requireIndependentProviders, verifyTreasurySafesWithTwoProviders } from './verify-treasury-safes.mjs';
 
 const asset = name => new URL('./rehearsal-review/' + name, import.meta.url);
@@ -145,7 +145,7 @@ export async function buildReview({ adminSafe, payer, reference, coreReview, tre
     return { ...base, operation, target, deployments, codeChecks, nonce, dataHash, data: tx.data, dataSha256: sha256Hex(tx.data) };
 }
 
-export async function listenForReview(loadPlan, { loadRegistration, loadAuction } = {}) {
+export async function listenForReview(loadPlan, { loadRegistration, loadAuction, loadSale } = {}) {
     const token = randomBytes(24).toString('hex');
     const prefix = '/' + token + '/';
     const files = new Map([['', ['index.html', 'text/html']], ['client.mjs', ['client.mjs', 'text/javascript']],
@@ -153,6 +153,7 @@ export async function listenForReview(loadPlan, { loadRegistration, loadAuction 
     const evidence = new Map();
     if (loadRegistration) evidence.set('registration', { load: loadRegistration, render: registrationPage, label: 'View verified work registration' });
     if (loadAuction) evidence.set('auction', { load: loadAuction, render: auctionPage, label: 'View finalized auction status' });
+    if (loadSale) evidence.set('settlement', { load: loadSale, render: settlementPage, label: 'View first sale and ownership' });
     let inflight;
     const server = createServer(async (req, res) => {
         const host = '127.0.0.1:' + server.address().port;
@@ -168,7 +169,13 @@ export async function listenForReview(loadPlan, { loadRegistration, loadAuction 
         }
         const name = req.url.slice(prefix.length);
         try {
-            if (name === 'plan.json') {
+            const evidenceLinks = () => [...evidence].map(([route, page]) => '<p><a href="./' + route + '">' + page.label + '</a></p>').join('');
+            if (!loadPlan && name === '') {
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(req.method === 'HEAD' ? undefined :
+                    '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+                    '<title>Base Sepolia rehearsal · ArtSoul</title><link rel="stylesheet" href="./review.css"><main><h1>Base Sepolia rehearsal</h1>' +
+                    evidenceLinks() + '</main></html>');
+            } else if (name === 'plan.json' && loadPlan) {
                 // Coalesce overlapping reads only. The wallet confirmation always requests fresh on-chain checks.
                 inflight ??= Promise.resolve().then(loadPlan).catch(error => {
                     // A load-balanced RPC can briefly serve an older finalized head.
@@ -184,12 +191,11 @@ export async function listenForReview(loadPlan, { loadRegistration, loadAuction 
                 const html = page.render(await page.inflight);
                 res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
                 res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(req.method === 'HEAD' ? undefined : html);
-            } else if (files.has(name)) {
+            } else if (files.has(name) && (loadPlan || name === 'review.css')) {
                 const [file, mime] = files.get(name);
                 let content = await readFile(asset(file));
                 if (name === '' && evidence.size) {
-                    content = content.toString('utf8').replace('<!-- evidence-link -->',
-                        [...evidence].map(([route, page]) => '<p><a href="./' + route + '">' + page.label + '</a></p>').join(''));
+                    content = content.toString('utf8').replace('<!-- evidence-link -->', evidenceLinks());
                 }
                 res.writeHead(200, { 'Content-Type': mime + '; charset=utf-8' }).end(req.method === 'HEAD' ? undefined : content);
             } else {
