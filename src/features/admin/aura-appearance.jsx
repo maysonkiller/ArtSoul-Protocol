@@ -8,6 +8,7 @@ const sourceMessages = {
     unavailable: 'Public frame verification is currently unavailable.'
 };
 const eligibility = {
+    founder: 'A personal work registered by a designated founder wallet on this publishing contract.',
     platform: 'The NFT comes from a verified ArtSoul publication by the designated publisher.',
     genesis: 'The NFT itself has a verified grant from the designated Genesis contract on Base mainnet.',
     partner: 'The NFT belongs to the specific collection approved as an ArtSoul Partner.'
@@ -56,11 +57,11 @@ export function AuraAppearance({ api, wallet, isSessionCurrent }) {
     return <section className="protocol-admin-setup admin-aura-setting" aria-labelledby="aura-appearance-heading">
         <h2 id="aura-appearance-heading">NFT appearance</h2>
         <label><input type="checkbox" checked={enabled === true} disabled={busy || !setting}
-            onChange={event => change(event.currentTarget.checked)} /> Show labels on verified NFT frames in Future</label>
-        <p>Cards and artwork pages show one eligible frame. Platform takes priority, followed by Genesis and Partner.</p>
+            onChange={event => change(event.currentTarget.checked)} /> Show labels on verified frames in Future</label>
+        <p>The label follows the frame on cards and artwork pages. Reduced motion keeps it still.</p>
         {setting && <figure className="admin-aura-preview">
             <figcaption><label>Frame preview <select value={preview} onChange={event => setPreview(event.currentTarget.value)}>
-                <option value="platform">ArtSoul</option><option value="genesis">Genesis</option><option value="partner">ArtSoul Partner</option>
+                <option value="platform">ArtSoul</option><option value="founder">ArtSoul Founder</option><option value="genesis">Genesis</option><option value="partner">ArtSoul Partner</option>
             </select></label></figcaption>
             <div className={auraFrameClassName(preview)} aria-hidden="true">
                 <img src="/brand/artsoul-audio-cover-384.webp" alt="" width="96" height="96" />

@@ -7,12 +7,12 @@ export function AuraSources({ api, wallet, isSessionCurrent }) {
     const [deployment,setDeployment] = React.useState('catalog');
     return <details className="identity-applications"><summary>Manage frame sources</summary>
         <label>Frame source <select value={kind} onChange={e => { setKind(e.target.value); setChain('84532'); }}>
-            <option value="platform">Platform publisher wallet</option><option value="partner">Partner collection contract</option>
+            <option value="platform">Platform publisher wallet</option><option value="founder">Founder artist wallet</option><option value="partner">Partner collection contract</option>
         </select></label>
-        {kind === 'partner' && <p>Enter the NFT collection contract on its issuing network. A personal wallet belongs under Platform publisher.</p>}
+        {kind === 'partner' && <p>Enter the NFT collection contract on its issuing network. For personal founder works, select Founder artist wallet.</p>}
         {kind === 'partner' && <label>Network <select value={chain} onChange={e=>setChain(e.target.value)}>
             <option value="84532">Base Sepolia</option><option value="8453">Base</option></select></label>}
-        {kind === 'platform' && <label>Publishing contract <select value={deployment} onChange={e => setDeployment(e.target.value)}>
+        {kind !== 'partner' && <label>Publishing contract <select value={deployment} onChange={e => setDeployment(e.target.value)}>
             <option value="catalog">Current website catalog</option><option value="rehearsal">New auction rehearsal</option></select></label>}
         <SourceEditor key={wallet + kind + chain + deployment} {...{kind,chain,deployment,api,wallet,isSessionCurrent}} />
     </details>;
@@ -30,7 +30,7 @@ function SourceEditor({kind,chain,deployment,api,wallet,isSessionCurrent}) {
     const sequence = React.useRef(0);
     React.useEffect(()=>()=>{sequence.current++; search.cancel();},[search]);
     const path = 'aura-sources?wallet='+encodeURIComponent(wallet.toLowerCase())+'&kind='+kind+'&chain='+chain+
-        (kind === 'platform' ? '&deployment='+deployment : '');
+        (kind !== 'partner' ? '&deployment='+deployment : '');
     const label = kind === 'partner' ? 'Collection contract' : 'Publisher address or profile name';
     const validAddress = /^0x[\da-f]{40}$/i.test(address.trim());
     function edit(value) { sequence.current++; search.reset(); setAddress(value); setSource(null); setList(null); setReason(''); setMessage(''); setBusy(false); }
@@ -61,11 +61,11 @@ function SourceEditor({kind,chain,deployment,api,wallet,isSessionCurrent}) {
         finally { if (isSessionCurrent() && sequence.current === request) setBusy(false); }
     }
     return <div>
-        <p>{kind === 'platform' ? 'Base Sepolia. The original registration must name this publisher on the selected contract. Public frames appear when the catalog verifies the minted NFT.' :
+        <p>{kind !== 'partner' ? 'Base Sepolia. The original registration must name this publisher on the selected contract. A founder wallet marks personal works. A platform wallet marks official ArtSoul publications. Enabling one replaces the other for this wallet and contract.' :
             'Use the exact contract of the partner collection. A verified mint identifies each eligible token, including after a transfer.'}</p>
-        <label>{label}<input value={address} placeholder={kind === 'platform' ? 'Name or 0x…' : '0x…'} maxLength={100} disabled={busy} onChange={e=>edit(e.target.value)} /></label>
-        {kind === 'platform' && <button type="button" disabled={busy} onClick={()=>edit(wallet)}>Use my wallet</button>}
-        {kind === 'platform' && canSearch(address) && !validAddress && !address.trim().startsWith('0x') ?
+        <label>{label}<input value={address} placeholder={kind !== 'partner' ? 'Name or 0x…' : '0x…'} maxLength={100} disabled={busy} onChange={e=>edit(e.target.value)} /></label>
+        {kind !== 'partner' && <button type="button" disabled={busy} onClick={()=>edit(wallet)}>Use my wallet</button>}
+        {kind !== 'partner' && canSearch(address) && !validAddress && !address.trim().startsWith('0x') ?
             <button type="button" disabled={busy || matches?.status === 'loading'} onClick={()=>search.search(address,'artists')}>Find profile</button> :
             <button type="button" disabled={busy || !validAddress} onClick={()=>load(address)}>Check address</button>}
         <button type="button" disabled={busy} onClick={()=>load(null)}>View sources</button>

@@ -14,15 +14,16 @@ export default async function handler(req,res) {
         const actor = await verifiedReviewActor(req);
         const {kind,chain,address,after,deployment} = req.query || {};
         const invalid = () => serviceError('INVALID_SOURCE','Choose a valid network, wallet or contract.');
-        if (!['platform','partner'].includes(kind) || !['8453','84532'].includes(chain) ||
-            (kind === 'platform' && chain !== '84532') ||
-            (deployment !== undefined && (kind !== 'platform' || !['catalog','rehearsal'].includes(deployment)))) throw invalid();
+        const publisher = kind === 'platform' || kind === 'founder';
+        if ((!publisher && kind !== 'partner') || !['8453','84532'].includes(chain) ||
+            (publisher && chain !== '84532') ||
+            (deployment !== undefined && (!publisher || !['catalog','rehearsal'].includes(deployment)))) throw invalid();
         const subject = address === undefined ? null : normalizeWallet(address);
         if (address !== undefined && (!subject || /^0x0{40}$/.test(subject)) ||
             after !== undefined && (!normalizeWallet(after) || address !== undefined)) throw invalid();
         const publishingCore = deployment === 'rehearsal' ? rehearsalCore : process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA;
-        const scope = kind === 'platform' ? normalizeWallet(publishingCore || '') : '';
-        if (kind === 'platform' && (!scope || /^0x0{40}$/.test(scope))) throw serviceError('CORE_UNAVAILABLE','The active publishing contract has not been configured.',503);
+        const scope = publisher ? normalizeWallet(publishingCore || '') : '';
+        if (publisher && (!scope || /^0x0{40}$/.test(scope))) throw serviceError('CORE_UNAVAILABLE','The active publishing contract has not been configured.',503);
         const params = {...actor.params,p_kind:kind,p_chain:Number(chain),p_scope:scope,p_address:subject,p_after:after?.toLowerCase() || '',
             p_revision:null,p_enabled:null,p_reason:null};
         if (req.method === 'POST') {
@@ -36,7 +37,7 @@ export default async function handler(req,res) {
                 const hasCode = await hasPartnerContract(Number(chain),subject).catch(() => {
                     throw serviceError('SOURCE_UNAVAILABLE','Could not check the collection contract. Try again.',503);
                 });
-                if (!hasCode) throw serviceError('INVALID_SOURCE','Enter the deployed collection contract address on the selected network.');
+                if (!hasCode) throw serviceError('INVALID_SOURCE','Enter the ERC-721 collection contract address on the selected network.');
             }
         }
         const rows = await supabaseRest('rpc/manage_aura_sources',{method:'POST',body:params});

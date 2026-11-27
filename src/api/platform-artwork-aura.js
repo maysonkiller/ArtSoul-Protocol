@@ -53,11 +53,23 @@ export function platformPublisherFor(config) {
   return publisher;
 }
 
+export async function publisherFrameStates(addresses, chain, core) {
+  const states = await supabaseRest('rpc/publisher_frame_states',{method:'POST',body:{
+    p_chain:chain,p_scope:core,p_addresses:addresses
+  },signal:AbortSignal.timeout(2000)});
+  if (!Array.isArray(states) || states.length > addresses.length ||
+      new Set(states.map(s=>s?.address)).size !== states.length ||
+      states.some(s=>!addresses.includes(s?.address) || !['platform','founder'].includes(s.kind) || typeof s.enabled !== 'boolean')) {
+    throw new Error('Invalid publisher designation');
+  }
+  return states;
+}
+
 export async function readArtworkAuraKinds(artworks, ownership) {
   const qualified = new Map();
   if (!ownership?.config || !artworks.length) return qualified;
   const publisher = platformPublisherFor(ownership?.config);
-  const publishers = new Set(publisher ? [publisher] : []);
+  const publishers = new Map(publisher ? [[publisher, 'platform']] : []);
   const core = ownership.config.coreAddress;
   const proven = new Map(ownership.rows.map(row => [row.artwork_id, row]));
   if (process.env.ARTSOUL_AURA_SOURCES_ENABLED === 'true') {
@@ -65,11 +77,8 @@ export async function readArtworkAuraKinds(artworks, ownership) {
       .map(a => normalizeWallet(a.creator)).filter(Boolean))];
     if (!addresses.length || addresses.length > 200) return qualified;
     try {
-      const states = await supabaseRest('rpc/aura_source_states',{method:'POST',body:{
-        p_kind:'platform',p_chain:ownership.config.chainId,p_scope:core,p_addresses:addresses
-      },signal:AbortSignal.timeout(2000)});
-      if (!Array.isArray(states) || states.length > addresses.length || states.some(s=>!addresses.includes(s.address) || typeof s.enabled !== 'boolean')) return qualified;
-      for (const s of states) { if (s.enabled) publishers.add(s.address); else publishers.delete(s.address); }
+      const states = await publisherFrameStates(addresses, ownership.config.chainId, core);
+      for (const s of states) { if (s.enabled) publishers.set(s.address,s.kind); else publishers.delete(s.address); }
     } catch { return qualified; }
   }
   if (!publishers.size) return qualified;
@@ -108,7 +117,7 @@ export async function readArtworkAuraKinds(artworks, ownership) {
         const kind = verifiedArtworkAura(identity, {
           platformRegistration: { chainId: Number(artwork.chain_id), address: nftAddress, tokenId: artwork.token_id }
         });
-        if (kind) qualified.set(artwork.artwork_id, kind);
+        if (kind) qualified.set(artwork.artwork_id, publishers.get(normalizeWallet(artwork.creator)));
       }
     }
   }));

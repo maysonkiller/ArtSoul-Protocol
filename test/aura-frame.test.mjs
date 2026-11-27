@@ -4,12 +4,11 @@ import { auraFrameClassName, projectedArtworkAura, auraCaption, auraWords } from
 
 test('a perimeter label keeps the complete designation together in reading order', () => {
     const create = (tag, props, ...children) => ({tag, props, children});
-    for (const name of ['ArtSoul', 'Genesis', 'ArtSoul Partner']) {
+    for (const name of ['ArtSoul', 'Genesis', 'ArtSoul Partner', 'ArtSoul Founder']) {
         const label = auraCaption(create, name);
         assert.equal(label.props['aria-hidden'], 'true');
         assert.deepEqual(label.children[0].children, [name]);
-        if (name === 'Genesis') assert.equal(label.children[1], null);
-        else assert.equal(label.children[1].props['data-word'], name);
+        assert.equal(label.children[1].props['data-word'], name);
     }
     assert.equal(auraWords.partner, 'ArtSoul Partner');
     assert.equal(auraCaption(create, 'unreviewed'), null);
@@ -29,7 +28,7 @@ test('aura presentation is absent unless the caller supplies one supported kind'
 test('the shared aura API supplies exactly one decoration without mutating caller data', () => {
     const claim = Object.freeze({ kind: 'genesis', owner: 'unverified' });
     assert.equal(auraFrameClassName(claim), '');
-    for (const kind of ['platform', 'genesis', 'partner']) {
+    for (const kind of ['platform', 'genesis', 'partner', 'founder']) {
         const classes = auraFrameClassName(kind).split(' ');
         assert.equal(classes[0], 'artsoul-aura-frame');
         assert.deepEqual(classes.slice(1), [`artsoul-aura-frame--${kind}`]);

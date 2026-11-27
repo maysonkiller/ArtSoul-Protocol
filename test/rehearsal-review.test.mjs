@@ -47,6 +47,20 @@ test('wallet checks refuse wrong chain, payer, pending payer nonce, runtime, des
     assert.equal(sameReview(plan, { ...plan, nonce: '0x5' }), false);
     assert.equal(sameReview(plan, { ...plan, block: { number: '0x10' } }), true);
 });
+test('review tolerates reordered object keys but requires another click when the nonce changes', async t => {
+    const check = plan.codeChecks[0];
+    assert.equal(sameReview(plan,{...plan,codeChecks:[{sha256:check.sha256,address:check.address}]}),true);
+    const provider = wallet({eth_requestAccounts:()=>[payer]});
+    let current = {...plan,roles:{},owners:[],block:{number:'0x2'}};
+    const field = await renderReview(t,provider,()=>current);
+    await field('connect').onclick();
+    current = {...current,nonce:'0x8'};
+    await field('submit').onclick();
+    assert.match(field('status').textContent,/Updated sender nonce/);
+    assert.ok(!provider.calls.includes('eth_sendTransaction'));
+    assert.equal(field('submit').disabled,false);
+});
+
 test('private custody review binds all owners, role addresses, payer and pending payload, allowing finalized steps to disappear', () => {
     const account = { address: admin, owners: [safe, target, payer], threshold: 2 };
     const roleRequests = [{ role: 'protocolTreasury', safe, dataHash: data }];
@@ -265,4 +279,19 @@ test('loopback server serves only token-bound read routes on the exact origin', 
     assert.equal((await get('/plan.json')).statusCode, 403);
     assert.equal((await get('other.js')).statusCode, 404);
     assert.equal(reads, 1);
+});
+
+test('a lagging finalized head triggers one fresh read and persistent lag stays unavailable', async t => {
+    let reads=0, ready=true;
+    const {server,url}=await listenForReview(()=>{
+        if (++reads === 2 && ready) return plan;
+        throw Error('Provider has not finalized the requested block');
+    });
+    t.after(()=>new Promise(resolve=>server.close(resolve)));
+    const first=await fetch(url+'plan.json');
+    assert.equal(first.status,200);
+    assert.deepEqual(await first.json(),plan);
+    ready=false;
+    assert.equal((await fetch(url+'plan.json')).status,503);
+    assert.equal(reads,4);
 });
