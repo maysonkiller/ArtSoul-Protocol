@@ -1,5 +1,7 @@
 # ArtSoul voice assistant feasibility review
 
+The November 27 [Marin recording inventory](../audio/assistant-phrase-bank.json) supersedes the device voice fallback described in this historical review. The site starts in English. Visitors can select Russian audio. The recording index accepts only matching local audio receipts. The written answer remains available when a phrase has no recording.
+
 ## What visitors hear
 
 At revision `1382df01`, speech and typing feed the same Russian/English command parser. The microphone uses the browser's speech recognition for one utterance. Browser support and audio processing depend on the device and vendor. The parser calls the same ArtSoul tools as the website assistant. This explains why a familiar command can work on an iPhone while a paraphrase can fail. [Command implementation](../../voice-commands.js) · [Browser speech recognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition)

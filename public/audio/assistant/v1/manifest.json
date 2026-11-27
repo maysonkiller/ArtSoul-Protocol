@@ -165,6 +165,300 @@
         "output_tokens": 152
       },
       "estimated_usd": 0.0030838000000000003
+    },
+    {
+      "lang": "ru",
+      "id": "helpSpeech",
+      "text": "Можно открыть галерею, найти работу или узнать о своей активности. Доступные команды показаны в примерах ниже. Действия с кошельком всегда требуют вашей проверки и подписи.",
+      "url": "/audio/assistant/v1/ru-helpSpeech.wav",
+      "transcript": "Можно открыть галерею, найти работу или узнать о своей активности. Доступные команды показаны в примерах ниже. Действия с кошельком всегда требуют вашей проверки и подписи.",
+      "sha256": "6feafb213b42e6c6e903be469128606186eb382b1ba4b23ce161df040ca7c345",
+      "bytes": 564044,
+      "duration_seconds": 11.75,
+      "generated_at": "2026-11-16T17:12:24.771Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 316
+      },
+      "estimated_usd": 0.00638
+    },
+    {
+      "lang": "ru",
+      "id": "searchPrompt",
+      "text": "Что найти? Например: «найди луна», «найди автора Vera» или «найди в документации fees».",
+      "url": "/audio/assistant/v1/ru-searchPrompt.wav",
+      "transcript": "Что найти? Например: «найди луна», «найди автора Vera» или «найди в документации fees».",
+      "sha256": "62313968300b703eaa92e2397e7bd33cc31d8203c690239670a577cc5cc7a81c",
+      "bytes": 328844,
+      "duration_seconds": 6.85,
+      "generated_at": "2026-11-16T17:13:08.788Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 86,
+        "output_tokens": 200
+      },
+      "estimated_usd": 0.0040516
+    },
+    {
+      "lang": "ru",
+      "id": "publicationPrompt",
+      "text": "Как назвать работу? Например: «подготовь работу с названием Лунный свет». На Publish вы проверите черновик; файл не загружается, подпись не запрашивается.",
+      "url": "/audio/assistant/v1/ru-publicationPrompt.wav",
+      "transcript": "Как назвать работу? Например: «подготовь работу с названием Лунный свет». На Publish вы проверите черновик; файл не загружается, подпись не запрашивается.",
+      "sha256": "3497097283ddf3d90aebd4ba66dd6819592592560ae8bae6f6b3a4b53008e7a9",
+      "bytes": 554444,
+      "duration_seconds": 11.55,
+      "generated_at": "2026-11-16T17:13:12.038Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 308
+      },
+      "estimated_usd": 0.00622
+    },
+    {
+      "lang": "ru",
+      "id": "tooLong",
+      "text": "Введите одну команду длиной до 300 символов.",
+      "url": "/audio/assistant/v1/ru-tooLong.wav",
+      "transcript": "Введите одну команду длиной до 300 символов.",
+      "sha256": "4c969387f57ad8b9768069c5cb99d21d0f274ac798332386847fef0502d132f7",
+      "bytes": 160844,
+      "duration_seconds": 3.35,
+      "generated_at": "2026-11-16T17:13:15.722Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 72,
+        "output_tokens": 111
+      },
+      "estimated_usd": 0.0022632
+    },
+    {
+      "lang": "ru",
+      "id": "empty",
+      "text": "Сначала введите команду.",
+      "url": "/audio/assistant/v1/ru-empty.wav",
+      "transcript": "Сначала введите команду.",
+      "sha256": "2b8a49a8f7993b32a5b90d3bfa7b689ccef212f1c1530eac1b45ac2282c2dee3",
+      "bytes": 98444,
+      "duration_seconds": 2.05,
+      "generated_at": "2026-11-16T17:13:18.604Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 67,
+        "output_tokens": 87
+      },
+      "estimated_usd": 0.0017802
+    },
+    {
+      "lang": "ru",
+      "id": "unavailable",
+      "text": "Команды недоступны на этой странице.",
+      "url": "/audio/assistant/v1/ru-unavailable.wav",
+      "transcript": "Команды недоступны на этой странице.",
+      "sha256": "6323ff2c9133970199ad7c70ed4f8683cd8b886fe9e65067f62fd79ee26cfa26",
+      "bytes": 132044,
+      "duration_seconds": 2.75,
+      "generated_at": "2026-11-16T17:13:21.273Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 69,
+        "output_tokens": 97
+      },
+      "estimated_usd": 0.0019814
+    },
+    {
+      "lang": "ru",
+      "id": "noWallet",
+      "text": "Кошелёк не подключён. Сначала подключите его.",
+      "url": "/audio/assistant/v1/ru-noWallet.wav",
+      "transcript": "Кошелёк не подключён. Сначала подключите его.",
+      "sha256": "3e210f0c59c820070e452ea829209277749057c457b7d79267bc4130ad951c09",
+      "bytes": 184844,
+      "duration_seconds": 3.85,
+      "generated_at": "2026-11-16T17:13:24.534Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 75,
+        "output_tokens": 146
+      },
+      "estimated_usd": 0.002965
+    },
+    {
+      "lang": "ru",
+      "id": "submitted",
+      "text": "Готово. Кошелёк подтвердил, транзакция отправлена.",
+      "url": "/audio/assistant/v1/ru-submitted.wav",
+      "transcript": "Готово. Кошелёк подтвердил, транзакция отправлена.",
+      "sha256": "6e40ba6baf6093e15b07972191997c772884fb26bfce89b919f82ef1ec55aa7f",
+      "bytes": 180044,
+      "duration_seconds": 3.75,
+      "generated_at": "2026-11-16T17:13:27.443Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 78,
+        "output_tokens": 124
+      },
+      "estimated_usd": 0.0025268
+    },
+    {
+      "lang": "ru",
+      "id": "settled",
+      "text": "Расчёт подтверждён. NFT теперь ваша. Данные работы обновляются.",
+      "url": "/audio/assistant/v1/ru-settled.wav",
+      "transcript": "Расчёт подтверждён. NFT теперь ваша. Данные работы обновляются.",
+      "sha256": "2cfd8cd697db3e23cc0591ba3731ba2d964e15e4b7c799092987f961f4f2f566",
+      "bytes": 290444,
+      "duration_seconds": 6.05,
+      "generated_at": "2026-11-16T17:13:31.248Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 77,
+        "output_tokens": 171
+      },
+      "estimated_usd": 0.0034662
+    },
+    {
+      "lang": "en",
+      "id": "r2Greeting",
+      "text": "Hello! What would you like to explore in ArtSoul?",
+      "url": "/audio/assistant/v1/phrases/en-r2Greeting.wav",
+      "transcript": "Hello! What would you like to explore in ArtSoul?",
+      "sha256": "40d51e8e7cf98a67f49b71759ceaaa362870364e505087c47932328cd98bf3a0",
+      "bytes": 148844,
+      "duration_seconds": 3.1,
+      "generated_at": "2026-11-21T15:11:31.518Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 81,
+        "output_tokens": 108
+      },
+      "estimated_usd": 0.0022086
+    },
+    {
+      "lang": "en",
+      "id": "options",
+      "text": "You can open the gallery, find artwork, or ask about your activity.",
+      "url": "/audio/assistant/v1/phrases/en-options.wav",
+      "transcript": "You can open the gallery, find artwork, or ask about your activity.",
+      "sha256": "4b52a038fddec9751fac1035c146c71f8d3d1fadc7e44c120eb4a6160dd3ca70",
+      "bytes": 197804,
+      "duration_seconds": 4.12,
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "derived_from": {
+        "url": "/audio/assistant/v1/en-helpSpeech.wav",
+        "sha256": "17466bb2f5863821fe503e9d627ebc8b8acfc6f58eb33df50def10a3be1c1ee7",
+        "pcm_start": 0,
+        "pcm_bytes": 197760
+      },
+      "source_commit": "60cb70d78eecba79e2778780c2654e7f9a1f4d50"
+    },
+    {
+      "lang": "en",
+      "id": "askSearch",
+      "text": "What would you like to find?",
+      "url": "/audio/assistant/v1/phrases/en-askSearch.wav",
+      "transcript": "What would you like to find?",
+      "sha256": "5b99f3716f5c164d49cd0490bb777e83c7dc40299f81e5e1cf541a71f2bccc7f",
+      "bytes": 74444,
+      "duration_seconds": 1.55,
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "derived_from": {
+        "url": "/audio/assistant/v1/en-searchPrompt.wav",
+        "sha256": "92ab57be015f6e92d98a38d3a5a63c301d7c3456e5bddf378919d4060fd9611b",
+        "pcm_start": 0,
+        "pcm_bytes": 74400
+      },
+      "source_commit": "60cb70d78eecba79e2778780c2654e7f9a1f4d50"
+    },
+    {
+      "lang": "en",
+      "id": "askTitle",
+      "text": "What is the title?",
+      "url": "/audio/assistant/v1/phrases/en-askTitle.wav",
+      "transcript": "What is the title?",
+      "sha256": "ace8e5806b4aec034f3eb1946a8a0916c6da27229ab7e771a89f1f79b82131a9",
+      "bytes": 62444,
+      "duration_seconds": 1.3,
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "derived_from": {
+        "url": "/audio/assistant/v1/en-publicationPrompt.wav",
+        "sha256": "e7b1033b718074e6057e506f5f92b7ed66b1a4027e119959ff746f58c2c1ed83",
+        "pcm_start": 0,
+        "pcm_bytes": 62400
+      },
+      "source_commit": "60cb70d78eecba79e2778780c2654e7f9a1f4d50"
+    },
+    {
+      "lang": "ru",
+      "id": "options",
+      "text": "Можно открыть галерею, найти работу или узнать о своей активности.",
+      "url": "/audio/assistant/v1/phrases/ru-options.wav",
+      "transcript": "Можно открыть галерею, найти работу или узнать о своей активности.",
+      "sha256": "578de32c8c3ddd977653cac0348375eca929204ca8ed225396595f2c23fdde03",
+      "bytes": 220844,
+      "duration_seconds": 4.6,
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "derived_from": {
+        "url": "/audio/assistant/v1/ru-helpSpeech.wav",
+        "sha256": "6feafb213b42e6c6e903be469128606186eb382b1ba4b23ce161df040ca7c345",
+        "pcm_start": 0,
+        "pcm_bytes": 220800
+      },
+      "source_commit": "60cb70d78eecba79e2778780c2654e7f9a1f4d50"
+    },
+    {
+      "lang": "ru",
+      "id": "askSearch",
+      "text": "Что найти?",
+      "url": "/audio/assistant/v1/phrases/ru-askSearch.wav",
+      "transcript": "Что найти?",
+      "sha256": "073afcbb6f3c213e39f3b566c9ffe6417aaa58dc4f67507615f9008edb42b0f4",
+      "bytes": 43244,
+      "duration_seconds": 0.9,
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "derived_from": {
+        "url": "/audio/assistant/v1/ru-searchPrompt.wav",
+        "sha256": "62313968300b703eaa92e2397e7bd33cc31d8203c690239670a577cc5cc7a81c",
+        "pcm_start": 0,
+        "pcm_bytes": 43200
+      },
+      "source_commit": "60cb70d78eecba79e2778780c2654e7f9a1f4d50"
+    },
+    {
+      "lang": "ru",
+      "id": "askTitle",
+      "text": "Как назвать работу?",
+      "url": "/audio/assistant/v1/phrases/ru-askTitle.wav",
+      "transcript": "Как назвать работу?",
+      "sha256": "f92a7c3db5f574dbdfcdab72f4f372fb94e7a43fc790a2ded5e2d803d708d1e5",
+      "bytes": 76844,
+      "duration_seconds": 1.6,
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "derived_from": {
+        "url": "/audio/assistant/v1/ru-publicationPrompt.wav",
+        "sha256": "3497097283ddf3d90aebd4ba66dd6819592592560ae8bae6f6b3a4b53008e7a9",
+        "pcm_start": 0,
+        "pcm_bytes": 76800
+      },
+      "source_commit": "60cb70d78eecba79e2778780c2654e7f9a1f4d50"
     }
   ]
 }
