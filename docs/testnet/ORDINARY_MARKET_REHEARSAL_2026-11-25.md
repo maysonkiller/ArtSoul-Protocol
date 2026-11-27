@@ -187,7 +187,15 @@ node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.
 node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.json> --verify-refund-work REGISTRATION_TX
 ```
 
-After registration the creator opens a separate auction. Two distinct collectors place bids. Record the outbidding and refund-processing receipts for the queue reader above. The first auction's winner-surplus withdrawal covers another payment path.
+After work 2 is registered, the creator can open its own 24-hour auction at the same 0.001 test ETH reserve. Supply the **second** registration's public transaction hash. Both providers must confirm its sender, exact metadata, event, work ID and canonical position. The wallet review simulates `createAuction(2, 1000000000000000, 86400)` with zero test ETH. Any existing auction at the expected ID closes the request. The receipt check also binds the opening to its earlier registration.
+
+```sh
+node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.json> --refund-opening-plan REGISTRATION_TX
+node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.json> --serve-refund-opening REGISTRATION_TX
+node scripts/review-rehearsal-artwork.mjs <payout-review.json> <payout-register.json> --verify-refund-opening REGISTRATION_TX OPENING_TX
+```
+
+Two distinct collectors then place bids. Record the outbidding and refund-processing receipts for the queue reader above. The first auction's winner-surplus withdrawal covers another payment path.
 
 ### Restoring the first hosted sale
 
