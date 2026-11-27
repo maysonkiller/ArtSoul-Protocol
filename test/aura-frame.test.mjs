@@ -59,3 +59,13 @@ test('only the verified minted projection exposes a named frame to the interface
         assert.equal(projectedArtworkAura({...historical,...change}),null);
     }
 });
+
+test('a founder designation requires its own origin evidence before and after mint', () => {
+    const work = {source:'v41_projection', chain_id:84532, aura_kind:'founder', ownership_status:'verified'};
+    for (const minted of [true, false]) {
+        assert.equal(projectedArtworkAura({...work, minted}), null);
+        const verified = {...work, minted, founder_origin_verified:true};
+        assert.equal(projectedArtworkAura(verified).kind, 'founder');
+        assert.equal(projectedArtworkAura({...verified, chain_id:8453}), null);
+    }
+});

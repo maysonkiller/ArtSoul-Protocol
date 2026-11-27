@@ -24,18 +24,20 @@ export async function ingestOrdinarySettlement(pool, listener, options) {
 }
 
 export async function persistOrdinarySettlement(pool, listener, options, sale) {
-    const inserted = await withOrdinaryIssuer(pool, listener, options, sale, async client => {
-        const key = { chain_id: sale.chainId, core_address: sale.coreAddress, auction_id: sale.auctionId };
-        const created = await appendExact(client, 'ordinary_settlements', {
-            ...key, artwork_id: sale.artworkId, token_id: sale.tokenId, price_wei: sale.priceWei, creator: sale.creator,
-            first_collector: sale.firstCollector, runner_up_accepted: sale.runnerUpAccepted,
-            transaction_hash: sale.transactionHash, block_number: sale.blockNumber, block_hash: sale.blockHash, log_index: sale.logIndex
-        });
-        await appendExact(client, 'ordinary_primary_credits', { ...key, protocol_treasury: sale.protocol,
-            protocol_wei: sale.protocolWei, creator_wei: sale.creatorWei, log_index: sale.creditLogIndex });
-        return created;
-    });
+    const inserted = await withOrdinaryIssuer(pool, listener, options, sale, client => appendOrdinarySettlement(client, sale));
     return { inserted, sale };
+}
+
+export async function appendOrdinarySettlement(client, sale) {
+    const key = { chain_id: sale.chainId, core_address: sale.coreAddress, auction_id: sale.auctionId };
+    const created = await appendExact(client, 'ordinary_settlements', {
+        ...key, artwork_id: sale.artworkId, token_id: sale.tokenId, price_wei: sale.priceWei, creator: sale.creator,
+        first_collector: sale.firstCollector, runner_up_accepted: sale.runnerUpAccepted,
+        transaction_hash: sale.transactionHash, block_number: sale.blockNumber, block_hash: sale.blockHash, log_index: sale.logIndex
+    });
+    await appendExact(client, 'ordinary_primary_credits', { ...key, protocol_treasury: sale.protocol,
+        protocol_wei: sale.protocolWei, creator_wei: sale.creatorWei, log_index: sale.creditLogIndex });
+    return created;
 }
 
 // The ordinary receipt reader supplies decimal strings for every uint256 field.

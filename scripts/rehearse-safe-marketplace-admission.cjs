@@ -27,7 +27,8 @@ async function main() {
 
     async function createRehearsalNetwork(chainId, safeCount) {
         const chain = { ...config.networks.hardhat, chainId, forking: undefined };
-        if (chainId === 8453) chain.initialDate = '2030-01-01T00:00:00Z';
+        const fixedTime = chainId === 8453 || process.argv[3] === '--banner-cash-evidence';
+        if (fixedTime) chain.initialDate = '2030-01-01T00:00:00Z';
         const evm = await createProvider({ ...config, networks: { hardhat: chain } }, 'hardhat', artifacts);
         const provider = new ethers.BrowserProvider(evm, undefined, { cacheTimeout: -1 });
         provider.pollingInterval = 10;
@@ -37,7 +38,7 @@ async function main() {
         const addresses = owners.map(owner => owner.address);
         let nextTimestamp = Date.parse('2030-01-01T00:00:00Z') / 1000;
         async function setGrantBlockTime() {
-            if (chainId === 8453) await evm.send('evm_setNextBlockTimestamp', [nextTimestamp += 60]);
+            if (fixedTime) await evm.send('evm_setNextBlockTimestamp', [nextTimestamp += 60]);
         }
         async function deploy({ abi, bytecode }, ...args) {
             await setGrantBlockTime();
@@ -60,6 +61,49 @@ async function main() {
         }
         return { provider, evm, relayer, accounts, owners, addresses, deploy, safes, setGrantBlockTime,
             adminSingleton: singleton.target, adminHandler: handler.target };
+    }
+
+    if (process.argv[3] === '--banner-cash-evidence') {
+        async function cashFixture() {
+            const { provider, evm, accounts, owners, addresses, safes: [treasury], setGrantBlockTime,
+                adminSingleton, adminHandler } = await createRehearsalNetwork(84532, 1);
+            const sponsor = accounts[4];
+            const cashTerms = { protocolTreasury: treasury.target.toLowerCase(), sponsorWallet: sponsor.address.toLowerCase(),
+                paymentNonce: String(await sponsor.getNonce()), refundWei: '101', refundSafeNonce: String(await treasury.nonce()) };
+            const preview = { revision: 3, terms: { id: 'exhibition', kind: 'negotiated', feeWei: '501', refundWei: '101' }, award: null };
+            const source = { preview, cashTerms };
+            const reviewed = { ...preview, status:'reviewed_terms_rehearsal', reviewedAt:'2029-12-31T23:00:00Z' };
+            const custody = { chainId: 84532, protocolTreasury: { address: treasury.target, owners: addresses, threshold: 2,
+                singleton: adminSingleton, proxyCodeHash: ethers.keccak256(await provider.getCode(treasury.target)),
+                singletonCodeHash: ethers.keccak256(await provider.getCode(adminSingleton)), guard: zero, moduleGuard: zero,
+                fallbackHandler: adminHandler, modules: [] } };
+            await setGrantBlockTime();
+            const payment = await mine(sponsor.sendTransaction({ to: treasury.target, value: 501n }));
+            const before = await provider.getBalance(sponsor.address);
+            await setGrantBlockTime();
+            const refund = await mine(treasury.execTransaction(...await signedTransfer(treasury, sponsor.address, 101n, '0x', owners.slice(0, 2))));
+            assert.equal(await provider.getBalance(sponsor.address), before + 101n);
+            assert.equal(await provider.getBalance(treasury.target), 400n);
+            return { reviewed, source, custody, paymentHash:payment.hash, refundHash:refund.hash,
+                provider:(method,params) => evm.send(method,params) };
+        }
+        const a = await cashFixture(), b = await cashFixture();
+        assert.equal(a.paymentHash, b.paymentHash);
+        assert.equal(a.refundHash, b.refundHash);
+        const { verifyBannerCashReceipt } = await import('./read-banner-cash-receipt.mjs');
+        const verify = (changes={}) => verifyBannerCashReceipt({ ...a, providers:[a.provider,b.provider], ...changes });
+        const accepted = await verify();
+        assert.equal(accepted.payment.amountWei,'501');
+        assert.equal(accepted.refund.amountWei,'101');
+        for (const change of [{ paymentNonce:'1' }, { refundSafeNonce:'1' }, { refundWei:undefined },
+            { sponsorWallet:zero }, { protocolTreasury:zero }]) {
+            await assert.rejects(verify({ source:{ ...a.source,cashTerms:{ ...a.source.cashTerms,...change } } }));
+        }
+        await assert.rejects(verify({ refundHash:a.paymentHash }));
+        await assert.rejects(verify({ reviewed:{ ...a.reviewed,reviewedAt:'2031-01-01T00:00:00Z' } }));
+        assert.equal((await verify({ refundHash:undefined })).refund,null);
+        console.log('PASS: two isolated EVMs agreed on the exact sponsor payment and two-owner Safe refund. Balances, order, both nonces, late review, missing refund and wrong parties checked.');
+        return;
     }
 
     if (process.argv[3] === '--genesis-evidence') {
@@ -363,7 +407,7 @@ async function main() {
         await pilot.evm.send('hardhat_mine', ['0x80', '0x1']);
         await assert.rejects(verifyGenesisSafeProposal(review, custody, proposal(authorized), [publicViews(), publicViews()]),
             /owner confirmation/);
-        return { evm: pilot.evm, review, hash: receipt.hash };
+        return { evm: pilot.evm, review: { ...review, safeTxHash: checked.safeTxHash }, hash: receipt.hash };
     }
 }
 

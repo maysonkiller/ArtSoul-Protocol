@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Interface, toBeHex, toQuantity } from 'ethers';
-import { verifyOutbidRefund } from '../scripts/read-ordinary-outbid-refund.mjs';
+import { verifyOutbidRefund, verifyRefundBatch } from '../scripts/read-ordinary-outbid-refund.mjs';
 import { resaleFixture } from './helpers/ordinary-resale-postgres.mjs';
 
 const abi = new Interface([
     'event OutbidRefundQueued(uint256 indexed auctionId,uint256 indexed index,address indexed creditor,uint256 amount)',
     'event OutbidRefundProcessed(uint256 indexed auctionId,uint256 indexed index,address indexed creditor,uint256 amount,bool paid)',
-    'function refundProgress(uint256) returns (uint256,uint256)'
+    'function refundProgress(uint256) returns (uint256,uint256)',
+    'function refundBatchLimit() returns (uint256)', 'function refundTransferGas() returns (uint256)',
+    'function processRefunds(uint256,uint256)'
 ]);
 
 function verify(options = {}) {
@@ -54,4 +56,43 @@ test('requires the same indexed obligation, full amount and processed cursor', a
     await assert.rejects(verify({amount:1n}), /disposition do not match/);
     await assert.rejects(verify({cursor:0}), /disagrees with finalized queue/);
     await assert.rejects(verify({entry:'1'}), /one matching ordinary refund event/);
+});
+
+async function verifyBatch(options = {}) {
+    const f = resaleFixture(98);
+    const { transactionHash, blockHash } = f.location;
+    const sender = toBeHex(15,20), creditor = toBeHex(12,20);
+    const position = { blockHash, transactionHash, blockNumber: toQuantity(f.location.blockNumber), transactionIndex: '0x0' };
+    const providers = f.providers.map((base, i) => Object.assign(async (method, args) => {
+        const senderAndCore = { from: sender, to: f.pair.coreAddress };
+        if (method === 'eth_getTransactionByHash') return { ...position, ...senderAndCore, hash: transactionHash, value: '0x0',
+            input: abi.encodeFunctionData('processRefunds',[1,options.requested ?? 8]) };
+        if (method === 'eth_getTransactionReceipt') return { ...position, ...senderAndCore, type:'0x2', status:'0x1',
+            gasUsed: '0x64', effectiveGasPrice:'0x2', l1Fee: i === 1 && options.feeDisagreement ? '0x2' : '0x1',
+            logs: (options.ids ?? [5,6]).map((entry,index) => ({ ...position, address: f.pair.coreAddress, logIndex: toQuantity(index + 1),
+                ...abi.encodeEventLog('OutbidRefundProcessed',[1,entry,creditor,100,index===0]) })) };
+        if (method === 'eth_call') {
+            const call = abi.parseTransaction(args[0]);
+            if (call?.name === 'refundProgress') return abi.encodeFunctionResult(call.name,[options.cursor ?? 10,12]);
+            if (call?.name === 'refundBatchLimit') return abi.encodeFunctionResult(call.name,[options.limit ?? 8]);
+            if (call?.name === 'refundTransferGas') return abi.encodeFunctionResult(call.name,[30000]);
+        }
+        return base(method,args);
+    }, { origin: base.origin }));
+    return verifyRefundBatch(f.pair,transactionHash,providers);
+}
+
+test('reports signed batch calldata, distinct recipients, per-entry dispositions and whole-transaction fee separately', async () => {
+    const { batch, fees, matchesReviewedLimits, perRecipientGasMeasurement } = await verifyBatch();
+    assert.equal(matchesReviewedLimits,true);
+    assert.equal(perRecipientGasMeasurement,'not_in_receipt');
+    assert.deepEqual([batch.requestedEntries,batch.processedEntries,batch.distinctCreditors,batch.deliveredEntries,batch.creditedEntries],
+        ['8',2,1,1,1]);
+    assert.deepEqual([fees.gasUsed,fees.executionFeeWei,fees.l1DataFeeWei,fees.networkFeeWei],['100','200','1','201']);
+    assert.equal((await verifyBatch({ ids: [] })).batch.processedEntries,0);
+    assert.equal((await verifyBatch({ limit: 9 })).matchesReviewedLimits,false);
+    await assert.rejects(verifyBatch({ feeDisagreement: true }), /FIELDS/);
+    await assert.rejects(verifyBatch({ ids: [5,7] }), /finalized queue/);
+    await assert.rejects(verifyBatch({ cursor: 6 }), /finalized queue/);
+    await assert.rejects(verifyBatch({ requested: 1 }), /exceeds/);
 });

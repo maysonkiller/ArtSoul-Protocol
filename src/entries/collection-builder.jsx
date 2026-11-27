@@ -5,13 +5,22 @@ import { CollectionScheduleField } from './collection-schedule-field.jsx';
 import { COLLECTION_NETWORKS } from '../config/collection-networks.js';
 import {
     changeDraftSupply, createAuctionMintDraft, createDraft, createFirstArtworkDraft, createMintReservationDraft, createOriginDraft, createPhase, ELIGIBILITY, hasFirstWorkMint, loadDraft,
-    MAX_DRAFT_ITEMS, MECHANISMS, parseDraft, reservationPublicMint, reviewConfig, saveDraft, setsMintPrice, UNUSED_SUPPLY
+    MAX_DRAFT_ITEMS, MECHANISMS, parseDraft, reservationPublicMint, reviewConfig, saveDraft, setsMintPrice, supportsPhaseCallReview, UNUSED_SUPPLY
 } from '../features/collections/launch-config.js';
 import '../features/collections/collections.css';
 import { ExplainedAction } from '../ui/explained-action.jsx';
 
 const { useEffect, useRef, useState } = React;
 const STEPS = ['Collection', 'Phases', 'Review'];
+
+function downloadJson(filename, json) {
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 function initialDraft() {
     try {
@@ -87,15 +96,21 @@ function Builder() {
         try {
             const json = JSON.stringify(draft);
             parseDraft(json);
-            const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'artsoul-collection-draft.json';
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(url), 0);
+            downloadJson('artsoul-collection-draft.json', json);
             setMessage('JSON copy exported. It is a draft, not a deployed or approved launch.');
         } catch {
             setMessage('Could not export this draft. Check the imported fields and try again.');
+        }
+    }
+
+    async function exportPhaseCalls() {
+        try {
+            const { preparePhaseCallReview } = await import('../features/collections/phase-call-review.js');
+            const calls = preparePhaseCallReview(JSON.stringify(draft));
+            downloadJson('artsoul-testnet-phase-calls.json', JSON.stringify(calls, null, 2));
+            setMessage('Testnet phase calls downloaded. Nothing was submitted to a wallet.');
+        } catch (error) {
+            setMessage(error.message || 'The phase calls could not be prepared.');
         }
     }
 
@@ -243,6 +258,8 @@ function Builder() {
                         {review.contractCompatibility.firstWorkArtifact && <p className="launch-help">This template uses the local <code>{review.contractCompatibility.firstWorkArtifact}</code> contract. Any author can use it. ArtSoul reviews Partner status and identity verification separately.</p>}
                         <p className="launch-help">{review.contractCompatibility.compatible ? 'These draft settings fit the current local contract checks. Deployment and sale approval are still required.' : 'This draft needs changes before it can fit the current local contracts. Resolve the configuration items above and the limitations below.'}</p>
                         {review.contractCompatibility.findings.map((finding, index) => <p className="launch-finding" key={finding.code + ':' + index}>{finding.message}</p>)}
+                        {review.contractCompatibility.compatible && supportsPhaseCallReview(draft) &&
+                            <button type="button" onClick={exportPhaseCalls}>Download testnet phase calls</button>}
                         <details className="launch-details"><summary>How the local contracts interpret these settings</summary>{review.contractCompatibility.notes.map(note => <p className="launch-finding" key={note}>{note}</p>)}</details>
                     </section>
                     <details className="launch-details"><summary>Utility and financial declarations</summary><div className="launch-stack">

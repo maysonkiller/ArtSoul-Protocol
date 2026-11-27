@@ -8,7 +8,7 @@ import { checkReceipt, decodeReceiptLog, verifyTransactionPosition } from '../sr
 import { inspectOpeningReceipt } from './review-rehearsal-artwork.mjs';
 import { rehearsalArtwork as pair, rehearsalLateBid as bid, rehearsalOpening, lateBidWindow, settlementDigest, withdrawalDigest, surplusWei } from './rehearsal-review/client.mjs';
 import { verifyPairReading } from './read-reviewed-ordinary-pair.mjs';
-import { readOrdinarySettlement } from '../src/indexer/nft-deployment-proof.js';
+import { readOrdinarySettlement, readOrdinaryToken } from '../src/indexer/nft-deployment-proof.js';
 import { listenForReview, sequencedRead } from './serve-rehearsal-review.mjs';
 import { confirmFinalizedBlock, finalizedBlock, requireIndependentProviders } from './verify-treasury-safes.mjs';
 
@@ -157,14 +157,33 @@ async function winnerSettlementReview(providers) {
     return plans[0];
 }
 
-// Validate exactly what the first transaction did, even if another bidder took the lead in the same block.
-export async function winnerCreditReview(providers) {
+const issuer = { chainId: 84532, coreAddress: pair.core, nftAddress: pair.nft,
+    expectedCoreCodeHash: pair.coreHash, expectedNftCodeHash: pair.nftHash };
+
+async function firstSale(providers) {
     const receipt = JSON.parse(await readFile(new URL('../docs/testnet/ordinary-auction-1-settlement.json', import.meta.url), 'utf8'));
-    const issuer = { chainId:84532, coreAddress:pair.core, nftAddress:pair.nft,
-        expectedCoreCodeHash:pair.coreHash, expectedNftCodeHash:pair.nftHash };
     const sale = await verifyPairReading(issuer, receipt, providers, readOrdinarySettlement);
+    assert(sale.auctionId === '1' && sale.artworkId === '1' && sale.tokenId === '1');
     assert.equal(getAddress(sale.firstCollector), bid.bidder);
     assert.equal(BigInt(sale.priceWei), price);
+    return sale;
+}
+
+export async function firstSaleHistory(providers) {
+    const sale = await firstSale(providers);
+    const heads = await Promise.all(providers.map(rpc => finalizedBlock(issuer.chainId, rpc)));
+    const head = BigInt(heads[0].number) <= BigInt(heads[1].number) ? heads[0] : heads[1];
+    const blockNumber = Number(BigInt(head.number));
+    assert(Number.isSafeInteger(blockNumber) && blockNumber >= sale.blockNumber);
+    const token = await verifyPairReading(issuer, { tokenId: sale.tokenId, blockNumber, blockHash: head.hash },
+        providers, readOrdinaryToken);
+    assert(token.artworkId === sale.artworkId && token.creator === sale.creator && token.firstCollector === sale.firstCollector,
+        'Finalized token provenance differs from its primary sale');
+    return { sale, owner: token.owner, ownerBlock: token.blockNumber, ownerBlockHash: token.blockHash };
+}
+
+export async function winnerCreditReview(providers) {
+    const sale = await firstSale(providers);
     const data = market.encodeFunctionData('withdraw');
     assert.equal(sha256(data), withdrawalDigest);
     const plans = await Promise.all(providers.map(async rpc => {
@@ -268,15 +287,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         const [mode, hash, ...extra] = process.argv.slice(2);
         const receiptMode = mode === '--verify-receipt' || mode === '--verify-withdrawal';
         assert(!extra.length && ((receiptMode && isHexString(hash,32)) ||
-            (!hash && ['--plan','--serve','--status','--settle-plan','--settle','--withdraw-plan','--withdraw'].includes(mode))), 'Expected --status, --plan, --serve, --settle-plan, --settle, --withdraw-plan, --withdraw, --verify-receipt HASH or --verify-withdrawal HASH');
+            (!hash && ['--plan','--serve','--status','--settle-plan','--settle','--withdraw-plan','--withdraw','--sale'].includes(mode))), 'Expected --status, --plan, --serve, --settle-plan, --settle, --withdraw-plan, --withdraw, --sale, --verify-receipt HASH or --verify-withdrawal HASH');
         const providers = ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'].map(sequencedRead);
         const review = mode.startsWith('--withdraw') ? winnerCreditReview : mode.startsWith('--settle') ? winnerSettlementReview : firstLateBidReview;
         const load = () => review(providers);
         if (receiptMode) console.log(JSON.stringify(await verifyRehearsalReceipt(hash,providers,mode==='--verify-withdrawal'),null,2));
         else if (mode.endsWith('-plan') || mode === '--plan') console.log(JSON.stringify(await load(), null, 2));
         else if (mode === '--status') console.log(JSON.stringify(await finalizedAuctionStatus(providers), null, 2));
-        else console.log('Open the private Base Sepolia auction review on this computer:\n' + (await listenForReview(load, {
-            loadAuction: () => finalizedAuctionStatus(providers)
-        })).url);
+        else console.log('Open the private Base Sepolia auction review on this computer:\n' + (await listenForReview(mode === '--sale' ? null : load, {
+            loadAuction: () => finalizedAuctionStatus(providers),
+            loadSale: () => firstSaleHistory(providers)
+        })).url + (mode === '--sale' ? 'settlement' : ''));
     } catch (error) { console.error(error.shortMessage ?? error.message); process.exitCode = 1; }
 }

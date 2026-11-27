@@ -144,9 +144,10 @@ export function auraCaption(h, word) {
 }
 
 export function projectedArtworkAura(artwork) {
-    if (artwork?.source === 'v41_projection' && artwork.chain_id === 84532 &&
-        artwork.aura_kind === 'founder' && artwork.founder_origin_verified === true && typeof artwork.minted === 'boolean') {
-        return {className:auraFrameClassName('founder'), label:auraFrameLabels.founder,
+    if (artwork?.aura_kind === 'founder') {
+        if (artwork.source !== 'v41_projection' || artwork.chain_id !== 84532 ||
+            artwork.founder_origin_verified !== true || typeof artwork.minted !== 'boolean') return null;
+        return {className:auraFrameClassName('founder'), label:auraFrameLabels.founder, kind:'founder',
             ...(artwork.aura_border_text === true ? {borderLabel:auraWords.founder} : {})};
     }
     if (artwork?.source === 'v41_projection' && artwork.chain_id === 84532 &&

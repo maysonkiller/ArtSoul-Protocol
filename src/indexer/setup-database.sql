@@ -28,6 +28,7 @@ BEGIN;
 \i src/indexer/migrations/021_genesis_grant_evidence.sql
 \i src/indexer/migrations/022_ordinary_registrations.sql
 \i src/indexer/migrations/023_ordinary_primary_credits.sql
+\i src/indexer/migrations/024_ordinary_nft_history.sql
 COMMIT;
 
 -- Verify setup

@@ -10,6 +10,24 @@ const fields = {
 };
 const awardFields = ['placementId', 'sponsorGroup', 'winningBidWei', 'decidedAt', 'recordUrl'];
 
+// Optional rehearsal evidence for a direct sponsor transfer and an explicitly reviewed refund.
+function cashFields(record, amount) {
+    if (!Object.hasOwn(record, 'cashTerms')) return [];
+    const cash = record.cashTerms;
+    const hasRefund = cash && Object.hasOwn(cash, 'refundWei');
+    exactFields(cash, ['sponsorWallet', 'protocolTreasury', 'paymentNonce', ...(hasRefund ? ['refundWei', 'refundSafeNonce'] : [])], 'cash terms');
+    const wallet = address => typeof address === 'string' && /^0x[0-9a-f]{40}$/.test(address) && !/^0x0+$/.test(address);
+    requireRule(wallet(cash.sponsorWallet) && wallet(cash.protocolTreasury) && cash.sponsorWallet !== cash.protocolTreasury &&
+        wei(amount, 'payment amount') > 0n, 'Invalid rehearsal cash parties or amount');
+    wei(cash.paymentNonce, 'sponsor transaction nonce');
+    if (hasRefund) {
+        const refund = wei(cash.refundWei, 'explicit refund');
+        requireRule(refund > 0n && refund <= BigInt(amount), 'Invalid explicit refund');
+        wei(cash.refundSafeNonce, 'refund Safe nonce');
+    }
+    return ['cashTerms'];
+}
+
 export function requireRule(condition, message) {
     if (!condition) throw new Error(message);
 }
@@ -56,7 +74,8 @@ function publicLink(value, field) {
 
 function validatePlacement(row, asOf) {
     requireRule(kinds.includes(row?.kind), 'Unknown placement kind');
-    exactFields(row, [...common, ...fields[row.kind], ...(row.kind === 'auction' ? [] : publicSponsorFields(row))], row.kind + ' terms');
+    exactFields(row, [...common, ...fields[row.kind], ...(row.kind === 'auction' ? [] : publicSponsorFields(row)),
+        ...(row.kind === 'negotiated' ? cashFields(row, row.feeWei) : [])], row.kind + ' terms');
     id(row.id, 'placement ID');
     id(row.proposedBy, 'proposer group');
     id(row.approvedBy, 'reviewer group');
@@ -117,7 +136,7 @@ export function readBannerSchedule(schedule, asOfUtc) {
     const sponsors = schedule.placements.filter(row => row.kind !== 'auction');
     for (const award of schedule.awards) {
         requireRule(award && typeof award === 'object', 'award must be an object');
-        exactFields(award, [...awardFields, ...publicSponsorFields(award)], 'award');
+        exactFields(award, [...awardFields, ...publicSponsorFields(award), ...cashFields(award, award.winningBidWei)], 'award');
         const placement = placements.get(award.placementId);
         requireRule(placement?.kind === 'auction', 'Award must identify a published auction');
         id(award.sponsorGroup, 'awarded sponsor group');

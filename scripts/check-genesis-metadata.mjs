@@ -71,7 +71,7 @@ export async function checkIssuedGenesisMedia(review, hash, prefix, tokenId, fil
     const media = await checkGenesisMetadata(prefix, tokenId, files, { published: true });
     await Promise.all(providers.map(async rpc => confirmFinalizedBlock(rpc, await finalizedBlock(8453, rpc), proof.block)));
     return { ...media, genesis: proof.genesis, recipient: grant.recipient, decisionHash: grant.decisionHash,
-        transactionHash: proof.transactionHash, block: proof.block, rpcReadings: providers.length };
+        transactionHash: proof.transactionHash, safeTxHash: proof.safeTxHash, block: proof.block, rpcReadings: providers.length };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

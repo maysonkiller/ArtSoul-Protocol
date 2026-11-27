@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { createReadStream } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { DEFAULT_HEALTH_MAX_BLOCKS_BEHIND, isIndexerWithinHealthLag, parseHealthCount } from '../src/indexer/health-policy.js';
 
@@ -190,15 +191,15 @@ export async function checkIndexerHealth(config, { fetchImpl = fetch, now = Date
     }
 }
 
-// Review the nearest observations bracketing both endpoints and every sample between them.
-// Only the previous and current sample need to stay in memory, including on long windows.
+function utc(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(value)) return NaN;
+    const ms = Date.parse(value);
+    const canonical = value.includes('.') ? value : value.slice(0, -1) + '.000Z';
+    return Number.isFinite(ms) && new Date(ms).toISOString() === canonical ? ms : NaN;
+}
+
+// Check both bracketing observations and every intervening sample in constant memory.
 export async function reviewHealthWindow(lines, config, from, to, maxGapSeconds, now = Date.now()) {
-    const utc = value => {
-        if (typeof value !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(value)) return NaN;
-        const ms = Date.parse(value);
-        const canonical = value.includes('.') ? value : value.slice(0, -1) + '.000Z';
-        return Number.isFinite(ms) && new Date(ms).toISOString() === canonical ? ms : NaN;
-    };
     const start = utc(from), end = utc(to), gapLimit = Number(maxGapSeconds) * 1000;
     if (!config.expectedCoreAddress || ![8453, 84532].includes(config.expectedChainId) ||
         !Number.isFinite(start) || !Number.isFinite(end) || !(start < end && end <= now) ||
@@ -256,15 +257,48 @@ export async function reviewHealthWindow(lines, config, from, to, maxGapSeconds,
         lastObservation: last.checkedAt, firstConfirmedBlock: first.observed.confirmedBlock, lastConfirmedBlock: last.observed.confirmedBlock };
 }
 
+// The operator supplies the incident register covering this deployment, including
+// incidents opened before the first observation that continued into the period.
+export async function reviewCoreStability(lines, config, from, to, maxGap, register, now = Date.now()) {
+    const start = utc(from), end = utc(to);
+    if (config.expectedChainId !== 8453 || !Number.isFinite(end - start) || end - start < 7 * 86400000) {
+        throw new Error('Core stability requires at least seven consecutive elapsed days on Base mainnet.');
+    }
+    const recordedStart = utc(register?.coverageFrom), recordedEnd = utc(register?.coverageThrough);
+    if (register?.chainId !== 8453 || !config.expectedCoreAddress ||
+        typeof register?.coreAddress !== 'string' || register.coreAddress.toLowerCase() !== config.expectedCoreAddress.toLowerCase() ||
+        !(recordedStart <= start && recordedEnd >= end && recordedEnd <= now) || !Array.isArray(register.criticalIncidents)) {
+        throw new Error('The incident register must cover this Core and the entire observation period.');
+    }
+    for (const incident of register.criticalIncidents) {
+        const opened = utc(incident?.openedAt);
+        const resolved = incident?.resolvedAt === null ? Infinity : utc(incident?.resolvedAt);
+        if (!Number.isFinite(opened) || opened > recordedEnd || !(resolved >= opened) ||
+            (resolved !== Infinity && resolved > recordedEnd)) throw new Error('Invalid critical incident interval.');
+        if (opened <= end && resolved >= start) throw new Error('A recorded critical incident overlaps the observation period.');
+    }
+    const health = await reviewHealthWindow(lines, config, from, to, maxGap, now);
+    return {...health, coverage: 'sampled_worker_health_and_reported_critical_incidents', criticalIncidentsInWindow: 0};
+}
+
 async function main() {
     try {
         const config = loadMonitorConfig();
         const args = process.argv.slice(2);
         if (args.length) {
-            if (args.length !== 5 || args[0] !== '--window') throw new Error('Usage: --window JOURNAL.ndjson START_UTC END_UTC MAX_GAP_SECONDS');
+            const stability = args[0] === '--core-stability' && args.length === 6;
+            if (!stability && (args.length !== 5 || args[0] !== '--window')) {
+                throw new Error('Usage: --window JOURNAL START_UTC END_UTC MAX_GAP_SECONDS or --core-stability JOURNAL START_UTC END_UTC MAX_GAP_SECONDS INCIDENT_REGISTER.json');
+            }
+            const register = stability && JSON.parse(await readFile(args[5], 'utf8'));
             const input = createReadStream(args[1], 'utf8');
             const lines = createInterface({input, crlfDelay: Infinity});
-            try { console.log(JSON.stringify(await reviewHealthWindow(lines, config, ...args.slice(2)))); }
+            try {
+                const window = args.slice(2, 5);
+                const result = stability ? await reviewCoreStability(lines, config, ...window, register)
+                    : await reviewHealthWindow(lines, config, ...window);
+                console.log(JSON.stringify(result));
+            }
             finally { lines.close(); input.destroy(); }
             return;
         }
@@ -282,7 +316,8 @@ async function main() {
         console.error(JSON.stringify({
             ok: false,
             checkedAt: new Date().toISOString(),
-            failures: [{ code: process.argv[2] === '--window' ? 'HEALTH_WINDOW' : 'CONFIGURATION', detail: String(error?.message || error) }],
+            failures: [{ code: ['--window','--core-stability'].includes(process.argv[2]) ? 'HEALTH_WINDOW' : 'CONFIGURATION',
+                detail: error instanceof SyntaxError ? 'Invalid incident register JSON.' : String(error?.message || error) }],
             observed: null
         }));
         process.exitCode = 1;

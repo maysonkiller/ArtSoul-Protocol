@@ -9,7 +9,8 @@ const { artifacts, config } = require('hardhat');
 const { createProvider } = require('hardhat/internal/core/providers/construction');
 
 async function main() {
-    const { readOrdinarySettlement, readOrdinaryToken, readOrdinaryResaleQuote, readOrdinaryResalePurchase, readOrdinaryRefundEntry } =
+    const { readOrdinarySettlement, readOrdinaryToken, readOrdinaryResaleQuote, readOrdinaryResalePurchase, readOrdinaryTransferRange,
+        readOrdinaryRefundEntry, readOrdinaryRefundBatch } =
         await import('../src/indexer/nft-deployment-proof.js');
     const { readBidExtension } = await import('./review-rehearsal-late-bid.mjs');
     const chainId = 84532;
@@ -31,7 +32,7 @@ async function main() {
         for (let i = 0; i < 3; i++) roles.push((await deploy('TreasuryAccountStub', 2)).target);
         const pairs = [];
         for (const [index, winner] of [first, second].entries()) {
-            const market = await deploy('OrdinaryMarket', ...roles, 2, 30_000);
+            const market = await deploy('OrdinaryMarket', ...roles, 8, 30_000);
             const nft = new ethers.Contract(await market.nft(), (await artifacts.readArtifact('SettledArtworkNFT')).abi, provider);
             const review = { chainId, coreAddress: market.target.toLowerCase(), nftAddress: nft.target.toLowerCase(),
                 expectedCoreCodeHash: ethers.keccak256(await provider.getCode(market.target)),
@@ -90,6 +91,16 @@ async function main() {
                 [review.nftAddress, buyer.address.toLowerCase(), creator.address.toLowerCase(), winner.address.toLowerCase(), '1']);
             await assert.rejects(readOrdinarySettlement(listener, { ...review, ...location(resale),
                 transactionHash: resale.hash, auctionId: '1' }), /Expected one AuctionSettled/);
+            const transfer = await mine(nft.connect(buyer).transferFrom(buyer.address,winner.address,1));
+            await finalize();
+            const previous = await provider.getBlock(primary.blockNumber-1);
+            const history = await readOrdinaryTransferRange(listener, { ...review, ...location(transfer),fromBlock:primary.blockNumber,
+                previousBlockHash:previous.hash,bootstrap:true,reviewResales:true });
+            assert.equal(history.events.length,3);
+            assert.deepEqual(history.purchases,[{ ...location(resale), transactionHash:resale.hash, logIndex:purchased.index }]);
+            const indexedSale = await readOrdinaryResalePurchase(listener,{ ...review, ...history.purchases[0] });
+            assert.equal(indexedSale.protocolWei, paid.protocolWei);
+            assert.equal(indexedSale.ecosystemWei, paid.ecosystemWei);
         }
         // Both pairs are deployed before either receipt, and both use auction/artwork/token ID 1.
         for (const [i, pair] of pairs.entries()) {
@@ -111,8 +122,13 @@ async function main() {
         }
         await rpc.send('evm_setNextBlockTimestamp', [Number((await market.auctions(2)).end)]);
         await mine(market.closeAuction(2));
-        const batch = await mine(market.processRefunds(2, 2));
+        const batch = await mine(market.processRefunds(2, 8));
         await finalize();
+        const measured = await readOrdinaryRefundBatch(listener, { ...review, ...location(batch), transactionHash: batch.hash });
+        assert.deepEqual([measured.configuredBatchLimit,measured.configuredGasArgument,measured.requestedEntries,
+            measured.processedEntries,measured.distinctCreditors,measured.deliveredEntries,measured.creditedEntries],
+        ['8','30000','8',2,2,1,1]);
+        console.log('Local batch: requested 8, processed 2, delivered 1, credited 1; whole-transaction execution gas', String(batch.gasUsed));
         for (const [i, queued] of queuedReceipts.entries()) {
             const options = {...review, auctionId:'2', entry:String(i)};
             const obligation = await readOrdinaryRefundEntry(listener, {...options, ...location(queued),

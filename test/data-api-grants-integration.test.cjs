@@ -62,7 +62,7 @@ test('new table migrations must join the no-default-grant rehearsal', async () =
     'sql/migrations/phase11_ai_core.sql', 'sql/migrations/phase12_correctness.sql',
     'sql/migrations/stabilization_layer.sql'
   ]);
-  const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services', '20261125210000_banner_schedule_revisions',
+  const covered = new Set(['phase18_artwork_moderation_visibility', 'collection_launch_services', '20261125210000_banner_schedule_revisions', '20261127031000_banner_terms_reviews',
     '20261119150000_collection_origin_reviews', '20261126185730_profile_identity_reviews', '20261126192603_identity_verification_applications',
     '20261126194000_aura_sources', ...features]
     .map(name => `sql/migrations/${name}.sql`));
@@ -106,7 +106,7 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   for (const migration of listIndexerMigrations()) query(migration.sql);
   await t.test('ordinary issuer and sale evidence has no effective Data API table privileges', () => {
     for (const role of ['anon', 'authenticated', 'service_role']) {
-      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations', 'ordinary_resale_purchases', 'ordinary_registrations', 'ordinary_primary_credits']) {
+      for (const table of ['ordinary_issuers', 'ordinary_settlements', 'ordinary_runner_up_observations', 'ordinary_resale_purchases', 'ordinary_registrations', 'ordinary_primary_credits', 'ordinary_nft_ranges', 'ordinary_nft_transfers']) {
         assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.${table}',
           'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN');`), 'f', `${role}: ${table}`);
       }
@@ -260,9 +260,12 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   });
   await t.test('the staged banner schedule grants no access to Data API roles', () => {
     query(fs.readFileSync('sql/migrations/20261125210000_banner_schedule_revisions.sql', 'utf8'));
+    query(fs.readFileSync('sql/migrations/20261127031000_banner_terms_reviews.sql', 'utf8'));
     for (const role of ['anon', 'authenticated', 'service_role']) {
-      assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.banner_schedule_revisions',
-        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')`), 'f');
+      for (const table of ['banner_schedule_revisions', 'banner_terms_reviews']) {
+        assert.equal(query(`SELECT has_table_privilege('${role}', 'artsoul_private.${table}',
+          'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')`), 'f');
+      }
     }
   });
   await t.test('profile identity reviews expose only decision columns with default grants removed', () => {

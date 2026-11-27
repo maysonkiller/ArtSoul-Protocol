@@ -10,6 +10,8 @@ test('two providers confirm only the reviewed Genesis serials including founder 
     const result = await verifyGenesisGrants(review, tx, [provider(), provider()]);
     assert.deepEqual(result.block, { number: block.number, hash: block.hash });
     assert.equal(result.transactionIndex, '1');
+    assert.equal(result.safeExecutionIndex, '16');
+    assert.equal(result.safeTxHash, id('fixture Safe proposal'));
     assert.deepEqual(result.grants.map(g => [g.tokenId, g.recipient, g.mintIndex, g.lockIndex, g.grantIndex]),
         [[0, founder, '8', '10', '11'], [201, mainnetCollector, '12', '14', '15']]);
     assert.deepEqual(result.grants.map(g => g.decisionHash), prepareGenesisGrants(review).grants.map(g => g.decisionHash));
@@ -77,9 +79,26 @@ test('the recorded pilot grant requires the exact reviewed zero-value CALL via t
     for (const replacement of [
         { ...transaction, to: mainnetCollector }, { ...transaction, transactionIndex: '0x0' },
         { ...transaction, blockHash: head.hash }, { ...transaction, input: '0x12345678' },
-        ...[{ to: founder }, { value: 1 }, { data: '0x1234' }, { operation: 1 }]
+        { ...transaction, input: transaction.input + '00' }, { ...transaction, value: '0x1' },
+        ...[{ to: founder }, { value: 1 }, { data: '0x1234' }, { operation: 1 }, { safeTxGas: 1 },
+            { baseGas: 1 }, { gasPrice: 1 }, { gasToken: founder }, { refundReceiver: founder }, { signatures: '0x' }]
             .map(changes => safeTransaction(review, tx, block, changes))
     ]) {
         await assert.rejects(verifyGenesisGrants(review, tx, [provider(), provider({ transaction: replacement })]), /Safe execution/);
+    }
+});
+
+test('links the signed proposal to one zero-reimbursement Safe success after the last grant', async () => {
+    const proposed = { ...review, safeTxHash: id('fixture Safe proposal') };
+    assert.equal((await verifyGenesisGrants(proposed, tx, [provider(), provider()])).safeTxHash, proposed.safeTxHash);
+    await assert.rejects(verifyGenesisGrants({ ...review, safeTxHash: id('different proposal') }, tx,
+        [provider(), provider()]), /proposal hash/);
+    for (const edit of [logs => logs.pop(), logs => logs.push(logs.at(-1)),
+        logs => { logs.at(-1).data = '0x' + '00'.repeat(31) + '01'; },
+        logs => { logs.at(-1).address = mainnetCollector; }, logs => { logs.at(-1).logIndex = '0xd'; },
+        logs => { logs.at(-1).topics[1] = id('different signed proposal'); }]) {
+        const edited = receipt();
+        edit(edited.logs);
+        await assert.rejects(verifyGenesisGrants(proposed, tx, [provider(), provider({ receipt: edited })]));
     }
 });

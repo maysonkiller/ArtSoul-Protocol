@@ -6,7 +6,7 @@ Use fresh instances of the replacement auction engine and its paired NFT in Base
 
 ## Security and operating sequence
 
-Phase C covers internal review of the exact release candidate, finding disposition, reproducible build evidence and the fresh testnet rehearsal. The full independent audit moves to the end of Phase D. Record its scope, findings, repairs and retest before D closes. Before exposing real funds, the owner must review outstanding security risks and approve the specific release and its current audit status. Keep an unresolved issue that could affect funds or withdrawal access visible in that decision.
+Phase C covers internal review of the exact release candidate, finding disposition, reproducible build evidence and the fresh testnet rehearsal. On November 27 the founder required independent review of financially critical contracts before exposing real funds. The owner must also approve the specific build, its outstanding risks and production custody. The full independent system audit, repairs and retest remain due before D closes.
 
 Business incorporation is deferred while development and the testnet rehearsal continue. Before charging real fees, identify the lawful operator and obligations that apply to the actual service, including accounting, user terms, privacy and complaints. Record protocol fees separately from sale volume, seller and artist proceeds, refundable deposits and the ecosystem treasury. The first actual revenue triggers a business-structure review. Any obligation arising earlier applies at its own effective date.
 

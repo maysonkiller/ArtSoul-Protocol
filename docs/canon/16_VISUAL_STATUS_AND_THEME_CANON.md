@@ -53,6 +53,8 @@ Open [NFT appearance](/admin#nft-appearance) with a verified administrator walle
 
 ### Evidence for each frame
 
+For a verified Founder work the ArtSoul logo and visible Founder label identify the creator on the card and detail page. The official publication mark stays beside the title of a platform publication. The profile identity check requires its own approval.
+
 A November 26 mobile viewport check exercised the built Gallery NFT tab and artwork detail at 430 pixels using a fixture with verified Platform status. Chromium and WebKit both measured the caption changing position in Future. Classic hid the caption, and the reduced-motion preference kept the Future caption stationary. The mobile motion stylesheet permits this animation only for Platform and Partner captions.
 
 In **Manage frame sources**, a Platform publisher can be designated for the current Base Sepolia catalog or for the new auction rehearsal before the catalog switches. Each choice uses its exact issuing Core. Reviewers can enter a wallet, select their connected wallet or search public profiles by name and check the resulting full address before saving. The selection prepares a visual designation without changing the public catalog or its on-chain contracts.

@@ -26,7 +26,7 @@ function publicSponsor(entry) {
     return { name: entry.sponsorName, relationship: entry.relationship };
 }
 
-export async function readBannerTerms(client, revision, placementId) {
+export async function readBannerReviewSource(client, revision, placementId) {
     if (!Number.isInteger(revision) || revision < 1 || revision > 2147483647 ||
         typeof placementId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(placementId)) {
         throw new Error('Supply a positive recorded revision and one placement ID');
@@ -60,7 +60,15 @@ export async function readBannerTerms(client, revision, placementId) {
     }
     const award = a ? { sponsor: publicSponsor(a), winningBidWei: a.winningBidWei, decidedAt: a.decidedAt,
         recordedAt: row.awards[0].recordedAt, recordUrl: a.recordUrl } : null;
-    return { status: 'recorded_terms_preview', revision, terms, award };
+    const cashTerms = a?.cashTerms ?? p.cashTerms ?? null;
+    if (cashTerms?.refundWei) (award ?? terms).refundWei = cashTerms.refundWei;
+    return { preview: { status: 'recorded_terms_preview', revision, terms, award }, cashTerms,
+        proposerGroup: p.proposedBy, reviewerGroup: p.approvedBy,
+        sponsorGroup: a?.sponsorGroup ?? p.sponsorGroup ?? '' };
+}
+
+export async function readBannerTerms(client, revision, placementId) {
+    return (await readBannerReviewSource(client, revision, placementId)).preview;
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

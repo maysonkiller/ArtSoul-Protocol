@@ -1,4 +1,5 @@
 import { rehearsalCore } from './deployment.mjs';
+import { refundOpeningHash, refundRequestAt, refundStages, refundCollectors } from './refund-auction.mjs';
 
 // The local test fixture is shared with the read-only planner. It accepts no caller-supplied metadata.
 export const rehearsalArtwork = Object.freeze({
@@ -97,7 +98,14 @@ export async function walletRequest(provider, plan) {
     const bid = plan.operation === 'placeBid';
     const settlement = plan.operation === 'settleAuction';
     const withdrawal = plan.operation === 'withdraw';
-    if (artwork || opening || bid || settlement || withdrawal) {
+    const refund = plan.refundStage !== undefined;
+    if (refund) {
+        check(refundStages.includes(plan.refundStage) && plan.rehearsalWorkId === '2' && plan.openingHash === refundOpeningHash &&
+            sameAddress(plan.target, rehearsalArtwork.core) && plan.deployments.length === 0 && plan.codeChecks.length === 2 &&
+            sameAddress(plan.codeChecks[0].address, rehearsalArtwork.core) && sameAddress(plan.codeChecks[1].address, rehearsalArtwork.nft),
+            'Unexpected two-collector rehearsal request.');
+        if (['close', 'refund'].includes(plan.refundStage)) check(/^0x[0-9a-f]{64}$/i.test(plan.queuedHash), 'Missing signed outbid receipt.');
+    } else if (artwork || opening || bid || settlement || withdrawal) {
         const artworkFixture = refundRegistration ? refundWork : rehearsalArtwork;
         const digest = withdrawal ? withdrawalDigest : settlement ? settlementDigest : refundOpening ? refundWork.openingSha256 :
             (bid ? rehearsalLateBid : artwork ? artworkFixture : rehearsalOpening).dataSha256;
@@ -147,7 +155,14 @@ export async function walletRequest(provider, plan) {
             settlement ? 'Settlement or token ID changed. Refresh the chain evidence.' :
                 opening ? 'Auction history changed. Refresh the chain evidence.' : 'Work registry changed. Refresh the chain evidence.');
     }
-    if (bid) {
+    if (refund) {
+        const expected = await refundRequestAt(rpc, rehearsalArtwork.core, plan.refundStage, 'pending');
+        check(!expected.unavailable && expected.operation === plan.operation && sameAddress(expected.payer, plan.payer) &&
+            expected.data === plan.data && expected.value === plan.value && expected.bidWei === plan.bidWei &&
+            expected.biddingEnd === plan.biddingEnd, 'The two-collector request changed. Refresh the chain evidence.');
+        const simulated = await rpc('eth_call', [{ from: plan.payer, to: rehearsalArtwork.core, value: expected.value, data: expected.data }, 'pending']);
+        check(simulated === '0x', 'The wallet could not simulate this two-collector request.');
+    } else if (bid) {
         const call = { from: plan.payer, to: rehearsalArtwork.core, value: rehearsalLateBid.deposit, data: plan.data };
         const simulated = await rpc('eth_call', [call, 'pending']);
         const head = await rpc('eth_getBlockByNumber', ['latest', false]);
@@ -155,7 +170,7 @@ export async function walletRequest(provider, plan) {
             'The reviewed first late bid is unavailable. Refresh the chain evidence.');
     }
     await matchWallet(provider, plan);
-    const tx = { from: plan.payer, chainId: testChain, nonce: plan.nonce, value: bid ? rehearsalLateBid.deposit : '0x0', data: plan.data };
+    const tx = { from: plan.payer, chainId: testChain, nonce: plan.nonce, value: bid ? plan.value : '0x0', data: plan.data };
     if (!create) tx.to = plan.target;
     return tx;
 }
@@ -171,6 +186,7 @@ function equalField(a, b) {
 
 const reviewFields = {chainId:'network', operation:'operation', payer:'sender', nonce:'sender nonce', target:'target',
     value:'value', registrationHash:'registration receipt', rehearsalWorkId:'work ID', metadataUri:'metadata URI',
+    refundStage:'rehearsal step', openingHash:'opening receipt', queuedHash:'outbid receipt', bidWei:'bid amount', biddingEnd:'bidding end',
     data:'transaction data', dataHash:'calldata hash', dataSha256:'calldata digest', codeChecks:'contract code',
     deployments:'deployment addresses', owners:'Safe signers', roles:'Safe roles'};
 
@@ -179,7 +195,7 @@ function changedReviewField(first, next) {
 }
 
 export function sameReview(first, next) {
-    return !next.complete && !next.waitingForFinality && !next.lateBidStatus && !changedReviewField(first, next);
+    return !next.complete && !next.waitingForFinality && !next.lateBidStatus && !next.refundStatus && !changedReviewField(first, next);
 }
 
 export async function start() {
@@ -263,7 +279,7 @@ export async function start() {
         return response.json();
     }
     function showOutcome(current) {
-        if (!current.waitingForFinality && !current.complete && !current.lateBidStatus) return false;
+        if (!current.waitingForFinality && !current.complete && !current.lateBidStatus && !current.refundStatus) return false;
         ++stateRevision; plan = undefined; connected = undefined; wrongChain = false;
         byId('review').hidden = true;
         if (current.lateBidStatus) {
@@ -273,6 +289,8 @@ export async function start() {
                 changed: 'The first bid or auction state has changed. This rehearsal request is closed.'
             };
             status(messages[current.lateBidStatus]);
+        } else if (current.refundStatus) {
+            status(current.refundStatus);
         } else if (current.emptyWinnerCredit) {
             status('This wallet has no remaining winner credit on the reviewed Core.');
         } else if (current.existingAuctionHistory) {
@@ -315,15 +333,29 @@ export async function start() {
             const bid = plan.operation === 'placeBid';
             const settlement = plan.operation === 'settleAuction';
             const withdrawal = plan.operation === 'withdraw';
-            byId('operation').textContent = withdrawal ? 'Withdraw the winner’s surplus' : settlement ? 'Settle auction 1 and mint its NFT' : bid ? 'First late bid · auction 1' : opening ? (plan.rehearsalWorkId === '2' ? 'Open the two-collector rehearsal auction' : 'Open the first rehearsal auction') : artwork ? 'Register rehearsal artwork' :
+            const refundHeadings = { first: 'First bid · auction 2', outbid: 'Second collector bid · auction 2',
+                close: 'Close auction 2', refund: 'Process the first collector’s deposit refund' };
+            byId('operation').textContent = plan.refundStage ? refundHeadings[plan.refundStage] : withdrawal ? 'Withdraw the winner’s surplus' : settlement ? 'Settle auction 1 and mint its NFT' : bid ? 'First late bid · auction 1' : opening ? (plan.rehearsalWorkId === '2' ? 'Open the two-collector rehearsal auction' : 'Open the first rehearsal auction') : artwork ? 'Register rehearsal artwork' :
                 create ? 'Deploy ' + plan.operation + ' and its NFT' : 'Create Safe · ' + roleName[plan.operation];
             byId('fields').replaceChildren();
             addField('Network', 'Base Sepolia · 84532');
             addField('Sender', plan.payer);
             addField('Value', bid ? '0.01 test ETH deposit plus test gas' : '0 test ETH · wallet estimates gas');
             addField('Nonce', String(BigInt(plan.nonce)));
-            addField(artwork || opening || bid || settlement || withdrawal ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
-            if (withdrawal) {
+            addField(plan.refundStage || artwork || opening || bid || settlement || withdrawal ? 'Reviewed Core' : create ? 'Method' : 'Safe factory', plan.target);
+            if (plan.refundStage) {
+                addField('Work and auction', 'Work 2 · Auction 2');
+                addField('Finalized opening', plan.openingHash);
+                if (bid) {
+                    addField('Price offered', plan.refundStage === 'first' ? '0.001 test ETH' : '0.011 test ETH');
+                    addField('Method', 'placeBid(2, ' + plan.bidWei + ')');
+                    addField('Bidding end before this bid', new Date(Number(plan.biddingEnd) * 1000).toISOString());
+                } else {
+                    addField('Signed outbid', plan.queuedHash);
+                    addField('Method', plan.refundStage === 'close' ? 'closeAuction(2)' : 'processRefunds(2, 1)');
+                    if (plan.refundStage === 'refund') addField('Refund', '0.01 test ETH to ' + refundCollectors[0]);
+                }
+            } else if (withdrawal) {
                 addField('Method', 'withdraw()');
                 addField('Credit to receive', '0.009 test ETH');
                 addField('Receiving wallet', rehearsalLateBid.bidder);

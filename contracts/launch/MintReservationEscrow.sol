@@ -92,7 +92,7 @@ abstract contract MintReservationEscrow is CollectionLaunch {
         _resolve(original, holder, Outcome.Redeemed);
         bids[0][original].claimed = true;
         ++phaseMints[0][holder];
-        _mintBatch(0, holder, recipient, 1, msg.value);
+        _mintBatch(0, holder, recipient, 1, msg.value, recipient);
     }
 
     function expireReservation(address original) external nonReentrant {

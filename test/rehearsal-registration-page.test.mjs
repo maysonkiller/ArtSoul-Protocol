@@ -12,8 +12,8 @@ const verified = {
     atRegistrationBlock: { activeAuctionId: null, tokenId: null, canonicalFloorWei: '0' }
 };
 
-async function rehearsal(t, options) {
-    const { server, url } = await listenForReview(() => { throw Error('A read-only request must not prepare a wallet plan'); }, options);
+async function rehearsal(t, options, plan = () => { throw Error('A read-only request must not prepare a wallet plan'); }) {
+    const { server, url } = await listenForReview(plan, options);
     t.after(() => new Promise(resolve => server.close(resolve)));
     return (path, headers = {}) => fetch(new URL(path, url), { headers: { Connection: 'close', ...headers } });
 }
@@ -73,4 +73,31 @@ test('ordinary registration is visible only on the selected rehearsal and must b
         assert.ok(!(await failed.text()).includes(verified.creator));
     }
     assert.equal(reads, 3);
+});
+
+test('the first sale view separates the collector at mint from ownership at a later finalized block', async t => {
+    const sale = { chainId: 84532, rpcReadings: 2, coreAddress: verified.core.toLowerCase(), nftAddress: verified.nft.toLowerCase(),
+        auctionId: '1', artworkId: '1', tokenId: '1', priceWei: '1000000000000000', creatorWei: '975000000000000',
+        protocolWei: '25000000000000', creator: verified.creator, firstCollector: '0x' + '2'.repeat(40),
+        protocol: '0x' + '3'.repeat(40), transactionHash: hash, blockNumber: 32, blockHash: hash, logIndex: 10 };
+    const ownership = { owner: '0x' + '4'.repeat(40), ownerBlock: 42, ownerBlockHash: '0x' + 'b'.repeat(64) };
+    const read = await rehearsal(t, { loadSale: () => ({ sale, ...ownership }) }, null);
+    const home = await (await read('')).text();
+    assert.match(home, /href="\.\/settlement"/);
+    assert.doesNotMatch(home, /<script|<form|wallet/i);
+    for (const path of ['plan.json', 'client.mjs', 'deployment.mjs']) assert.equal((await read(path)).status, 404);
+    assert.equal((await read('settlement?chain=8453')).status, 404);
+    const response = await read('settlement');
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    const html = await response.text();
+    for (const [label, value] of Object.entries({ 'First Collector': sale.firstCollector, Owner: ownership.owner,
+        'Ownership block': '42', 'Sale price': '0.001 test ETH', 'Protocol proceeds': '0.000025 test ETH',
+        'Settlement transaction': hash, Core: sale.coreAddress, 'NFT contract': sale.nftAddress })) {
+        assert.ok(html.includes(label + '</dt><dd>' + value + '</dd>'), label);
+    }
+    assert.doesNotMatch(html, /<script|<form|<iframe|eth_requestAccounts|eth_sendTransaction/i);
+    t.mock.method(console, 'error', () => {});
+    sale.nftAddress = ownership.owner;
+    assert.equal((await read('settlement')).status, 503);
 });

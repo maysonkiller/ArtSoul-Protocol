@@ -327,6 +327,14 @@ test('detects unreviewed modules, pagination overflow, guard and handler changes
     assert.equal((await verifyTreasurySafes(register, rpc)).coreBindingsChecked, true);
 });
 
+test('a pinned fallback handler must have the reviewed runtime on the selected block', async () => {
+    const {register,rpc} = fixture();
+    register.adminSecurity.fallbackHandlerCodeHash = keccak256('0x6001');
+    await verifyTreasurySafes(register,rpc);
+    register.adminSecurity.fallbackHandlerCodeHash = keccak256('0x6002');
+    await assert.rejects(verifyTreasurySafes(register,rpc), /Runtime code mismatch for adminSecurity fallback handler/);
+});
+
 test('detects wrong Core bindings, nonmatching finalized headers and omitted contract code', async () => {
     const { register, rpc } = fixture();
     [register.protocolTreasury, register.ecosystemTreasury] = [register.ecosystemTreasury, register.protocolTreasury];

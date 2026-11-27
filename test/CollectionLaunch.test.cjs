@@ -61,6 +61,46 @@ describe('Additive Collection Launch security and accounting', function () {
     await fail(c.connect(signers[2]).pause());
   });
 
+  it('executes the collection builder exports for both public auction formats and verifies the original lock after mint', async () => {
+    const {createFirstArtworkDraft, createAuctionMintDraft} = await import('../src/features/collections/launch-config.js');
+    const {preparePhaseCallReview, expectedPhaseCommitment} = await import('../src/features/collections/phase-call-review.js');
+    const {readCollectionLockReceipt} = await import('../scripts/read-collection-opening-receipts.mjs');
+    const rpc = (method, params) => network.provider.send(method, params);
+    const chain = BigInt(await rpc('eth_chainId', []));
+    for (const makeDraft of [createFirstArtworkDraft, createAuctionMintDraft]) {
+      const draft = makeDraft();
+      Object.assign(draft, {name: 'Studio', maxSupply: 4, description: 'A test series.', holderRights: 'Personal display.'});
+      draft.media.metadataBaseURI = 'ipfs://fixture/';
+      const openingStart = Number((await provider.getBlock('latest')).timestamp) + 120;
+      const date = offset => new Date((openingStart + offset) * 1000).toISOString();
+      Object.assign(draft.phases[0], {allocation: 1, startAt: date(0), endAt: date(100)});
+      draft.phases[0].pricing.priceEth = '0.000000000000000031';
+      Object.assign(draft.phases[1], {allocation: 3, walletLimit: 2, startAt: date(100), endAt: date(200)});
+      const review = preparePhaseCallReview(JSON.stringify(draft));
+      const registry = await deploy('SettledArtworkSourceFixture');
+      const args = [draft.name, 'STU', draft.media.metadataBaseURI, draft.maxSupply, creator.address, treasury.address];
+      if (review.template === 'CollectionLaunch') args.push(creator.address, 0);
+      const collection = await deploy(review.template, [...args, registry.target]);
+      for (const phase of review.phases) await tx(creator.sendTransaction({to: collection.target, data: phase.data}));
+      const locked = await tx(creator.sendTransaction({to: collection.target, data: review.lock.data}));
+      await time(openingStart);
+      await tx(collection.connect(signers[2]).bid(0, {value: 420n}));
+      await time(openingStart + 105);
+      await tx(collection.finalizeAuction(0));
+      assert.equal(await collection.mintPrice(1), 420n);
+      await tx(collection.connect(signers[2]).claimAuction(0, signers[3].address));
+      assert.equal(await collection.ownerOf(1), signers[3].address);
+      assert.equal(await collection.firstCollector(1), signers[2].address);
+      const head = await rpc('eth_getBlockByNumber', ['latest', false]);
+      const runtime = ethers.keccak256(await rpc('eth_getCode', [collection.target, 'latest']));
+      const check = (phases, hash = locked.hash) => readCollectionLockReceipt(rpc, head, collection.target, runtime,
+        chain, hash, expectedPhaseCommitment(chain, collection.target, phases));
+      assert.equal((await check(review.phases)).transactionHash, locked.hash);
+      draft.phases[1].walletLimit = 1;
+      await assert.rejects(check(preparePhaseCallReview(JSON.stringify(draft)).phases), /locked different phase terms/);
+    }
+  });
+
   it('passes the operator release gate for all new collection templates', async () => {
     const {rehearseCollectionOperators, requireRestrictedOperators} = require('../scripts/check-collection-operator-policy.cjs');
     const report = await rehearseCollectionOperators({network, artifacts});

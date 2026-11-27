@@ -124,6 +124,19 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   await pool.query('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE EXTENSION pgcrypto');
   const migrations = [...read('src/indexer/setup-database.sql').matchAll(/^\\i (.+)$/gm)].map(match => match[1].trim());
   for (const migration of migrations) await pool.query(read(migration));
+  async function checkHistory() {
+    await t.test('ordinary history resumes across mint, ownership transfer and empty blocks, and rolls back inconsistent ranges', async () => {
+      const { checkOrdinaryHistory } = await import('./helpers/ordinary-settlement-postgres.mjs');
+      await checkOrdinaryHistory(pool);
+    });
+    if (process.env.ARTSOUL_TEST_LIVE_ORDINARY_HISTORY === '1') {
+      await t.test('restore a verified Base Sepolia mint and continue from its finalized block', async drill => {
+        const { checkPublicMintRestore } = await import('./helpers/ordinary-history-restore.mjs');
+        drill.diagnostic(JSON.stringify(await checkPublicMintRestore(pool, path.resolve(BIN), directory)));
+      });
+    }
+  }
+  if (process.env.ARTSOUL_TEST_ORDINARY_HISTORY_ONLY === '1') return checkHistory();
   await t.test('ordinary demand report counts only indexed receipts for one issuer and block interval', async () => {
     const { checkOrdinaryDemand } = await import('./helpers/ordinary-demand-postgres.mjs');
     await checkOrdinaryDemand(pool);
@@ -299,6 +312,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     const { checkOrdinaryRegistrationIntake } = await import('./helpers/ordinary-registration-postgres.mjs');
     await checkOrdinaryRegistrationIntake(pool);
   });
+  await checkHistory();
   for (const name of ['identity', 'preparation', 'submission', 'registration', 'reorg']) {
     await pool.query(read(`sql/migrations/artwork_media_${name}.sql`));
   }

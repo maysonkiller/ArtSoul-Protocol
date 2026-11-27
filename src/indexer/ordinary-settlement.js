@@ -1,5 +1,5 @@
-import { Interface, ZeroAddress, toBeHex } from 'ethers';
-import { checkReceipt, decodeReceiptLog } from './settlement-receipt.js';
+import { Interface, ZeroAddress, toBeHex, toQuantity } from 'ethers';
+import { checkReceipt, decodeReceiptLog, verifyTransactionPosition } from './settlement-receipt.js';
 
 const events = new Interface([
     'event ProceedsCredited(uint256 indexed auctionId,address indexed creator,address indexed treasury,uint256 creatorAmount,uint256 protocolAmount)',
@@ -10,6 +10,82 @@ const events = new Interface([
     'event ResalePurchased(uint256 indexed tokenId, uint256 version, address indexed seller, address indexed buyer, uint256 price)',
     'event ResaleCredited(uint256 indexed tokenId, uint256 indexed version, address protocol, address ecosystem, uint256 sellerAmount, uint256 creatorAmount, uint256 protocolAmount, uint256 ecosystemAmount)'
 ]);
+
+export function auctionForIssuedToken(receipt, proof, transactionHash, tokenId) {
+    checkReceipt(receipt, proof, transactionHash);
+    const topics = events.encodeFilterTopics('SettledArtworkIssued', [null, null, BigInt(tokenId)]);
+    const matches = receipt.logs.filter(log => log.address?.toLowerCase() === proof.nftAddress &&
+        topics.every((topic, index) => topic === null || log.topics?.[index]?.toLowerCase() === topic));
+    if (matches.length !== 1) throw new Error('Missing or ambiguous ordinary token issuance');
+    return decodeReceiptLog(events, 'SettledArtworkIssued', matches[0], receipt).args.auctionId.toString();
+}
+
+// A sale requires a matching Core purchase, credit and adjacent delivery. A wallet
+// transfer in the same transaction is still only a transfer unless its own log matches.
+export async function discoverOrdinaryResales(send, proof, fromBlock, transfers, headers) {
+    const topic = events.getEvent('ResalePurchased').topicHash;
+    const logs = await send('eth_getLogs', [{ address: proof.coreAddress, topics: [topic],
+        fromBlock: toQuantity(fromBlock), toBlock: toQuantity(proof.blockNumber) }]);
+    if (!Array.isArray(logs) || logs.length > transfers.length) throw new Error('Ordinary resale range has missing deliveries');
+    const movements = transfers.filter(event => event.eventData.from !== ZeroAddress);
+    const deliveries = new Map(movements.map(event => [event.transactionHash + ':' + (event.logIndex - 1), event]));
+    const candidates = new Map();
+    for (const log of logs) {
+        const pos = /^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(log?.logIndex) ? Number(BigInt(log.logIndex)) : -1;
+        const tx = log?.transactionHash?.toLowerCase(), key = tx + ':' + pos;
+        const entry = deliveries.get(key);
+        if (!entry || candidates.has(key) || log.removed !== false || log.address?.toLowerCase() !== proof.coreAddress) {
+            throw new Error('Ordinary resale range has no matching token delivery');
+        }
+        const position = { blockHash: entry.blockHash, blockNumber: toQuantity(entry.blockNumber),
+            transactionHash: tx, transactionIndex: toQuantity(entry.transactionIndex) };
+        const decoded = decodeReceiptLog(events, 'ResalePurchased', log, position).args;
+        if (decoded.seller.toLowerCase() !== entry.eventData.from || decoded.buyer.toLowerCase() !== entry.eventData.to ||
+            decoded.tokenId.toString() !== entry.eventData.tokenId) throw new Error('Ordinary resale delivery differs from the purchase');
+        candidates.set(key,{
+            location: { blockNumber: entry.blockNumber, blockHash: entry.blockHash, transactionHash: tx, logIndex: pos },
+            data: log.data.toLowerCase(), topics: log.topics.map(value => value.toLowerCase()), checked: false
+        });
+    }
+    const transactions = new Map();
+    for (const event of transfers) {
+        if (!transactions.has(event.transactionHash)) transactions.set(event.transactionHash,new Map());
+        transactions.get(event.transactionHash).set(event.logIndex,event);
+    }
+    let matched = 0;
+    for (const [tx, txEvents] of transactions) {
+        const event = txEvents.values().next().value;
+        const receipt = await send('eth_getTransactionReceipt', [tx]);
+        checkReceipt(receipt,event,tx,'secondary transfer');
+        verifyTransactionPosition(receipt, headers.get(event.blockNumber), tx);
+        const transferTopic = events.getEvent('Transfer').topicHash;
+        for (const log of receipt.logs.filter(item => item.address?.toLowerCase() === proof.nftAddress &&
+            item.topics?.[0]?.toLowerCase() === transferTopic)) {
+            const { index, args } = decodeReceiptLog(events,'Transfer',log,receipt);
+            const indexed = txEvents.get(index)?.eventData;
+            if (!indexed || indexed.from !== args.from.toLowerCase() || indexed.to !== args.to.toLowerCase() ||
+                indexed.tokenId !== args.tokenId.toString()) throw new Error('Ordinary transfer discovery differs from the receipt');
+            txEvents.delete(index);
+        }
+        if (txEvents.size) throw new Error('Ordinary transfer discovery includes a missing receipt log');
+        for (const log of receipt.logs.filter(item => item.address?.toLowerCase() === proof.coreAddress &&
+            item.topics?.[0]?.toLowerCase() === topic)) {
+            const { index } = decodeReceiptLog(events,'ResalePurchased',log,receipt);
+            const key = tx + ':' + index;
+            const candidate = candidates.get(key);
+            if (!candidate || candidate.checked || log.data.toLowerCase() !== candidate.data ||
+                log.topics.length !== candidate.topics.length ||
+                log.topics.some((value,i) => value.toLowerCase() !== candidate.topics[i])) {
+                throw new Error('Ordinary resale discovery differs from the transfer receipt');
+            }
+            candidate.checked = true;
+            matched++;
+        }
+    }
+    if (matched !== candidates.size) throw new Error('Ordinary resale discovery has no matching receipt');
+    return [...candidates.values()].map(candidate => candidate.location)
+        .sort((a,b) => a.blockNumber-b.blockNumber || a.logIndex-b.logIndex);
+}
 
 export function parseOrdinarySettlement(receipt, proof, transactionHash, auctionId) {
     checkReceipt(receipt, proof, transactionHash);
