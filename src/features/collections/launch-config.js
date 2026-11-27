@@ -177,6 +177,14 @@ export function hasFirstWorkMint(draft) {
         mint.eligibility.kind === 'public';
 }
 
+export function supportsPhaseCallReview(draft) {
+    const [auction, mint] = draft.phases;
+    return Number(draft.chainId) === 84532 && draft.phases.length === 2 && !draft.crafting.enabled &&
+        (hasFirstWorkMint(draft) || auction.mechanism === 'uniform-auction') &&
+        ['fixed', 'fcfs'].includes(mint.mechanism) && mint.pricing.sourcePhaseId === auction.id &&
+        draft.phases.every(phase => phase.eligibility.kind === 'public');
+}
+
 // Only a deliberate supply edit resizes allocations. Loading an older draft preserves its original terms.
 export function changeDraftSupply(draft, maxSupply) {
     if (!hasFirstWorkMint(draft)) return { ...draft, maxSupply };
@@ -426,7 +434,7 @@ export function reviewConfig(config) {
         },
         deploymentBlockers: [
             'No verified Collection Launch deployment is configured for this page.',
-            'Compatibility is checked against local source only. Deployment arguments, immutable phase locking and wallet transaction review are not connected.',
+            'Verify the deployed contract, constructor settings and original configuration lock before opening the launch.',
             firstWork
                 ? 'Review the collection symbol, creator and protocol receiver. This template assigns ERC-2981 royalties directly to the creator. The opening auction must start after configuration lock.'
                 : 'A symbol, creator, protocol receiver and royalty receiver must be reviewed separately; no missing constructor address is inferred, even for zero royalties. The first phase must still be in the future when locking.',

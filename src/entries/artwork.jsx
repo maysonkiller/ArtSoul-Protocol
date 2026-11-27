@@ -51,7 +51,7 @@ function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevi
         ? prepared : { url: '', failed: false };
 }
 
-function OwnershipIdentity({ source, label, name, verified, className, style, nameStyle, isClassic }) {
+function OwnershipIdentity({ source, label, name, verified, designation, className, style, nameStyle, isClassic }) {
     // This component is keyed by wallet: keep the same person's decoded avatar
     // visible while a newer profile image is prepared, never across identities.
     const image = useDecodedImage(source, '/default-avatar.png', prepareAvatar, true, readPreparedAvatar);
@@ -61,7 +61,7 @@ function OwnershipIdentity({ source, label, name, verified, className, style, na
                 <span className="w-12 h-12 flex-shrink-0" aria-hidden="true" />
             )}
             <div className="min-w-0 flex-1">
-                <div className={`text-xs ${isClassic ? 'opacity-70' : 'opacity-90'}`}>{label}</div>
+                <div className={`text-xs ${isClassic ? 'opacity-70' : 'opacity-90'}`}>{label}{designation}</div>
                 {image.url ? <div className="font-semibold truncate" style={nameStyle}>{name}{verified && <VerificationMark label="Verified profile identity" />}</div> : (
                     <div className="text-sm" role="status">Loading profile…</div>
                 )}
@@ -1008,6 +1008,7 @@ function OwnershipIdentity({ source, label, name, verified, className, style, na
                                 label={currentOwner ? `${label} / Owner` : label}
                                 name={getProfileDisplayName(resolvedProfile, address)}
                                 verified={projected && resolvedProfile?.profile_identity_verified === true}
+                                designation={label === 'Creator' && window.ArtSoulArtworkCard?.founderMark?.(React.createElement, aura)}
                                 nameStyle={nameStyle}
                                 isClassic={isClassic}
                                 className={`w-12 h-12 rounded-full border-2 flex-shrink-0 ${

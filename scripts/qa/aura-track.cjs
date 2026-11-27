@@ -15,7 +15,7 @@ const artwork = {
 };
 const mime = {'.js':'text/javascript','.css':'text/css','.html':'text/html','.json':'application/json','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png'};
 
-async function serveBuild(route) {
+async function serveBuild(route, work) {
     const url = new URL(route.request().url());
     if (route.request().resourceType() === 'media') return route.abort();
     if (url.host === new URL(image).host && route.request().resourceType() === 'image') {
@@ -23,7 +23,7 @@ async function serveBuild(route) {
     }
     if (url.origin !== origin) return route.abort();
     if (url.pathname.startsWith('/api/')) return route.fulfill({json:url.pathname === '/api/public/artworks'
-        ? {success:true, data:[artwork], count:1, warnings:[]} : {}});
+        ? {success:true, data:[work], count:1, warnings:[]} : {}});
     const file = path.resolve(dist, '.' + url.pathname);
     if (!file.startsWith(dist + path.sep)) return route.abort();
     const ext = path.extname(file);
@@ -122,7 +122,8 @@ async function run(engine) {
         const mobile = name === 'webkit';
         const context = await browser.newContext({viewport:mobile?{width:430,height:932}:{width:1440,height:960},isMobile:mobile,hasTouch:mobile});
         await context.addInitScript(()=>localStorage.setItem('artsoul_theme','future'));
-        await context.route('**/*', serveBuild);
+        let displayedWork = artwork;
+        await context.route('**/*', route => serveBuild(route, displayedWork));
         const page = await context.newPage();
         page.setDefaultTimeout(7000);
         for (const [route,selector] of [
@@ -168,6 +169,18 @@ async function run(engine) {
             document.documentElement.classList.replace('future','classic');
         });
         assert(!await track.isVisible(),'Classic has no moving caption');
+        displayedWork = {...artwork, aura_kind:'founder', founder_origin_verified:true, creator_identity_verified:true};
+        for (const [route, creatorSelector] of [
+            ['/index.html','.home-showcase-creator'], ['/gallery.html#nft','.artsoul-card-creator'],
+            ['/artwork.html?id=13','.artwork-ownership-row']
+        ]) {
+            await page.goto(origin+route, {waitUntil:'domcontentloaded'});
+            const mark = page.locator(creatorSelector).getByTitle('Work by the ArtSoul founder').first();
+            await mark.waitFor();
+            assert.equal((await mark.innerText()).trim(),'Founder');
+            assert.equal(await mark.locator('img').getAttribute('src'),'/favicon.jpg');
+            assert.equal(await page.locator('[title="Official ArtSoul NFT"]').count(),0);
+        }
     } finally { await browser.close(); }
 }
 (async()=>{await run(chromium);await run(webkit);})().catch(error=>{console.error(error);process.exitCode=1;});

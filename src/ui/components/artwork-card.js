@@ -70,11 +70,19 @@
         return label ? h('img', {className: 'artsoul-official-nft', src: '/favicon.jpg', alt: label, title: label}) : null;
     }
 
+    function founderMark(h, aura) {
+        if (aura?.kind !== 'founder') return null;
+        return h('span', {className: 'inline-flex items-center gap-1 ml-1 text-xs', title: aura.label},
+            h('img', {src: '/favicon.jpg', alt: '', width: 14, height: 14, className: 'rounded-full'}),
+            h('span', {}, 'Founder'));
+    }
+
     function decorateIdentity(title, creator, artwork, aura) {
         const official = officialMark(cardElement, artwork, aura);
         const check = creatorMark(cardElement, artwork);
-        for (const [line, mark] of [[title, official], [creator, check]]) {
-            if (mark) line.replaceChildren(cardElement('span', {className:'artsoul-identity-name'}, line.textContent), mark);
+        for (const [line, ...marks] of [[title, official], [creator, check, founderMark(cardElement, aura)]]) {
+            const visible = marks.filter(Boolean);
+            if (visible.length) line.replaceChildren(cardElement('span', {className:'artsoul-identity-name'}, line.textContent), ...visible);
         }
     }
 
@@ -1384,7 +1392,7 @@
                 h('div', { className: 'artsoul-card-title-row' },
                     h('h3', { className: 'artsoul-card-title' }, h('span', {className:'artsoul-identity-name'}, artwork.title || 'Untitled Artwork'), officialMark(h, artwork, aura)),
                     reactNetworkMarker(h, artwork)),
-                h('p', { className: 'artsoul-card-creator' }, h('span', {className:'artsoul-identity-name'}, `Creator: ${creatorLabel(artwork)}`), creatorMark(h, artwork)),
+                h('p', { className: 'artsoul-card-creator' }, h('span', {className:'artsoul-identity-name'}, `Creator: ${creatorLabel(artwork)}`), creatorMark(h, artwork), founderMark(h, aura)),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     h('span', { className: 'artsoul-card-price-label' }, summary.label),
@@ -1433,6 +1441,7 @@
 
     window.ArtSoulArtworkCard = {
         officialMark,
+        founderMark,
         decorateIdentity,
         createAuraCaption: word => window.ArtSoulAuraCaption?.(cardElement, word),
         createCardElement,

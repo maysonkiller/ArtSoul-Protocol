@@ -199,7 +199,7 @@ contract CollectionLaunch is CollectionOperatorApprovals, ERC2981, Ownable2Step,
         state.consumed += uint32(quantity);
         phaseMints[id][msg.sender] = minted;
         _creditProceeds(msg.value);
-        _mintBatch(id, msg.sender, recipient, quantity, price);
+        _mintBatch(id, msg.sender, recipient, quantity, price, recipient);
     }
 
     /// @notice One funded, indivisible bid per wallet; no cancellation or bid replacement.
@@ -248,7 +248,7 @@ contract CollectionLaunch is CollectionOperatorApprovals, ERC2981, Ownable2Step,
         entry.claimed = true;
         _creditWinnerRefund(id, msg.sender);
         phaseMints[id][msg.sender] = 1;
-        _mintBatch(id, msg.sender, recipient, 1, _states[id].clearingPrice);
+        _mintBatch(id, msg.sender, recipient, 1, _states[id].clearingPrice, msg.sender);
     }
 
     function withdrawTo(address payable recipient) external nonReentrant {
@@ -353,7 +353,7 @@ contract CollectionLaunch is CollectionOperatorApprovals, ERC2981, Ownable2Step,
         credits[creator] += amount - fee;
     }
 
-    function _mintBatch(uint256 id, address payer, address recipient, uint256 quantity, uint256 price) internal {
+    function _mintBatch(uint256 id, address payer, address recipient, uint256 quantity, uint256 price, address collector) internal {
         if (totalMinted + quantity > maxSupply) revert SupplyExceeded();
         uint256 firstId = totalMinted + 1;
         // Keep token 1 for the opening work even when public collectors mint first.
@@ -366,7 +366,6 @@ contract CollectionLaunch is CollectionOperatorApprovals, ERC2981, Ownable2Step,
             }
         }
         totalMinted += quantity;
-        address collector = id == 0 && _phases[0].kind == Kind.FirstArtworkAuction ? payer : recipient;
         for (uint256 i; i < quantity; ++i) {
             firstCollector[firstId + i] = collector;
             _safeMint(recipient, firstId + i);
