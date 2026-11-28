@@ -554,7 +554,8 @@
         const agent = window.ArtSoulWebMCP;
         const tools = new Map(agent.createTools(agent.browserDependencies()).map(tool => [tool.name, tool]));
         const staffPage = agent.isStaffPage?.() === true;
-        const staffHelp = 'Use public catalog commands here. Try “open gallery”, “search moon” or “open artwork 31”.';
+        const identityHelp = fixedReply('identityReviewHelp', 'Verify your staff sign-in and open Identity reviews to review blue check requests. Another authorized reviewer must decide your own request.');
+        const staffExamples = 'Try “Why can’t I approve my request?”, “open gallery” or “search moon”.';
 
         let inputLanguage = readStored(LANG_KEY) === 'ru' ? 'ru' : 'en';
         let replyLanguage = readStored(REPLY_LANG_KEY) === 'ru' ? 'ru' : 'en';
@@ -635,14 +636,14 @@
             button.setAttribute('aria-label', t.title);
             panel.setAttribute('lang', 'en');
             panel.querySelector('h2').textContent = t.title;
-            panel.querySelector('.artsoul-voice-hint').textContent = typeof Recognition === 'function'
-                ? t.hint + ' ' + t.conversationHint : t.hint;
+            panel.querySelector('.artsoul-voice-hint').textContent = staffPage
+                ? 'Ask about identity reviews or search the public catalog.'
+                : typeof Recognition === 'function' ? t.hint + ' ' + t.conversationHint : t.hint;
             panel.querySelector('.artsoul-voice-hint').textContent += replyLanguage === 'ru'
                 ? ' Recorded replies: Russian.' : ' Recorded replies: English.';
             if (/^\/upload(?:\.html)?\/?$/.test(window.location?.pathname || '')) {
                 panel.querySelector('.artsoul-voice-hint').textContent += ' For a draft, say “title” and dictate it, or say “choose 48 hours”.';
             }
-            if (staffPage) panel.querySelector('.artsoul-voice-hint').textContent = staffHelp;
             panel.querySelector('label').textContent = t.input;
             input.placeholder = t.placeholder;
             close.setAttribute('aria-label', t.close);
@@ -652,7 +653,7 @@
             support.hidden = typeof Recognition === 'function';
             support.textContent = t.noSpeech;
             panel.querySelector('summary').textContent = t.examples;
-            panel.querySelector('.artsoul-voice-examples p').textContent = staffPage ? staffHelp : t.help;
+            panel.querySelector('.artsoul-voice-examples p').textContent = staffPage ? staffExamples : t.help;
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => {
                 el.setAttribute('aria-pressed', String(el.dataset.lang === inputLanguage));
             });
@@ -857,6 +858,10 @@
             };
             if (transcript.length > 300) { reply('', t.tooLong); return; }
             if (!transcript.trim()) { reply('', t.empty); return; }
+            if (staffPage && !pendingPrompt && /^(?:how (?:do|can) i (?:review|approve) (?:a |my |this )?(?:blue check |identity )?request|why (?:can['’]t|cannot) i approve (?:my|this) request|как (?:одобрить|подтвердить) (?:свою )?заявку(?: на (?:синюю )?галочку)?|почему я не могу (?:одобрить|подтвердить) (?:свою |эту )?заявку)[?!.]?$/i.test(transcript.trim())) {
+                reply(transcript, identityHelp);
+                return;
+            }
             if (!pendingDraftField && !pendingPrompt && /^(?:hello|hi|hey|привет|здравствуй(?:те)?)[.!]?$/i.test(transcript.trim())) {
                 const greeting = fixedReply('r2Greeting', 'Hello! What would you like to explore in ArtSoul?');
                 reply(transcript, greeting);
@@ -897,12 +902,12 @@
                 return;
             }
             if (command.help) {
-                if (staffPage) reply(transcript, staffHelp);
+                if (staffPage) reply(transcript, identityHelp);
                 else reply(transcript, t.help, t.helpSpeech);
                 return;
             }
             if (staffPage && (command.publicationPrompt || command.tool && !tools.has(command.tool))) {
-                reply(transcript, staffHelp);
+                reply(transcript, staffExamples, fixedReply('r2OutOfScope', t.unavailable));
                 return;
             }
             if (command.searchPrompt || command.publicationPrompt) {

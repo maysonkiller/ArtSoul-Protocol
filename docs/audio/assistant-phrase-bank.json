@@ -1284,6 +1284,18 @@
       "id": "r2VideoSearchChoice",
       "text": "Выберите номер результата: первый, второй или третий.",
       "url": "/audio/assistant/v1/phrases/ru-r2VideoSearchChoice.wav"
+    },
+    {
+      "lang": "en",
+      "id": "identityReviewHelp",
+      "text": "Verify your staff sign-in and open Identity reviews to review blue check requests. Another authorized reviewer must decide your own request.",
+      "url": "/audio/assistant/v1/phrases/en-identityReviewHelp.wav"
+    },
+    {
+      "lang": "ru",
+      "id": "identityReviewHelp",
+      "text": "Подтвердите вход сотрудника и откройте раздел Identity reviews для проверки заявок на синюю галочку. Вашу собственную заявку рассматривает другой уполномоченный сотрудник.",
+      "url": "/audio/assistant/v1/phrases/ru-identityReviewHelp.wav"
     }
   ],
   "amendments": [

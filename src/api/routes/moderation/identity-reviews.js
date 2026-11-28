@@ -23,10 +23,20 @@ export default async function handler(req, res) {
         }
         params.p_status = req.query?.status ?? 'pending';
         params.p_after = req.query?.after ?? '0';
+        const summary = req.query?.summary;
         if (!['pending','approved','declined','revoked'].includes(params.p_status) || typeof params.p_after !== 'string' ||
-            !/^(0|[1-9]\d{0,17})$/.test(params.p_after)) throw serviceError('INVALID_QUERY','Choose a valid queue page.');
+            !/^(0|[1-9]\d{0,17})$/.test(params.p_after) ||
+            (summary !== undefined && (summary !== '1' || params.p_status !== 'pending' || params.p_after !== '0'))) {
+            throw serviceError('INVALID_QUERY','Choose a valid queue page.');
+        }
         const rows = await reviewRpc('manage_identity_reviews',params);
         if (!Array.isArray(rows) || rows.length > 26) throw serviceError('REVIEW_UNAVAILABLE','Reload the review queue.',503);
+        if (summary === '1') {
+            const hasMore = rows.length > 25;
+            const foundIndependent = rows.some(row => row.wallet !== actor.params.p_actor);
+            return res.status(200).json({ pending: Math.min(rows.length, 25), hasMore,
+                needsReview: foundIndependent || (hasMore ? null : false) });
+        }
         return res.status(200).json({ applications: rows.slice(0,25), next: rows.length > 25 ? rows[24].id : null });
     } catch (error) { return sendError(res,error); }
 }

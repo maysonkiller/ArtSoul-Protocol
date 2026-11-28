@@ -43,9 +43,9 @@ Do not show "indexer", "projection", or "pending indexer" as public product lang
 | Caption in Future | Source of the frame |
 | --- | --- |
 | ArtSoul | An official publisher's verified registration on its designated Core, or a proven mint from a designated official collection. The ArtSoul logo is reserved for a verified official NFT. |
-| ArtSoul Founder | The original creator of a personal work matches the Founder designation for that publishing contract. The metallic turquoise frame can appear at verified registration. |
-| ArtSoul Genesis | The exact NFT has a finalized grant from the designated, soulbound Genesis contract on Base mainnet. Its rail is blue. |
-| ArtSoul Partner | The exact NFT was minted by a collection the governing Team reviewed for partnership on that chain. Its rail is gold. |
+| ArtSoul Founder | The verified creator has a Founder artist designation on that network, or a historical Founder designation for that publishing contract. The metallic turquoise frame can appear at verified registration. |
+| ArtSoul Genesis | A blue frame can identify a verified grant for the exact Genesis NFT on Base mainnet, or a visual designation for works by a Team-reviewed artist wallet. |
+| ArtSoul Partner | The gold frame can identify a verified mint from a reviewed Partner collection, or a work created by a designated Partner artist wallet. |
 
 Previews and artwork details share the same frame and caption. The public site uses one frame per item. A purchase or wallet transfer preserves the token's origin. Holding an eligible NFT does not decorate unrelated works in its owner's wallet. A personal Founder designation gives no identity check, Genesis grant or discovery weight.
 
@@ -55,7 +55,9 @@ In Classic the frame is static. In Future, **Show labels on verified frames** pl
 
 A passkey-verified Administrator or a verified Team member in the current staff-authority pair can change label visibility and review a blue identity check for a profile or collection. An applicant's own wallet cannot approve its application. Only a verified Team member of the active pair manages frame sources. A change belongs to the selected network, source and revision. The database rechecks the staff role and current authority policy on write.
 
-In **Admin → NFT appearance → Manage frame sources**, choose the source type and network, review the complete addresses and record the reason. Team can retire a source through the same screen. Keep a dedicated publishing wallet for official mainnet works, separate from personal accounts, treasury accounts and Safe signer keys. Enter it only after the issuing deployment is reviewed. The original Base Sepolia catalog and replacement rehearsal have different Core contracts. Each publisher designation applies to its selected deployment.
+In **Admin → NFT appearance → Manage frame sources**, choose the frame and network. For an artist wallet, search a profile or paste the wallet address, review it and record the reason. These designations apply only to works with verified authorship on that network. One revision per wallet guards replacement or removal of its current frame. The manual Genesis frame confers no Genesis grant, token, holder benefits, discovery weight or blue identity check. A verified official publication takes priority over an artist frame.
+
+Under **Official ArtSoul**, choose a publishing wallet or an NFT collection. An official publishing wallet is scoped to its reviewed Core. The original Base Sepolia catalog and replacement rehearsal have different Core contracts. For a collection, provide its contract address. Two readers check the reviewed runtime and read its original issuer. Team can remove an existing designation even if the collection RPC is offline. Keep a dedicated publishing wallet for official mainnet works, separate from personal accounts, treasury accounts and Safe signer keys.
 
 ### How the site verifies an NFT
 

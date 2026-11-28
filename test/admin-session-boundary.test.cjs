@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(process.env.ADMIN_CANDIDATE_PATH || 'src/entries/admin.jsx', 'utf8').replace(/\r\n/g, '\n');
-const start = source.indexOf('function ProtocolAdminPage()');
+const start = source.indexOf('function linkedSection()');
 const end = source.indexOf('    const SignInDialog =', start);
 const logic = source.slice(start, end) + `return {checkAccess, authenticate, changeQueueStatus, submitDecision, setDecision, stepUp,
     closeSetup: () => { if (typeof setPasskeyOpen === 'function') setPasskeyOpen(false); },
-    snapshot: {accessState, access, data, busy, message, decision,
+    snapshot: {accessState, access, data, busy, message, decision, checkingReturn,
         setupAllowed: Boolean(setupWallet),
         passkeyOpen: typeof passkeyOpen === 'undefined' ? false : passkeyOpen}}; }`;
 const WALLET = '0x'+'11'.repeat(20), OTHER = '0x'+'22'.repeat(20);
@@ -396,13 +396,11 @@ test('expired or missing server deadline cannot open a protected workspace',asyn
     }
 });
 
-test('foreground and network revalidation conceal old data and fence late queue responses',async()=>{
-    for(const event of ['focus','visibilitychange','online','connection:change']) {
+test('network revalidation clears old data and fences late queue responses',async()=>{
+    for(const event of ['online','connection:change']) {
         const h=harness();await tick();h.render();const oldQueue=deferred(),newAccess=deferred();
         h.state.api=path=>path.startsWith('access')?newAccess.promise:oldQueue.promise;
         const old=h.actions.changeQueueStatus('resolved');
-        if(event==='focus')h.event('blur');
-        if(event==='visibilitychange'){h.state.visibility='hidden';h.event('visibilitychange');h.state.visibility='visible';}
         h.event(event);
         const waiting=h.render();assert.equal(waiting.data.reports.length,0);assert.notEqual(waiting.accessState,'ready');
         oldQueue.resolve({data:secret()});await old;assert.equal(h.render().data.reports.length,0);
@@ -430,14 +428,26 @@ test('duplicate focus and same-wallet updates preserve the workspace; a real for
     const h=harness();await tick();h.render();const initial=h.state.calls.length;
     for(const event of ['pageshow','focus','visibilitychange','artsoul:wallet-state-changed','artsoul:auth-state-changed']) h.event(event);
     assert.equal(h.state.calls.length,initial);assert.equal(h.render().data.reports[0].id,'private-report');
+    h.actions.setDecision({action:'hide',report:{id:'draft'}});
     h.event('blur');h.state.visibility='hidden';h.event('visibilitychange');
     h.state.visibility='visible';h.event('visibilitychange');h.event('focus');h.event('pageshow',{persisted:false});
-    assert.equal(h.state.calls.length,initial+1);assert.equal(h.render().data.reports.length,0);
-    await tick();assert.equal(h.render().accessState,'ready');assert.equal(h.state.calls.length,initial+2);
+    assert.equal(h.state.calls.length,initial+1);assert.equal(h.render().checkingReturn,true);
+    await tick();assert.equal(h.render().accessState,'ready');assert.equal(h.state.calls.length,initial+1);
+    assert.equal(h.render().checkingReturn,false);assert.equal(h.render().decision.report.id,'draft');
     h.event('pagehide');assert.equal(h.render().data.reports.length,0);
     h.state.access=access({eligible:false,access:null});
     h.event('pageshow',{persisted:true});await tick();
     assert.equal(h.render().accessState,'ineligible');assert.equal(h.render().data.reports.length,0);
+});
+
+test('a revoked staff role on tab return discards the private editor before it can be revealed',async()=>{
+    const h=harness();await tick();h.render();
+    h.actions.setDecision({action:'hide',report:{id:'draft'}});
+    const read=deferred();h.state.api=()=>read.promise;
+    h.event('blur');h.event('focus');assert.equal(h.render().checkingReturn,true);
+    read.resolve(access({eligible:false,access:null}));await tick();
+    const view=h.render();assert.equal(view.checkingReturn,false);assert.equal(view.accessState,'ineligible');
+    assert.equal(view.decision,null);assert.equal(view.data.reports.length,0);
 });
 
 test('throughput changes recheck access without discarding a healthy draft and fail closed on revocation',async()=>{

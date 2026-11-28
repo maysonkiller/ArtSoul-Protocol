@@ -139,6 +139,13 @@ test('an archived mint follows the token across owners and still requires a curr
     assert.equal(personal.founder_origin_verified,true);
     assert.equal(personal.aura_kind,'founder');
     assert.equal(personal.platform_origin_verified,undefined);
+    for (kind of ['artist_partner','artist_genesis','artist_founder']) {
+        const [assigned,invalid] = await withCatalogMintOrigins([card,{...card,token_id:'9'}]);
+        assert.equal(assigned.aura_kind,kind);
+        assert.equal(assigned.artist_frame_verified,true);
+        assert.equal(assigned.platform_origin_verified,undefined);
+        assert.equal(invalid.aura_kind,undefined);
+    }
     enabled = false;
     assert.equal((await withCatalogMintOrigins([card]))[0].aura_kind, undefined);
 });

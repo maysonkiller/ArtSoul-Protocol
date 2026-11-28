@@ -17,6 +17,11 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-heading h1 {
 }
 
 body:is(.classic, .future) .admin-workspace .protocol-admin-session { margin-top: .35rem; }
+.admin-workspace:is([data-access="ready"], [data-access="checking"]) .protocol-admin-access-status {
+    min-inline-size: 9em;
+    box-sizing: border-box;
+    text-align: center;
+}
 body:is(.classic, .future) .admin-workspace .protocol-admin-overview {
     display: flex;
     flex-wrap: wrap;
@@ -43,6 +48,64 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-overview strong { fo
     gap: clamp(1rem, 2.5vw, 2.5rem);
 }
 .admin-workspace-content { min-width: 0; }
+.admin-private-workspace[aria-hidden="true"],
+.admin-private-workspace[aria-hidden="true"] * { visibility: hidden !important; }
+.admin-private-workspace[aria-hidden="true"] dialog,
+.admin-private-workspace[aria-hidden="true"] dialog::backdrop { display: none; }
+body:is(.classic, .future) .admin-workspace .protocol-admin-access-guide[data-locked="true"] {
+    border-inline-start: .25rem solid var(--c-notification-alert);
+    background: var(--c-surface);
+}
+.admin-workspace:is([data-access="step_up"], [data-access="unauthenticated"]) .protocol-admin-access-status {
+    border-color: var(--c-notification-alert);
+}
+.future .admin-workspace[data-access="step_up"] .protocol-admin-header-actions .protocol-admin-primary {
+    box-shadow: 0 0 .8rem color-mix(in srgb, var(--c-accent) 30%, transparent);
+}
+.admin-workspace .admin-review-count {
+    margin-inline-start: auto;
+    padding: .1rem .45rem;
+    border: 1px solid var(--c-border);
+    border-radius: 1rem;
+    color: var(--c-text);
+    font-size: .8rem;
+    font-variant-numeric: tabular-nums;
+}
+.admin-workspace .admin-review-count[data-actionable="true"] {
+    background: var(--c-notification-alert);
+    border-color: var(--c-notification-alert);
+    color: var(--c-notification-on-alert);
+}
+.admin-workspace .protocol-admin-overview { align-items: center; }
+.admin-workspace .admin-review-shortcut { min-height: 44px; }
+.identity-applications { max-width: 57rem; }
+.identity-review-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem 1rem; }
+.identity-review-toolbar label { display: grid; gap: .25rem; }
+.identity-review-toolbar select, .identity-review-card textarea {
+    background: var(--c-surface);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+    border-radius: .5rem;
+    min-height: 44px;
+    padding: .5rem .7rem;
+    font: inherit;
+}
+.identity-review-card {
+    display: grid;
+    gap: .65rem;
+    margin-block: 1rem;
+    padding: clamp(.75rem, 2vw, 1.4rem);
+    background: var(--c-surface);
+    border: 1px solid var(--c-border-soft);
+    border-radius: .875rem;
+    overflow-wrap: anywhere;
+}
+.identity-review-card :is(h3, p, dl, dd) { margin: 0; }
+.identity-review-card textarea { width: 100%; box-sizing: border-box; min-height: 5rem; resize: vertical; }
+.identity-review-notice { border-inline-start: 3px solid var(--c-accent); padding: .4rem .7rem; }
+.identity-review-facts { display: flex; flex-wrap: wrap; gap: .65rem 1.5rem; }
+.identity-review-facts dt, .identity-review-card small { color: var(--c-text-muted); }
+.identity-review-facts a { color: var(--c-accent); text-decoration: underline; text-underline-offset: .15em; }
 .admin-aura-setting > label { display: flex; align-items: center; gap: .65rem; min-height: 44px; }
 .admin-aura-setting > label input { flex: none; inline-size: 1.125rem; block-size: 1.125rem; margin: 0; accent-color: var(--c-accent); }
 .admin-aura-setting a { color: var(--c-accent); text-underline-offset: .14em; }

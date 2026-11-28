@@ -37,7 +37,7 @@ test('identity applications bind both sessions and expose decisions only to veri
   const previous = process.env;
   process.env = {...previous,ARTSOUL_PROFILE_IDENTITY_REVIEWS_ENABLED:'true',ARTSOUL_PUBLIC_ORIGIN:'https://example.com',ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true'};
   t.after(() => { process.env=previous; });
-  let role='team', member=true;
+  let role='team', member=true, queueRows=[];
   const calls=fixture(t,(path,options) => {
     if (path.startsWith('artsoul_staff_roles?')) return json([{role,authorization_version:2}]);
     if (path.startsWith('artsoul_staff_authority_policy?')) return json([{origin:'https://example.com',chain_id:84532,version:3,
@@ -46,14 +46,14 @@ test('identity applications bind both sessions and expose decisions only to veri
       assert.deepEqual(JSON.parse(options.body),{p_wallet:STAFF,p_evidence:'https://artist.example/announcement',p_chain:null,p_collection:null});
       return json('1');
     }
-    if (path==='rpc/manage_identity_reviews') return json([]);
+    if (path==='rpc/manage_identity_reviews') return json(queueRows);
   });
   const form=req({cookie:cookie(false),method:'POST',body:{evidence:'https://artist.example/announcement',chain:null,collection:null}});
   Object.assign(form.headers,{'x-artsoul-wallet':STAFF,origin:'https://example.com','content-type':'application/json'});
   let res=response();await identityApplication(form,res);assert.deepEqual(res.body,{id:'1'});
   form.headers['x-artsoul-wallet']=''; res=response();await identityApplication(form,res);assert.equal(res.statusCode,401);
   form.headers['x-artsoul-wallet']=STAFF;form.headers.origin='https://another.example';res=response();await identityApplication(form,res);assert.equal(res.statusCode,403);
-  const check=async(auth) => { const out=response();await identityReviews(req({cookie:auth,query:{wallet:STAFF}}),out);return out; };
+  const check=async(auth,query={}) => { const out=response();await identityReviews(req({cookie:auth,query:{wallet:STAFF,...query}}),out);return out; };
   assert.ok([401,403].includes((await check(cookie(false))).statusCode));
   assert.deepEqual((await check(cookie(true,2))).body,{applications:[],next:null});
   member=false;assert.equal((await check(cookie(true,2))).statusCode,403);
@@ -61,6 +61,23 @@ test('identity applications bind both sessions and expose decisions only to veri
   role='moderator';assert.equal((await check(cookie(true,2))).statusCode,403);
   assert.equal(calls.filter(c=>c.path==='rpc/request_identity_review').length,1);
   assert.equal(calls.filter(c=>c.path==='rpc/manage_identity_reviews').length,2);
+
+  const summary={summary:'1'};
+  assert.equal((await check(cookie(true,2),summary)).statusCode,403);
+  role='team';assert.equal((await check(cookie(true,2),summary)).statusCode,403);
+  member=true;assert.ok([401,403].includes((await check(cookie(false),summary)).statusCode));
+  assert.equal((await check(cookie(true,2),{...summary,status:'approved'})).statusCode,400);
+  assert.equal(calls.filter(c=>c.path==='rpc/manage_identity_reviews').length,2);
+  assert.deepEqual((await check(cookie(true,2),summary)).body,{pending:0,hasMore:false,needsReview:false});
+  queueRows=[{id:'1',wallet:STAFF,evidence:'https://artist.example/proof'}];
+  assert.deepEqual((await check(cookie(true,2),summary)).body,{pending:1,hasMore:false,needsReview:false});
+  queueRows.push(...Array.from({length:25},(_,i)=>({id:String(i+2),wallet:'0x'+'2'.repeat(40),profile_name:'Fixture artist'})));
+  const counted=await check(cookie(true,2),summary);
+  assert.equal(counted.headers['Cache-Control'],'private, no-store');
+  assert.deepEqual(counted.body,{pending:25,hasMore:true,needsReview:true});
+  assert.equal((await check(cookie(true,2))).body.applications.length,25);
+  queueRows=queueRows.map(row=>({...row,wallet:STAFF}));
+  assert.deepEqual((await check(cookie(true,2),summary)).body,{pending:25,hasMore:true,needsReview:null});
 });
 
 test('source management binds an explicit switch to the displayed Core and current staff wallet',async t=>{
@@ -109,6 +126,11 @@ test('mainnet frame sources bind the reviewed Core, original collection issuer a
     if(path.startsWith('artsoul_staff_roles?'))return json([{role:'team',authorization_version:2}]);
     if(path.startsWith('artsoul_staff_authority_policy?'))return json([{origin:'https://example.com',chain_id:84532,version:3,
       wallet_a:STAFF,wallet_b:issuer}]);
+    if(path==='rpc/review_official_frame_sources')return json([{address:token,enabled:true,revision:1,issuer}]);
+    if(path==='rpc/manage_artist_frames'){
+      const b=JSON.parse(options.body);assert.equal(b.p_scope,undefined);assert.equal(b.p_frame,'genesis');
+      return json([{address:token,revision:1,enabled:true,active_frame:'genesis'}]);
+    }
     if(path==='rpc/manage_aura_sources'){
       const b=JSON.parse(options.body);
       return json(b.p_enabled===null?[]:[{address:b.p_address,enabled:b.p_enabled,revision:b.p_revision+1}]);
@@ -123,7 +145,9 @@ test('mainnet frame sources bind the reviewed Core, original collection issuer a
   process.env.ARTSOUL_CORE_ADDRESS_BASE_MAINNET=token;
   assert.equal((await call('founder',{deployment:'catalog'})).body.scope,token);
   assert.equal((await call('platform',{deployment:'rehearsal'})).statusCode,400);
-  assert.equal((await call('official_collection')).statusCode,400);
+  assert.equal((await call('official_collection')).body.scope,issuer);
+  assert.equal((await call('artist_genesis',{}, {scope:'',enabled:true,revision:0,reason:'Visual artist designation'})).body.sources[0].enabled,true);
+  assert.equal((await call('artist_genesis',{deployment:'rehearsal'})).statusCode,400);
   assert.equal((await call('official_collection',{issuer})).body.scope,issuer);
   assert.equal((await call('genesis')).body.configuredGenesis,null);
   const change={scope:'',reason:'Recorded issuer review',enabled:true,revision:0};

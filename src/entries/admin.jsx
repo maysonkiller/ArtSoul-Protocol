@@ -4,7 +4,7 @@ import { StaffFactorDialog } from '../features/admin/staff-factor-dialog.jsx';
 import { staffEntryHint } from '../features/admin/staff-entry.js';
 import { StaffAuthority } from '../features/admin/staff-authority.jsx';
 import { AuraAppearance } from '../features/admin/aura-appearance.jsx';
-import { IdentityReviews } from '../features/admin/identity-reviews.jsx';
+import { IdentityReviews, usePendingIdentityReviews } from '../features/admin/identity-reviews.jsx';
 import { AdminArtworkCatalog, AdminArtworkPreview } from '../features/admin/artwork-catalog.jsx';
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
@@ -83,7 +83,7 @@ function groupReports(reports = []) {
     return [...groups.values()];
 }
 
-function DecisionDialog({ decision, onClose, onSubmit, busy }) {
+function DecisionDialog({ decision, onClose, onSubmit, busy, concealed }) {
     const dialogRef = useRef(null);
     const reasonRef = useRef(null);
     const previousFocusRef = useRef(null);
@@ -92,6 +92,7 @@ function DecisionDialog({ decision, onClose, onSubmit, busy }) {
     useEffect(() => {
         const dialog = dialogRef.current;
         if (!dialog || !decision) return undefined;
+        if (concealed) { if (dialog.open) dialog.close(); return undefined; }
         previousFocusRef.current = document.activeElement;
         dialog.showModal();
         reasonRef.current?.focus();
@@ -119,7 +120,7 @@ function DecisionDialog({ decision, onClose, onSubmit, busy }) {
             dialog.removeEventListener('keydown', onKeyDown);
             previousFocusRef.current?.focus?.();
         };
-    }, [busy, decision, onClose]);
+    }, [busy, decision, onClose, concealed]);
 
     if (!decision) return null;
     return (
@@ -192,7 +193,7 @@ function AccessGate({ state, message, walletAddress }) {
             ? ['Verify your staff wallet', 'Confirm this wallet to check its staff role. Switching accounts does not carry over the previous account\'s admin access.']
             : ['Connect your staff wallet', 'Use the wallet assigned to your staff account. You can connect it using the button above.'],
         ineligible: ['Access unavailable', 'This wallet does not have an active staff role.'],
-        step_up: ['Verify your admin sign-in', 'Your wallet is connected. Use your passkey or authenticator app to unlock complaints. Verification is required again after access expires or your browser or network changes.'],
+        step_up: ['Review workspace locked', 'Choose Verify admin access and use your passkey or authenticator app to open your staff tools.'],
         setup: ['Admin panel', 'Set up your sign-in method here. The review workspace is not active yet.'],
         setup_verified: ['Admin access confirmed', 'Your sign-in method is verified. The review workspace is not active yet.'],
         authority: ['Staff access', 'This authority wallet can approve staff access. Reviewing complaints requires a separate staff role and verification.'],
@@ -200,11 +201,15 @@ function AccessGate({ state, message, walletAddress }) {
     }[state] || ['Protocol Admin', message || 'Access is not ready.'];
 
     return (
-        <section className="protocol-admin-gate protocol-admin-access-guide" aria-live="polite">
+        <section className="protocol-admin-gate protocol-admin-access-guide" data-locked={['unauthenticated', 'step_up', 'ineligible'].includes(state)} aria-live="polite">
             <h2>{copy[0]}</h2>
             <p>{state === 'unauthenticated' && message ? message : copy[1]}</p>
         </section>
     );
+}
+
+function linkedSection() {
+    return { '#nft-appearance': 'appearance', '#identity-reviews': 'identity' }[window.location?.hash] || 'queue';
 }
 
 function ProtocolAdminPage() {
@@ -214,7 +219,7 @@ function ProtocolAdminPage() {
     const [queueTarget, setQueueTarget] = useState(null);
     const queueTargetRef = useRef(null);
     const [data, setData] = useState({ reports: [], events: [], hidden: [], moderationLog: [], notifications: [] });
-    const [section, setSection] = useState(() => window.location?.hash === '#nft-appearance' ? 'appearance' : 'queue');
+    const [section, setSection] = useState(linkedSection);
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState('');
     const [decision, setDecision] = useState(null);
@@ -222,10 +227,12 @@ function ProtocolAdminPage() {
     const [setupWallet, setSetupWallet] = useState('');
     const [authorityWallet, setAuthorityWallet] = useState('');
     const [passkeyOpen, setPasskeyOpen] = useState(false);
+    const [checkingReturn, setCheckingReturn] = useState(false);
     const signInIntent = useRef('login'), completedSignIn = useRef('');
     const setupEpoch = useRef(0), openedSetupFor = useRef('');
     const accessRequest = useRef(0), queueRequest = useRef(0), readySession = useRef(null);
     const accessController = useRef(null);
+    const accessOwnsBusy = useRef(false);
     const queueController = useRef(null);
     const checkAccessRef = useRef(null);
     const expiryTimer = useRef(null);
@@ -234,6 +241,7 @@ function ProtocolAdminPage() {
         ? String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase() : '';
     const sessionIsCurrent = (epoch, wallet) => epoch === setupEpoch.current && wallet === currentSetupWallet();
     const clearProtectedView = () => {
+        setCheckingReturn(false);
         clearTimeout(expiryTimer.current);
         expiryTimer.current = null;
         readySession.current = null;
@@ -293,7 +301,7 @@ function ProtocolAdminPage() {
         };
         const walletChanged = () => sessionChanged(true);
         const authChanged = () => sessionChanged();
-        const showLinkedSection = () => setSection(window.location?.hash === '#nft-appearance' ? 'appearance' : 'queue');
+        const showLinkedSection = () => setSection(linkedSection());
         const storage = event => { if (!event.key || ['artsoul_wallet', 'artsoul_authenticated_wallet'].includes(event.key)) clearSession(); };
         const resume = () => {
             if (document.visibilityState === 'hidden' || !currentSetupWallet()) return;
@@ -308,7 +316,13 @@ function ProtocolAdminPage() {
         const leave = () => { leftPage = true; };
         const foreground = () => {
             if (document.visibilityState === 'hidden') { leave(); return; }
-            if (leftPage) { leftPage = false; resume(); }
+            if (!leftPage) return;
+            leftPage = false;
+            if (readySession.current && readySession.current.wallet === currentSetupWallet()) {
+                // Keep the editor mounted but concealed while checking the returning wallet.
+                setCheckingReturn(true);
+                checkAccessRef.current?.({ returning: true });
+            } else resume();
         };
         const restoredPage = event => { if (event.persisted) { leftPage = false; resume(); } };
         const connection = window.navigator?.connection;
@@ -403,6 +417,11 @@ function ProtocolAdminPage() {
     }, []);
 
     const accessFailed = error => {
+        setupEpoch.current++;
+        accessRequest.current++;
+        accessController.current?.abort();
+        accessOwnsBusy.current = false;
+        setBusy(false);
         clearProtectedView();
         const stepUpRequired = ['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(error.code);
         if (stepUpRequired) {
@@ -418,9 +437,10 @@ function ProtocolAdminPage() {
         setMessage(error.message);
     };
 
-    const checkAccess = useCallback(async ({ verified = false, background = false } = {}) => {
+    const checkAccess = useCallback(async ({ verified = false, background = false, returning = false } = {}) => {
         if (background && accessController.current) return;
-        const wallet = currentSetupWallet(), epoch = setupEpoch.current, request = ++accessRequest.current;
+        const wallet = currentSetupWallet(), request = ++accessRequest.current;
+        let epoch = setupEpoch.current;
         accessController.current?.abort();
         if (verified && signInIntent.current === 'login') completedSignIn.current = wallet;
         const startedAt = performance.now();
@@ -435,7 +455,7 @@ function ProtocolAdminPage() {
             setBusy(false);
             return;
         }
-        if (!background) { setBusy(true); setMessage(''); }
+        if (!background && !returning) { accessOwnsBusy.current = true; setBusy(true); setMessage(''); }
         const controller = new AbortController();
         accessController.current = controller;
         const timeout = setTimeout(() => controller.abort(), 15000);
@@ -453,13 +473,21 @@ function ProtocolAdminPage() {
             const canApprove = result.setupEnabled === true && result.authenticated === true && result.authorityEligible === true;
             if (result.authenticated === true && typeof result.eligible === 'boolean') staffEntryHint(wallet, window, canSetup || canApprove);
             const previous = readySession.current;
-            if (background && previous?.epoch === epoch && previous.wallet === wallet &&
+            const sameScope = previous?.epoch === epoch && previous.wallet === wallet &&
                 result.enabled && canSetup && result.access?.stepUpActive &&
                 previous.role === result.access.role && previous.authority === canApprove &&
-                previous.dualWallet === result.access.dualWallet) {
+                previous.dualWallet === result.access.dualWallet &&
+                previous.identityReviewer === result.access.identityReviewer &&
+                previous.frameSourceManager === result.access.frameSourceManager;
+            if ((returning || background) && sameScope) {
                 clearTimeout(expiryTimer.current);
                 expiryTimer.current = setTimeout(expireView, remaining);
+                setCheckingReturn(false);
                 return;
+            }
+            if (previous && !sameScope) {
+                epoch = ++setupEpoch.current;
+                setBusy(false);
             }
             setAuthorityWallet(canApprove ? wallet : '');
             setSetupWallet(canSetup ? wallet : '');
@@ -486,7 +514,7 @@ function ProtocolAdminPage() {
             } else if (!result.access?.stepUpActive) {
                 setAccessState('step_up');
             } else {
-                readySession.current = { epoch, wallet, request, role: result.access.role, authority: canApprove, dualWallet: result.access.dualWallet };
+                readySession.current = { ...result.access, epoch, wallet, request, authority: canApprove };
                 setAccessState('ready');
                 await loadQueue(queueStatusRef.current);
             }
@@ -495,7 +523,7 @@ function ProtocolAdminPage() {
         } finally {
             clearTimeout(timeout);
             if (accessController.current === controller) accessController.current = null;
-            if (isCurrent() && !background) setBusy(false);
+            if (isCurrent() && accessOwnsBusy.current) { setBusy(false); accessOwnsBusy.current = false; }
         }
     }, [loadQueue]);
     checkAccessRef.current = checkAccess;
@@ -608,14 +636,13 @@ function ProtocolAdminPage() {
     const identityAllowed = access?.identityReviewer === true && appearanceAllowed;
     const activeSection = (section === 'staff' && !rosterWallet || section === 'identity' && !identityAllowed || section === 'appearance' && !appearanceAllowed) ? 'queue' : section;
     const catalogEpoch = setupEpoch.current, catalogWallet = connectedWallet;
+    const pendingIdentity = usePendingIdentityReviews({api, wallet: ready && identityAllowed ? catalogWallet : '', epoch: catalogEpoch, onAccessError: accessFailed});
     const catalogSessionCurrent = () => sessionIsCurrent(catalogEpoch,catalogWallet)
         && readySession.current?.epoch === catalogEpoch && readySession.current.wallet === catalogWallet;
     const reviewArtwork = (artwork,status) => { setSection('queue'); void changeQueueStatus(status,artwork); };
     const statusLabel = { loading: 'Checking access', unauthenticated: 'Wallet sign-in required', step_up: 'Verification required',
         ready: 'Verified', authority: 'Approval access', setup: 'Set up sign-in', setup_verified: 'Verified',
         error: 'Access needs attention', ineligible: 'No staff role', disabled: 'Unavailable' }[accessState];
-    // One organized navigation and one compact summary; all counts come from
-    // the already-authorized queue response. Do not add public/staff requests.
     const adminGroups = [
         { title: 'Moderate', items: [['queue', 'Reports'], ['artworks', 'Artworks'], ['hidden', 'Hidden'], ...(identityAllowed ? [['identity','Identity reviews']] : [])] },
         { title: 'History', items: [['audit', 'Audit log'], ['notifications', 'Delivery']] },
@@ -625,18 +652,17 @@ function ProtocolAdminPage() {
 
     function openWorkspaceSection(value) {
         setSection(value);
-        if (value === 'appearance' || window.location.hash === '#nft-appearance') {
-            window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (value === 'appearance' ? '#nft-appearance' : ''));
-        }
+        const hash = { appearance: '#nft-appearance', identity: '#identity-reviews' }[value] || '';
+        if (hash !== window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + hash);
     }
 
     return (
-        <div className="protocol-admin-shell admin-workspace">
+        <div className="protocol-admin-shell admin-workspace" data-access={checkingReturn ? 'checking' : accessState}>
             <header className="protocol-admin-heading" ref={accessHeading} tabIndex={-1}>
                 <div>
                     <h1>Admin panel</h1>
                     <div className="protocol-admin-session">
-                        <span className={`protocol-admin-access-status${ready ? ' is-verified' : ''}`} role="status">{statusLabel}</span>
+                        <span className={`protocol-admin-access-status${ready && !checkingReturn ? ' is-verified' : ''}`} role="status">{checkingReturn ? 'Checking access' : statusLabel}</span>
                         <span>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : accessState === 'loading' ? 'Waiting for your wallet' : 'No staff wallet connected'}{roleLabel ? ` / ${roleLabel}` : ''}</span>
                     </div>
                 </div>
@@ -653,8 +679,10 @@ function ProtocolAdminPage() {
                 {ready || accessState === 'ineligible' ? 'This staff account does not have permission to manage NFT appearance.' : 'Verify your authorized staff wallet to open NFT appearance.'}
             </p>}
 
+            <div className="admin-private-workspace" aria-hidden={checkingReturn || undefined} inert={checkingReturn ? '' : undefined}>
             {ready &&
                 <div className="protocol-admin-overview" role="group" aria-label="Current workspace counts">
+                    {pendingIdentity.needsReview && identityAllowed && activeSection !== 'identity' && <button className="admin-review-shortcut" onClick={() => openWorkspaceSection('identity')}>Review identity requests <span aria-hidden="true">→</span></button>}
                     <div><span>Reports in view</span><strong>{data.reports.length}</strong></div>
                     <div><span>Hidden works</span><strong>{data.hidden.length}</strong></div>
                     <div><span>Delivery records</span><strong>{data.notifications.length}</strong></div>
@@ -665,7 +693,7 @@ function ProtocolAdminPage() {
                     <label className="admin-mobile-section">Workspace section
                         <select value={activeSection} onChange={event => openWorkspaceSection(event.target.value)}>
                             {adminGroups.map(group => <optgroup label={group.title} key={group.title}>
-                                {group.items.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                {group.items.map(([value, label]) => <option key={value} value={value}>{value === 'identity' && pendingIdentity.label && pendingIdentity.label !== '0' ? `${label} (${pendingIdentity.label})` : label}</option>)}
                             </optgroup>)}
                         </select>
                     </label>
@@ -681,6 +709,7 @@ function ProtocolAdminPage() {
                                     onClick={() => openWorkspaceSection(value)}
                                 >
                                     {label}
+                                    {value === 'identity' && pendingIdentity.label && pendingIdentity.label !== '0' && <span className="admin-review-count" data-actionable={pendingIdentity.needsReview} aria-label={`${pendingIdentity.label} pending requests`}>{pendingIdentity.label}</span>}
                                 </button>
                             ))}
                         </div>
@@ -693,7 +722,7 @@ function ProtocolAdminPage() {
 
             {ready && message && <p className="protocol-admin-message" role="status">{message}</p>}
             {ready && identityAllowed && activeSection === 'identity' && <IdentityReviews
-                key={catalogEpoch + catalogWallet} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent} />}
+                key={catalogEpoch + catalogWallet} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent} onQueueChange={pendingIdentity.refresh} onAccessError={accessFailed} />}
             {ready && appearanceAllowed && activeSection === 'appearance' && <AuraAppearance
                 key={`${catalogEpoch}:${catalogWallet}`} wallet={catalogWallet} api={api} isSessionCurrent={catalogSessionCurrent}
                 frameSourceManager={access.role === 'team' && authorityWallet === catalogWallet && access.frameSourceManager === true} />}
@@ -837,7 +866,8 @@ function ProtocolAdminPage() {
 
                 </div>
             </div>
-            {ready && decision && <DecisionDialog decision={decision} onClose={() => !busy && setDecision(null)} onSubmit={submitDecision} busy={busy} />}
+            {ready && decision && <DecisionDialog decision={decision} onClose={() => !busy && setDecision(null)} onSubmit={submitDecision} busy={busy} concealed={checkingReturn} />}
+            </div>
         </div>
     );
 }

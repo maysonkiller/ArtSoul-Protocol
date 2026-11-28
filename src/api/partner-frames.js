@@ -15,7 +15,7 @@ const txHash = /^0x[0-9a-f]{64}$/;
 const creatorSelector = id('creator()').slice(0,10);
 const blockNumber = value => typeof value === 'string' && /^0x[0-9a-f]{1,13}$/.test(value) ? Number(BigInt(value)) : NaN;
 
-async function observeCollectionContract(chain, address, issuer, readers) {
+async function observeCollectionContract(chain, address, inspectIssuer, readers) {
     const signal = AbortSignal.timeout(4500);
     if (readers.length !== 2) throw new Error('Two collection observations are required');
     const heads = await Promise.all(readers.map(async rpc => {
@@ -36,24 +36,25 @@ async function observeCollectionContract(chain, address, issuer, readers) {
     if (codes.some(code=>typeof code !== 'string' || !/^0x(?:[0-9a-f]{2})*$/i.test(code)) ||
         codes[0].toLowerCase() !== codes[1].toLowerCase()) throw new Error('Contract observations differ');
     if (codes[0] === '0x' || /^0xef0100[0-9a-f]{40}$/i.test(codes[0])) return false;
-    const runtime = issuer && reviewedCollectionRuntime(codes[0]);
-    if (issuer && !runtime) return false;
+    const runtime = inspectIssuer && reviewedCollectionRuntime(codes[0]);
+    if (inspectIssuer && !runtime) return false;
 
     const support = await Promise.all(readers.map(rpc=>Promise.all(['01ffc9a7','ffffffff','80ac58cd'].map(id=>
         rpc('eth_call',[{to:address,gas:'0xf000',data:'0x01ffc9a7'+id.padEnd(64,'0')},at],{signal})))));
     if (support[0].some((answer,i)=>answer !== support[1][i])) throw new Error('Collection interfaces differ');
     const encoded = value=>'0x'+String(value).padStart(64,'0');
     if (!support[0].every((answer,i)=>answer === encoded(i === 1 ? 0 : 1))) return false;
-    if (!issuer) return true;
+    if (!inspectIssuer) return true;
     // creator() returns the immutable original issuer. owner() may change.
     const answers = await Promise.all(readers.map(rpc=>rpc('eth_call',[{to:address,data:creatorSelector},at],{signal})));
     if (answers[0] !== answers[1]) throw new Error('Collection issuer observations differ');
-    return answers[0]?.toLowerCase() === '0x'+issuer.slice(2).padStart(64,'0') ? runtime : false;
+    if (!/^0x0{24}[0-9a-f]{40}$/i.test(answers[0]) || /^0x0{64}$/i.test(answers[0])) return false;
+    return {issuer:'0x'+answers[0].slice(-40).toLowerCase(), runtime};
 }
 
 export function hasPartnerContract(chain, address, readers = createRegistrationReaders(networks[chain])) {
     if (reservedCollection(chain,address)) return Promise.resolve(false);
-    return observeCollectionContract(chain,address,null,readers);
+    return observeCollectionContract(chain,address,false,readers);
 }
 
 function reservedCollection(chain,address) {
@@ -63,9 +64,14 @@ function reservedCollection(chain,address) {
     return reserved.some(value=>value && value.toLowerCase() === address.toLowerCase());
 }
 
-export function officialCollectionRuntime(chain,address,issuer,readers = createRegistrationReaders(networks[chain])) {
+export async function officialCollectionRuntime(chain,address,issuer,readers = createRegistrationReaders(networks[chain])) {
     if (!/^0x[0-9a-f]{40}$/.test(issuer) || /^0x0{40}$/.test(issuer)) return null;
-    return observeCollectionContract(chain,address,issuer,readers);
+    const collection = await discoverOfficialCollection(chain,address,readers);
+    return collection?.issuer === issuer ? collection.runtime : false;
+}
+
+export function discoverOfficialCollection(chain,address,readers = createRegistrationReaders(networks[chain])) {
+    return observeCollectionContract(chain,address,true,readers);
 }
 
 export function mintTransactionHint(mint) {

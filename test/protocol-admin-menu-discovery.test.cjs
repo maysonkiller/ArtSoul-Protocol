@@ -137,10 +137,36 @@ test('render paths call only the non-fetching wallet sync', () => {
   const renderCalls = SOURCE.match(/this\.syncProtocolAdminWallet\(walletAddress\);/g) || [];
   assert.equal(renderCalls.length, 2);
   assert.doesNotMatch(SOURCE, /refreshProtocolAdminAccess/);
-  const openCall = SOURCE.match(/void this\.requestProtocolAdminAccessOnce\(\);/g) || [];
+  const openCall = SOURCE.match(/void this\.requestProtocolAdminAccessOnce\(\)/g) || [];
   assert.equal(openCall.length, 2);
   // Visual rendering is still separate from the confirmed sign-in warmup.
-  assert.match(SOURCE, /if \(this\.isOpen\) \{\s*\n\s*void this\.requestProtocolAdminAccessOnce\(\);/);
+  assert.match(SOURCE, /if \(this\.isOpen\) \{\s*\n\s*void this\.requestProtocolAdminAccessOnce\(\)\.then/);
+});
+
+test('menu attention comes from the verified reviewer summary and expires or clears on account change', async () => {
+  const h = createHarness();
+  confirmedSignIn(h);
+  h.context.AbortController = AbortController;
+  const account = h.dropdown;
+  account.protocolAdminWallet = WALLET_A;
+  account.protocolAdminEligible = true;
+  account.isOpen = true;
+  let reads = 0;
+  h.context.fetch = async url => {
+    reads++;
+    assert.match(url, /identity-reviews\?wallet=0xa+&summary=1$/);
+    return {ok:true,json:async()=>({pending:2,needsReview:true})};
+  };
+  await account.loadReviewAttention();
+  assert.equal(reads, 0);
+  account.reviewAccessUntil = Date.now() + 60000;
+  await account.loadReviewAttention();
+  assert.equal(reads, 1);
+  assert.match(account.adminEntry('/'), /admin#identity-reviews/);
+  account.reviewAccessUntil = Date.now() - 1;
+  assert.doesNotMatch(account.adminEntry('/'), /Needs review/);
+  account.clearProtocolAdminAccess();
+  assert.equal(account.reviewAttention, false);
 });
 
 function confirmedSignIn(harness, wallet = WALLET_A) {

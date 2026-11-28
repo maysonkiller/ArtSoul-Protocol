@@ -8,10 +8,10 @@ const sourceMessages = {
     unavailable: 'Public frame verification is currently unavailable.'
 };
 const eligibility = {
-    founder: 'A personal work registered by a designated founder wallet on this publishing contract.',
+    founder: 'A verified work created by a designated Founder wallet.',
     platform: 'This frame identifies a verified official ArtSoul publication or an NFT from a designated ArtSoul collection.',
-    genesis: 'The NFT itself has a verified grant from the designated Genesis contract on Base mainnet.',
-    partner: 'The NFT belongs to the specific collection approved as an ArtSoul Partner.'
+    genesis: 'Team can assign this visual frame to an artist. On a Genesis NFT, the frame follows its verified mainnet grant.',
+    partner: 'Team can designate an artist wallet for their works or a collection for its verified NFT mints.'
 };
 
 export function AuraAppearance({ api, wallet, isSessionCurrent, frameSourceManager }) {

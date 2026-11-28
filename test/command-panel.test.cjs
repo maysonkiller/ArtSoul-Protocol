@@ -9,7 +9,7 @@ const searchResult = { category: 'all', groups: {
 }};
 
 function harness({speech = false, audio = false, execute = async () => JSON.stringify(searchResult),
-  navigation, session = new Map(), storage = new Map(), browserLanguage = 'en'} = {}) {
+  navigation, session = new Map(), storage = new Map(), browserLanguage = 'en', staffPage = false} = {}) {
   const nodes = new Map(), calls = [], sessions = [], spoken = [], utterances = [];
   const players = [], plays = [], timers = new Map();
   let prompts = 0, cancelled = 0, timerId = 0;
@@ -78,7 +78,7 @@ function harness({speech = false, audio = false, execute = async () => JSON.stri
     confirm: () => {prompts++; return true;},
     speechSynthesis: {cancel() {cancelled++;}, speak(value) {utterances.push(value); spoken.push(value.text);}},
     sessionStorage: {getItem: key => session.get(key), setItem: (key, value) => session.set(key, value), removeItem: key => session.delete(key)},
-    ArtSoulWebMCP: {browserDependencies: () => ({}), createTools: () => ['search_catalog', 'open_page', 'open_artwork', 'buy_resale_listing', 'complete_settlement', 'get_my_activity', 'add_to_saved', 'remove_from_saved', 'revise_publication_draft'].map(name => ({name,
+    ArtSoulWebMCP: {isStaffPage: () => staffPage, browserDependencies: () => ({}), createTools: () => ['search_catalog', 'open_page', 'open_artwork', 'buy_resale_listing', 'complete_settlement', 'get_my_activity', 'add_to_saved', 'remove_from_saved', 'revise_publication_draft'].map(name => ({name,
       execute: args => {calls.push({name, args}); return execute(args);}
     }))}
   };
@@ -96,7 +96,7 @@ function harness({speech = false, audio = false, execute = async () => JSON.stri
   // a different scenario. The full shipped inventory has separate integrity tests.
   const actualBank = window.ArtSoulVoicePhraseBank;
   const coreIds = new Set(['helpSpeech', 'searchPrompt', 'publicationPrompt', 'tooLong', 'empty',
-    'unavailable', 'noWallet', 'submitted', 'settled', 'options', 'askSearch', 'askTitle']);
+    'unavailable', 'noWallet', 'submitted', 'settled', 'options', 'askSearch', 'askTitle', 'identityReviewHelp']);
   window.ArtSoulVoicePhraseBank = Object.freeze({...actualBank, lookup(text, lang = 'en') {
     const url = actualBank.lookup(text, lang);
     const id = /\/(en|ru)-([a-zA-Z0-9]+)\.wav$/.exec(url);
@@ -143,6 +143,18 @@ test('a prior explicit RU speech choice restores Russian recordings without tran
   assert.equal(h.get('.artsoul-voice-panel').attrs.lang, 'en');
   h.en.fire('click'); h.submit('help'); await flush(); h.get('.artsoul-voice-replay').fire('click');
   assert.equal(h.plays[1].src, '/audio/assistant/v1/en-helpSpeech.wav');
+});
+
+test('staff help explains self-review on screen and plays the selected Marin recording without an admin action', async () => {
+  const h = harness({audio: true, staffPage: true}); h.open();
+  for (const [lang, request] of [['en', 'help'], ['en', "Why can't I approve my request?"], ['ru', 'Как подтвердить свою заявку?']]) {
+    h[lang].fire('click'); h.submit(request); await flush();
+    assert.match(h.get('.artsoul-voice-answer').textContent, /Another authorized reviewer/);
+    assert.equal(h.get('.artsoul-voice-replay').disabled, false);
+    h.get('.artsoul-voice-replay').fire('click');
+    assert.equal(h.plays.at(-1).src, '/audio/assistant/v1/phrases/' + lang + '-identityReviewHelp.wav');
+  }
+  assert.deepEqual(h.calls, []); assert.deepEqual(h.sessions, []);
 });
 
 test('greetings use their exact available recording and never consume search or title data', async () => {

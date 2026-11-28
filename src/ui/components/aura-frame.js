@@ -147,6 +147,14 @@ export function auraCaption(h, word) {
 }
 
 export function projectedArtworkAura(artwork) {
+    if (['artist_founder','artist_partner','artist_genesis'].includes(artwork?.aura_kind)) {
+        if (artwork.source !== 'v41_projection' || ![84532,8453].includes(artwork.chain_id) ||
+            artwork.artist_frame_verified !== true || typeof artwork.minted !== 'boolean') return null;
+        const frame = artwork.aura_kind.slice(7);
+        return {className:auraFrameClassName(frame), label:auraWords[frame] + ' artist frame assigned by Team',
+            kind:frame === 'founder' ? 'founder' : artwork.aura_kind,
+            ...(artwork.aura_border_text === true ? {borderLabel:auraWords[frame]} : {})};
+    }
     if (artwork?.aura_kind === 'founder') {
         if (artwork.source !== 'v41_projection' || artwork.chain_id !== 84532 ||
             artwork.founder_origin_verified !== true || typeof artwork.minted !== 'boolean') return null;
