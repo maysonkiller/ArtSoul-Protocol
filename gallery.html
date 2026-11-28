@@ -40,7 +40,7 @@
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
     <script src="/header-prepaint.js?v=12"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
-    <link rel="stylesheet" href="/unified-styles.css?v=109">
+    <link rel="stylesheet" href="/unified-styles.css?v=110">
     <link rel="stylesheet" href="/button-effects.css?v=6">
     <link rel="stylesheet" href="/mobile-responsive.css?v=5">
     <link rel="stylesheet" href="/performance-optimizations.css?v=3">
@@ -114,6 +114,7 @@
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
     <script type="module" src="/src/entries/search.js"></script>
     <script type="module" src="/src/entries/header-notifications.js"></script>
+    <script type="module" src="/src/entries/first-visit-guide.js"></script>
 </head>
 <body>
     <script>document.body.classList.add(document.documentElement.classList.contains('future') ? 'future' : 'classic');</script>
@@ -176,6 +177,7 @@
             </div>
         </div>
     </header>
+    <div data-visit-page="/gallery" hidden></div>
     <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
     <div class="min-h-screen">
         <main class="gallery-page-main site-page-container py-6">

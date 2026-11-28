@@ -126,7 +126,7 @@ export function AdminArtworkCatalog({ api, isSessionCurrent, onAccessError, onRe
                     <div className="protocol-admin-card-actions">
                         {artwork.report_count > 0 && <button type="button" disabled={busy} onClick={() => onReview(artwork, artwork.actioned_count > 0 ? 'actioned' : artwork.pending_count > 0 ? 'pending_review' : 'all')}>Review artwork reports</button>}
                         {artwork.donation_report_count > 0 && <button type="button" disabled={busy} onClick={() => onReview({...artwork,target_type:'donation_message'},'all')}>Review donation reports</button>}
-                        {(!artwork.hidden || artwork.actioned_count === 0) && <button type="button" disabled={busy} onClick={() => setDecision(artwork)}>{artwork.hidden ? 'Restore artwork' : 'Hide artwork'}</button>}
+                        {(!artwork.hidden || artwork.actioned_count === 0) && <button type="button" className="admin-catalog-visibility" disabled={busy} onClick={() => setDecision(artwork)}>{artwork.hidden ? 'Restore artwork' : 'Hide artwork'}</button>}
                     </div>
                     {artwork.hidden && artwork.actioned_count > 0 && <p>Resolve active artwork reports before restoring.</p>}
                     </div>

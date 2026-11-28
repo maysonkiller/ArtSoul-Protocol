@@ -701,6 +701,7 @@ body.future .artwork-page-compact-action {
 .classic {
     --c-brand-mark-background: #ffffff;
     --c-notification-alert: #b84a4e;
+    --c-access-verified: #94c9a5;
     --c-notification-on-alert: #ffffff;
     --c-qr-background: #ffffff;
     --c-qr-foreground: #000000;
@@ -736,6 +737,7 @@ body.future .artwork-page-compact-action {
 .future {
     --c-brand-mark-background: #ffffff;
     --c-notification-alert: #f05a71;
+    --c-access-verified: #74e69a;
     --c-notification-on-alert: #17070b;
     --c-qr-background: #ffffff;
     --c-qr-foreground: #000000;

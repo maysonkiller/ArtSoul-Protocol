@@ -1,0 +1,41 @@
+[data-visit-page][hidden], [data-visit-slot][hidden] { display: none !important; }
+
+.visit-guide {
+    box-sizing: border-box;
+    width: min(100%, 42rem);
+    min-width: 0;
+    margin: .75rem 0;
+    padding: .875rem 1rem;
+    border: 1px solid var(--c-border-soft);
+    border-inline-start: 3px solid var(--c-accent);
+    border-radius: .6rem;
+    color: var(--c-text);
+    background: var(--c-surface);
+    text-align: start;
+    overflow-wrap: anywhere;
+}
+[data-open-visit-guide] { margin-top: .75rem; }
+body > [data-visit-page] { margin-inline: var(--site-gutter, 1rem); }
+.visit-guide:has(> button:only-child) { border: 0; background: transparent; padding: 0; }
+.visit-guide h2 { margin: 0; font-size: 1.125rem; font-weight: 600; line-height: 1.35; }
+.visit-guide p { margin: .3rem 0 .6rem; font-size: .9375rem; line-height: 1.45; }
+.visit-guide small { display: block; color: var(--c-text-muted); margin-bottom: .25rem; }
+.visit-guide-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem; }
+.visit-guide button, [data-open-visit-guide] {
+    min-height: 44px;
+    max-width: 100%;
+    padding: .4rem .75rem;
+    white-space: normal;
+}
+.visit-guide, [data-visit-highlight] {
+    scroll-margin-block: calc(var(--site-header-height, 6.5rem) + .5rem) 1rem;
+}
+[data-visit-highlight], .visit-guide :focus-visible, [data-open-visit-guide]:focus-visible {
+    outline: 3px solid var(--c-accent) !important;
+    outline-offset: 2px;
+}
+.artsoul-card-link[data-visit-highlight] { outline-offset: -4px; }
+.profile-edit-dialog .visit-guide, .profile-edit-dialog [data-visit-highlight] { scroll-margin-block: .5rem; }
+@media (prefers-reduced-motion: reduce) {
+    .visit-guide *, [data-visit-highlight] { animation: none !important; transition: none !important; }
+}

@@ -225,6 +225,14 @@ node scripts/read-ordinary-outbid-refund.mjs docs/testnet/ordinary-auction-1-set
 
 The discovery read reported `pending-at-finality` through block 64,464,037 (`0xdf6c2ae816e730bdcf01c41105cce1eeb285313322cc7d5e62d2c7063f674644`). Once the cursor passes entry 0, each provider searches historical cursor values and reads the matching event in a single block. The receipt reader checks the block, contract, creditor, amount and whether the payment was delivered or credited for withdrawal. Its `processed.transactionHash` can also be used for the batch fee report above.
 
+On November 28 both public nodes confirmed the successful
+[close of auction 2](https://sepolia.basescan.org/tx/0x8eb7f91eab8c04de95ab0fb77cacf6ebfd53992cc1a0eae7cf9655360cb9f56f)
+at finalized block 64,653,800. In the subsequent
+[refund transaction](https://sepolia.basescan.org/tx/0x3d29f64d08d18a541a0d1d50b294f3a769165758c35f17735e3587121684dd70)
+both nodes returned `OutbidRefundProcessed(2, 0, creditor, 10000000000000000, true)`
+from the reviewed Core at block 64,663,558. The first bidder received 0.01
+test ETH directly. This is a single-entry refund.
+
 ### Restoring the first hosted sale
 
 A read-only, data-only PostgreSQL export included just the three private issuer, sale and credit tables. Its archive contained three table-data entries and occupied 2,540 bytes. Restoring into an empty local database with migrations 018 and 023 reproduced every field of the hosted issuer, finalized sale and allocations. The source and restored tables each had one row. The temporary database and local export were removed after comparison. This drill covers that sale. A full catalog and indexer recovery still requires its own release rehearsal.

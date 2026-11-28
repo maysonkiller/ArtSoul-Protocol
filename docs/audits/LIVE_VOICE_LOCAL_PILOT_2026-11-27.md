@@ -39,6 +39,12 @@ node scripts/serve-live-voice-pilot.mjs
 
 Enabling requires `--enable-funded-pilot`, the approved existing server-side credential supplied through the existing secure setup, and a fresh operator-reviewed `docs/private/live-voice-pilot-approval.json`. The implementation does not create that approval or retrieve credentials. The private directory is ignored by Git.
 
+To charge a dedicated voice project, set `ARTSOUL_VOICE_OPENAI_PROJECT` to
+that project's ID and supply its own `ARTSOUL_VOICE_OPENAI_API_KEY` in the
+local server environment. With a project selected, the bridge requires the
+voice key before reserving an attempt and sends the project ID to OpenAI.
+The hosted development runner continues using its separate project key.
+
 Required approval fields:
 
 - `purpose`: `artsoul-local-live-voice-pilot`; exact `model`; verified `organizationId` (`org-…`); `modelCoverageConfirmed`.

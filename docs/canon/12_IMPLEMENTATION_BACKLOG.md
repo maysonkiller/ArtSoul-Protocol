@@ -1,5 +1,7 @@
 # Implementation Backlog
 
+**C13 pilot preparation, November 28.** The public first-visit guide covers gallery discovery, profile setup, publication and a browser-local collection draft. The [participant week](../testnet/CONTROLLED_BETA_ENTRY.md#final-contract-rehearsal-week) requires the final contract and indexer bindings before invitations. The [single-entry refund record](../testnet/ORDINARY_MARKET_REHEARSAL_2026-11-25.md) covers auction 2. Full-batch, paid resale and public cutover acceptance remain open.
+
 This backlog tracks the A–D phase model in `ARTSOUL_CANON_BIBLE_FULL.md` §17. Apply the [November 2 decision-authority clarification](CHANGELOG_2026-11-02_DECISION_AUTHORITY.md): current founder requests, risk and actual dependencies take priority over obsolete ordering. The Bible records design decisions; deployed contracts, receipts and verified configuration establish current behavior. A backlog entry alone does not approve new financial parameters, custody or critical authority, or establish release acceptance.
 
 Work proceeds one contained task at a time. One backlog item normally equals one focused PR. Contract changes require focused tests and explicit storage-layout review.

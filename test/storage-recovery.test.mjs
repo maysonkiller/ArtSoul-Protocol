@@ -43,6 +43,16 @@ test('restored media matches its independently pinned manifest and complete vers
     await assert.rejects(checkStorageRecovery({ ...args, manifestSha256: sha('other') }), /independent digest/);
 });
 
+test('the source inventory observation identifies a real instant independent of local time', async t => {
+    const { args } = await fixture(t);
+    const verifyAt = observed_at => checkStorageRecovery({ ...args, source: { ...args.source, observed_at } });
+    for (const timestamp of ['2026-02-30T02:01:00Z', '2026-11-27T02:01:00', ['2026-11-27T02:01:00Z']]) {
+        await assert.rejects(verifyAt(timestamp), /source inventory/, JSON.stringify(timestamp));
+    }
+    const timestamp = '2024-02-29T07:31:00.123456+05:30';
+    assert.equal((await verifyAt(timestamp)).sourceObservedAt, timestamp);
+});
+
 test('content changes at the same size, extra objects and missing restored bytes fail verification', async t => {
     const { args, file } = await fixture(t);
     const extra = join(args.restoredDirectory, 'art', 'extra');

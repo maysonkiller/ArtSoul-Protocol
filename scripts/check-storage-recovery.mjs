@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { lstat, readdir, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { captureCutOffMicros } from '../src/snapshot/snapshot-a.js';
 import { readReviewedFile } from './security/read-reviewed-file.mjs';
 
 const digest = input => createHash('sha256').update(input).digest('hex');
@@ -24,7 +25,8 @@ async function listRestoredKeys(directory, prefix = '') {
 }
 
 export async function checkStorageRecovery({ manifestFile, manifestSha256, source, restoredDirectory, project }) {
-    check(isDigest(manifestSha256) && isDigest(source?.inventory_sha256) && Number.isFinite(Date.parse(source.observed_at)), 'Supply the dated source inventory and independently retained manifest digest');
+    check(isDigest(manifestSha256) && isDigest(source?.inventory_sha256), 'Supply the dated source inventory and independently retained manifest digest');
+    check(captureCutOffMicros(source.observed_at) !== null, 'Supply a valid ISO-8601 source inventory observation time with a time zone');
     const manifestBytes = await readReviewedFile(manifestFile, 16 * 1024 * 1024);
     check(digest(manifestBytes) === manifestSha256, 'The retained manifest differs from its independent digest');
     const m = JSON.parse(manifestBytes);

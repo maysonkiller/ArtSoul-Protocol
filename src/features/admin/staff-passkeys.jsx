@@ -204,7 +204,7 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
         <dialog ref={dialogRef} className="protocol-admin-dialog protocol-admin-passkeys" aria-labelledby="adminPasskeyTitle" aria-describedby="adminPasskeyDescription"
             onCancel={event => { event.preventDefault(); close(); }} onClick={event => { if (event.target === event.currentTarget) close(); }}>
             <div className="protocol-admin-passkey-content">
-                <header><h2 id="adminPasskeyTitle">Verify admin access</h2><button ref={closeRef} type="button" onClick={close} aria-label="Close verification">Close</button></header>
+                <header><h2 id="adminPasskeyTitle">{sessionActive ? 'Account security' : 'Verify admin access'}</h2><button ref={closeRef} type="button" onClick={close} aria-label="Close verification">Close</button></header>
                 <p id="adminPasskeyDescription">Use your device's fingerprint, face recognition, or security key to confirm it is you. Your wallet stays the same.</p>
                 {!sessionActive && <section aria-labelledby="firstPasskeyTitle">
                     <h3 id="firstPasskeyTitle">Set up your first passkey</h3>

@@ -59,8 +59,21 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-access-guide[data-lo
 .admin-workspace:is([data-access="step_up"], [data-access="unauthenticated"]) .protocol-admin-access-status {
     border-color: var(--c-notification-alert);
 }
-.future .admin-workspace[data-access="step_up"] .protocol-admin-header-actions .protocol-admin-primary {
-    box-shadow: 0 0 .8rem color-mix(in srgb, var(--c-accent) 30%, transparent);
+body:is(.classic, .future) .admin-workspace:is([data-access="step_up"],[data-access="setup"],[data-access="unauthenticated"]) .protocol-admin-header-actions .protocol-admin-primary {
+    border: 2px solid var(--c-notification-alert);
+    background: var(--c-surface);
+    color: var(--c-text);
+}
+body:is(.classic, .future) .admin-workspace:is([data-access="ready"],[data-access="setup_verified"]) :is(.admin-security-action, .protocol-admin-access-status) {
+    border: 2px solid var(--c-access-verified);
+    background: var(--c-surface);
+    color: var(--c-access-verified);
+}
+body:is(.classic, .future) .admin-workspace .protocol-admin-passkeys[open] {
+    border-inline-start: .25rem solid var(--c-notification-alert);
+}
+body:is(.classic, .future) .admin-workspace:is([data-access="ready"],[data-access="setup_verified"]) .protocol-admin-passkeys[open] {
+    border-inline-start-color: var(--c-access-verified);
 }
 .admin-workspace .admin-review-count {
     margin-inline-start: auto;
@@ -160,7 +173,17 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-tab-group {
     grid-template-columns: minmax(0,1fr);
     gap: .125rem;
 }
-body:is(.classic, .future) .admin-workspace .protocol-admin-tab-label { padding-inline: .6rem; }
+body:is(.classic, .future) .admin-workspace .protocol-admin-tab-label {
+    padding: .65rem .6rem .25rem;
+    border-top: 1px solid var(--c-border-soft);
+    color: var(--c-text-muted);
+    font-size: .72rem;
+    letter-spacing: .09em;
+}
+body:is(.classic, .future) .admin-workspace .protocol-admin-tab-group > button[aria-current="page"] {
+    border-inline-start: .25rem solid var(--c-accent);
+    background: var(--c-surface-strong);
+}
 body:is(.classic, .future) .admin-workspace .protocol-admin-tab-group > button {
     display: flex;
     justify-content: flex-start;
@@ -183,7 +206,8 @@ body:is(.classic, .future) .admin-workspace .protocol-admin-tab-group > button {
     padding: 0;
     border-radius: .875rem;
 }
-.admin-catalog-card-body { display: flex; flex: 1; flex-direction: column; min-width: 0; padding: .85rem; }
+.admin-catalog-card-body { display: flex; flex: 1; flex-direction: column; min-width: 0; padding: .65rem .75rem; }
+.admin-workspace .admin-catalog-card-body p { margin: .15rem 0; font-size: .8125rem; line-height: 1.4; }
 .admin-workspace .protocol-admin-catalog-card h3 { margin: .4rem 0 .15rem; font-size: 1.025rem; line-height: 1.3; }
 .admin-catalog-card-meta { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.25rem; color:var(--c-text-muted); font-size:.75rem; }
 .admin-catalog-card-meta > span:first-child { text-transform: capitalize; }
@@ -205,9 +229,16 @@ body:is(.classic, .future) .admin-workspace .admin-catalog-card-body .protocol-a
     font-size: .8125rem;
 }
 .admin-workspace .protocol-admin-catalog-card > .admin-review-media {
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 16 / 10;
     border-width: 0 0 1px;
     border-radius: 0;
+}
+body:is(.classic, .future) .admin-workspace .admin-catalog-card-body button.admin-catalog-visibility {
+    border-color: transparent;
+    color: var(--c-text-muted);
+    background: transparent;
+    text-decoration: underline;
+    text-underline-offset: .2em;
 }
 body:is(.classic, .future) .admin-workspace .protocol-admin-group > header .admin-review-media {
     flex: 0 1 15rem;

@@ -43,7 +43,7 @@
     <script src="/header-prepaint.js?v=12"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=109">
+    <link rel="stylesheet" href="/unified-styles.css?v=110">
     <link rel="stylesheet" href="/button-effects.css?v=6">
     <link rel="stylesheet" href="/ai-ui-styles.css?v=1">
     <link rel="stylesheet" href="/simplified-ui.css?v=1">
@@ -218,6 +218,7 @@
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
     <script type="module" src="/src/entries/search.js"></script>
     <script type="module" src="/src/entries/header-notifications.js"></script>
+    <script type="module" src="/src/entries/first-visit-guide.js"></script>
 </head>
 <body>
     <script>document.body.classList.add(document.documentElement.classList.contains('future') ? 'future' : 'classic');</script>
@@ -306,6 +307,7 @@
                     Publish artwork <span aria-hidden="true">→</span>
                 </a>
             </div>
+            <div data-visit-page="/" hidden></div>
             </div>
             <aside class="home-showcase" id="homeShowcase" data-state="loading" aria-label="Featured artworks">
                 <div class="home-showcase-shell">

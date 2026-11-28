@@ -150,7 +150,7 @@ function Builder() {
         </div>
         <div className="launch-hero">
             <div><h1>Create a collection</h1><p>Choose how collectors get their first NFT and how the remaining mints are priced.</p></div>
-            <div className="launch-actions"><button type="button" className="launch-primary" onClick={save}>Save draft</button></div>
+            <div className="launch-actions"><button type="button" className="launch-primary" data-save-collection-draft="" onClick={save}>Save draft</button></div>
         </div>
         <LocalDraftNotice />
         <div className="launch-draft-tools">
@@ -173,14 +173,16 @@ function Builder() {
             {previousDraft && <button type="button" onClick={() => { setDraft(previousDraft); setPreviousDraft(null); setMessage('Previous working draft restored.'); }}>Undo replacement</button>}
             <p className="launch-banner-status" role="status" aria-live="polite">{message} {dirty ? 'Unsaved changes.' : ''}</p>
         </div>
+        <div data-visit-slot="collection-steps" hidden />
         <div className="launch-layout">
-            <nav className="launch-steps" aria-label="Collection draft steps">{STEPS.map((name, index) => <button key={name} type="button" aria-current={step === index ? 'step' : undefined} onClick={() => setStep(index)}><span className="launch-step-index">0{index + 1}</span>{name}</button>)}</nav>
+            <nav className="launch-steps" aria-label="Collection draft steps">{STEPS.map((name, index) => <button key={name} type="button" data-draft-step={name} aria-current={step === index ? 'step' : undefined} onClick={() => setStep(index)}><span className="launch-step-index">0{index + 1}</span>{name}</button>)}</nav>
             <section className="launch-panel" aria-label={STEPS[step]}>
                 {step === 0 && <>
+                    <div data-visit-slot="collection-name" hidden />
                     <PanelTitle title="The collection">Describe your work and its boundaries. These are draft settings; choosing a network does not switch your wallet.</PanelTitle>
                     <div className="launch-stack">
                         <div className="launch-grid">
-                            <Field label="Collection name" maxLength={160} value={draft.name} onChange={event => update('name', event.target.value)} />
+                            <Field label="Collection name" id="collectionName" maxLength={160} value={draft.name} onChange={event => update('name', event.target.value)} />
                             <Field label="Draft network"><select value={draft.chainId} onChange={event => update('chainId', Number(event.target.value))}>
                                 {!COLLECTION_NETWORKS.some(network => network.chainId === Number(draft.chainId)) && <option value={draft.chainId}>Unsupported imported network</option>}
                                 {COLLECTION_NETWORKS.map(network => <option key={network.chainId} value={network.chainId}>{network.name} / draft only</option>)}

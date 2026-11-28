@@ -1620,7 +1620,7 @@ const { useState, useEffect, useRef } = React;
                             <section className="profile-connect-state max-w-xl mx-auto p-8 text-center">
                                 <h1 className="text-2xl font-semibold mb-3">Connect your wallet to view your profile</h1>
                                 <p className="text-sm opacity-70 mb-6">Your creator, auction, sales, and collected artwork sections will appear after connection.</p>
-                                <button type="button" onClick={handleProfileConnect} className="btn-main">Connect Wallet</button>
+                                <button type="button" data-profile-connect="" onClick={handleProfileConnect} className="btn-main">Connect Wallet</button>
                             </section>
                         </main>
                     </div>
@@ -1849,6 +1849,7 @@ const { useState, useEffect, useRef } = React;
                             <div className="profile-edit-layout">
                                 {renderAvatar(true)}
                                 <div className="profile-edit-fields">
+                                    <div data-visit-slot="profile-name" hidden />
                                     <div className="profile-identity-editor">
                                             <div className="profile-detail-field">
                                                 <label htmlFor="profileName">Name</label>
@@ -1975,6 +1976,7 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                             </section>
                                         </div>
+                                    <div data-visit-slot="profile-save" hidden />
                                     <div className="profile-actions mt-4 flex gap-3 flex-wrap">
                                             <>
                                                 <button onClick={saveProfile} className="btn-main">

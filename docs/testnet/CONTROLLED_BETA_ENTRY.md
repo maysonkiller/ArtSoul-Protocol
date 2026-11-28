@@ -16,6 +16,42 @@ are recorded separately from the decision to open a cohort window. The
 lists the three remaining observations on the current prototype. The C13
 cohort will use the checklist below with its own deployment and participants.
 
+### Final-contract rehearsal week
+
+The founder selected a roughly seven-day trial of the final contracts before
+mainnet. The seven days start when the release candidate and participants are
+ready. Record the network and contract addresses in the invitation checklist;
+verify that the website, wallet request and indexer all identify the same pair.
+Advertising a collection journey requires an accepted deployment for that
+format. Mark any available collection draft as a draft until then.
+
+| Day | Participant journey | Evidence to retain |
+| --- | --- | --- |
+| 1 | A new visitor starts or skips the guide, explores and creates a profile on mobile. | Device, browser and the first step that needed help. |
+| 2 | An artist publishes a licensed work and opens an auction. Two collectors bid using different test wallets. | Artwork, auction, network and public transaction hashes. |
+| 3 | A collector places a late bid. After the deadline, close and settle. Process the losing deposit. | Deadline change, credited or delivered refund, actual NFT owner and public timeline. |
+| 4 | An independent author prepares a collection. Test each enabled launch format with different collectors. | Published terms, supply, receipts and resulting collection card. |
+| 5 | Rehearse the available resale and transfer paths, audio/video on iPhone, both themes, wallet switching and an interrupted visit. | Distinct sale and transfer records; device results and recovery steps. |
+| 6 | Fix and retest reported issues. Prepare mainnet configuration, recovery evidence and Genesis media in parallel. | Candidate revision, regression checks and outstanding blockers. |
+| 7 | Compare website and indexed events with finalized receipts; review feedback, support capacity and independent audit status. | Recorded decision to extend the pilot, retest a changed contract, or submit the release for mainnet approval. |
+
+Recruit an artist, at least two independent collectors and a collection author;
+one person can cover more than one journey. Agree an operator and a monitored
+reply channel before sending. Pause the affected journey if the wallet shows a
+different network, recipient or amount, or a successful payment yields the
+wrong owner or refund. Preserve public hashes and browser details. A fix that
+requires a replacement contract needs fresh end-to-end evidence on that pair.
+
+**Invitation draft for an accepted release candidate**
+
+> Help us test ArtSoul on Base Sepolia. Artists can publish an original work,
+> collectors can bid and follow it through settlement, and collection authors
+> can try the launch formats listed in their invitation. Use a dedicated test
+> wallet and test ETH. On the home page choose the guided tour or explore at
+> your own pace. Reply with the device, the step you tried, what you saw and
+> the public transaction hash if you have one. Testnet activity carries no
+> financial value or mainnet Genesis eligibility.
+
 Security reports go to the project mailbox. [Email a security report to artsoulprotocol@gmail.com](mailto:artsoulprotocol@gmail.com?subject=Security%20report).
 
 The [machine-readable security.txt](https://artsoulprotocol.com/.well-known/security.txt) publishes the same address. Reconfirm the monitored address and renew its published expiry before October 31, 2027, or update it immediately when the contact changes. The founder owns incident intake under the [solo support procedure](../runbooks/B3_INCIDENT_RESPONSE.md#solo-founder-support-and-incident-ownership). Reply coverage, mailbox recovery and retention still need operating evidence before mainnet. [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116.html)

@@ -6,6 +6,7 @@ dist/
 .vite/
 .queue-wal/
 artifacts/
+.artsoul-hosted/
 cache/
 coverage/
 .env
