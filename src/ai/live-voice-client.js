@@ -45,16 +45,48 @@ export function createLiveVoiceController({onState = () => {}, onTranscript = ()
     const attempt = ++generation;
     aborter = new AbortController();
     const signal = aborter.signal;
+    const rateError = 'Live voice requires 24 kHz audio. Try a browser or audio device that supports 24 kHz.';
+    const bridgeError = 'Could not connect to the local voice bridge. Check that the local pilot server is running and try again.';
+    let startupError = 'Could not start browser audio. Check your audio settings and try again.';
+    let bridgeConnected = false;
+    const failStartup = message => {
+      if (attempt !== generation) return;
+      generation++;
+      closeResources();
+      state('error', message);
+    };
     try {
-      state('connecting', 'Requesting microphone permission…');
+      state('connecting', 'Starting browser audio…');
       const AudioContextClass = environment.AudioContext || environment.webkitAudioContext;
-      context = new AudioContextClass({sampleRate: 24000});
+      if (!AudioContextClass) {
+        failStartup('Live voice needs Web Audio support. Try a browser that supports Web Audio.');
+        return;
+      }
+      try {
+        context = new AudioContextClass({sampleRate: 24000});
+      } catch (error) {
+        failStartup(error?.name === 'NotSupportedError' ? rateError : startupError);
+        return;
+      }
+      if (context.sampleRate !== 24000) { failStartup(rateError); return; }
       await context.resume();
       if (attempt !== generation) return;
-      if (context.sampleRate !== 24000) throw new Error('unsupported_sample_rate');
-      const granted = await environment.navigator.mediaDevices.getUserMedia({audio: {
-        channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true
-      }});
+      state('connecting', 'Requesting microphone permission…');
+      let granted;
+      try {
+        granted = await environment.navigator.mediaDevices.getUserMedia({audio: {
+          channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true
+        }});
+      } catch (error) {
+        if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+          failStartup('Microphone permission was denied. Allow microphone access for this site in your browser settings and try again.');
+        } else if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
+          failStartup('No microphone was found. Connect or select a microphone and try again.');
+        } else {
+          failStartup('Could not open the microphone. Check your input device settings and try again.');
+        }
+        return;
+      }
       if (attempt !== generation) { granted.getTracks().forEach(track => track.stop()); return; }
       stream = granted;
       await context.audioWorklet.addModule('/src/ai/live-voice-capture.js');
@@ -67,9 +99,10 @@ export function createLiveVoiceController({onState = () => {}, onTranscript = ()
       const url = new URL('/__live-voice-pilot/socket', environment.location.origin);
       url.searchParams.set('language', language === 'ru' ? 'ru' : 'en');
       url.protocol = environment.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      startupError = bridgeError;
       socket = new environment.WebSocket(url.href);
       const activeSocket = socket;
-      connectTimer = environment.setTimeout(() => { if (attempt === generation) stop('connection_timeout'); }, 15000);
+      connectTimer = environment.setTimeout(() => failStartup(bridgeError), 15000);
       capture.port.onmessage = event => {
         if (attempt !== generation || !ready || activeSocket.readyState !== 1 || context.currentTime < audioEndsAt) return;
         if (activeSocket.bufferedAmount > 64000) { stop('network_slow'); return; }
@@ -81,6 +114,7 @@ export function createLiveVoiceController({onState = () => {}, onTranscript = ()
         let data;
         try { data = JSON.parse(event.data); } catch { stop('invalid_response'); return; }
         if (data.type === 'ready') {
+          bridgeConnected = true;
           environment.clearTimeout(connectTimer);
           ready = true;
           expiryTimer = environment.setTimeout(() => { if (attempt === generation) stop('expired'); }, Math.min(60000, data.durationMs || 60000));
@@ -128,12 +162,15 @@ export function createLiveVoiceController({onState = () => {}, onTranscript = ()
           else if (reason !== 'stopped') state('ended', `Pilot ended: ${String(reason).replace(/_/g, ' ')}.`);
         }
       };
-      activeSocket.onerror = () => { if (attempt === generation) stop('connection_error'); };
-      activeSocket.onclose = () => { if (attempt === generation) stop('disconnected'); };
+      const connectionLost = reason => {
+        if (attempt !== generation) return;
+        if (bridgeConnected) stop(reason);
+        else failStartup(bridgeError);
+      };
+      activeSocket.onerror = () => connectionLost('connection_error');
+      activeSocket.onclose = () => connectionLost('disconnected');
     } catch {
-      if (attempt !== generation) return;
-      stop('unavailable');
-      state('error', 'Could not start live voice. Check microphone access and the local pilot server.');
+      failStartup(startupError);
     }
   }
   const listen = (target, name, callback) => {

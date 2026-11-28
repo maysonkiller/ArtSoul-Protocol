@@ -114,11 +114,14 @@
     }
 
     function mediaTypeFromUrl(value = '') {
-        const url = normalize(value);
-        if (/\.(mp4|webm|mov|avi|mkv)(\?|$)/.test(url)) return 'video';
-        if (/\.(mp3|wav|ogg|aac|m4a|flac)(\?|$)/.test(url)) return 'audio';
-        if (/\.gif(\?|$)/.test(url)) return 'gif';
-        if (/\.(jpg|jpeg|png|webp|avif|svg)(\?|$)/.test(url)) return 'image';
+        const [path, query = ''] = normalize(value).split('#', 1)[0].split('?');
+        const filename = /(?:^|&)(?:filename|download)=([^&]+)/.exec(query)?.[1];
+        for (const name of [path, filename]) {
+            if (/\.(mp4|webm|mov|avi|mkv)$/.test(name)) return 'video';
+            if (/\.(mp3|wav|ogg|aac|m4a|flac)$/.test(name)) return 'audio';
+            if (/\.gif$/.test(name)) return 'gif';
+            if (/\.(jpg|jpeg|png|webp|avif|svg)$/.test(name)) return 'image';
+        }
         return '';
     }
 
@@ -849,33 +852,28 @@
     }
 
     function createVideoFirstPaintGuard(video, descriptor) {
-        const guard = descriptor.poster
-            ? document.createElement('img')
-            : createMediaLoadingElement();
-        guard.className = descriptor.poster
-            ? 'artsoul-video-poster'
-            : guard.className;
-        if (descriptor.poster) {
-            guard.src = descriptor.poster;
-            guard.alt = '';
-            guard.loading = 'lazy';
-            guard.decoding = 'async';
-            video.addEventListener('play', () => guard.remove(), { once: true });
-            guard.onerror = () => {
-                guard.className = 'artsoul-media-loading';
-                guard.src = '';
-                ['loadedmetadata', 'loadeddata', 'seeked'].forEach((eventName) => {
-                    video.addEventListener(eventName, () => guard.remove(), { once: true });
-                });
-            };
-        } else {
-            // iOS commonly honours metadata loading but defers loadeddata until
-            // playback. Revealing at metadata/seeked lets the prepared first
-            // frame paint instead of leaving the homepage card covered forever.
-            ['loadedmetadata', 'loadeddata', 'seeked', 'play'].forEach((eventName) => {
-                video.addEventListener(eventName, () => guard.remove(), { once: true });
-            });
-        }
+        const loadingFrame = () => {
+            const loading = createMediaLoadingElement();
+            // WebKit can defer loadeddata until playback even after metadata arrives.
+            for (const event of ['loadedmetadata', 'loadeddata', 'seeked', 'play']) {
+                video.addEventListener(event, () => loading.remove(), { once: true });
+            }
+            return loading;
+        };
+        if (!descriptor.poster) return loadingFrame();
+
+        const guard = document.createElement('img');
+        guard.className = 'artsoul-video-poster';
+        guard.src = descriptor.poster;
+        guard.alt = '';
+        guard.loading = 'lazy';
+        guard.decoding = 'async';
+        video.addEventListener('play', () => guard.remove(), { once: true });
+        guard.onerror = () => {
+            video.poster = '';
+            if (video.readyState >= 1) guard.remove();
+            else guard.replaceWith(loadingFrame());
+        };
         return guard;
     }
 

@@ -50,6 +50,83 @@ test('pilot never auto-connects and requires an explicit gesture on localhost', 
   }
 });
 
+for (const failure of ['constructor rejection', 'different sample rate']) {
+  test(`unsupported 24 kHz audio explains how to retry after ${failure}`, async () => {
+    const b = browser(), states = [];
+    let micRequests = 0, requestedRate;
+    b.env.navigator.mediaDevices.getUserMedia = async () => { micRequests++; return b.stream; };
+    b.env.AudioContext = class extends b.env.AudioContext {
+      constructor(options) {
+        requestedRate = options.sampleRate;
+        if (failure === 'constructor rejection') throw new DOMException('', 'NotSupportedError');
+        super();
+        this.sampleRate = 48000;
+      }
+    };
+    const controller = createLiveVoiceController({environment: b.env, onState: value => states.push(value)});
+    await controller.start();
+    assert.equal(states.at(-1).name, 'error');
+    assert.match(states.at(-1).message, /24 kHz.*try a browser/i);
+    assert.equal(requestedRate, 24000);
+    assert.equal(micRequests, 0);
+    assert.equal(b.sockets.length, 0);
+    if (failure === 'different sample rate') assert.equal(b.contexts[0].closed, true);
+    controller.destroy();
+  });
+}
+
+test('missing Web Audio and a busy audio device each give relevant startup guidance', async () => {
+  for (const hasContext of [false, true]) {
+    const b = browser(), states = [];
+    b.env.AudioContext = hasContext ? class {
+      constructor() { throw new DOMException('', 'InvalidStateError'); }
+    } : undefined;
+    const controller = createLiveVoiceController({environment: b.env, onState: value => states.push(value)});
+    await controller.start();
+    assert.equal(states.at(-1).name, 'error');
+    assert.match(states.at(-1).message, hasContext ? /audio settings/i : /Web Audio support/i);
+    assert.equal(b.sockets.length, 0);
+    controller.destroy();
+  }
+});
+
+for (const [name, guidance] of [
+  ['NotAllowedError', /allow microphone access/i],
+  ['NotFoundError', /connect or select a microphone/i]
+]) {
+  test(`microphone ${name} gives device-specific guidance and releases the context`, async () => {
+    const b = browser(), states = [];
+    b.env.navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('', name); };
+    const controller = createLiveVoiceController({environment: b.env, onState: value => states.push(value)});
+    await controller.start();
+    assert.equal(states.at(-1).name, 'error');
+    assert.match(states.at(-1).message, guidance);
+    assert.equal(b.contexts[0].closed, true);
+    assert.equal(b.sockets.length, 0);
+    controller.destroy();
+  });
+}
+
+for (const failure of ['constructor', 'error', 'close', 'timeout']) {
+  test(`bridge startup ${failure} points to the local server and stops capture`, async () => {
+    const b = browser(), states = [];
+    if (failure === 'constructor') {
+      b.env.WebSocket = class { constructor() { throw new DOMException('', 'NotAllowedError'); } };
+    }
+    const controller = createLiveVoiceController({environment: b.env, onState: value => states.push(value)});
+    await controller.start();
+    if (failure === 'error') b.sockets[0].onerror();
+    if (failure === 'close') b.sockets[0].onclose();
+    if (failure === 'timeout') b.timers.find(timer => timer.ms === 15000).fn();
+    assert.equal(states.at(-1).name, 'error');
+    assert.match(states.at(-1).message, /check.*local pilot server/i);
+    assert.equal(b.stoppedTracks, 1);
+    assert.equal(b.contexts[0].closed, true);
+    assert.equal(b.captures[0].port.onmessage, null);
+    controller.destroy();
+  });
+}
+
 test('late microphone permission after Stop cannot leak a track or open a provider bridge', async () => {
   let resolve;
   const b = browser({grant: new Promise(done => {resolve = done;})});
@@ -57,6 +134,24 @@ test('late microphone permission after Stop cannot leak a track or open a provid
   const pending = controller.start(); await Promise.resolve(); controller.stop();
   resolve(b.stream); await pending;
   assert.equal(b.stoppedTracks, 1); assert.equal(b.sockets.length, 0); assert.equal(b.contexts[0].closed, true);
+});
+
+test('a permission denial after Stop cannot overwrite a restarted session', async () => {
+  let rejectGrant;
+  const b = browser({grant: new Promise((_, reject) => { rejectGrant = reject; })}), states = [];
+  const controller = createLiveVoiceController({environment: b.env, onState: value => states.push(value)});
+  const pending = controller.start();
+  await Promise.resolve();
+  controller.stop();
+  b.env.navigator.mediaDevices.getUserMedia = async () => b.stream;
+  await controller.start();
+  await b.sockets[0].receive({type: 'ready'});
+  rejectGrant(new DOMException('', 'NotAllowedError'));
+  await pending;
+  assert.equal(states.at(-1).name, 'listening');
+  assert.equal(b.contexts[1].closed, false);
+  assert.equal(b.stoppedTracks, 0);
+  controller.destroy();
 });
 
 test('capture, reply PCM and transcript flow works; stop releases all resources and restarts cleanly', async () => {
