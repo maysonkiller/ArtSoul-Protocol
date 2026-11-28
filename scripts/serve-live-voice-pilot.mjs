@@ -43,10 +43,16 @@ mountLiveVoicePilot(document.getElementById('pilot'));</script>` : '<p role="sta
 
 export async function serveLiveVoicePilot({enabled = false} = {}) {
   let approval = null;
+  let providerHeaders;
   if (enabled) {
     try { approval = JSON.parse(fs.readFileSync(approvalPath, 'utf8')); } catch {}
     if (!fundingApprovalValid(approval)) throw new Error('A fresh, independently verified promotional funding approval with cash overage disabled is required.');
     if (fs.existsSync(marker)) throw new Error('This local pilot already consumed its one provisioning attempt. Review the recorded attempt before authorizing another.');
+    const project = process.env.ARTSOUL_VOICE_OPENAI_PROJECT;
+    const key = project ? process.env.ARTSOUL_VOICE_OPENAI_API_KEY : process.env.OPENAI_API_KEY;
+    if (!key || (project && !/^proj_[a-zA-Z0-9_-]+$/.test(project))) throw new Error('Configure the local voice project and its server-side key before starting the pilot.');
+    providerHeaders = {Authorization: 'Bearer ' + key, 'OpenAI-Organization': approval.organizationId,
+      ...(project && {'OpenAI-Project': project})};
   }
   const sessions = new Set();
   let spent = false, publicReads = 0;
@@ -103,11 +109,9 @@ export async function serveLiveVoicePilot({enabled = false} = {}) {
           fs.writeFileSync(marker, JSON.stringify({attemptedAt: new Date().toISOString(), model: LIVE_PILOT.model,
             voice: LIVE_PILOT.voice, status: 'attempt-reserved', note: 'Review provider usage before further authorization.'}), {flag: 'wx'});
         },
-        openProvider(organizationId) {
-          const key = process.env.OPENAI_API_KEY;
-          if (!key) throw new Error('Key unavailable');
+        openProvider() {
           return new WebSocket(`wss://api.openai.com/v1/realtime?model=${LIVE_PILOT.model}`, {
-            headers: {Authorization: `Bearer ${key}`, 'OpenAI-Organization': organizationId}, handshakeTimeout: 10000, maxPayload: 524288, perMessageDeflate: false
+            headers: providerHeaders, handshakeTimeout: 10000, maxPayload: 524288, perMessageDeflate: false
           });
         }
       });

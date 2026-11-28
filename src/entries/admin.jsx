@@ -208,8 +208,13 @@ function AccessGate({ state, message, walletAddress }) {
     );
 }
 
+const sectionFragments = {
+    queue: '', artworks: '#artworks', hidden: '#hidden', audit: '#audit-log', notifications: '#delivery',
+    appearance: '#nft-appearance', identity: '#identity-reviews', staff: '#staff-access'
+};
+
 function linkedSection() {
-    return { '#nft-appearance': 'appearance', '#identity-reviews': 'identity' }[window.location?.hash] || 'queue';
+    return Object.keys(sectionFragments).find(section => sectionFragments[section] === window.location?.hash) || 'queue';
 }
 
 function ProtocolAdminPage() {
@@ -639,7 +644,7 @@ function ProtocolAdminPage() {
     const pendingIdentity = usePendingIdentityReviews({api, wallet: ready && identityAllowed ? catalogWallet : '', epoch: catalogEpoch, onAccessError: accessFailed});
     const catalogSessionCurrent = () => sessionIsCurrent(catalogEpoch,catalogWallet)
         && readySession.current?.epoch === catalogEpoch && readySession.current.wallet === catalogWallet;
-    const reviewArtwork = (artwork,status) => { setSection('queue'); void changeQueueStatus(status,artwork); };
+    const reviewArtwork = (artwork,status) => { openWorkspaceSection('queue'); void changeQueueStatus(status,artwork); };
     const statusLabel = { loading: 'Checking access', unauthenticated: 'Wallet sign-in required', step_up: 'Verification required',
         ready: 'Verified', authority: 'Approval access', setup: 'Set up sign-in', setup_verified: 'Verified',
         error: 'Access needs attention', ineligible: 'No staff role', disabled: 'Unavailable' }[accessState];
@@ -652,7 +657,7 @@ function ProtocolAdminPage() {
 
     function openWorkspaceSection(value) {
         setSection(value);
-        const hash = { appearance: '#nft-appearance', identity: '#identity-reviews' }[value] || '';
+        const hash = sectionFragments[value];
         if (hash !== window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + hash);
     }
 
@@ -668,7 +673,7 @@ function ProtocolAdminPage() {
                 </div>
                 <div className="protocol-admin-header-actions">
                     {accessState === 'unauthenticated' && <button type="button" className="protocol-admin-primary" onClick={authenticate} disabled={busy}>{connectedWallet ? 'Verify wallet' : 'Connect staff wallet'}</button>}
-                    {setupWallet && <button type="button" className={ready ? '' : 'protocol-admin-primary'} disabled={busy} onClick={stepUp} aria-haspopup="dialog" aria-expanded={passkeyOpen}>{access?.stepUpActive ? 'Account security' : 'Verify admin access'}</button>}
+                    {setupWallet && <button type="button" className={ready ? 'admin-security-action' : 'admin-security-action protocol-admin-primary'} disabled={busy || checkingReturn} onClick={stepUp} aria-haspopup="dialog" aria-expanded={passkeyOpen}>{access?.stepUpActive ? 'Account security' : 'Verify admin access'}</button>}
                     <button type="button" onClick={checkAccess} disabled={busy}>{busy ? 'Checking...' : accessState === 'error' ? 'Retry access check' : 'Refresh access'}</button>
                 </div>
             </header>
@@ -802,7 +807,7 @@ function ProtocolAdminPage() {
                 <section aria-labelledby="hiddenTitle">
                     <h2 id="hiddenTitle">Hidden artwork</h2>
                     <p>Resolve active reports to restore a work. For a manual hide without active reports, review its visibility in Artworks.</p>
-                    <button type="button" className="protocol-admin-secondary" onClick={() => setSection('artworks')}>Open artwork catalog</button>
+                    <button type="button" className="protocol-admin-secondary" onClick={() => openWorkspaceSection('artworks')}>Open artwork catalog</button>
                     <div className="protocol-admin-ledger">
                         {data.hidden.length === 0 ? <p>No hidden artwork.</p> : data.hidden.map(item => (
                             <div key={`${item.chain_id}:${item.artwork_id}`}>
@@ -810,7 +815,7 @@ function ProtocolAdminPage() {
                                 <span>Chain {item.chain_id}</span>
                                 <span>{item.hidden_reason || 'No reason recorded'}</span>
                                 <button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => {
-                                    setSection('queue'); void changeQueueStatus('actioned', item);
+                                    reviewArtwork(item, 'actioned');
                                 }}>Review to restore</button>
                             </div>
                         ))}
@@ -823,7 +828,7 @@ function ProtocolAdminPage() {
                                 <strong>Profile {shortWallet(item.profile_wallet)}</strong>
                                 {profilePath(item.profile_wallet) && <a href={profilePath(item.profile_wallet)}>Open public profile</a>}
                                 <button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => {
-                                    setSection('queue'); void changeQueueStatus('actioned', { target_type: 'profile_content', profile_wallet: item.profile_wallet });
+                                    reviewArtwork({ target_type: 'profile_content', profile_wallet: item.profile_wallet }, 'actioned');
                                 }}>Review to restore</button>
                             </div>
                         ))}

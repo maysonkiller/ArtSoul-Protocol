@@ -21,6 +21,8 @@ const metadata = encodeURIComponent(JSON.stringify({
 let activeRole = 'admin';
 let rpcCalls = [];
 let visibilityReadCalls = 0;
+let visibilityUnavailable = false;
+let extraHiddenWork = null;
 let holdExactArtworkSeven = false;
 let releaseExactArtworkSeven = null;
 let exactLookupCalls = [];
@@ -89,7 +91,9 @@ function restRows(pathname) {
     return [{ chain_id: 84532, token_id: '3', active: true, price: '2000000000000000', seller: staffWallet }];
   }
   if (pathname === 'artwork_moderation_visibility') {
-    return [{ chain_id: 84532, artwork_id: '4', hidden: true, hidden_reason: 'Test hide' }];
+    const hidden = [{ chain_id: 84532, artwork_id: '4', hidden: true, hidden_reason: 'Test hide' }];
+    if (extraHiddenWork) hidden.push({ chain_id: 84532, artwork_id: extraHiddenWork, hidden: true });
+    return hidden;
   }
   if (pathname === 'artsoul_staff_roles') {
     return activeRole ? [{ role: activeRole }] : [];
@@ -133,7 +137,10 @@ global.fetch = async (url, options = {}) => {
       hidden_by: payload.p_actor_wallet
     }];
   } else {
-    if (pathname === 'artwork_moderation_visibility') visibilityReadCalls += 1;
+    if (pathname === 'artwork_moderation_visibility') {
+      visibilityReadCalls += 1;
+      if (visibilityUnavailable) return {ok:false,status:503,text:async()=> '{}' };
+    }
     body = restRows(pathname);
   }
 
@@ -190,6 +197,27 @@ test('Auctions includes only live auctions', async () => {
   const response = await callPublic({ view: 'auctions', limit: '100' });
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body.data.map(row => row.artwork_id), ['1']);
+});
+
+test('a warm feed and detail reflect moderation changes and return a retryable error if visibility is unavailable', async () => {
+  const feed = {limit:'100'}, detail = {id:'v41:84532:1'};
+  try {
+    for (const query of [feed,detail]) assert.equal((await callPublic(query)).statusCode,200);
+    extraHiddenWork = '1';
+    for (const query of [feed,detail]) {
+      const res = await callPublic(query);
+      assert.equal(res.statusCode,200);
+      assert.ok(res.body.data.every(row => row.artwork_id !== '1'));
+    }
+    visibilityUnavailable = true;
+    for (const query of [feed,detail]) {
+      const res = await callPublic(query);
+      assert.equal(res.statusCode,503);
+      assert.equal(res.headers['Cache-Control'],'private, no-store');
+      assert.equal(res.body.data,undefined);
+    }
+  } finally { extraHiddenWork = null; visibilityUnavailable = false; }
+  assert.ok((await callPublic(detail)).body.data.some(row => row.artwork_id === '1'));
 });
 
 test('Marketplace includes only minted active resale listings', async () => {

@@ -452,6 +452,31 @@ function moderationVisibilityByArtwork(rows = []) {
   return map;
 }
 
+async function readPageVisibility(artworks) {
+  const reads = [];
+  try {
+    if (artworks.some(row => !PUBLIC_CHAIN_IDS.includes(Number(row.chain_id)) ||
+        !/^[1-9]\d{0,77}$/.test(String(row.artwork_id)))) throw Error('Invalid artwork identity');
+    for (const chain of PUBLIC_CHAIN_IDS) {
+      const ids = [...new Set(artworks.filter(row => Number(row.chain_id) === chain).map(row => String(row.artwork_id)))];
+      for (let offset = 0; offset < ids.length; offset += 40) {
+        const batch = ids.slice(offset, offset + 40);
+        const filter = batch.length === 1 ? 'eq.' + batch[0] : 'in.(' + batch.join(',') + ')';
+        reads.push(supabaseRest('artwork_moderation_visibility?select=chain_id,artwork_id::text,hidden' +
+          `&chain_id=eq.${chain}&artwork_id=${filter}&limit=${batch.length}`));
+      }
+    }
+    const pages = await Promise.all(reads);
+    if (pages.some(rows => !Array.isArray(rows) || rows.some(row => typeof row?.hidden !== 'boolean' ||
+      !PUBLIC_CHAIN_IDS.includes(Number(row.chain_id)) || !protocolId(row.artwork_id)))) throw Error('Invalid visibility');
+    return pages.flat();
+  } catch {
+    throw Object.assign(new Error('Artwork visibility is temporarily unavailable. Please retry.'), {
+      code: 'ARTWORKS_UNAVAILABLE', statusCode: 503
+    });
+  }
+}
+
 // Mirrors the client-side ArtSoulProfileDisplay rule: auto-generated
 // "User1a2b"-style usernames are not public nicknames, so cards fall back
 // to the shortened wallet address.
@@ -850,11 +875,9 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }, initialBounda
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=5000`,
       warnings
     );
-  const artworkModerationVisibilityPromise = queryTable(
-      'artwork_moderation_visibility',
-      `select=chain_id,artwork_id::text,hidden&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`,
-      warnings
-    );
+  const artworkModerationVisibilityPromise = readPageVisibility([{ chain_id: chain, artwork_id: artworkId }]);
+  // The projection awaits this together with the independent lifecycle reads below.
+  artworkModerationVisibilityPromise.catch(() => {});
 
   // Only resale tables depend on token_id. Everything else above begins with
   // the request instead of waiting for the artwork row to return first.
@@ -1016,11 +1039,7 @@ async function buildProjectionSnapshot() {
       `select=chain_id,artwork_id::text,wallet_address,signal_type&chain_id=${chainFilter}&limit=5000`,
       warnings
     ),
-    queryTable(
-      'artwork_moderation_visibility',
-      `select=chain_id,artwork_id::text,hidden&chain_id=${chainFilter}&limit=1000`,
-      warnings
-    ),
+    artworksPromise.then(readPageVisibility),
     queryTable(
       'v41_public_metrics',
       'select=chain_id,artists_onboarded,auctions_completed,unique_collectors,settled_volume_wei::text,last_updated_block,updated_at' +
@@ -1044,9 +1063,8 @@ async function buildProjectionSnapshot() {
   return projectTableData(tableData, warnings, normalizePublicMetrics(publicMetricRows), preload);
 }
 
-// Keep lifecycle/metadata reads cached, but never reuse mutable profile content
-// after a moderation decision. Refresh only the public identity projection.
-async function refreshCachedProfileIdentities(snapshotPromise, includeAvatar = false) {
+// A moderation decision can change either visibility or a public identity during the cache lifetime.
+async function refreshCachedPublicFields(snapshotPromise, includeAvatar = false) {
   const snapshot = await snapshotPromise;
   const warnings = snapshot.warnings.filter(warning => warning.table !== PUBLIC_PROFILE_SOURCE);
   const roles = snapshot.cards.map(card => [...new Set([
@@ -1054,7 +1072,10 @@ async function refreshCachedProfileIdentities(snapshotPromise, includeAvatar = f
     ...(includeAvatar ? [card.auction_winner_address, card.current_owner_address,
       card.status === 'settlement_pending' ? card.current_bidder : null] : [])
   ].map(address => normalizeText(address).toLowerCase()).filter(address => address && address !== ZERO_ADDRESS))]);
-  const identities = await publicIdentitiesByAddress(roles.flat(), warnings, { includeAvatar });
+  const [identities, visibilityRows] = await Promise.all([
+    publicIdentitiesByAddress(roles.flat(), warnings, { includeAvatar }), readPageVisibility(snapshot.cards)
+  ]);
+  const visibility = moderationVisibilityByArtwork(visibilityRows);
   const cards = snapshot.cards.map((card, index) => {
     const creator = identities?.get(normalizeText(card.creator).toLowerCase());
     // Drop old identities even if the current public projection is unavailable.
@@ -1062,6 +1083,7 @@ async function refreshCachedProfileIdentities(snapshotPromise, includeAvatar = f
     const { ownership_profiles, creator_identity_verified, ...publicCard } = card;
     return {
       ...publicCard,
+      moderation_hidden: visibility.get(keyFor(card.chain_id, card.artwork_id))?.hidden === true,
       creator_name: creator?.username || null,
       ...(creator?.profile_identity_verified === true ? {creator_identity_verified: true} : {}),
       ...(includeAvatar ? {
@@ -1090,7 +1112,7 @@ function getProjectionSnapshot() {
     });
     return promise;
   }
-  return refreshCachedProfileIdentities(projectionSnapshotPromise);
+  return refreshCachedPublicFields(projectionSnapshotPromise);
 }
 
 function getDirectProjectionSnapshot(lookup, fresh = false) {
@@ -1100,7 +1122,7 @@ function getDirectProjectionSnapshot(lookup, fresh = false) {
   const cached = directProjectionCache.get(key);
   // A receipt-triggered lookup refreshes only one artwork. Coalesce repeated
   // requests for one second; never rebuild the full public corpus on refresh.
-  if (cached && now - cached.createdAt < (fresh ? 1000 : PROJECTION_CACHE_MS)) return refreshCachedProfileIdentities(cached.promise, true);
+  if (cached && now - cached.createdAt < (fresh ? 1000 : PROJECTION_CACHE_MS)) return refreshCachedPublicFields(cached.promise, true);
 
   const cacheEntry = { createdAt: now, promise: null };
   const promise = buildDirectProjectionSnapshot(lookup).then(snapshot => {

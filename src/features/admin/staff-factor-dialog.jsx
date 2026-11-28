@@ -134,9 +134,9 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
     return <dialog ref={dialog} className="protocol-admin-dialog protocol-admin-passkeys" aria-labelledby="staffFactorTitle"
         onCancel={event => { event.preventDefault(); close(); }} onClick={event => { if (event.target === event.currentTarget) close(); }}>
         <div className="protocol-admin-passkey-content">
-            <header><h2 id="staffFactorTitle">Verify admin access</h2><button ref={closeButton} type="button" onClick={close}>Close</button></header>
+            <header><h2 id="staffFactorTitle">{sessionActive ? 'Account security' : 'Verify admin access'}</h2><button ref={closeButton} type="button" onClick={close}>Close</button></header>
             <p>Staff wallet: {wallet.slice(0, 6)}...{wallet.slice(-4)}</p>
-            <p>Use your authenticator app or a saved passkey. Your wallet identifies your staff account.</p>
+            {!sessionActive && <p>Use your authenticator app or a saved passkey to unlock your staff tools.</p>}
             {sessionActive && <p role="status">Admin verification is active for up to 24 hours. Verify again on a new browser or network.</p>}
             {status?.passkeyAvailable && <button type="button" disabled={busy} onClick={() => passkey(false)}>Verify passkey</button>}
             {status?.setup && <section aria-label="Approved sign-in setup">
@@ -166,7 +166,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
             </form>}
             {status && !status.setup && !status.passkeyAvailable && !status.totpFactorId && <p>Ask both authority wallets to approve sign-in setup for this wallet. Wallet login alone does not grant admin access.</p>}
             <p>Lost your sign-in method? Both authority wallets can approve a replacement in Staff access. The previous method stops working when they approve it.</p>
-            {!status && <button type="button" disabled={busy} onClick={() => run(refresh)}>{busy ? 'Checking...' : 'Check setup approval'}</button>}
+            {!status && (busy ? <p role="status">Loading sign-in methods…</p> : <button type="button" onClick={() => run(refresh)}>Retry loading sign-in methods</button>)}
             {message && <p role="status" className="protocol-admin-message">{message}</p>}
         </div>
     </dialog>;

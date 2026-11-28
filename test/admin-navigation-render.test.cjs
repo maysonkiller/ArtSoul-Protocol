@@ -34,6 +34,14 @@ function render({state='ready',wallet=WALLET,staff=true,authority=true,role=auth
     return renderToStaticMarkup(React.createElement(scope.Component));
 }
 
+test('reloading each workspace section preserves its destination and ignores unknown fragments',()=>{
+    for (const [hash, expected] of Object.entries({'#artworks':'artworks','#hidden':'hidden','#audit-log':'audit',
+        '#delivery':'notifications','#staff-access':'staff','#nft-appearance':'appearance','#identity-reviews':'identity','#unknown':'queue','':'queue'})) {
+        const scope = {React, window:{location:{hash}}};
+        assert.equal(vm.runInNewContext(compiled+'\nlinkedSection();',scope),expected);
+    }
+});
+
 test('sign-in controls remain above staff and complaint content with one verification action',()=>{
     for(const state of ['ready','step_up','setup']) {
         const html=render({state});

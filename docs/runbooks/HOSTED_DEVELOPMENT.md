@@ -5,6 +5,41 @@ A submitted assignment continues after the terminal closes. Each assignment
 finishes with a patch and a test report. The cloud session has no GitHub token,
 wallet, database credentials, or outbound network access.
 
+For the pre-mainnet review and first-visit guide, use the dedicated sessions:
+
+```powershell
+Set-Location -LiteralPath C:\Projects\ArtSoul
+node scripts/develop-with-astra.mjs audit
+node scripts/develop-with-astra.mjs pilot-guide
+```
+
+Each command creates its assignment once. Repeating it with the same local
+state prints the existing ID, including after updating the repository.
+Append `-status` to either command to see provider usage and state, then
+`-collect` to download the completed patch and report. These jobs use
+`gpt-6.2-astra` at `max` reasoning effort. Both receive the committed source,
+the installed Atlas and the reviewed project handoff. The audit also covers
+contract inventory, indexer, data access and operating readiness. Record any
+scope limitations before using the findings in a release decision.
+
+New named sessions start with a lifetime limit of 600 USD cents each. An
+operator can set an explicit limit on the existing session with `audit-limit
+<cents>` or `pilot-guide-limit <cents>`. The provider counts amounts already
+used in that session toward the limit. Before increasing it, compare all
+session limits with the organization's available grant and any voice reserve.
+Project budget alerts do not partition the organization's credit balance.
+
+To continue development after reviewing the guide, use its existing session:
+
+```powershell
+git fetch origin main
+node scripts/develop-with-astra.mjs pilot-guide-sync
+node scripts/develop-with-astra.mjs pilot-guide-next "Check the published guide against the current Phase C backlog. Fix one confirmed usability regression and run the relevant offline tests."
+```
+
+The same suffixes work for the audit session. Synchronization must succeed
+before assigning work on a newly published revision.
+
 From the project directory, inspect the current assignment and collect its files:
 
 ```powershell
@@ -39,7 +74,7 @@ the specified summary and tells the agent where to read it.
 On first setup, run `check` for an offline input check, then `start` to open one
 session and submit the voice startup task. Use the existing project key in
 `.env.local` and the installed ArtSoul Atlas. Session state is in the Git-ignored
-`artifacts/astra-development/session.json`. Retain this file when switching
+`.artsoul-hosted/`, outside the compiler's output directory. Retain these records when switching
 tasks. If a creation request is interrupted before its ID is saved, check the
 project's Agents dashboard before starting another billable session.
 

@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +10,9 @@ import { parseEnv } from 'node:util';
 // All repository inputs are committed public blobs. Read the API key only on the host.
 const root = fileURLToPath(new URL('../', import.meta.url));
 const local = path.join(root, 'artifacts', 'astra-development');
-const statePath = path.join(local, 'session.json');
+// Hardhat prunes unrecognized JSON from artifacts during compilation.
+const stateDirectory = path.join(root, '.artsoul-hosted');
+const statePath = path.join(stateDirectory, 'session.json');
 const skills = path.join(homedir(), '.codex', 'skills', 'artsoul-protocol-atlas');
 const bundlePaths = [
   'AGENTS.md', 'package.json', 'docs/canon/12_IMPLEMENTATION_BACKLOG.md',
@@ -29,7 +32,11 @@ const developmentPaths = [
   'docs/canon/12_IMPLEMENTATION_BACKLOG.md', 'docs/canon/17_ROADMAP_PHASES.md',
   ':(top,glob)*.html', ':(top,glob)*.css', ':(top,glob)*.js', ':(top,glob)*.cjs'
 ];
+const reviewPaths = ['sql', 'migrations', 'src/indexer/migrations', '.github/workflows', 'vercel.json',
+  'docs/canon', 'docs/testnet', 'docs/runbooks', 'docs/BACKLOG.md'];
 const backlogTask = 'Select and implement up to two independent, evidenced improvements from the current Phase C preparation backlog or Phase D offline readiness, starting with the public preview/detail playback or display issues. Prefer an actual user-visible defect or a missed realistic regression in a frequently used path. Read the relevant existing implementation and tests first; skip already-fixed issues. For each, reproduce using offline fixtures, implement, and test. Do not touch release gates, permissions, legal decisions, operator approvals, accounts, write-network activation or financial rules. Make no phase-completion claims. Keep one combined reviewable patch and a short handoff listing any genuinely blocked items. Stop when the two fixes are tested or further progress depends on missing evidence.';
+const auditTask = 'Conduct a defensive pre-mainnet source and readiness review. Inventory each supported contract for ordinary artworks, collection launches, optional mint reservations, marketplace operators, refunds, and Genesis. Distinguish code from deployment and actual acceptance, especially the public catalog binding. Review indexer, database access, wallet authentication, admin, frontend, media and operating readiness. Use existing safe tests and static inspection only. Do not create exploit demonstrations or probe live services. List concrete findings with source locations and practical remediation, tested scope, missing evidence and a prioritized one-week testnet pilot. Record the report as a new English file docs/audits/PRE_MAINNET_API_SOURCE_REVIEW.md. Include the new document in changes.patch (git add -N before git diff); report what you could not verify. An internal review is input to the later independent audit.';
+const pilotTask = 'Implement the founder-requested interactive first visit guide on the public product. On first public home visit offer an unobtrusive optional welcome, Start or Skip, with a way to reopen in How it works. Guide visitors across real pages for browsing, profile creation, publishing one artwork, or designing a collection. Use real controls and existing routes; show the next control and explain what to do, allow dismiss, resume, back and skip. Keep the controls reachable on small screens. Avoid re-triggering the tour or jumping on reload. A local collection draft must not claim a deployed mint. Never request wallet access automatically. Use existing guidance, respect both palettes, reduced motion and English UI. Include focused behavior tests, all necessary source and new files in changes.patch, and the exact checks you ran. Leave admin UI to the other engineer.';
 const instructions = [
   'You develop ArtSoul Protocol in the isolated copy provided by the owner.',
   'Unzip /workspace/source.zip into /workspace/project on first use. Run from that directory. Initialize a local Git baseline if needed before making edits.',
@@ -40,7 +47,7 @@ const instructions = [
 ].join('\n');
 const git = (...args) => execFileSync('git', args, {cwd: root, maxBuffer: 8 * 1024 * 1024});
 const inline = (name, bytes) => ({type: 'inline', path: '/workspace/' + name, data: bytes.toString('base64')});
-const usage = 'Usage: node scripts/develop-with-astra.mjs check | start | sync | handoff | status | collect [turn_id] | work | followup | next "development task"';
+const usage = 'Usage: node scripts/develop-with-astra.mjs check | start | sync | handoff | status | collect [turn_id] | work | followup | next "development task" | audit[-status|-collect|-sync|-next "task"|-limit cents] | pilot-guide[-status|-collect|-sync|-next "task"|-limit cents]';
 
 async function prepare() {
   const revision = git('rev-parse', '--verify', 'refs/remotes/origin/main').toString().trim();
@@ -53,10 +60,14 @@ async function prepare() {
 }
 
 async function main() {
-  const [action, ...args] = process.argv.slice(2);
-  if (!['check', 'start', 'sync', 'handoff', 'status', 'collect', 'work', 'followup', 'next'].includes(action)) throw Error(usage);
+  const [command, ...args] = process.argv.slice(2);
+  const job = /^(audit|pilot-guide)(?:-(status|collect|limit|sync|next))?$/.exec(command || '');
+  const action = job ? job[2] || 'start' : command;
+  const jobStatePath = job ? path.join(stateDirectory, job[1] + '.json') : statePath;
+  if (!['check', 'start', 'sync', 'handoff', 'status', 'collect', 'limit', 'work', 'followup', 'next'].includes(action)) throw Error(usage);
+  if (action === 'limit' && (!job || args.length !== 1 || !/^[1-9]\d{0,3}$/.test(args[0]))) throw Error(usage);
   if (action === 'next' ? args.length !== 1 || !args[0].trim() || args[0].length > 4000 :
-    action === 'collect' ? args.length > 1 || (args.length && !/^turn_[\w-]+$/.test(args[0])) : args.length !== 0) throw Error(usage);
+    action === 'collect' ? args.length > 1 || (args.length && !/^turn_[\w-]+$/.test(args[0])) : action !== 'limit' && args.length !== 0) throw Error(usage);
   if (action === 'check') {
     const {revision, files} = await prepare();
     console.log('Source revision:', revision, '\nPublic source paths:', bundlePaths.join(', '),
@@ -79,30 +90,58 @@ async function main() {
     return response;
   }
   await mkdir(local, {recursive: true});
-  let state = await readFile(statePath, 'utf8').then(JSON.parse).catch(e => {
+  await mkdir(stateDirectory, {recursive: true});
+  try {
+    await copyFile(path.join(local, path.basename(jobStatePath)), jobStatePath, constants.COPYFILE_EXCL);
+  } catch (error) {
+    if (!['ENOENT','EEXIST'].includes(error.code)) throw error;
+  }
+  let state = await readFile(jobStatePath, 'utf8').then(JSON.parse).catch(e => {
     if (e.code !== 'ENOENT') throw e;
     return null;
   });
   if (action === 'start') {
     if (state?.session) { console.log('Already created:', state.session); return; }
     const {revision, files} = await prepare();
+    let task = firstTask;
+    if (job) {
+      const project = git('-c', 'core.autocrlf=false', 'archive', '--format=zip', revision, '--', ...developmentPaths);
+      files.push(inline('project.zip', project));
+      files.push(inline('skills/references/library.zip', await readFile(path.join(skills, 'references/library.zip'))));
+      const reviewInputs = git('-c', 'core.autocrlf=false', 'archive', '--format=zip', revision, '--', ...reviewPaths);
+      files.push(inline('review.zip', reviewInputs));
+      const handoff = await readFile(path.join(local, 'owner-handoff.md')).catch(e => { if (e.code !== 'ENOENT') throw e; });
+      if (handoff) {
+        if (handoff.length > 16384) throw Error('The reviewed handoff exceeds 16 KiB.');
+        files.push(inline('owner-handoff.md', handoff));
+      }
+      task = 'Extract /workspace/project.zip and /workspace/review.zip together into /workspace/project before creating any Git baseline. Read /workspace/owner-handoff.md if present. Source revision ' + revision + '. Use ArtSoul Atlas. ' + (job[1] === 'audit' ? auditTask : pilotTask);
+    }
     if (state) throw Error('A previous creation is unconfirmed. Check the Agents dashboard before starting another session.');
     state = {revision, request: randomUUID()};
-    await writeFile(statePath, JSON.stringify(state), {flag: 'wx'});
-    const session = await (await api('/sessions', {agent: {model: 'gpt-6.2-astra', instructions},
-      spend_control: {limit: sessionLimitCents},
+    await writeFile(jobStatePath, JSON.stringify(state), {flag: 'wx'});
+    const session = await (await api('/sessions', {agent: {model: 'gpt-6.2-astra', instructions, reasoning: {effort: 'max'}},
+      spend_control: {limit: job ? 600 : sessionLimitCents},
       environment: {type: 'openai_hosted', network: {access: 'disabled'}, files},
-      input: firstTask, stream: false}, state.request)).json();
+      input: task, stream: false}, state.request)).json();
     if (!/^[\w-]+$/.test(session.id || '')) throw Error('No valid hosted session ID returned.');
     state.session = session.id;
-    await writeFile(statePath + '.tmp', JSON.stringify(state));
-    await rename(statePath + '.tmp', statePath);
+    await writeFile(jobStatePath + '.tmp', JSON.stringify(state));
+    await rename(jobStatePath + '.tmp', jobStatePath);
+    if (job) console.log('Model:', session.agent?.model, 'reasoning:', session.agent?.reasoning?.effort, 'limit (USD cents):', session.spend_control?.limit);
     console.log('Hosted session:', state.session, 'at', revision);
     return;
   }
   if (!state?.session || !/^[\w-]+$/.test(state.session)) throw Error('No confirmed session. Use check and start first.');
   const route = '/sessions/' + state.session;
   const session = await (await api(route)).json();
+  if (action === 'limit') {
+    const limit = Number(args[0]);
+    const capped = await (await api(route, {spend_control: {limit}})).json();
+    if (capped.id !== state.session || capped.spend_control?.limit !== limit) throw Error('The new session limit was not confirmed.');
+    console.log(job[1], 'confirmed lifetime limit (USD cents):', limit);
+    return;
+  }
   const turns = (await (await api(route + '/turns?limit=100')).json()).data;
   const latest = action === 'collect' && args[0] ? await (await api(route + '/turns/' + args[0])).json() :
     [...turns].sort((a, b) => b.created_at - a.created_at)[0];
@@ -156,7 +195,8 @@ async function main() {
   }
   if (['sync', 'next', 'work'].includes(action)) {
     if (turns.some(t => !['completed', 'failed', 'cancelled', 'canceled', 'incomplete'].includes(t.status))) throw Error('A turn is still active.');
-    if (session.spend_control?.limit == null || session.spend_control.limit > sessionLimitCents) {
+    if (job && !(session.spend_control?.limit > 0)) throw Error('The named session needs an explicit spending limit.');
+    if (!job && (session.spend_control?.limit == null || session.spend_control.limit > sessionLimitCents)) {
       const capped = await (await api(route, {spend_control: {limit: sessionLimitCents}})).json();
       if (capped.spend_control?.limit !== sessionLimitCents) throw Error('The session spending limit was not confirmed.');
     }
@@ -167,21 +207,24 @@ async function main() {
       const archive = git('-c', 'core.autocrlf=false', 'archive', '--format=zip', revision, '--', ...developmentPaths);
       const files = [inline('public-development-' + revision + '.zip', archive),
         inline('skills/references/library.zip', await readFile(path.join(skills, 'references/library.zip')))];
+      if (job) files.push(inline('review-' + revision + '.zip',
+        git('-c', 'core.autocrlf=false', 'archive', '--format=zip', revision, '--', ...reviewPaths)));
       for (const file of files) {
         if (file.data.length > 6990508) throw Error('File exceeds the hosted inline-file limit: ' + file.path);
         const saved = await (await api('/environments/' + env + '/files', file)).json();
         if (saved.path !== file.path || saved.size_bytes !== Buffer.byteLength(file.data, 'base64')) throw Error('Incomplete context upload.');
         console.log(saved.path, saved.size_bytes, 'bytes');
       }
-      await writeFile(statePath + '.tmp', JSON.stringify({...state, synced: revision}));
-      await rename(statePath + '.tmp', statePath);
+      await writeFile(jobStatePath + '.tmp', JSON.stringify({...state, synced: revision}));
+      await rename(jobStatePath + '.tmp', jobStatePath);
       return;
     }
     if (action === 'work' && !state.synced) throw Error('Run sync before selecting a broader backlog assignment.');
     const context = state.synced
       ? ' The public development snapshot is /workspace/public-development-' + state.synced + '.zip. Extract it to a separate clean directory, using this revision as the baseline. Refer to prior turn results to avoid repeating pending changes. The complete ArtSoul skills including Classic are in /workspace/skills/references/library.zip. Read only relevant sections. '
       : '';
-    const task = (action === 'work' ? backlogTask : args[0]) + context + readHandoff;
+    const assignment = action === 'work' ? backlogTask : args[0];
+    const task = assignment + context + (job && state.synced ? ' Overlay /workspace/review-' + state.synced + '.zip before creating the baseline.' : '') + readHandoff;
     const submission = createHash('sha256').update(JSON.stringify([state.session, latest.id, task])).digest('hex');
     await api(route + '/events', {events: [{type: 'agent.session.input.message', input: [
       {role: 'user', content: [{type: 'input_text', text: task}]}
