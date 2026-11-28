@@ -151,6 +151,8 @@ export async function checkOrdinaryHistory(pool) {
     badCredit = false;
     assert.equal((await sync({ pool: undefined })).status, 'verified');
     assert.equal(await count('ordinary_nft_ranges'), 0);
+    assert.equal((await sync({preview:true})).primarySales, 1);
+    assert.equal(await count('ordinary_nft_ranges'), 0);
     const results = await Promise.allSettled([sync(),sync()]);
     assert.ok(results.some(result => result.status === 'fulfilled' && result.value.primarySales === 1));
     for (const result of results) if (result.status === 'rejected') assert.match(result.reason.message,/checkpoint changed/);
@@ -160,8 +162,16 @@ export async function checkOrdinaryHistory(pool) {
     head = 92;
     wrongPreviousOwner = true;
     await assert.rejects(sync(), /preceding owner/);
+    await assert.rejects(sync({preview:true}), /preceding owner/);
     assert.equal(await count('ordinary_nft_ranges'), 1, 'a failed ownership check rolls back its whole range');
     wrongPreviousOwner = false;
+    const preview = await sync({preview:true});
+    assert.equal(preview.status, 'verified');
+    assert.equal(preview.fromBlock, 91);
+    assert.equal(preview.previousBlockHash, hash(90));
+    assert.equal(preview.transfers, 1);
+    assert.equal(await count('ordinary_nft_ranges'), 1);
+    assert.equal(await count('ordinary_nft_transfers'), 1);
     assert.equal((await sync()).throughBlock, 91);
     assert.equal((await sync()).transfers, 0);
     assert.equal((await sync()).status, 'caught-up');

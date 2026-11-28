@@ -143,7 +143,7 @@ export function IdentityReviews({ api, wallet, isSessionCurrent, onQueueChange, 
             const actionable = status === 'pending' || status === 'approved';
             const note = notes[row.id] || '';
             return <article className="identity-review-card protocol-admin-report-text" key={row.id} aria-labelledby={'identity-title-' + row.id}>
-                <p className="identity-review-meta">{row.chain_id ? 'Collection identity' : 'Profile identity'} · Request #{row.id} · {titleCase(status)}</p>
+                <p className="identity-review-meta">{row.chain_id ? 'Collection identity' : 'Profile identity'} / Request #{row.id} / {titleCase(status)}</p>
                 <h3 id={'identity-title-' + row.id}>{row.profile_name}</h3>
                 <dl className="identity-review-facts">
                     <div><dt>Applicant profile</dt><dd><a target="_blank" rel="noopener noreferrer" href={'/profile?address=' + row.wallet}>{row.wallet}</a></dd></div>
