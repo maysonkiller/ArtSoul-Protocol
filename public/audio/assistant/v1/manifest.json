@@ -3825,6 +3825,42 @@
         "output_tokens": 256
       },
       "estimated_usd": 0.005162
+    },
+    {
+      "lang": "en",
+      "id": "identityReviewHelp",
+      "text": "Verify your staff sign-in and open Identity reviews to review blue check requests. Another authorized reviewer must decide your own request.",
+      "url": "/audio/assistant/v1/phrases/en-identityReviewHelp.wav",
+      "transcript": "Verify your staff sign-in and open Identity reviews to review blue check requests. Another authorized reviewer must decide your own request.",
+      "sha256": "2f2ee6857ce00982413b22e80e9f588b3c7ea5c52d237c443b269f1d6c2f8755",
+      "bytes": 391244,
+      "duration_seconds": 8.15,
+      "generated_at": "2026-11-28T00:04:27.782Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 66,
+        "output_tokens": 218
+      },
+      "estimated_usd": 0.0043996
+    },
+    {
+      "lang": "ru",
+      "id": "identityReviewHelp",
+      "text": "Подтвердите вход сотрудника и откройте раздел Identity reviews для проверки заявок на синюю галочку. Вашу собственную заявку рассматривает другой уполномоченный сотрудник.",
+      "url": "/audio/assistant/v1/phrases/ru-identityReviewHelp.wav",
+      "transcript": "Подтвердите вход сотрудника и откройте раздел Identity reviews для проверки заявок на синюю галочку. Вашу собственную заявку рассматривает другой уполномоченный сотрудник.",
+      "sha256": "308f10b8130791443fede96476c60b9edd8cdfb9c0f167d04c2b4c47033c509e",
+      "bytes": 571244,
+      "duration_seconds": 11.9,
+      "generated_at": "2026-11-28T00:04:32.330Z",
+      "model": "gpt-realtime-2.1-mini",
+      "voice": "marin",
+      "usage": {
+        "input_tokens": 83,
+        "output_tokens": 320
+      },
+      "estimated_usd": 0.0064498
     }
   ]
 }

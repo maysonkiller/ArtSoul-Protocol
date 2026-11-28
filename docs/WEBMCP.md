@@ -13,6 +13,12 @@ The assistant uses Marin for prerecorded English and Russian speech. The [phrase
 
 The [local live conversation pilot](audits/LIVE_VOICE_LOCAL_PILOT_2026-11-27.md) uses microphone input and the same API voice. Its provider connection is disabled by default. The public site plays the available recordings.
 
+For an independent code review while someone edits the site, run the command below in the repository from PowerShell. The script sends the question and one public source file from the local `origin/main` revision to GPT-6.2 Astra through the Responses API. It prints the reply and token usage. Add `--check` before the filename to see the revision and size offline. Confirm the linked organization's available grant balance before a paid review. [API credit coverage](https://help.openai.com/en/articles/20001626-api-credits-benefit-for-eligible-chatgpt-subscriptions)
+
+```powershell
+node scripts/review-with-astra.mjs src/ai/live-voice-capture.js "Check the audio frame size at 24 kHz."
+```
+
 Run the following from the repository root to check the bank and see which responses still need recording. Both commands run offline.
 
 ```sh
@@ -239,6 +245,10 @@ be reachable through speech and typing, using the same permissions, enabled
 controls, validations and results as the pointer and keyboard UI. A request
 for a private or protected action hands control to the person for wallet
 selection, signatures, passkeys, native file selection and final approvals.
+On the admin page, Help explains how a staff reviewer finds blue check requests
+and who reviews the staff member's own application. Staff can also ask “Why
+can't I approve my request?” or «Как подтвердить свою заявку?». This uses a
+fixed Marin recording in the selected language and reads no application data.
 Only an authorized staff member can use administrative controls. Any future
 assistant support for staff must use the same role checks, step-up and review
 as the staff interface. Further assistant and WebMCP acceptance is deferred.

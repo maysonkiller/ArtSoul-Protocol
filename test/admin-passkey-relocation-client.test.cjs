@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(process.env.ADMIN_CANDIDATE_PATH || 'src/entries/admin.jsx', 'utf8').replace(/\r\n/g, '\n');
-const start = source.indexOf('function ProtocolAdminPage()');
+const start = source.indexOf('function linkedSection()');
 const end = source.indexOf('    const SignInDialog =', start);
 const logic = source.slice(start, end) + `return {checkAccess, authenticate, changeQueueStatus, submitDecision, setDecision, stepUp,
     closeSetup: () => { if (typeof setPasskeyOpen === 'function') setPasskeyOpen(false); },

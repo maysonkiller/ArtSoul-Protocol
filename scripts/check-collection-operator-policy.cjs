@@ -39,11 +39,13 @@ async function rehearseCollectionOperators({ network, artifacts }) {
     const first = await deploy('PartnerFirstWorkLaunch', 'First work', 'FST', 'ipfs://fixture/', 2, creator.address, treasury.address, registry.target);
     const forge = await deploy('CollectionForge', 'Forged', 'FRG', 'ipfs://fixture/', editions.target,
         2, 1, ethers.id('local recipe'), creator.address, creator.address, 550);
-    const {officialCollectionRuntime} = await import('../src/api/partner-frames.js');
+    const {officialCollectionRuntime,discoverOfficialCollection} = await import('../src/api/partner-frames.js');
     const read = (method,params) => network.provider.send(method,params);
     for (const launch of [editions,first]) {
         const code = await provider.getCode(launch.target);
         assert.equal(await officialCollectionRuntime(31337,launch.target,creator.address.toLowerCase(),[read,read]),ethers.keccak256(code));
+        assert.deepEqual(await discoverOfficialCollection(31337,launch.target,[read,read]),
+            {issuer:creator.address.toLowerCase(),runtime:ethers.keccak256(code)});
         assert.equal(await officialCollectionRuntime(31337,launch.target,other.address.toLowerCase(),[read,read]),false);
         const changedCode = code.slice(0,-2)+(code.endsWith('ff')?'00':'ff');
         const changed = (method,params) => method === 'eth_getCode' ? changedCode : read(method,params);

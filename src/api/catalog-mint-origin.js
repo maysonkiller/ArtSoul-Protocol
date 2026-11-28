@@ -138,9 +138,10 @@ export async function withCatalogMintOrigins(cards) {
         return cards.map(card=>{
             if (!marked.has(card) && !credited.has(card)) return card;
             const kind = publishers.get(normalizeWallet(card.creator));
-            const origin = kind === 'founder' ? {founder_origin_verified:true} :
+            const artist = kind.startsWith('artist_');
+            const origin = artist ? {artist_frame_verified:true} : kind === 'founder' ? {founder_origin_verified:true} :
                 marked.has(card) ? {platform_origin_verified:true} : {platform_publication_verified:true};
-            return {...card,...origin,...(marked.has(card) || kind === 'founder' ? {aura_kind:kind} : {}),
+            return {...card,...origin,...(marked.has(card) || kind === 'founder' || artist ? {aura_kind:kind} : {}),
                 ...(labels ? {aura_border_text:true} : {})};
         });
     } catch { return cards; }

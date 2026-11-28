@@ -69,3 +69,13 @@ test('a founder designation requires its own origin evidence before and after mi
         assert.equal(projectedArtworkAura({...verified, chain_id:8453}), null);
     }
 });
+test('manual artist frames identify the author designation separately from an official or Genesis NFT', () => {
+    for (const frame of ['genesis','partner','founder']) {
+        const candidate = {source:'v41_projection',chain_id:84532,minted:false,aura_kind:'artist_'+frame};
+        assert.equal(projectedArtworkAura(candidate),null);
+        const aura = projectedArtworkAura({...candidate,artist_frame_verified:true,aura_border_text:true});
+        assert.equal(aura.kind,frame === 'founder' ? 'founder' : 'artist_'+frame);
+        assert.match(aura.label,/artist frame assigned by Team/);
+        assert.match(aura.className,new RegExp('--'+frame+'$'));
+    }
+});

@@ -1,53 +1,62 @@
 import { React } from '../../entries/react-runtime.js';
 import { canSearch, createSearchState } from '../search/search-state.js';
 
-const sourceKinds = {
-    founder: ['Founder artist wallet', 'Personal works registered by this wallet receive the Founder frame.'],
-    platform: ['Official ArtSoul publisher', 'Artist registrations must match both the publisher wallet and the selected publishing contract.'],
-    official_collection: ['Official ArtSoul collection', 'The issuing wallet and collection contract must match on the selected network.'],
-    partner: ['Partner collection', 'Choose the partner’s dedicated ERC-721 collection. Its frame follows each verified NFT when it changes hands.'],
-    genesis: ['Genesis contract', 'A Genesis frame requires the designated Base mainnet contract and a verified grant for the individual token.']
+const sources = {
+    'ArtSoul Founder': [['artist_founder','Artist wallet'],['founder','Earlier publishing contract designation']],
+    'ArtSoul Partner': [['artist_partner','Artist wallet'],['partner','NFT collection']],
+    'ArtSoul Genesis': [['artist_genesis','Artist wallet'],['genesis','Genesis NFT contract']],
+    'Official ArtSoul': [['platform','Publishing wallet'],['official_collection','NFT collection']]
+};
+const instructions = {
+    artist_founder: 'Give the Founder frame to verified works created by this wallet.',
+    artist_partner: 'Give the Partner frame to verified works created by this wallet.',
+    artist_genesis: 'Give this artist the Genesis frame for their works. This visual designation grants no Genesis token, holder status or benefits.',
+    founder: 'Review an earlier Founder designation recorded for a specific publishing contract.',
+    platform: 'The official mark applies to verified ArtSoul publications from this wallet on the selected publishing contract.',
+    official_collection: 'Enter the collection contract. ArtSoul reads its original issuer and verifies its deployed code.',
+    partner: 'Approve a dedicated Partner collection. The frame follows each verified NFT when it changes hands.',
+    genesis: 'A finalized grant from the dedicated Base mainnet contract identifies each Genesis NFT. The reviewed deployment appears here after launch.'
 };
 
 const validAddress = value => /^0x[\da-f]{40}$/i.test(value.trim()) && !/^0x0{40}$/i.test(value.trim());
 
 export function AuraSources({ api, wallet, isSessionCurrent }) {
-    const [kind, setKind] = React.useState('founder');
+    const [frame, setFrame] = React.useState('ArtSoul Founder');
+    const [kind, setKind] = React.useState('artist_founder');
     const [chain, setChain] = React.useState('84532');
     const [deployment, setDeployment] = React.useState('catalog');
-    const [issuer, setIssuer] = React.useState('');
     const publisher = kind === 'platform' || kind === 'founder';
-    const officialCollection = kind === 'official_collection';
+    const walletSource = publisher || kind.startsWith('artist_');
     const genesis = kind === 'genesis';
     function changeKind(value) {
         setKind(value);
         setDeployment('catalog');
-        setIssuer('');
         if (value === 'genesis') setChain('8453');
     }
     const query = new URLSearchParams({wallet: wallet.toLowerCase(), kind, chain});
     if (publisher) query.set('deployment', deployment);
-    if (officialCollection) query.set('issuer', issuer.trim().toLowerCase());
-    return <details className="identity-applications admin-frame-sources"><summary>Manage frame sources</summary>
-        <label><span id="admin-frame-kind">Frame source</span><select aria-labelledby="admin-frame-kind" value={kind} onChange={event => changeKind(event.target.value)}>
-            {Object.entries(sourceKinds).map(([value, [label]]) => <option key={value} value={value}>{label}</option>)}
+    return <section className="identity-applications admin-frame-sources" aria-labelledby="admin-frame-sources-title">
+        <h3 id="admin-frame-sources-title">Manage frame sources</h3>
+        <label><span id="admin-frame-selection">Frame</span><select aria-labelledby="admin-frame-selection" value={frame} onChange={event => {
+            const selection = event.target.value;
+            setFrame(selection); changeKind(sources[selection][0][0]);
+        }}>{Object.keys(sources).map(label => <option key={label}>{label}</option>)}</select></label>
+        <label><span id="admin-frame-kind">Apply to</span><select aria-labelledby="admin-frame-kind" value={kind} onChange={event => changeKind(event.target.value)}>
+            {sources[frame].map(([value,label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <p>{sourceKinds[kind][1]}</p>
+        <p>{instructions[kind]}</p>
         {genesis ? <p>Network / Base mainnet</p> : <label><span id="admin-frame-network">Network</span><select aria-labelledby="admin-frame-network" value={chain} onChange={event => {
-            setChain(event.target.value); setDeployment('catalog'); setIssuer('');
+            setChain(event.target.value); setDeployment('catalog');
         }}><option value="84532">Base Sepolia (testnet)</option><option value="8453">Base mainnet</option></select></label>}
         {publisher && <label><span id="admin-frame-deployment">Publishing contract</span><select aria-labelledby="admin-frame-deployment" value={deployment} onChange={event => setDeployment(event.target.value)}>
             <option value="catalog">{chain === '84532' ? 'Website catalog' : 'Mainnet publishing contract'}</option>
             {chain === '84532' && <option value="rehearsal">New auction rehearsal</option>}
         </select></label>}
-        {officialCollection && <label>Original collection issuer wallet<input type="text" value={issuer} placeholder="0x…"
-            autoCapitalize="none" spellCheck={false} maxLength={42} onChange={event => setIssuer(event.target.value)} /></label>}
-        {(!officialCollection || validAddress(issuer)) && <SourceEditor key={query.toString()}
-            path={'aura-sources?' + query.toString()} {...{kind, publisher, api, wallet, isSessionCurrent}} />}
-    </details>;
+        <SourceEditor key={query.toString()} path={'aura-sources?' + query.toString()} {...{kind, publisher, walletSource, api, wallet, isSessionCurrent}} />
+    </section>;
 }
 
-function SourceEditor({kind, publisher, path, api, wallet, isSessionCurrent}) {
+function SourceEditor({kind, publisher, walletSource, path, api, wallet, isSessionCurrent}) {
     const [address, setAddress] = React.useState('');
     const [source, setSource] = React.useState(null);
     const [list, setList] = React.useState(null);
@@ -60,7 +69,7 @@ function SourceEditor({kind, publisher, path, api, wallet, isSessionCurrent}) {
     React.useEffect(() => () => { sequence.current++; search.cancel(); }, [search]);
     const current = request => isSessionCurrent() && sequence.current === request;
     const genesis = kind === 'genesis';
-    const label = kind === 'founder' ? 'Artist wallet or profile name' : publisher ? 'Publisher wallet or profile name' : 'NFT collection contract';
+    const label = kind === 'platform' ? 'Publisher wallet or profile name' : walletSource ? 'Artist wallet or profile name' : 'NFT collection contract';
     const busy = Boolean(operation);
     function edit(value) {
         sequence.current++; search.reset(); setAddress(value); setSource(null); setList(null); setReason(''); setMessage('');
@@ -108,18 +117,18 @@ function SourceEditor({kind, publisher, path, api, wallet, isSessionCurrent}) {
             if (current(request)) setOperation('');
         }
     }
-    const canFind = publisher && canSearch(address) && !address.trim().toLowerCase().startsWith('0x');
+    const canFind = walletSource && canSearch(address) && !address.trim().toLowerCase().startsWith('0x');
     const canChange = source && (!genesis || source.enabled || source.address === source.configuredGenesis);
     return <div>
         {!genesis && <>
-            <label>{label}<input value={address} placeholder={publisher ? 'Profile name or 0x…' : '0x…'} maxLength={publisher ? 100 : 42}
+            <label>{label}<input value={address} placeholder={walletSource ? 'Profile name or 0x…' : '0x…'} maxLength={walletSource ? 100 : 42}
                 autoCapitalize="none" spellCheck={false} disabled={busy} onChange={event => edit(event.target.value)} /></label>
-            {publisher && <button type="button" disabled={busy} onClick={() => load(wallet)}>Use my wallet</button>}
+            {walletSource && <button type="button" disabled={busy} onClick={() => load(wallet)}>Use my wallet</button>}
             {canFind ? <button type="button" disabled={busy || matches?.status === 'loading'}
                 onClick={() => search.search(address, 'artists')}>Find profile</button> :
                 <button type="button" disabled={busy || !validAddress(address)} onClick={() => load(address)}>Check address</button>}
         </>}
-        <button type="button" disabled={busy} onClick={() => load(null)}>{genesis ? 'Check Genesis deployment' : 'View sources'}</button>
+        <button type="button" disabled={busy} onClick={() => load(null)}>{genesis ? 'View Genesis deployment' : 'View sources'}</button>
         {matches?.status === 'loading' && <p role="status">Searching profiles…</p>}
         {matches?.status === 'error' && <p role="status">{matches.error}</p>}
         {matches?.status === 'ready' && <div>
@@ -132,7 +141,7 @@ function SourceEditor({kind, publisher, path, api, wallet, isSessionCurrent}) {
         {list && <div>
             {genesis && (list.configuredGenesis ?
                 <p>Designated Genesis contract <button type="button" disabled={busy} onClick={() => load(list.configuredGenesis)}>{list.configuredGenesis}</button></p> :
-                <p>The Base mainnet Genesis deployment has not been configured.</p>)}
+                <p>The Genesis NFT contract has not been configured on Base mainnet. After deployment, configure the reviewed contract, its code hash, Safe and founder wallet and index the confirmed grants.</p>)}
             {list.sources.length ? <ul>{list.sources.map(item => <li key={item.address}>
                 <button type="button" disabled={busy} onClick={() => load(item.address)}>{item.address}</button> {item.enabled ? 'Enabled' : 'Disabled'}
             </li>)}</ul> : !genesis && <p>No recorded sources on this page.</p>}
@@ -140,6 +149,7 @@ function SourceEditor({kind, publisher, path, api, wallet, isSessionCurrent}) {
         </div>}
         {source && <div>
             <p><strong>{source.enabled ? 'Enabled' : 'Disabled'}</strong> / {source.address}</p>
+            {source.active_frame && !source.enabled && <p>Saving replaces this wallet’s current {source.active_frame} artist frame.</p>}
             {source.scope && <p>{publisher ? 'Publishing contract' : 'Original issuer'} / {source.scope}</p>}
             {publisher && !source.enabled && <p>Enabling this source replaces any {kind === 'founder' ? 'official publisher' : 'Founder'} designation for this wallet on this publishing contract.</p>}
             {canChange && <><label>Reason for the change<textarea value={reason} disabled={busy} maxLength={500} onChange={event => setReason(event.target.value)} /></label>

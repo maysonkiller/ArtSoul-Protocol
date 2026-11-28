@@ -64,5 +64,29 @@ BEGIN
     ASSERT NOT has_function_privilege('anon','public.collection_frame_sources(integer,text[])','EXECUTE');
     ASSERT NOT has_function_privilege('authenticated','public.manage_aura_sources(text,bigint,text,bigint,text,integer,text,text,text,integer,boolean,text,text)','EXECUTE');
     ASSERT NOT public.has_collection_origin_review(8453,core,actor);
+    BEGIN
+        PERFORM public.manage_artist_frames(admin_wallet,av,NULL,NULL,'partner',84532,actor,'',0,true,'One staff source');
+        RAISE EXCEPTION 'Administrator issued a wallet frame';
+    EXCEPTION WHEN raise_exception THEN IF SQLERRM<>'FRAME_TEAM_REQUIRED' THEN RAISE; END IF; END;
+    ASSERT NOT has_function_privilege('authenticated','public.manage_artist_frames(text,bigint,text,bigint,text,integer,text,text,integer,boolean,text)','EXECUTE');
+    ASSERT NOT has_function_privilege('anon','public.review_official_frame_sources(text,bigint,text,bigint,integer,text,text)','EXECUTE');
+    SELECT * INTO STRICT r FROM public.review_official_frame_sources(actor,v,site,7,8453,core,'');
+    ASSERT r.issuer=publisher AND NOT r.enabled AND r.revision=2;
+    SELECT * INTO STRICT r FROM public.manage_artist_frames(actor,v,site,7,'partner',84532,actor,'',0,true,'Partner artist wallet');
+    ASSERT r.revision=1 AND r.enabled AND r.active_frame='partner';
+    ASSERT (SELECT kind='artist_partner' AND enabled FROM public.publisher_frame_states(84532,core,ARRAY[actor]));
+    ASSERT (SELECT kind='artist_partner' AND enabled FROM public.publisher_frame_states(84532,publisher,ARRAY[actor]));
+    ASSERT NOT EXISTS (SELECT 1 FROM public.publisher_frame_states(8453,core,ARRAY[actor]));
+    BEGIN
+        PERFORM public.manage_artist_frames(actor,v,site,7,'genesis',84532,actor,'',0,true,'Outdated artist review');
+        RAISE EXCEPTION 'Reclassified without checking current grant';
+    EXCEPTION WHEN raise_exception THEN IF SQLERRM<>'SOURCE_CHANGED' THEN RAISE; END IF; END;
+    SELECT * INTO STRICT r FROM public.manage_artist_frames(actor,v,site,7,'genesis',84532,actor,'',NULL,NULL,NULL);
+    ASSERT NOT r.enabled AND r.active_frame='partner' AND r.revision=1;
+    PERFORM public.manage_artist_frames(actor,v,site,7,'genesis',84532,actor,'',1,true,'Visual artist designation');
+    ASSERT (SELECT kind='artist_genesis' AND enabled FROM public.publisher_frame_states(84532,core,ARRAY[actor]));
+    ASSERT NOT EXISTS (SELECT 1 FROM public.aura_source_states('genesis',8453,'',ARRAY[actor]));
+    PERFORM public.manage_artist_frames(actor,v,site,7,'genesis',84532,actor,'',2,false,'Visual designation retired');
+    ASSERT NOT (SELECT enabled FROM public.publisher_frame_states(84532,core,ARRAY[actor]));
 END $$;
 ROLLBACK;

@@ -67,7 +67,7 @@ async function main() {
                 const {kind,chain,deployment,address,issuer:originator} = Object.fromEntries(url.searchParams);
                 const publisher = ['platform','founder'].includes(kind);
                 if (publisher && chain === '8453') return route.fulfill({status:503,json:{message:'The active publishing contract has not been configured.'}});
-                const scope = publisher ? core : originator || '';
+                const scope = publisher ? core : kind === 'official_collection' ? issuer : '';
                 const key = [kind,chain,scope,address].join('/');
                 if (route.request().method() === 'POST') {
                     const body = route.request().postDataJSON();
@@ -94,7 +94,9 @@ async function main() {
             const button = name => page.getByRole('button',{name,exact:true});
             const field = label => page.getByLabel(label,{exact:true});
             const reason = field('Reason for the change');
-            const kind = field('Frame source');
+            const kind = field('Apply to');
+            const frame = field('Frame');
+            assert.equal(await field('Publishing contract').count(),0);
             await field('Artist wallet or profile name').fill('Example artist');
             await button('Find profile').click();
             await button('Example artist / ' + issuer).click();
@@ -106,13 +108,13 @@ async function main() {
             await reason.fill('Personal artist publications');
             await button('Enable frame source').click();
             await page.getByText('Frame source enabled.').waitFor();
-            assert.deepEqual(writes.at(-1),{kind:'founder',chain:'84532',deployment:'catalog',address:wallet,originator:undefined,
-                body:{scope:core,enabled:true,revision:0,reason:'Personal artist publications'}});
+            assert.deepEqual(writes.at(-1),{kind:'artist_founder',chain:'84532',deployment:undefined,address:wallet,originator:undefined,
+                body:{scope:'',enabled:true,revision:0,reason:'Personal artist publications'}});
             await reason.fill('Designation retired');
             await button('Disable frame source').click();
             await page.getByText('Frame source disabled.').waitFor();
             assert.equal(writes.at(-1).body.revision,1);
-            await kind.selectOption('platform');
+            await frame.selectOption('Official ArtSoul');
             await field('Publishing contract').selectOption('rehearsal');
             await button('Use my wallet').click();
             await reason.fill('Reviewed test publisher');
@@ -127,20 +129,30 @@ async function main() {
             await page.getByText('The active publishing contract has not been configured.').waitFor();
             assert.equal(await reason.count(),0);
             await kind.selectOption('official_collection');
-            assert.equal(await button('Check address').count(),0);
-            await field('Original collection issuer wallet').fill(issuer);
+            assert.equal(await field('Original collection issuer wallet').count(),0);
             await field('NFT collection contract').fill(collection);
             await button('Check address').click();
             await reason.fill('Approved project collection');
             await button('Enable frame source').click();
             await page.getByText('Frame source enabled.').waitFor();
-            assert.equal(writes.at(-1).originator,issuer);
+            assert.equal(writes.at(-1).originator,undefined);
             assert.equal(writes.at(-1).address,collection);
             assert.equal(writes.at(-1).body.scope,issuer);
             if (process.env.ARTSOUL_QA_SCREENSHOTS) {
                 const directory=process.env.ARTSOUL_QA_SCREENSHOTS;
                 await fs.mkdir(directory,{recursive:true});
                 await page.screenshot({path:path.join(directory,`frame-admin-${theme}-${width}.png`),fullPage:true});
+            }
+            for (const [label,source] of [['ArtSoul Genesis','artist_genesis'],['ArtSoul Partner','artist_partner']]) {
+                await frame.selectOption(label);
+                await field('Network').selectOption('84532');
+                await field('Artist wallet or profile name').fill(issuer);
+                await button('Check address').click();
+                await reason.fill('Recognized artist designation');
+                await button('Enable frame source').click();
+                await page.getByText('Frame source enabled.').waitFor();
+                assert.equal(writes.at(-1).kind,source);
+                assert.equal(writes.at(-1).body.scope,'');
             }
             await kind.selectOption('partner');
             await field('Network').selectOption('84532');
@@ -151,12 +163,13 @@ async function main() {
             await page.getByText('Frame source enabled.').waitFor();
             assert.equal(writes.at(-1).body.scope,'');
             assert.equal(writes.at(-1).chain,'84532');
+            await frame.selectOption('ArtSoul Genesis');
             await kind.selectOption('genesis');
             assert.equal(await page.locator('.admin-frame-sources input').count(),0);
-            await button('Check Genesis deployment').click();
-            await page.getByText('The Base mainnet Genesis deployment has not been configured.').waitFor();
+            await button('View Genesis deployment').click();
+            await page.getByText(/The Genesis NFT contract has not been configured/).waitFor();
             pinned=genesis;
-            await button('Check Genesis deployment').click();
+            await button('View Genesis deployment').click();
             await button(genesis).click();
             await reason.fill('Reviewed mainnet deployment');
             await button('Enable frame source').click();

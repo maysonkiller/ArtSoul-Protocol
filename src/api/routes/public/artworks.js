@@ -647,6 +647,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     ...(ownershipStatus ? { ownership_status: ownershipStatus } : {}),
     ...(frameKind ? {
       aura_kind: frameKind,
+      ...(frameKind.startsWith('artist_') ? { artist_frame_verified:true } : {}),
       ...(frameKind === 'founder' ? { founder_origin_verified:true } : {}),
       ...(maps.auraBorderEnabled ? { aura_border_text: true } : {})
     } : {}),

@@ -48,7 +48,7 @@ export async function publisherFrameStates(addresses, chain, core) {
   },signal:AbortSignal.timeout(2000)});
   if (!Array.isArray(states) || states.length > addresses.length ||
       new Set(states.map(s=>s?.address)).size !== states.length ||
-      states.some(s=>!addresses.includes(s?.address) || !['platform','founder'].includes(s.kind) || typeof s.enabled !== 'boolean')) {
+      states.some(s=>!addresses.includes(s?.address) || !['platform','founder','artist_founder','artist_partner','artist_genesis'].includes(s.kind) || typeof s.enabled !== 'boolean')) {
     throw new Error('Invalid publisher designation');
   }
   return states;

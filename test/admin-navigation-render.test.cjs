@@ -14,18 +14,19 @@ test.before(async()=>{
         'admin-navigation-render.jsx',{jsx:{runtime:'classic'}})).code;
 });
 
-function render({state='ready',wallet=WALLET,staff=true,authority=true,role=authority?'team':'moderator',section='queue',dialog=false,frameSourceManager=false,identityReviewer=false}={}) {
+function render({state='ready',wallet=WALLET,staff=true,authority=true,role=authority?'team':'moderator',section='queue',dialog=false,frameSourceManager=false,identityReviewer=false,returning=false,pending=null,actionable=false}={}) {
     const ready = state==='ready';
     const data = {reports:[],events:[],hidden:[],moderationLog:[],notifications:[]};
     // Use actual page JSX with explicit state fixtures. No network, wallet or
     // native credential operation is executed by a static render.
     const states = [state,staff?{role,dualWallet:true,stepUpActive:ready,frameSourceManager,identityReviewer}:null,
-        'pending_review',null,data,section,false,'',null,staff?wallet:'',authority?wallet:'',dialog];
+        'pending_review',null,data,section,false,'',null,staff?wallet:'',authority?wallet:'',dialog,returning];
     let index=0;
     const scope={React:{...React,useState:initial=>[index<states.length?states[index++]:initial,()=>{}]},
         window:{artsoulWalletStateSettled:true,getCurrentWalletAddress:()=>wallet},
         AuraAppearance:props=>React.createElement('section',{'data-fixture':'appearance','data-sources':props.frameSourceManager===true},'Frame label controls'),
         IdentityReviews:()=>React.createElement('section',{'data-fixture':'identity'},'Identity reviews'),
+        usePendingIdentityReviews:({wallet})=>({label:wallet?pending:null,needsReview:wallet && actionable,refresh:()=>{}}),
         StaffFactorDialog:()=>React.createElement('dialog',{'data-fixture':'factor'},'Factor dialog'),
         StaffPasskeyDialog:()=>React.createElement('dialog',{'data-fixture':'passkey'},'Passkey dialog'),
         StaffAuthority:()=>React.createElement('div',{'data-fixture':'staff'},'Team fixture')};
@@ -43,6 +44,17 @@ test('sign-in controls remain above staff and complaint content with one verific
         assert(html.indexOf('</header>')<html.indexOf('data-fixture="staff"'));
         if(state!=='ready')assert.doesNotMatch(html,/id="reviewQueueTitle"|Protocol Admin sections/);
     }
+});
+
+test('the returning workspace conceals mounted editors and exposes review notices only to eligible staff',()=>{
+    const editor=render({section:'identity',identityReviewer:true,returning:true});
+    assert.match(editor,/aria-hidden="true" inert=""/);
+    assert.match(editor,/data-fixture="identity"/);
+    const reviewer={identityReviewer:true,pending:'2',actionable:true};
+    assert.match(render(reviewer),/Review identity requests/);
+    assert.match(render(reviewer),/aria-label="2 pending requests"/);
+    assert.doesNotMatch(render({...reviewer,actionable:false}),/Review identity requests/);
+    assert.doesNotMatch(render({...reviewer,state:'step_up'}),/pending requests|Review identity requests/);
 });
 
 test('each opened section has one selected navigation item and staff state stays mounted',()=>{

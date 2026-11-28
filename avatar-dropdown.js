@@ -739,6 +739,9 @@
             const current = this.protocolAdminWallet === wallet;
             if (current && this.protocolAdminRoleChecked && !this.protocolAdminEligible) return '';
             const label = current && this.protocolAdminEligible ? 'Admin panel' : 'Staff sign-in';
+            if (current && this.isOpen && this.reviewAttention && Date.now() < this.reviewAccessUntil) {
+                return '<a class="dropdown-item" href="/admin#identity-reviews">Admin panel <span class="notification-group-count">Needs review</span></a>';
+            }
             return '<a class="dropdown-item" href="/admin">' + label + '</a>';
         }
 
@@ -758,11 +761,43 @@
 
         clearProtocolAdminAccess() {
             this.protocolAdminGeneration += 1;
+            this.clearReviewAttention();
+            this.reviewAccessUntil = 0;
             this.protocolAdminWallet = null;
             this.protocolAdminEligible = false;
             this.protocolAdminRoleChecked = false;
             this.protocolAdminRequest = null;
             this.updateProtocolAdminSlot();
+        }
+
+        clearReviewAttention() {
+            this.reviewRequest?.abort();
+            this.reviewRequest = null;
+            this.reviewAttention = false;
+            clearTimeout(this.reviewExpiryTimer);
+        }
+
+        async loadReviewAttention() {
+            const wallet = this.protocolAdminWallet;
+            if (!this.isOpen || !this.protocolAdminEligible || !(Date.now() < this.reviewAccessUntil) ||
+                this.isPage(window.location.pathname, 'admin') ||
+                String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase() !== wallet) return;
+            this.clearReviewAttention();
+            const controller = new AbortController();
+            this.reviewRequest = controller;
+            this.reviewExpiryTimer = setTimeout(() => {
+                this.clearReviewAttention();
+                this.updateProtocolAdminSlot();
+            }, this.reviewAccessUntil - Date.now());
+            try {
+                const res = await fetch('/api/moderation/identity-reviews?wallet=' + encodeURIComponent(wallet) + '&summary=1', {
+                    credentials: 'same-origin', cache: 'no-store', signal: controller.signal
+                });
+                const summary = res.ok ? await res.json() : null;
+                if (controller.signal.aborted || wallet !== this.protocolAdminWallet) return;
+                this.reviewAttention = summary?.needsReview === true;
+                this.updateProtocolAdminSlot();
+            } catch { /* The regular admin link remains available. */ }
         }
 
         // Render-time bookkeeping only: never issues a network request. It
@@ -809,6 +844,7 @@
             if (this.protocolAdminRequest?.wallet === wallet) return this.protocolAdminRequest.promise;
 
             const generation = this.protocolAdminGeneration;
+            const startedAt = Date.now();
             const isCurrent = () => generation === this.protocolAdminGeneration && wallet === String(
                 window.currentWalletAddress || window.artsoulSettledWalletState?.address || ''
             ).toLowerCase();
@@ -827,6 +863,9 @@
                         && (result.enabled === true || result.setupEnabled === true)
                         && result.authenticated === true
                         && (result.eligible === true || result.authorityEligible === true);
+                    this.reviewAccessUntil = this.protocolAdminEligible && result.enabled === true && result.access?.identityReviewer === true &&
+                        result.access.stepUpActive === true && Number.isSafeInteger(result.serverTime) && Number.isSafeInteger(result.access.stepUpExpiresAt)
+                        ? startedAt + Math.max(0, Math.min(86400000, result.access.stepUpExpiresAt - result.serverTime)) : 0;
                     this.updateProtocolAdminSlot();
                     return this.protocolAdminEligible;
                 })
@@ -2057,7 +2096,7 @@
 
             // Reuse the warm decision or discover it now if sign-in was late.
             if (this.isOpen) {
-                void this.requestProtocolAdminAccessOnce();
+                void this.requestProtocolAdminAccessOnce().then(() => this.loadReviewAttention());
                 this.recoverUnresolvedIdentity();
                 void this.updateNetworkDisplay().catch(error => {
                     console.warn('Unable to refresh the account balance:', error);
@@ -2073,7 +2112,7 @@
                 arrow.style.transform = this.isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
             }
             avatarButton?.setAttribute('aria-expanded', String(this.isOpen));
-            if (!this.isOpen) this.closeNetworkOptions();
+            if (!this.isOpen) { this.clearReviewAttention(); this.updateProtocolAdminSlot(); this.closeNetworkOptions(); }
             return this.isOpen;
         }
 
@@ -2082,6 +2121,8 @@
          */
         close() {
             this.isOpen = false;
+            this.clearReviewAttention();
+            this.updateProtocolAdminSlot();
             const menu = document.getElementById('avatarDropdownMenu');
             const arrow = document.querySelector('.dropdown-arrow');
             const avatarButton = document.querySelector('.avatar-button');

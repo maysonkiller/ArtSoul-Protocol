@@ -291,6 +291,7 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     // future mainnet wallet lookup. The frame migration must still install.
     query('ALTER TABLE artsoul_private.genesis_issuers RENAME TO fixture_deferred_genesis_issuers');
     query(fs.readFileSync('sql/migrations/20261127130000_governing_team_frame_sources.sql','utf8'));
+    query(fs.readFileSync('sql/migrations/20261128120000_artist_wallet_frames.sql','utf8'));
     assert.equal(query(`SELECT count(*) FROM artsoul_private.aura_sources WHERE address='${personal}' AND
       chain_id=84532 AND revision=2 AND NOT enabled AND actor='migration:20261127130000' AND role_version=0 AND policy_version IS NULL`),'2');
     assert.equal(query(`SELECT count(*) FROM artsoul_private.aura_sources WHERE address='${personal}' AND revision=1 AND enabled AND actor='fixture'`),'3');
