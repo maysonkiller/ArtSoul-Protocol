@@ -91,6 +91,26 @@ test('restoring a cached page resets generated previews and preserves author-spe
     assert.deepEqual([preview.currentTime, authored.currentTime, poster.currentTime], [0.1, 4, 0]);
 });
 
+test('an authored clip fragment and a separate poster resolve to playable video', () => {
+    const clip = 'https://cdn.example.test/film.MP4#t=3,6';
+    const poster = 'https://cdn.example.test/still.jpg';
+    const descriptor = mediaDescriptor({ animation_url: clip, image: poster });
+    assert.equal(descriptor.type, 'video');
+    assert.equal(descriptor.url, clip);
+    assert.equal(descriptor.poster, poster);
+});
+
+test('a download filename in the query cannot turn a cover into playable video', () => {
+    const image = 'https://cdn.example.test/still.png?download=film.mp4';
+    assert.equal(mediaDescriptor({ image }).type, 'image');
+});
+
+test('an extensionless storage URL can supply its playback filename', () => {
+    const clip = 'https://cdn.example.test/ipfs/cid?filename=teaser.mp4&download=true#t=3';
+    assert.equal(mediaDescriptor({ animation_url: clip }).type, 'video');
+    assert.equal(mediaDescriptor({ animation_url: clip }).url, clip);
+});
+
 test('video evidence wins over stale audio metadata without selecting the audio URL', () => {
     const artwork = {
         media_type: 'audio',

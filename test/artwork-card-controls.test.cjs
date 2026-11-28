@@ -65,6 +65,38 @@ function loadDomCardRuntime() {
     return { api: window.ArtSoulArtworkCard, mediaElements, window, document, events };
 }
 
+test('a late poster failure reveals the ready video frame on a paused homepage card', () => {
+    const { api } = loadDomCardRuntime();
+    const card = api.createMediaElement({ file_url: 'film.mp4', poster_url: 'cover.jpg' });
+    const video = card.children.find(child => child.tagName === 'VIDEO');
+    const poster = card.children.find(child => child.className === 'artsoul-video-poster');
+    video.readyState = 1;
+    video.dispatch('loadedmetadata');
+    assert.equal(poster.removed, false);
+    poster.onerror();
+    assert.equal(poster.removed, true);
+    assert.equal(video.poster, '');
+    assert.equal(video.paused, true);
+    assert.equal(video.src, 'film.mp4');
+});
+
+test('an early poster failure shows the loader until video metadata arrives', () => {
+    const { api } = loadDomCardRuntime();
+    const card = api.createMediaElement({ file_url: 'film.mp4', poster_url: 'cover.jpg' });
+    const video = card.children.find(child => child.tagName === 'VIDEO');
+    const poster = card.children.find(child => child.className === 'artsoul-video-poster');
+    let loader;
+    poster.replaceWith = element => { loader = element; };
+    video.readyState = 0;
+    poster.onerror();
+    assert.equal(loader.className, 'artsoul-media-loading');
+    assert.equal(loader.removed, false);
+    video.readyState = 1;
+    video.dispatch('loadedmetadata');
+    assert.equal(loader.removed, true);
+    assert.equal(video.paused, true);
+});
+
 test('both card renderers disclose the confirmed transaction while projection synchronization is pending', () => {
     const { api, window } = loadDomCardRuntime();
     window.React = {
