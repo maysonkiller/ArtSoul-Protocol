@@ -36,6 +36,14 @@ A new password-protected PostgreSQL 18.4 instance on `127.0.0.1` applied the fou
 
 The normal source reader returned revision 2, disabled, for both the former Platform publisher and former Partner designation. The collection reader returned zero active sources for those addresses. The setting reader returned revision 5 with labels enabled. Both tables retained RLS, and all six table/role combinations denied direct Data API privileges. The disposable listener was confirmed closed and its data directory and one-off runner were removed. This second read covered only the two appearance tables. The independent full-project recovery point remains the one listed below.
 
+### Restore after artist-wallet frame support
+
+On November 28 at **00:13:14 UTC**, one read-only production statement captured all six source revisions and five border-setting revisions. A new password-protected, loopback-only PostgreSQL 18.4 instance applied the six appearance migrations through [artist wallet frames](../../sql/migrations/20261128120000_artist_wallet_frames.sql). A single transaction restored all 11 rows to the empty tables.
+
+The source and restored canonical UTF-8 JSONB texts were byte-identical. Both measured **3,445 bytes** with SHA-256 `8118c3138c825cfeb7df396f31aa2af5fc56712ea4c2138d84e43d208ac2fb0f`. The comparison included the new `artist_frame` column for every historical revision. At capture time the journal contained zero manual artist-wallet decisions. The normal setting reader returned revision 5 with labels enabled. The source reader returned the recorded latest revision and status for all three reviewed sources, including the one active source.
+
+Both restored tables had row-level security enabled. All six table and Data API role combinations denied direct privileges, including column access. The nine execution checks for the artist-frame editor, collection-source reader and publisher-frame reader granted execution only to the service role. The disposable server stopped, its loopback port closed and its temporary directory was removed. The source snapshot was used in memory. This rehearsal covered the two appearance tables only.
+
 ## Cutover limits
 
 The last evidenced independent encrypted full database and Storage recovery point is [November 9](B35_INDEPENDENT_RECOVERY_AND_CORE_CUTOVER_2026-11-09.md). The November 16 full database archive was read-validated. This drill covered current Storage and two mutable settings tables. A new independent whole-project backup and full isolated restore at the eventual cutover, including current roles, schemas, mutable service data and indexer progress, are still required before destructive operations. C14 and D2 remain open.
