@@ -218,6 +218,7 @@
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
     <script type="module" src="/src/entries/search.js"></script>
     <script type="module" src="/src/entries/header-notifications.js"></script>
+    <script type="module" src="/src/entries/first-visit-guide.js"></script>
 </head>
 <body>
     <script>document.body.classList.add(document.documentElement.classList.contains('future') ? 'future' : 'classic');</script>
@@ -306,6 +307,7 @@
                     Publish artwork <span aria-hidden="true">→</span>
                 </a>
             </div>
+            <div data-visit-page="/" hidden></div>
             </div>
             <aside class="home-showcase" id="homeShowcase" data-state="loading" aria-label="Featured artworks">
                 <div class="home-showcase-shell">

@@ -36,7 +36,7 @@
     line-height: 1.05;
 }
 
-.protocol-docs-intro > p:last-child {
+.protocol-docs-intro > p:last-of-type {
     max-width: 760px;
     margin: 0;
     color: var(--c-text-muted);
@@ -326,7 +326,7 @@ body:is(.classic, .future) .protocol-docs-intro h1 {
     letter-spacing: -0.035em;
 }
 
-body:is(.classic, .future) .protocol-docs-intro > p:last-child {
+body:is(.classic, .future) .protocol-docs-intro > p:last-of-type {
     max-width: 44rem;
     font-size: 1rem;
     line-height: 1.7;

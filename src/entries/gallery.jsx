@@ -407,6 +407,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
             return (
                 <>
+                        <div data-visit-slot="gallery-filter" hidden />
                         {/* Filters */}
                         <div className="gallery-filter-panel rounded-xl">
                             <div className="gallery-tab-row" ref={galleryTabsRef} role="group" aria-label="Artwork categories">
@@ -563,6 +564,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                             </>}
                         </div>
 
+                        <div data-visit-slot="gallery-results" hidden />
                         {/* Gallery Grid */}
                         {collectionOverview ? (
                             <div className="gallery-empty-state">

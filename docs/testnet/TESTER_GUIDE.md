@@ -1,10 +1,17 @@
 # ArtSoul Testnet Tester Guide
 
-Last updated: 2026-07-28
+Last updated: 2026-11-28
 
 Use this guide only during an operator-approved controlled-beta window. The
 entry gates, support path, severity definitions, and current go/no-go status
 live in [`CONTROLLED_BETA_ENTRY.md`](CONTROLLED_BETA_ENTRY.md).
+
+On the home page, choose **Start** in **Welcome to ArtSoul** and select
+**Browse artworks**, **Create a profile**, **Publish one artwork** or
+**Design a collection**. **Show control** takes you to the actual field or
+button. You can skip the guide or open it again from **How it works**.
+Saving a collection draft keeps it in your browser. Your operator will
+identify which contract-backed journeys are open for this test window.
 
 ## Before You Start
 

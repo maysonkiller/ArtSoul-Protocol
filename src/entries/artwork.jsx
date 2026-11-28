@@ -3133,6 +3133,7 @@ function OwnershipIdentity({ source, label, name, verified, designation, classNa
 
             const communityPanel = (
                 <section key="community" className="artwork-page-panel artwork-page-trust artwork-mobile-trust" aria-label="Community signals">
+                        <div data-visit-slot="community" hidden />
                         <div className="artwork-page-panel-heading">
                             <div className="context-help-label"><h2>Community</h2><ContextHelp topic="reactions" /></div>
                             {trustScore > 0 && (
