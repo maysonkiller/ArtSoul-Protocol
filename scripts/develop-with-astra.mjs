@@ -21,6 +21,7 @@ const bundlePaths = [
 ];
 const firstTask = 'Implement actionable startup errors for the localhost live voice assistant. Read the current client and tests. Distinguish an unsupported 24 kHz AudioContext and microphone permission denial from bridge failures. Consider constructor failures and a missing microphone device. Keep the existing PCM format (480 samples at 24 kHz), user gesture requirement, cancellation, and cleanup. Add focused tests to the existing test file using browser mocks. Only change src/ai/live-voice-client.js and test/live-voice-client.test.mjs. Run the silent Node test; never access a real microphone or speaker.';
 const sessionLimitCents = 1500;
+const readHandoff = ' Read /workspace/owner-handoff.md if present for the latest owner decisions.';
 const developmentPaths = [
   'src', 'contracts', 'api', 'test', 'scripts', 'package.json', 'package-lock.json',
   'AGENTS.md', 'README.md', 'public/brand/artsoul-audio-cover-384.webp',
@@ -32,14 +33,14 @@ const backlogTask = 'Select and implement up to two independent, evidenced impro
 const instructions = [
   'You develop ArtSoul Protocol in the isolated copy provided by the owner.',
   'Unzip /workspace/source.zip into /workspace/project on first use. Run from that directory. Initialize a local Git baseline if needed before making edits.',
-  'Use AGENTS.md, the scoped ArtSoul Atlas materials under /workspace/skills, the roadmap and backlog. Work on the assigned task. Treat the dated readiness document as historical evidence; never infer release acceptance from a test or report.',
+  'Use AGENTS.md, the scoped ArtSoul Atlas materials under /workspace/skills, the roadmap and backlog. Read /workspace/owner-handoff.md if supplied for current decisions. Work on the assigned task. Treat the dated readiness document as historical evidence; never infer release acceptance from a test or report.',
   'Use existing components. Make minimal real changes, preserve unrelated changes, and run focused offline tests. Product UI and artifacts are in English.',
   'Use only the provided sources. No external services, deployments, wallet actions, production data, paid calls, grant decisions or changes of economic/security policy.',
   'For each assignment write /workspace/outputs/changes.patch (git diff --binary against the baseline for this assignment) and /workspace/outputs/result.md (changed paths, exact tests, outcomes and limitations). Keep files in the project for follow-up turns. Commit the finished change locally in the sandbox to separate successive diffs. Stop when the assignment is done.'
 ].join('\n');
 const git = (...args) => execFileSync('git', args, {cwd: root, maxBuffer: 8 * 1024 * 1024});
 const inline = (name, bytes) => ({type: 'inline', path: '/workspace/' + name, data: bytes.toString('base64')});
-const usage = 'Usage: node scripts/develop-with-astra.mjs check | start | sync | status | collect [turn_id] | work | followup | next "development task"';
+const usage = 'Usage: node scripts/develop-with-astra.mjs check | start | sync | handoff | status | collect [turn_id] | work | followup | next "development task"';
 
 async function prepare() {
   const revision = git('rev-parse', '--verify', 'refs/remotes/origin/main').toString().trim();
@@ -53,7 +54,7 @@ async function prepare() {
 
 async function main() {
   const [action, ...args] = process.argv.slice(2);
-  if (!['check', 'start', 'sync', 'status', 'collect', 'work', 'followup', 'next'].includes(action)) throw Error(usage);
+  if (!['check', 'start', 'sync', 'handoff', 'status', 'collect', 'work', 'followup', 'next'].includes(action)) throw Error(usage);
   if (action === 'next' ? args.length !== 1 || !args[0].trim() || args[0].length > 4000 :
     action === 'collect' ? args.length > 1 || (args.length && !/^turn_[\w-]+$/.test(args[0])) : args.length !== 0) throw Error(usage);
   if (action === 'check') {
@@ -110,7 +111,30 @@ async function main() {
   console.log('Session spend (USD cents):', JSON.stringify(session.spend_control));
   if (latest.usage) console.log('Usage:', JSON.stringify(latest.usage));
   if (action === 'status') {
-    if (state.followup) console.log('Scheduled follow-up:', state.followup.id, new Date(state.followup.at * 1000).toISOString());
+    for (const turn of turns) console.log('Turn:', turn.id, turn.status);
+    if (state.followup) {
+      const schedule = await (await api('/automations/' + encodeURIComponent(state.followup.id))).json();
+      console.log('One-time follow-up:', schedule.id, schedule.status, new Date(schedule.run_at * 1000).toISOString());
+    }
+    return;
+  }
+  if (action === 'handoff') {
+    if (session.status !== 'idle') throw Error('Send updated context between assignments.');
+    const summary = await readFile(path.join(local, 'owner-handoff.md'));
+    if (!summary.length || summary.length > 16384) throw Error('Use a reviewed project summary of at most 16 KiB.');
+    const saved = await (await api('/environments/' + encodeURIComponent(session.environment.id) + '/files',
+      inline('owner-handoff.md', summary))).json();
+    if (saved.size_bytes !== summary.length) throw Error('Incomplete handoff upload.');
+    if (state.followup && state.followup.at * 1000 > Date.now()) {
+      const url = '/automations/' + encodeURIComponent(state.followup.id);
+      const schedule = await (await api(url)).json();
+      const target = schedule.target;
+      if (target?.session_id === state.session && !target.instructions.includes(readHandoff.trim())) {
+        await api(url, {target: {type: 'existing_session', session_id: state.session,
+          instructions: target.instructions + readHandoff}});
+      }
+    }
+    console.log('Owner handoff saved:', saved.path, saved.size_bytes, 'bytes');
     return;
   }
   if (action === 'followup') {
@@ -121,7 +145,7 @@ async function main() {
     const runAt = Math.floor(Date.now() / 1000) + 45 * 60;
     const target = {type: 'existing_session', session_id: state.session, instructions:
       'Continue development autonomously in the same session. Read previous results so you do not duplicate pending fixes. Use the uploaded public-development-' +
-      state.synced + '.zip revision and ArtSoul skills. Select a different offline-testable Phase C or D readiness issue, preferably a genuine missing case in the rehearsal or recovery tooling. Implement and verify one bounded fix in a clean snapshot. No external data, transactions, credentials, releases or changes to financial or permission rules. Publish changes.patch and result.md as before. If no defect can be evidenced, publish the test evidence and an empty diff. Stop after this task.'};
+      state.synced + '.zip revision and ArtSoul skills. Select a different offline-testable Phase C or D readiness issue, preferably a genuine missing case in the rehearsal or recovery tooling. Implement and verify one bounded fix in a clean snapshot. No external data, transactions, credentials, releases or changes to financial or permission rules. Publish changes.patch and result.md as before. If no defect can be evidenced, publish the test evidence and an empty diff. Stop after this task.' + readHandoff};
     const schedule = await (await api('/automations', {type: 'once', name: 'ArtSoul release rehearsal follow-up',
       run_at: runAt, target}, createHash('sha256').update(state.session + '/release-followup').digest('hex'))).json();
     if (!schedule.id || schedule.target?.session_id !== state.session || schedule.type !== 'once') throw Error('Unexpected schedule response. Check the Agents dashboard.');
@@ -157,7 +181,7 @@ async function main() {
     const context = state.synced
       ? ' The public development snapshot is /workspace/public-development-' + state.synced + '.zip. Extract it to a separate clean directory, using this revision as the baseline. Refer to prior turn results to avoid repeating pending changes. The complete ArtSoul skills including Classic are in /workspace/skills/references/library.zip. Read only relevant sections. '
       : '';
-    const task = (action === 'work' ? backlogTask : args[0]) + context;
+    const task = (action === 'work' ? backlogTask : args[0]) + context + readHandoff;
     const submission = createHash('sha256').update(JSON.stringify([state.session, latest.id, task])).digest('hex');
     await api(route + '/events', {events: [{type: 'agent.session.input.message', input: [
       {role: 'user', content: [{type: 'input_text', text: task}]}

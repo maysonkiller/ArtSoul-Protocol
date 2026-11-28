@@ -31,6 +31,10 @@ session retains the conversation between turns. Synchronization sends a
 versioned archive of selected committed code, tests, roadmap documents and the
 owner's local ArtSoul Atlas. It excludes the local working tree, private
 operating notes and chat history. Provide relevant new decisions in the task.
+To share a longer decision summary, save it in the ignored local file
+`artifacts/astra-development/owner-handoff.md`, review its contents, and run
+`node scripts/develop-with-astra.mjs handoff` between turns. This uploads only
+the specified summary and tells the agent where to read it.
 
 On first setup, run `check` for an offline input check, then `start` to open one
 session and submit the voice startup task. Use the existing project key in
